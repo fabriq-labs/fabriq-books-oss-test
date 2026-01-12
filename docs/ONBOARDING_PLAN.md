@@ -21,57 +21,49 @@ This onboarding plan introduces a junior developer to:
 
 **Objective**: Set up Cursor IDE workspace with both frontend and backend
 
-#### 1.1 Clone Repositories
+#### 1.1 Clone Workspace Repository
+
+**First, clone the workspace repository** (contains workspace config and documentation):
 ```bash
 # Create workspace directory
 mkdir ~/fabriq-workspace
 cd ~/fabriq-workspace
 
-# Clone backend
-git clone <backend-repo-url> backend
+# Clone workspace repo (contains workspace file and docs)
+git clone https://github.com/fabriq-labs/fabriq-ws-setup fabriq
+cd fabriq
+```
+
+#### 1.2 Clone Backend and Frontend Repositories
+
+**Clone backend and frontend into the workspace**:
+```bash
+# Clone backend repository
+git clone https://github.com/fabriq-labs/fabriq-base backend
 cd backend
 npm install
-
-# Clone frontend
 cd ..
-git clone <frontend-repo-url> frontend-1
+
+# Clone frontend repository
+git clone https://github.com/fabriq-labs/zeiv-v2 frontend-1
 cd frontend-1
 npm install
-
-# Clone docs (if separate repo)
 cd ..
-git clone <docs-repo-url> docs
 ```
 
-#### 1.2 Cursor IDE Workspace Configuration
+#### 1.3 Open Cursor IDE Workspace
 
-**Create `.cursor/workspace.code-workspace`**:
-```json
-{
-  "folders": [
-    {
-      "path": "backend",
-      "name": "Backend (Node.js/Express)"
-    },
-    {
-      "path": "frontend-1",
-      "name": "Frontend (React/Vite)"
-    },
-    {
-      "path": "docs",
-      "name": "Documentation"
-    }
-  ],
-  "settings": {
-    "typescript.tsdk": "backend/node_modules/typescript/lib",
-    "editor.formatOnSave": true,
-    "files.exclude": {
-      "**/node_modules": true,
-      "**/.git": true
-    }
-  }
-}
-```
+**Open the workspace file** (already included in the workspace repo):
+1. In Cursor IDE, go to: `File → Open Workspace from File...`
+2. Navigate to `fabriq/fabriq.code-workspace`
+3. Click "Open"
+
+**The workspace file includes**:
+- Root folder (workspace config and docs)
+- Backend folder (Node.js/Express)
+- Frontend folder (React/Vite)
+
+**All three git repositories will be visible in the Source Control view.**
 
 #### 1.3 Environment Setup
 
@@ -116,8 +108,12 @@ npm run dev  # Should start on port 5173
 ```
 
 **Checklist**:
-- [ ] Both repos cloned and dependencies installed
-- [ ] Cursor workspace opens with all three folders
+- [ ] Workspace repo cloned
+- [ ] Backend repo cloned into `backend/` folder
+- [ ] Frontend repo cloned into `frontend-1/` folder
+- [ ] Dependencies installed for both repos
+- [ ] Cursor workspace file opened (`fabriq.code-workspace`)
+- [ ] All three git repositories visible in Source Control view
 - [ ] Backend starts without errors
 - [ ] Frontend starts without errors
 - [ ] Can login and see dashboard

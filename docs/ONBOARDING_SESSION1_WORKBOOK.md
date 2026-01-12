@@ -29,9 +29,9 @@ Before starting, ensure you have:
   - Install and launch Cursor
   
 - [ ] **Access to repositories**
-  - Backend repository URL: `_________________`
-  - Frontend repository URL: `_________________`
-  - Documentation repository URL (if separate): `_________________`
+  - Workspace repository: `https://github.com/fabriq-labs/fabriq-ws-setup`
+  - Backend repository: `https://github.com/fabriq-labs/fabriq-base`
+  - Frontend repository: `https://github.com/fabriq-labs/zeiv-v2`
   
 - [ ] **Database credentials**
   - Database host: `_________________`
@@ -41,7 +41,7 @@ Before starting, ensure you have:
 
 ---
 
-## Step 1: Create Workspace Directory
+## Step 1: Clone Workspace Repository
 
 **Time**: 5 minutes
 
@@ -64,17 +64,28 @@ Before starting, ensure you have:
    cd fabriq-workspace
    ```
 
-4. Verify you're in the right location:
+4. Clone the workspace repository (contains workspace config and documentation):
    ```bash
-   pwd  # macOS/Linux
-   # or
-   cd   # Windows
+   git clone https://github.com/fabriq-labs/fabriq-ws-setup fabriq
+   cd fabriq
    ```
 
-**Expected Output**: You should see the path to `fabriq-workspace`
+5. Verify you're in the right location and files are present:
+   ```bash
+   pwd  # macOS/Linux - should show path ending in fabriq
+   ls -la  # Should show fabriq.code-workspace, docs/, README.md, etc.
+   ```
+
+**Expected Output**: 
+- You should see the path to `fabriq-workspace/fabriq`
+- You should see `fabriq.code-workspace` file
+- You should see `docs/` directory
 
 - [ ] Workspace directory created
-- [ ] Currently in `fabriq-workspace` directory
+- [ ] Workspace repository cloned
+- [ ] Currently in `fabriq` directory
+- [ ] `fabriq.code-workspace` file exists
+- [ ] `docs/` directory exists
 
 ---
 
@@ -84,12 +95,10 @@ Before starting, ensure you have:
 
 ### Instructions
 
-1. Clone the backend repository:
+1. Clone the backend repository into the `backend/` folder:
    ```bash
-   git clone <BACKEND_REPO_URL> backend
+   git clone https://github.com/fabriq-labs/fabriq-base backend
    ```
-   
-   **Replace `<BACKEND_REPO_URL>` with the actual repository URL**
 
 2. Navigate into the backend directory:
    ```bash
@@ -123,14 +132,20 @@ Before starting, ensure you have:
    
    **You should see a list of installed packages without errors.**
 
+6. Navigate back to workspace root:
+   ```bash
+   cd ..
+   ```
+
 **Troubleshooting**:
 - If `npm install` fails, check your Node.js version: `node --version` (should be 18+)
 - If you get permission errors, try: `sudo npm install` (macOS/Linux)
 - If you get network errors, check your internet connection
 
-- [ ] Backend repository cloned
+- [ ] Backend repository cloned into `backend/` folder
 - [ ] Dependencies installed successfully
 - [ ] No errors in npm output
+- [ ] Back in workspace root directory
 
 ---
 
@@ -140,17 +155,15 @@ Before starting, ensure you have:
 
 ### Instructions
 
-1. Navigate back to workspace root:
+1. Make sure you're in the workspace root (fabriq directory):
    ```bash
-   cd ..
+   pwd  # Should show path ending in fabriq
    ```
 
-2. Clone the frontend repository:
+2. Clone the frontend repository into the `frontend-1/` folder:
    ```bash
-   git clone <FRONTEND_REPO_URL> frontend-1
+   git clone https://github.com/fabriq-labs/zeiv-v2 frontend-1
    ```
-   
-   **Replace `<FRONTEND_REPO_URL>` with the actual repository URL**
 
 3. Navigate into the frontend directory:
    ```bash
@@ -182,117 +195,58 @@ Before starting, ensure you have:
    npm list --depth=0
    ```
 
-- [ ] Frontend repository cloned
+7. Navigate back to workspace root:
+   ```bash
+   cd ..
+   ```
+
+- [ ] Frontend repository cloned into `frontend-1/` folder
 - [ ] Dependencies installed successfully
 - [ ] No errors in npm output
+- [ ] Back in workspace root directory
 
 ---
 
-## Step 4: Clone Documentation Repository (Optional)
+## Step 4: Open Cursor IDE Workspace
 
 **Time**: 5 minutes
 
 ### Instructions
 
-1. Navigate back to workspace root:
-   ```bash
-   cd ..
-   ```
-
-2. If documentation is in a separate repository, clone it:
-   ```bash
-   git clone <DOCS_REPO_URL> docs
-   ```
-   
-   **If documentation is in the main repository, skip this step.**
-
-3. Verify docs directory exists:
-   ```bash
-   ls -la docs  # Should show files if separate repo
-   # or check if docs folder exists in backend/frontend
-   ```
-
-- [ ] Documentation repository cloned (if separate)
-- [ ] Or verified docs exist in main repository
-
----
-
-## Step 5: Configure Cursor IDE Workspace
-
-**Time**: 15 minutes
-
-### Instructions
-
 1. **Open Cursor IDE**
 
-2. **Create Workspace File**:
-   - In Cursor, go to: `File → Open Folder...`
-   - Navigate to and select: `fabriq-workspace`
+2. **Open the Workspace File**:
+   - In Cursor, go to: `File → Open Workspace from File...`
+   - Navigate to `fabriq/fabriq.code-workspace`
    - Click "Open"
-
-3. **Create Workspace Configuration File**:
-   - In Cursor, go to: `File → Save Workspace As...`
-   - Save as: `fabriq-workspace.code-workspace`
-   - This creates a multi-root workspace
-
-4. **Edit Workspace File** (if needed):
    
-   Open `fabriq-workspace.code-workspace` and ensure it contains:
-   ```json
-   {
-     "folders": [
-       {
-         "path": "backend",
-         "name": "Backend (Node.js/Express)"
-       },
-       {
-         "path": "frontend-1",
-         "name": "Frontend (React/Vite)"
-       },
-       {
-         "path": "docs",
-         "name": "Documentation"
-       }
-     ],
-     "settings": {
-       "typescript.tsdk": "backend/node_modules/typescript/lib",
-       "editor.formatOnSave": true,
-       "files.exclude": {
-         "**/node_modules": true,
-         "**/.git": true
-       },
-       "search.exclude": {
-         "**/node_modules": true,
-         "**/dist": true,
-         "**/.next": true
-       }
-     }
-   }
-   ```
-   
-   **Note**: If `docs` folder doesn't exist, remove that folder entry.
+   **Alternatively**: Double-click `fabriq.code-workspace` in Finder/File Explorer
 
-5. **Reload Workspace**:
-   - Close Cursor
-   - Reopen Cursor
-   - Open the workspace file: `fabriq-workspace.code-workspace`
-   - You should now see multiple folders in the sidebar
-
-6. **Verify Workspace Setup**:
-   - Check sidebar shows:
-     - ✅ Backend (Node.js/Express)
-     - ✅ Frontend (React/Vite)
-     - ✅ Documentation (if exists)
+3. **Verify Workspace Setup**:
+   - Check sidebar shows three folders:
+     - ✅ **fabriq (Workspace Config)** - Root folder with docs and workspace config
+     - ✅ **Backend** - Backend repository
+     - ✅ **Frontend** - Frontend repository
    - You should be able to navigate between folders
 
+4. **Verify Git Repositories**:
+   - Open Source Control view (Ctrl+Shift+G / Cmd+Shift+G)
+   - You should see **three separate git repositories**:
+     - fabriq (Workspace Config)
+     - Backend
+     - Frontend
+   - Each repository shows its own status independently
+
 **Troubleshooting**:
-- If folders don't appear, make sure paths are relative to workspace root
+- If folders don't appear, make sure you opened the `.code-workspace` file, not just the folder
+- If git repositories don't show, make sure you cloned backend and frontend into the correct folders
 - If TypeScript errors appear, wait for Cursor to index files (may take a minute)
 
 - [ ] Cursor IDE opened
-- [ ] Workspace file created
-- [ ] All folders visible in sidebar
-- [ ] Can navigate between backend and frontend folders
+- [ ] Workspace file opened (`fabriq.code-workspace`)
+- [ ] All three folders visible in sidebar
+- [ ] Can navigate between folders
+- [ ] All three git repositories visible in Source Control view
 
 ---
 
@@ -660,14 +614,15 @@ Before starting, ensure you have:
 Run through this checklist to ensure everything is set up correctly:
 
 #### Repository Setup
-- [ ] Backend repository cloned
-- [ ] Frontend repository cloned
-- [ ] Documentation accessible (if separate)
+- [ ] Workspace repository cloned
+- [ ] Backend repository cloned into `backend/` folder
+- [ ] Frontend repository cloned into `frontend-1/` folder
 - [ ] All dependencies installed
 
 #### IDE Setup
-- [ ] Cursor IDE workspace configured
-- [ ] All folders visible in sidebar
+- [ ] Cursor IDE workspace file opened (`fabriq.code-workspace`)
+- [ ] All three folders visible in sidebar (Root, Backend, Frontend)
+- [ ] All three git repositories visible in Source Control view
 - [ ] Can navigate between projects
 - [ ] TypeScript/IntelliSense working
 
@@ -766,8 +721,11 @@ Once you've completed all steps and verified everything works:
 
 Before moving to Session 2, ensure:
 
-- [ ] All repositories cloned
-- [ ] Cursor workspace configured
+- [ ] Workspace repository cloned
+- [ ] Backend repository cloned into `backend/` folder
+- [ ] Frontend repository cloned into `frontend-1/` folder
+- [ ] Cursor workspace file opened (`fabriq.code-workspace`)
+- [ ] All three git repositories visible in Source Control view
 - [ ] Backend environment configured
 - [ ] Frontend environment configured
 - [ ] Database set up with demo data

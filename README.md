@@ -10,26 +10,41 @@ This is a multi-repository workspace that contains multiple git repositories:
 
 ### For New Developers
 
-1. Clone this repository:
+1. **Clone the workspace repository** (contains workspace config and documentation):
    ```bash
-   git clone <repository-url> fabriq
+   git clone https://github.com/fabriq-labs/fabriq-ws-setup fabriq
    cd fabriq
    ```
 
-2. Clone the nested repositories:
+2. **Clone the nested repositories**:
    ```bash
    # Clone backend repo into backend/ directory
-   git clone <backend-repo-url> backend
+   git clone https://github.com/fabriq-labs/fabriq-base backend
    
    # Clone frontend repo into frontend-1/ directory
-   git clone <frontend-repo-url> frontend-1
+   git clone https://github.com/fabriq-labs/zeiv-v2 frontend-1
    ```
 
-3. Open the workspace in Cursor/VS Code:
+3. **Install dependencies**:
+   ```bash
+   # Backend
+   cd backend
+   npm install
+   cd ..
+   
+   # Frontend
+   cd frontend-1
+   npm install
+   cd ..
+   ```
+
+4. **Open the workspace in Cursor/VS Code**:
    - **Option 1**: Double-click `fabriq.code-workspace`
    - **Option 2**: File → Open Workspace from File... → Select `fabriq.code-workspace`
 
-4. The workspace will automatically recognize all three git repositories in the Source Control view.
+5. The workspace will automatically recognize all three git repositories in the Source Control view.
+
+6. **Follow the onboarding guide**: See `docs/ONBOARDING_SESSION1_WORKBOOK.md` for detailed setup instructions.
 
 ### Workspace Benefits
 
