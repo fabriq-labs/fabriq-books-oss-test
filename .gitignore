@@ -1,0 +1,52 @@
+# Ignore nested git repositories (they manage their own files)
+backend/
+frontend-1/
+fabriqdata.com/
+
+# But keep the workspace file visible (it's tracked)
+!.code-workspace
+!*.code-workspace
+
+# Common build artifacts and dependencies
+node_modules/
+dist/
+build/
+data/
+scripts/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files (but keep workspace settings)
+.vscode/*
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+.cache/
+.temp/
+.tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# User-specific IDE/AI folders
+.claude/
+.cursor/*
+!.cursor/skills/

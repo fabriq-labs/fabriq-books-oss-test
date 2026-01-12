@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"name": "fabriq (Workspace Config)",
+			"path": "."
+		},
+		{
+			"name": "Backend",
+			"path": "backend"
+		},
+		{
+			"name": "Frontend",
+			"path": "frontend-1"
+		}
+	],
+	"settings": {
+		"postman.settings.dotenv-detection-notification-visibility": false
+	}
+}
