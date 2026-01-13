@@ -1,5 +1,5 @@
 # Session 5: Hands-On - Create a Simple Form
-## Junior Developer Onboarding Workbook
+## Developer Onboarding Workbook
 
 **Duration**: 2 hours  
 **Objective**: Create a complete form for a new master data model from scratch.

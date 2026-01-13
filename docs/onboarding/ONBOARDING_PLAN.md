@@ -1,6 +1,6 @@
-# Fabriq Books - Junior Developer Onboarding Plan
+# Fabriq Books - Developer Onboarding Plan
 
-**Target**: Get junior developer productive by Day 4  
+**Target**: Get developer productive by Day 4  
 **Focus**: Views, Forms, and Workflow Configuration  
 **Duration**: 4 days (with hands-on exercises)
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-This onboarding plan introduces a junior developer to:
+This onboarding plan introduces a developer to:
 1. **Fabriq Books** - A metadata-driven financial management platform
 2. **The Framework** - How automatic CRUD generation works
 3. **Practical Skills** - Configuring views, forms, and workflows

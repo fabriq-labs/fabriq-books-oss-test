@@ -1,5 +1,5 @@
 # Session 4: Understanding Forms
-## Junior Developer Onboarding Workbook
+## Developer Onboarding Workbook
 
 **Duration**: 3 hours  
 **Objective**: Learn how forms work and how to create/edit them in the Fabriq framework.

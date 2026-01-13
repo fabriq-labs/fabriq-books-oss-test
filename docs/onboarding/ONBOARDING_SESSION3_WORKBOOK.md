@@ -1,5 +1,5 @@
 # Session 3: Hands-On Exercise - Explore Existing Models
-## Junior Developer Onboarding Workbook
+## Developer Onboarding Workbook
 
 **Duration**: 1 hour  
 **Objective**: Get familiar with existing models and their structure through hands-on exploration.

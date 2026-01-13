@@ -1,5 +1,5 @@
 # Session 2: Understanding the Metadata-Driven Framework
-## Junior Developer Onboarding Workbook
+## Developer Onboarding Workbook
 
 **Duration**: 3 hours  
 **Objective**: Understand how the system automatically generates CRUD from Prisma models through a metadata-driven architecture.
