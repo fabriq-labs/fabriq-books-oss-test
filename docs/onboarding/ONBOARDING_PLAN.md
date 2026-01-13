@@ -9,9 +9,10 @@
 ## Overview
 
 This onboarding plan introduces a developer to:
-1. **Fabriq Books** - A metadata-driven financial management platform
-2. **The Framework** - How automatic CRUD generation works
-3. **Practical Skills** - Configuring views, forms, and workflows
+1. **Fabriq Books** - A metadata-driven financial management platform for procurement, sales, accounting, and investment tracking
+2. **The Metadata-Driven Framework** - How the system automatically generates APIs, enforces permissions, and renders dynamic UIs from Prisma models and view configurations
+3. **Core Concepts** - Views, permissions, multi-tenancy, and the complete request-to-response flow
+4. **Practical Skills** - Configuring views and permissions, building forms, setting up workflows, and working with the framework's conventions
 
 ---
 
