@@ -1029,6 +1029,136 @@ backend/prisma/metadata/prompt-templates/
 | `src/agent/ToolManager.ts` | Selects tools based on question classification |
 | `src/agent/AgentService.ts` | Orchestrates classification, prompt loading, and execution |
 
+## ERP Integration Handlers
+
+### Overview
+
+The AI agent system includes a specialized handler layer for ERP connector methods located in `backend/src/agent/handlers/erp/`. These handlers are **AI-agent-specific** and provide a wrapper/adapter layer between the AI agent tool system and the existing ERP connector implementations.
+
+### Purpose and Rationale
+
+**Why handlers exist:**
+
+1. **Parameter Validation & Transformation**: Handlers validate and transform parameters from AI tool calls before invoking the underlying ERP connector methods
+2. **Context Resolution**: Handlers can automatically resolve parameters from request context (e.g., `context.recordId` → `externalId` for purchase orders)
+3. **AI Tool Integration**: Provides a consistent interface for the AI agent tool system (`erpConnector` tool) to interact with ERP connectors
+
+**Why they're AI-agent-specific:**
+
+- **REST API** (`rest/routes.ts`): Calls ERP connector methods directly without handlers
+- **Workflow Actions** (`lib/actions/purchase_order.ts`): Calls ERP connector methods directly without handlers
+- **Tests**: Call ERP connector methods directly without handlers
+- **AI Agent Only**: Uses handlers via `getHandler()` in `AgentTools.ts`
+
+The handlers are **not required** for other parts of the system - they're exclusively for the AI agent's tool system.
+
+### Architecture
+
+```
+AI Agent Tool Call (erpConnector)
+    ↓
+Handler (agent/handlers/erp/) 
+    • Validates parameters
+    • Resolves context (e.g., recordId → externalId)
+    • Provides consistent interface
+    ↓
+ERP Connector (lib/integrations/connectors/)
+    • Actual implementation (ZohoBooksConnector, QuickBooksConnector)
+    ↓
+ERP API Client
+    • Makes HTTP calls to external ERP systems
+```
+
+### Handler Structure
+
+Each handler implements the `ERPMethodHandler` interface:
+
+```typescript
+interface ERPMethodHandler {
+  method: string;                    // Method name (e.g., 'getPurchaseOrder')
+  validateParams(params?, context?, auth?): any;  // Parameter validation
+  execute(connector, params, context?, auth?): Promise<any>;  // Execution
+  requiresContext?: boolean;         // Whether context is needed
+  description?: string;              // Description for AI prompts
+}
+```
+
+### Current Handlers
+
+Located in `backend/src/agent/handlers/erp/`:
+
+1. **`getPurchaseOrder.ts`**: 
+   - Fetches purchase orders from ERP systems
+   - Supports automatic resolution from `context.recordId` for purchase_order model
+   - Validates `externalId` parameter or resolves from context
+
+2. **`getExpenseAccounts.ts`**:
+   - Fetches expense accounts from ERP systems
+   - No parameters required
+
+3. **`getSystemType.ts`**:
+   - Returns ERP system type identifier (e.g., 'zoho_books', 'quickbooks')
+   - No parameters required
+
+### Registry Pattern
+
+Handlers are registered in `registry.ts` using a registry pattern:
+
+- **Automatic Registration**: All handlers in the `erp/` directory are automatically registered
+- **Fast Lookup**: Handler map is populated on first access for O(1) lookup
+- **Extensibility**: New methods can be added by creating handler files without modifying core tool code
+
+### Adding New ERP Methods
+
+To add support for a new ERP connector method:
+
+1. **Create Handler File**: Create `backend/src/agent/handlers/erp/<methodName>.ts`
+2. **Implement Interface**: Implement `ERPMethodHandler` interface
+3. **Register**: Import and add to handlers array in `registry.ts`
+4. **No Core Changes**: The `erpConnector` tool automatically discovers new methods
+
+**Example:**
+```typescript
+// backend/src/agent/handlers/erp/getVendors.ts
+export const getVendorsHandler: ERPMethodHandler = {
+  method: 'getVendors',
+  requiresContext: false,
+  description: 'Get all vendors from the ERP system',
+  
+  validateParams(params?: any): any {
+    // Validate parameters if needed
+    return {};
+  },
+  
+  async execute(connector: ERPConnector): Promise<any> {
+    return await connector.getVendors();
+  },
+};
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/agent/handlers/erp/registry.ts` | Handler registry and lookup functions |
+| `src/agent/handlers/erp/types.ts` | `ERPMethodHandler` interface definition |
+| `src/agent/handlers/erp/getPurchaseOrder.ts` | Purchase order retrieval handler |
+| `src/agent/handlers/erp/getExpenseAccounts.ts` | Expense accounts retrieval handler |
+| `src/agent/handlers/erp/getSystemType.ts` | System type retrieval handler |
+| `src/agent/AgentTools.ts` | Uses handlers via `getHandler()` in `erpConnector` tool |
+
+### Relationship to ERP Connectors
+
+The handlers **do not implement** the ERP connector methods - those are already implemented in:
+- `lib/integrations/connectors/types.ts` - Interface definition
+- `lib/integrations/zoho_books/connectors/purchase_order_connector.ts` - Zoho implementation
+- `lib/integrations/quickbooks/connectors/purchase_order_connector.ts` - QuickBooks implementation
+
+The handlers are a **thin wrapper layer** that adds:
+- Parameter validation for AI tool calls
+- Context-aware parameter resolution
+- Consistent error handling for the AI agent
+
 ---
 
 This guide provides everything needed for AI agents to understand the Fabriq Base system and generate appropriate metadata configurations for any business process described by users.

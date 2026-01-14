@@ -120,7 +120,102 @@ The `Master.tsx` component is the heart of the UI - a **completely generic list 
 2. Passes metadata to `DynamicTable` for auto-column generation
 3. Handles pagination, filtering, search, sort
 4. Manages create/edit navigation
-5. Provides bulk operations
+5. Provides bulk operations (Edit, Delete, and custom actions via `bulkActions`)
+
+#### Custom Bulk Actions
+
+The `Master` component supports custom bulk actions through the `bulkActions` prop. This allows model-specific bulk operations (like AI categorization) while keeping the component generic and reusable.
+
+**Type Definition** (`src/types/bulkActions.ts`):
+```typescript
+interface BulkAction {
+  id: string;                    // Unique identifier
+  label: string;                  // Button label
+  icon?: React.ReactNode;         // Optional icon
+  variant?: 'default' | 'outline' | 'destructive' | 'secondary';
+  
+  // Handler function
+  onClick: (
+    selectedRows: any[], 
+    context: { type: string; view: string }
+  ) => Promise<void>;
+  
+  // Optional visibility control
+  isVisible?: (selectedRows: any[]) => boolean;
+  
+  // Optional disabled state
+  isDisabled?: (selectedRows: any[]) => boolean;
+  
+  // Optional confirmation dialog
+  confirmation?: {
+    title: string;
+    content: string | ((selectedRows: any[]) => string);
+    okText?: string;
+    cancelText?: string;
+  };
+}
+```
+
+**Usage Example** (from `Transactions.tsx`):
+```tsx
+import { BulkAction } from "@/types/bulkActions";
+import { Sparkles } from "lucide-react";
+import { agentAPI } from "@/api/api";
+
+const bulkActions: BulkAction[] = [
+  {
+    id: 'categorize',
+    label: 'Categorize',
+    icon: <Sparkles size={16} />,
+    variant: 'outline',
+    onClick: async (selectedRows, context) => {
+      // Validation
+      if (hasAnyFullyCategorized(selectedRows)) {
+        toast({ title: "Cannot categorize", ... });
+        return;
+      }
+      
+      // API call
+      const result = await agentAPI.categorizeTransactionBatch({
+        posting_ids: selectedRows.map(row => row.id),
+        options: { ... }
+      });
+      
+      // Show success toast
+      toast({ title: "Bulk categorization completed", ... });
+    },
+    isVisible: (rows) => !hasAnyFullyCategorized(rows),
+    confirmation: {
+      title: 'Bulk Categorize Transactions',
+      content: (rows) => `This will categorize ${rows.length} transaction(s) using AI. Continue?`,
+      okText: 'Yes, Categorize',
+      cancelText: 'Cancel',
+    },
+  },
+];
+
+<Master
+  type="posting"
+  view="posting_view"
+  displayName="Transactions"
+  bulkActions={bulkActions}  // Custom actions appear between Edit and Delete
+/>
+```
+
+**Behavior:**
+- Custom bulk actions appear in the bulk action panel when 2+ rows are selected
+- Actions are rendered between the default "Edit" button and "Delete" button
+- Each action can control its own visibility and disabled state based on selected rows
+- Confirmation modals are shown before execution if configured
+- Master component automatically:
+  - Shows loading state during action execution
+  - Refreshes data after successful completion
+  - Clears selection after successful completion
+  - Handles errors (action handler should show error toasts)
+
+**Backward Compatibility:**
+- Routes without `bulkActions` prop continue to work normally
+- Default Edit and Delete buttons are always available (unless disabled via `listConfig`)
 
 ### 2. Routing Patterns
 

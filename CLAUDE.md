@@ -46,6 +46,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
+| AI transaction categorization | [docs/AI_AUTO_CATEGORIZATION.md](./docs/AI_Categorizer.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |

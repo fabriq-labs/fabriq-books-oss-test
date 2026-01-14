@@ -5,11 +5,11 @@
 			"path": "."
 		},
 		{
-			"name": "Backend",
+			"name": "backend",
 			"path": "backend"
 		},
 		{
-			"name": "Frontend",
+			"name": "frontend",
 			"path": "frontend-1"
 		}
 	],
