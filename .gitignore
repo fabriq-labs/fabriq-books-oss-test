@@ -50,3 +50,5 @@ venv/
 .claude/
 .cursor/*
 !.cursor/skills/
+
+trash/
