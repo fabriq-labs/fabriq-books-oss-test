@@ -21,6 +21,8 @@ This document summarizes the findings and proposed design for building a visual 
 
 ## Datagraph Structure - Key Findings
 
+For a full property-by-property reference, see **[Datagraph Schema Reference](./DATAGRAPH_SCHEMA_REFERENCE.md)**.
+
 ### Field Types Supported
 
 1. **Scalar Fields** (String, Number, Date, Boolean)
@@ -36,8 +38,8 @@ This document summarizes the findings and proposed design for building a visual 
 
 3. **Foreign Key Fields**
    - Separate from relation fields (e.g., `payment_term_id` vs `payment_terms`)
-   - Can have `selectProps` for dropdown configuration
-   - Used for form inputs, while relation fields are for data loading
+   - Can have `selectProps` for dropdown configuration (including `relationName` when the Prisma relation name differs from the FK-derived key)
+   - Used for form inputs and list display (via SelectCell); relation fields define what the API includes
 
 ### Patterns Observed
 
@@ -152,6 +154,7 @@ Returns:
 
 ## Related Documentation
 
-- Full design document: `docs/DATAGRAPH_BUILDER_DESIGN.md`
-- Datagraph system docs: `backend/docs/RBAC_DATAGRAPH_SYSTEM.md`
+- **[Datagraph Schema Reference](./DATAGRAPH_SCHEMA_REFERENCE.md)** – Canonical reference for every `data_graph` property (displayName, tableProps, selectProps, relationName, relation select, etc.) and how they drive list/form/backend.
+- Full design document: [DATAGRAPH_BUILDER_DESIGN.md](./DATAGRAPH_BUILDER_DESIGN.md)
+- Table-based UI design: [DATAGRAPH_BUILDER_TABLE_DESIGN.md](./DATAGRAPH_BUILDER_TABLE_DESIGN.md)
 - Example views: `backend/prisma/metadata/views/*.json`

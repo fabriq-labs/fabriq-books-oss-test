@@ -55,6 +55,36 @@ The system relies on **view metadata** to determine:
 
 **Example**: For `posting_view`, the metadata defines fields like `value_date`, `description`, `account_id`, `amount`, etc. The same import components work for `account_view`, `category_view`, or any other view without modification.
 
+### Import Extension Hooks
+
+Import extensions can provide model-specific functionality without modifying generic components:
+
+1. **`getPdfUploadOptions(context: PdfUploadContext)`**: Extract options from UI context for PDF processing
+   - Receives `PdfUploadContext` with `relationSelection` (full selected item from dropdown)
+   - Returns options object (e.g., `{ legalEntityId: string }`)
+   - Used by `ImportPannel` before calling PDF upload handler
+
+2. **`handlePdfUpload(file, options)`**: Custom PDF processing logic
+   - Receives file and options from `getPdfUploadOptions`
+   - Can call specialized backend endpoints
+
+3. **`getColumns(context)`**: Provide additional columns for CSV mapper
+   - Returns column definitions for extension-specific data (e.g., AI Category column)
+
+4. **`renderToolbarActions(context)`**: Add toolbar buttons to CSV mapper
+   - Returns React elements for additional actions (e.g., Categorize button)
+
+**Example: Posting Extension**:
+```typescript
+// frontend-1/src/features/import-extensions/posting/index.tsx
+getPdfUploadOptions(context: PdfUploadContext) {
+  const selected = context.relationSelection;
+  return {
+    legalEntityId: selected?.item?.legal_entity_id,
+  };
+}
+```
+
 ## Frontend Components
 
 ### ImportPannel Component
@@ -200,6 +230,7 @@ Modal component for file selection:
 2. **Relationship Support**:
    - Optional parent record selection dropdown
    - Used for importing child records (e.g., line items)
+   - **Full Selection Object**: When a record is selected, the full item object (including all fields like `legal_entity_id`) is passed to the parent component, not just the ID
 
 3. **File Processing**:
    - CSV: Parses file and extracts content
@@ -519,11 +550,14 @@ PDF extraction works in two modes:
 
 1. **Frontend PDF Upload**:
    - User selects PDF file in `UploadManager` component
+   - If an import extension exists for the model, `extension.getPdfUploadOptions()` is called
+   - This hook receives `PdfUploadContext` with access to `relationSelection` (full selected item)
+   - Extensions can extract model-specific options (e.g., `legalEntityId` from `relationSelection.item.legal_entity_id`)
    - File is converted to `FormData` with field name `"file"`
    - Request sent to `/api/parse-document/{modelName}` (e.g., `/api/parse-document/posting` for bank statements)
-   - Uses `importAPI.parseDocument(modelName, file)` method
-   - **Location**: `frontend-1/src/components/import/ImportPannel.tsx` (line 90-198)
-   - **API Location**: `frontend-1/src/api/api.ts` (line 420-429)
+   - Uses `importAPI.parseDocument(modelName, file)` or extension's custom handler
+   - **Location**: `frontend-1/src/components/import/ImportPannel.tsx`
+   - **Extension Types**: `frontend-1/src/features/import-extensions/types.ts`
 
 2. **Backend File Validation** (`RestService.parseDocument`):
    - Validates file is present
@@ -674,7 +708,20 @@ PDF extraction works in two modes:
   - `getTargetModel()`: Target model name (e.g., "invoice")
   - `getExtractionPrompt()`: Model-specific extraction instructions
   - `getExpectedSchema()`: Expected JSON schema for extracted data
+- **Augmentation Hooks** (for subclasses to extend prompts/schemas):
+  - `augmentPromptWithContext(basePrompt, options)`: Add context to extraction prompt
+  - `augmentSchemaWithContext(baseSchema, options)`: Add fields to expected schema
 - **Location**: `backend/src/lib/extractors/base-extractor.ts`
+
+**Bank Statement with Categorization Extractor** (`BankStatementWithCategorizationExtractor`):
+- Extends `BaseDocumentExtractor` with AI categorization
+- Uses augmentation hooks to inject Chart of Accounts context
+- Key methods:
+  - `prepareCategorizationContext({ orgId, legalEntityId })`: Fetches and caches accounts
+  - `augmentPromptWithContext()`: Adds categorization instructions and account list
+  - `augmentSchemaWithContext()`: Adds categorization fields to schema
+- Can be used directly via API/MCP without import extension context
+- **Location**: `backend/src/lib/extractors/bank-statement-with-categorization-extractor.ts`
 
 **Example Extractor** (`InvoiceExtractor`):
 - Extracts invoice header and line items
@@ -1345,6 +1392,8 @@ Potential improvements identified in code:
 - `frontend-1/src/components/import/UploadManager.tsx`
 - `frontend-1/src/components/import/TransactionImport.tsx`
 - `frontend-1/src/components/import/utils/upload.tsx`
+- `frontend-1/src/features/import-extensions/types.ts` (PdfUploadContext, ImportExtension interfaces)
+- `frontend-1/src/features/import-extensions/posting/index.tsx` (PostingImportExtension)
 - `frontend-1/src/pages/Import.tsx`
 - `frontend-1/src/pages/Master.tsx`
 - `frontend-1/src/api/api.ts` (importAPI)
@@ -1353,6 +1402,9 @@ Potential improvements identified in code:
 - `backend/src/services/upload/UploadService.ts`
 - `backend/src/rest/RestService.ts` (uploadCSV method)
 - `backend/src/rest/routes.ts` (route definitions)
+- `backend/src/lib/extractors/base-extractor.ts` (BaseDocumentExtractor with augmentation hooks)
+- `backend/src/lib/extractors/bank-statement-with-categorization-extractor.ts`
+- `backend/src/lib/import-extensions/posting/index.ts` (PostingImportExtension)
 - `backend/uploadService.ts` (legacy implementation)
 
 ## Data Transformation with `updateCSVData`
@@ -1484,9 +1536,14 @@ const updateCSVData = (formattedData: any, relationId: any) => {
 - The import system is **fully generic** and works with any model/view combination
 - **Metadata-driven**: Field definitions, permissions, and validation come from view metadata
 - The `TransactionImport` component exists but is currently commented out in favor of `ImportPannel`
-- PDF extraction requires backend task processing
+- PDF extraction uses the extractor framework with AI-powered document processing
 - Lookup field validation happens in real-time during mapping
 - The system supports both direct CSV uploads and JSON-formatted data uploads
 - `updateCSVData` is optional but recommended for complex transformations
 - Parent record selection (`relation` prop) is optional and model-specific
+- **Import Extensions**: Model-specific behavior can be added via import extensions:
+  - Frontend extensions provide `getPdfUploadOptions()`, `getColumns()`, `renderToolbarActions()`
+  - Backend extensions provide `customExtract()` for specialized document processing
+  - Extensions receive full context (selected items, user info) via typed interfaces
+- **Extractor Augmentation**: Subclasses can extend base extractor via hooks without modifying core logic
 

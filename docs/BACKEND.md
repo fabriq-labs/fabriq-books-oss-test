@@ -155,7 +155,7 @@ Request → Auth Middleware → Route Handler → ModelService → PermissionSer
 ### 2. View-Based Access Control
 Every data access goes through a **View** which defines:
 - `model_name`: Which Prisma model
-- `data_graph`: Which fields/relations to select (Prisma `select`)
+- `data_graph`: Which fields/relations to select (Prisma `select`). See [Datagraph Schema Reference](./datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md) for property definitions.
 - `permissions[]`: Field-level access (read/write/none)
 
 ```typescript

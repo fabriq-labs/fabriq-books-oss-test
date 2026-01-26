@@ -2,6 +2,7 @@
 backend/
 frontend-1/
 fabriqdata.com/
+backups/
 
 # But keep the workspace file visible (it's tracked)
 !.code-workspace
