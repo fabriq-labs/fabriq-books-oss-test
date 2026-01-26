@@ -15,15 +15,18 @@ This is a multi-repository workspace that contains multiple git repositories:
    git clone https://github.com/fabriq-labs/fabriq-ws-setup fabriq
    cd fabriq
    ```
+   use the **main** branch
 
 2. **Clone the nested repositories**:
    ```bash
    # Clone backend repo into backend/ directory
    git clone https://github.com/fabriq-labs/fabriq-base backend
+   cd backend
    
    # Clone frontend repo into frontend-1/ directory
    git clone https://github.com/fabriq-labs/zeiv-v2 frontend-1
    ```
+   use the **demo** branch for both these repos
 
 3. **Install dependencies**:
    ```bash
