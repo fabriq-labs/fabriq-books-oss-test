@@ -643,6 +643,7 @@ const refreshToken = oauth.refresh_token;
 - **Real-Time Processing**: Stream processing for critical data
 - **Data Quality Framework**: Validation rules and alerts
 - **Enhanced Reverse Sync**: Support for more document types and ERP systems
+- **Live bank/card feed (e.g. Plaid)**: Scheduled pull of bank and credit card transactions into the same ledger (`posting`) model. Complements existing [CSV/PDF import and AI extractors](../IMPORT_FUNCTIONALITY.md) (account and credit card statements → posting); Plaid would add automated connectivity.
 
 ## Key Principles
 

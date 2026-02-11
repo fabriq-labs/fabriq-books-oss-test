@@ -48,6 +48,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
+| Agentic FinOps positioning, demo roadmap, GTM | [docs/positioning/](./docs/positioning/) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
 
 ---
