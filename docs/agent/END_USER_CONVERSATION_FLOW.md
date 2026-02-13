@@ -2,7 +2,7 @@
 
 **Audience:** Engineers extending or debugging the Fabriq AI agent.
 **Scope:** How end-user conversations with the AI agent are handled at runtime -- from HTTP request to LLM response.
-**See also:** `docs/AI_AGENT.md` (coding-agent-focused behavior), `backend/src/agent/AGENT_SERVICE_ARCHITECTURE.md` (bottom-up component reference), `backend/src/agent/prompt/README.md` (prompt template mechanics).
+**See also:** [AI_AGENT.md](../AI_AGENT.md) (coding-agent-focused behavior), [RECONCILIATION_TOOL.md](./RECONCILIATION_TOOL.md) (bank reconciliation pipeline and confirm), [AI_Categorizer.md](./AI_Categorizer.md) (transaction categorization), `backend/src/agent/AGENT_SERVICE_ARCHITECTURE.md` (bottom-up component reference), `backend/src/agent/prompt/README.md` (prompt template mechanics).
 
 ---
 
@@ -115,9 +115,9 @@ All requests now use `ToolManager.getUnifiedTools()` which combines model-specif
 | `purchase_requisition` | `searchRecords`, `createRecord`, `updateRecord`, `createChildItem`, `updateChildItem`, `advancedSqlQuery`, `erpConnector`, + 11 model-specific search tools | `getAnalyticsContext`, `analyticsQuery` |
 | `invoice` | `searchRecords`, `createRecord`, `updateRecord`, `processInvoiceFromPdf`, `extractInvoiceFromFile`, `advancedSqlQuery`, `erpConnector` | `getAnalyticsContext`, `analyticsQuery` |
 | `purchase_order` | `searchRecords`, `createRecord`, `updateRecord`, `advancedSqlQuery`, `erpConnector` | `getAnalyticsContext`, `analyticsQuery` |
-| `posting` | `searchRecords`, `createRecord`, `updateRecord`, `advancedSqlQuery` | `getAnalyticsContext`, `analyticsQuery` |
+| `posting` | `searchRecords`, `createRecord`, `updateRecord`, `advancedSqlQuery`, `suggestReconciliationMatches` | `getAnalyticsContext`, `analyticsQuery` |
 
-The LLM chooses the appropriate tools based on the question context. For simple lookups, it uses `searchRecords`. For aggregations and analytics, it uses `getAnalyticsContext` + `analyticsQuery`.
+The LLM chooses the appropriate tools based on the question context. For reconciliation (“reconcile this posting”, “find matches”), it uses `suggestReconciliationMatches`; see [RECONCILIATION_TOOL.md](./RECONCILIATION_TOOL.md). For simple lookups, it uses `searchRecords`. For aggregations and analytics, it uses `getAnalyticsContext` + `analyticsQuery`.
 
 ---
 
@@ -150,6 +150,7 @@ The `searchRecordsSchema` (`GenericFunctions.ts`) is **static** -- it accepts a 
 **Special-cased** (hardcoded behavior for specific domains):
 - `advancedSqlQuery` -- executes arbitrary SQL with validation (`AgentTools.ts`)
 - `getAnalyticsContext` / `analyticsQuery` -- analytics pipeline (`backend/src/agent/tools/`)
+- `suggestReconciliationMatches` -- bank posting ↔ payment receipt / invoice matching (`backend/src/agent/tools/suggestReconciliationMatches.ts`); see [RECONCILIATION_TOOL.md](./RECONCILIATION_TOOL.md)
 - `processInvoiceFromPdf` / `extractInvoiceFromFile` -- invoice-specific extraction
 - `erpConnector` -- calls ERP methods via the handler registry (`backend/src/agent/handlers/erp/`)
 - 11 named search tools (`searchItems`, `searchSuppliers`, etc.) -- thin wrappers that fix `modelName` to a specific value
@@ -816,6 +817,8 @@ All endpoints are mounted at `/api/agent` (registered in `backend/src/index.ts:6
 | POST | `/extract` | File upload + AI extraction | `authMiddleware` + multer (10MB, memory) | JSON `{ content, toolResults, fileInfo }` |
 | POST | `/erp/categorize-transaction` | Single transaction categorization | `authMiddleware` | JSON `{ success, prediction, confidence_score }` |
 | POST | `/erp/categorize-transaction-batch` | Batch categorization | `authMiddleware` | JSON array |
+| POST | `/erp/reconcile-transaction` | Reconcile one posting (categorize + match suggestions) | `authMiddleware` | JSON `{ success, data: { posting, reconciliation } }` |
+| POST | `/erp/confirm-reconciliation` | Confirm match: create/link receipt, set MATCHED | `authMiddleware` | JSON `{ success, data: { posting } }` |
 | GET | `/health` | Health check | None | JSON `{ status }` |
 
 ## Appendix B: Frontend Request Shape

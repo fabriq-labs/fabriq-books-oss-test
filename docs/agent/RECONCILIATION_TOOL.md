@@ -1,0 +1,232 @@
+# Reconciliation Tool — Overview & Implementation
+
+**Audience:** Product, support, and engineers.  
+**See also:** [AI_Categorizer.md](./AI_Categorizer.md) (transaction categorization), [END_USER_CONVERSATION_FLOW.md](./END_USER_CONVERSATION_FLOW.md), [AI_AGENT.md](../AI_AGENT.md).
+
+---
+
+## Quick Reference
+
+| Item | Details |
+|------|---------|
+| **Pipeline** | `reconcileImportedPostings(postingIds, auth)` in `backend/src/services/reconciliation/reconcileImportedPostings.ts`. Runs: batch categorize → filter incoming (amount > 0) → per-posting `findSuggestionsForPosting` → pick best match → set `reconciliation_status` = `SUGGESTED` or `UNMATCHED`, `matched_reference`, and AI notes block in `posting.notes`. |
+| **Reconcile API** | `POST /api/agent/erp/reconcile-transaction` body `{ posting_id }`. Returns `{ posting, reconciliation: { status, best_match, alternatives } }`. Posting is already updated in DB. |
+| **Confirm API** | `POST /api/agent/erp/confirm-reconciliation` body `{ posting_id }`. Creates payment receipt (if match is invoice) or links to existing receipt; sets `posting.payment_receipt_id` and `reconciliation_status` = `MATCHED`. Returns updated posting with `payment_receipt` (and nested `invoice`, `invoice.customers`). |
+| **Frontend** | PostingForm: **Reconcile** button calls `reconcileTransaction()`, then refresh. If `reconciliation.status === 'SUGGESTED'`, a panel shows best match + alternatives and **Confirm match** (calls `confirmReconciliation()`). When a receipt is linked, a **Linked receipt** section shows receipt + invoice + customer. Reconcile is disabled when both accounts are set and a receipt is linked. |
+| **Status lifecycle** | `NULL`/`UNMATCHED` → pipeline sets `SUGGESTED` (match found) or `UNMATCHED` (none). User confirms → **Confirm match** → `MATCHED` and `payment_receipt_id` set. |
+| **Test script** | `backend/scripts/test-reconciliation-pipeline.ts`: default = CSV import + pipeline; `--single` = create one posting + pipeline; `--posting-id=post_xxx` = pipeline on existing; `--cleanup` = delete `[TEST-RECON]` postings. npm: `test:reconciliation`, `test:reconciliation:single`, `test:reconciliation:cleanup`. |
+
+---
+
+## What It Does
+
+The **reconciliation tool** suggests how to match **bank statement lines** (postings) to **payment receipts** and **sales invoices**. The user can:
+
+1. Click **Reconcile** on a posting → pipeline categorizes (debit/credit account) and finds receipt/invoice suggestions; best match is shown with **Confirm match**.
+2. Click **Confirm match** → system creates a payment receipt (if the suggestion was an invoice) or links the posting to an existing receipt, and sets `posting.payment_receipt_id` and `reconciliation_status` = `MATCHED`.
+
+Categorization (which account to debit/credit) is handled by the same pipeline and uses the same LLM flow as the standalone categorizer; see [AI_Categorizer.md](./AI_Categorizer.md) for prompt and batch behaviour.
+
+---
+
+## Where It Fits
+
+| Layer | What |
+|-------|------|
+| **Model** | `posting` (bank/journal lines). Optional context: selected bank account, current posting record. |
+| **Prompt** | Reconciliation prompt (e.g. `reconciliation_zeiv`) is loaded when `modelName === 'posting'` or when the frontend sends `promptTypes` including `'reconciliation'`. |
+| **Tool** | `suggestReconciliationMatches` — registered for the posting model in `ToolManager`; used by the pipeline via `findSuggestionsForPosting`. |
+| **Frontend** | Posting detail (PostingForm): Reconcile button, suggestions panel, Confirm match, Linked receipt section. Transactions list and chat can also drive the tool via `modelContext.selectedAccountId` and `recordId`. |
+
+---
+
+## Implementation Details
+
+### Schema (Prisma)
+
+- **posting** (`backend/prisma/schema/data.prisma`):
+  - `reconciliation_status String?` — `'UNMATCHED' | 'SUGGESTED' | 'MATCHED'`
+  - `matched_reference String?` — e.g. `"payment_receipt:payr_xxx:REC-001"` or `"invoice:inv_xxx:INV-001"`
+  - `payment_receipt_id String? @unique` — FK to `payment_receipt.id` when matched
+  - `payment_receipt payment_receipt? @relation("PostingToPaymentReceipt", ...)`
+- **payment_receipt** (`backend/prisma/schema/zeiv.prisma`): back-relation `posting posting? @relation("PostingToPaymentReceipt")` (no FK on receipt side; posting holds the link).
+
+### Services
+
+| Service | Path | Role |
+|---------|------|------|
+| Pipeline | `backend/src/services/reconciliation/reconcileImportedPostings.ts` | Batch categorize → filter incoming → per-posting suggestions → update status, `matched_reference`, notes. |
+| Confirm | `backend/src/services/reconciliation/confirmReconciliation.ts` | Parse `matched_reference`; if invoice → create `payment_receipt` and set `posting.payment_receipt_id`; if receipt → set `posting.payment_receipt_id` only; set `reconciliation_status` = `MATCHED`. Idempotent when already MATCHED. |
+
+### APIs
+
+| Method | Path | Body | Behaviour |
+|--------|------|------|-----------|
+| POST | `/api/agent/erp/reconcile-transaction` | `{ posting_id }` | Run pipeline for one posting; return updated posting + reconciliation (status, best_match, alternatives). |
+| POST | `/api/agent/erp/confirm-reconciliation` | `{ posting_id }` | Call `confirmReconciliation`; return posting with `payment_receipt` (and nested invoice + customers). |
+
+### Frontend
+
+| Location | Behaviour |
+|----------|-----------|
+| `frontend-1/src/api/api.ts` | `agentAPI.reconcileTransaction({ posting_id })`, `agentAPI.confirmReconciliation({ posting_id })`. |
+| `frontend-1/src/components/forms/Masters/PostingForm.tsx` | **Reconcile** button → `reconcileTransaction` → `fetchingDetails`. Suggestions panel when status is SUGGESTED and best_match is not the already-linked receipt; **Confirm match** → `confirmReconciliation` → refresh. **Linked receipt** section when `initialValues.payment_receipt` exists (receipt + invoice + customer). Reconcile disabled when both account_id and credit_account_id are set and a receipt is linked. |
+
+### Posting view data_graph
+
+- **File:** `backend/prisma/metadata/views/posting_posting_view.json`
+- **Reconciliation fields:** `reconciliation_status`, `matched_reference`, `payment_receipt_id`, and relation `payment_receipt` with `select`: `id`, `receipt_number`, `amount`, `receipt_date`, `invoice_id`, and nested `invoice` with `invoice_number`, `invoice_total`, `invoice_date`, and `customers` with `id`, `customer_name`. Category is not in the datagraph (dropped from list and form).
+
+### Books behaviour (on Confirm match)
+
+- **Match to invoice:** Create a `payment_receipt` for that invoice (amount, receipt_date, account from posting, customer from invoice); set `posting.payment_receipt_id` and `reconciliation_status` = `MATCHED`.
+- **Match to existing receipt:** Set `posting.payment_receipt_id` to that receipt and `reconciliation_status` = `MATCHED`; do not create a new receipt.
+
+This aligns with Zoho Books / QuickBooks: the bank transaction (our posting) holds the link to the payment; matching to an invoice creates the payment in the books.
+
+---
+
+## Matching Logic (High Level)
+
+1. **Amount** — Receipts: bank amount vs receipt amount (with optional tolerance). Invoices: bank amount vs invoice total or `balance_amount` (partials supported).
+2. **Reference** — Posting description is parsed for patterns like `INV-001`, `REC-DEMO-001`; matching reference boosts confidence (e.g. high).
+3. **Date** — Not a hard filter; used as a soft signal (e.g. within ±30 days → medium confidence).
+4. **Confidence** — High: amount + reference; Medium: amount + date; Low: amount only.
+
+The tool treats postings with `reconciliation_status === 'SUGGESTED'` as already processed (suggestions were applied); the UI hides the suggestion panel when the suggested match is the same as the already-linked receipt.
+
+---
+
+## Seed Data & Demo (Indian Demo)
+
+**Script:** `backend/prisma/setup-IN/setup-indian-demo.ts` (run via `node setup-db.js --demo-data=indian-demo` or equivalent).
+
+### Pre-linked postings (5)
+
+These are updated with `reconciliation_status: 'MATCHED'`, `matched_reference`, and `payment_receipt_id` so they appear as already reconciled:
+
+| Posting ID   | Receipt ID     | Receipt Number  |
+|--------------|----------------|-----------------|
+| post_demo_01 | payr_demo_001  | REC-DEMO-001    |
+| post_demo_02 | payr_demo_002  | REC-DEMO-002    |
+| post_demo_03 | payr_demo_003  | REC-DEMO-003    |
+| post_demo_04 | payr_demo_004  | REC-DEMO-004    |
+| post_demo_05 | payr_demo_005  | REC-DEMO-005    |
+
+### Unlinked postings for AI reconciliation demo (4)
+
+These have **no** `payment_receipt_id`; use **Reconcile** in the UI to get suggestions, then **Confirm match** to link:
+
+| Posting ID   | Amount   | Description                          | Intended match        |
+|--------------|----------|--------------------------------------|------------------------|
+| post_demo_21 | ₹60,000  | NEFT credit - INV-006 payment         | Invoice INV-006        |
+| post_demo_22 | ₹50,000  | RTGS from customer - INV-003          | Invoice INV-003        |
+| post_demo_23 | ₹25,000  | IMPS REC-DEMO-006 advance             | Receipt REC-DEMO-006   |
+| post_demo_24 | ₹45,000  | ACH CREDIT - INV-007 payment         | Invoice INV-007        |
+
+Other postings (e.g. post_demo_06, post_demo_08, post_demo_10, post_demo_12) are also unlinked and can be used for ad-hoc demos; the four above are explicitly seeded with descriptions that match existing invoices/receipts.
+
+---
+
+## Test Cases & Script
+
+### Reconciliation pipeline script
+
+**Path:** `backend/scripts/test-reconciliation-pipeline.ts`
+
+| Mode    | Command / flag              | Behaviour |
+|---------|-----------------------------|-----------|
+| Batch   | (default)                   | Import test CSV via UploadService (same path as frontend), run pipeline on created postings, print scorecard. Uses auth `sanjay.gupta@demo-india.com`, org `org_indian_demo`. |
+| Single  | `--single`                  | Create one posting with description containing `[TEST-RECON]`, run pipeline, print result. |
+| Existing| `--posting-id=post_xxx`     | Run pipeline on the given posting only. |
+| Cleanup | `--cleanup`                 | Delete postings whose description contains `[TEST-RECON]`. |
+
+**npm scripts** (in `backend/package.json`): `test:reconciliation`, `test:reconciliation:single`, `test:reconciliation:cleanup`.
+
+**Test CSV:** `backend/test-data/test-bank-statement.csv` (used in batch mode).
+
+### Sample scorecard output
+
+**Batch mode** (`npm run test:reconciliation` or default run) prints a summary and a per-posting table:
+
+```
+====================================================================================================
+  RECONCILIATION PIPELINE SCORECARD
+====================================================================================================
+  Postings imported:       8
+  Categorized:             8  (100%)
+  Incoming payments:       5
+  Reconciled (SUGGESTED):  3  (60% of incoming)
+  Unmatched:               2
+  Skipped (expense/out):   3
+
+----------------------------------------------------------------------------------------------------
+DESCRIPTION                                          AMOUNT     CATEGORY               STATUS       BEST MATCH                          CONF
+----------------------------------------------------------------------------------------------------
+[TEST-RECON] NEFT - INV-001 payment                  100,000    Checking Account       SUGGESTED    receipt:REC-DEMO-001                high
+[TEST-RECON] RTGS - INV-004                          120,000    Checking Account       SUGGESTED    invoice:INV-004                     high
+[TEST-RECON] IMPS REC-DEMO-006 advance                25,000    Checking Account       SUGGESTED    receipt:REC-DEMO-006                high
+[TEST-RECON] Unidentified credit                      15,000    Checking Account       UNMATCHED    —                                    —
+[TEST-RECON] Bank charges                              2,500    Checking Account       SKIPPED      —                                    —
+...
+====================================================================================================
+```
+
+**Single posting mode** (`npm run test:reconciliation:single` or `--posting-id=post_xxx`) prints a detailed result for one posting:
+
+```
+================================================================================
+  SINGLE POSTING PIPELINE RESULT
+================================================================================
+  Posting ID:       post_abc123
+  Description:      [TEST-RECON] NEFT - Infosys balance payment INV-002
+  Amount:           35,000
+  Date:             2025-10-30
+  Is Incoming:      true
+
+  --- Categorization ---
+  Predicted:        Checking Account
+  Confidence:       high
+  Reasoning:        Incoming NEFT payment; description references INV-002. Credit to bank.
+
+  --- Reconciliation ---
+  Status:           SUGGESTED
+  Best Match:       payment_receipt:REC-DEMO-002 (high)
+    Amount:         35,000
+    Date:           2025-09-30
+    Customer:       Infosys Ltd
+  Alternatives:     (1)
+    - invoice:INV-002  amt=35,000  conf=medium  customer=Infosys Ltd
+================================================================================
+```
+
+### Manual test cases
+
+1. **Reconcile → suggestion → Confirm (invoice):** Open an unlinked posting that matches an invoice (e.g. post_demo_21). Click Reconcile; expect SUGGESTED with invoice INV-006. Click Confirm match; expect MATCHED, new payment_receipt created, and Linked receipt section with invoice and customer.
+2. **Reconcile → suggestion → Confirm (receipt):** Open post_demo_23. Reconcile → expect suggestion REC-DEMO-006. Confirm match → expect MATCHED and posting linked to existing receipt (no new receipt).
+3. **Already linked:** Open post_demo_01. Reconcile button should be disabled (both accounts set + receipt linked). Linked receipt section should show REC-DEMO-001 and invoice details.
+4. **Suggestion same as linked:** If a posting already has payment_receipt_id set and the pipeline returns the same receipt as best_match, the suggestions panel is hidden (no duplicate UI).
+
+---
+
+## Code and Config (Pointers)
+
+| What | Where |
+|------|--------|
+| Tool (suggestions) | `backend/src/agent/tools/suggestReconciliationMatches.ts` — `findSuggestionsForPosting`, `MatchSuggestion`, `PostingWithSuggestions` |
+| Pipeline | `backend/src/services/reconciliation/reconcileImportedPostings.ts` |
+| Confirm service | `backend/src/services/reconciliation/confirmReconciliation.ts` |
+| Routes | `backend/src/agent/routes.ts` — `POST /erp/reconcile-transaction`, `POST /erp/confirm-reconciliation` |
+| Tool registration | `backend/src/agent/ToolManager.ts` (posting model) |
+| Reconciliation prompt | `backend/prisma/metadata/prompt-templates/` (view_*_reconciliation_zeiv.txt) |
+| PostingForm | `frontend-1/src/components/forms/Masters/PostingForm.tsx` — Reconcile, suggestions panel, Confirm match, Linked receipt |
+| Frontend API | `frontend-1/src/api/api.ts` — `reconcileTransaction`, `confirmReconciliation` |
+| Posting view | `backend/prisma/metadata/views/posting_posting_view.json` — data_graph (no category; includes payment_receipt with invoice + customers) |
+
+---
+
+## Related Docs
+
+- **[AI_Categorizer.md](./AI_Categorizer.md)** — Transaction categorization (accounts, prompts, batch API). Reconciliation pipeline uses the same categorization step.
+- [END_USER_CONVERSATION_FLOW.md](./END_USER_CONVERSATION_FLOW.md) — Chat flows for reconciliation.
+- [AI_AGENT.md](../AI_AGENT.md) — Agent and tools overview.

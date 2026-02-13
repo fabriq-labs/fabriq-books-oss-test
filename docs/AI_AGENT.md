@@ -1,7 +1,7 @@
 # AI Metadata Context Guide for Fabriq Base
 
 **When to read**: AI agent integration, LLM tool development, understanding metadata queries
-**Related docs**: [BACKEND.md](./BACKEND.md), [WORKFLOWS.md](./WORKFLOWS.md), [BUSINESS_DOMAIN.md](./BUSINESS_DOMAIN.md)
+**Related docs**: [BACKEND.md](./BACKEND.md), [WORKFLOWS.md](./WORKFLOWS.md), [BUSINESS_DOMAIN.md](./BUSINESS_DOMAIN.md), [agent/RECONCILIATION_TOOL.md](./agent/RECONCILIATION_TOOL.md) (bank reconciliation), [agent/AI_Categorizer.md](./agent/AI_Categorizer.md) (transaction categorization)
 
 ---
 

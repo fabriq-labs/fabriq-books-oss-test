@@ -46,6 +46,8 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
+| Bank reconciliation (posting → receipt/invoice), Reconcile/Confirm flow | [docs/agent/RECONCILIATION_TOOL.md](./docs/agent/RECONCILIATION_TOOL.md) |
+| Transaction categorization (AI), batch categorize | [docs/agent/AI_Categorizer.md](./docs/agent/AI_Categorizer.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Agentic FinOps positioning, demo roadmap, GTM | [docs/positioning/](./docs/positioning/) |
@@ -103,6 +105,10 @@ fabriq/
 │   ├── AUTHENTICATION.md        # Auth system
 │   ├── WORKFLOWS.md             # Workflow engine
 │   ├── AI_AGENT.md              # AI/LLM integration
+│   ├── agent/                   # Agent: reconciliation, categorizer, conversation flow
+│   │   ├── RECONCILIATION_TOOL.md  # Bank reconciliation (Reconcile/Confirm, seed data, tests)
+│   │   ├── AI_Categorizer.md       # Transaction categorization
+│   │   └── END_USER_CONVERSATION_FLOW.md
 │   ├── BUSINESS_DOMAIN.md       # Business context
 │   └── INTEGRATIONS.md          # ERP integration architecture
 ├── backend/                     # Node.js/Express backend

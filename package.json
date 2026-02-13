@@ -1,0 +1,16 @@
+{
+  "name": "fabriq-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fabriq Financial Suite - Monorepo",
+  "scripts": {
+    "dev": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend-1 && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend-1 && npm install",
+    "build:all": "cd backend && npm run build && cd ../frontend-1 && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
