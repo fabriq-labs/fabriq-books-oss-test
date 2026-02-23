@@ -1,20 +1,23 @@
-# Dev stack: single container (frontend + backend + nginx + PostgreSQL)
-# Use from repo root after cloning backend/ and frontend-1/ (see docs/BUILD_AND_DEPLOY.md)
+# Embedded PostgreSQL: single container (frontend + backend + nginx + in-container Postgres).
+# Same Dockerfile as external-PG; use USE_EMBEDDED_PG=true to run embedded DB.
+# Use from repo root after cloning backend/ and frontend-1/ (see docs/BUILD_AND_DEPLOY.md).
 
 services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.dev
-    image: fabriq-dev:latest
+      dockerfile: Dockerfile
+    image: fabriq:latest
+    env_file:
+      - .env
     ports:
       - "8080:8080"
+      - "5432:5432"   # PostgreSQL (host + external; ensure firewall allows if needed)
     environment:
       PORT: "8080"
-      JWT_SECRET: "${JWT_SECRET:-dev-secret}"
+      USE_EMBEDDED_PG: "true"
       NODE_ENV: "development"
     volumes:
-      # Persist PostgreSQL data between runs
       - fabriq_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]

@@ -11,9 +11,9 @@ steps:
            'https://${_GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git',
            'frontend-1']
 
-  # Build Docker image (dev: with embedded PostgreSQL)
+  # Build Docker image (same Dockerfile; set USE_EMBEDDED_PG=true for embedded PG)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-f', 'Dockerfile.dev',
+    args: ['build', '-f', 'Dockerfile',
            '-t', 'gcr.io/$PROJECT_ID/fabriq-books-dev:latest',
            '-t', 'gcr.io/$PROJECT_ID/fabriq-books-dev:$SHORT_SHA',
            '.']

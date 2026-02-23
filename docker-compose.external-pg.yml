@@ -1,0 +1,18 @@
+# External PostgreSQL: same image as embedded; USE_EMBEDDED_PG unset → use DATABASE_URL.
+# Requires DATABASE_URL and JWT_SECRET in .env. See docs/BUILD_AND_DEPLOY.md.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fabriq:latest
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      # USE_EMBEDDED_PG not set (or false) → start-external.sh, DATABASE_URL from .env
+
+volumes: {}

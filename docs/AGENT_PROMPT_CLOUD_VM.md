@@ -22,14 +22,14 @@ You are on a **GCP cloud VM** (Singapore). The workspace is **~/repos/fabriq** �
 - **Clone backend and frontend** into this workspace if they are missing:
   - `backend/` ← `https://github.com/fabriq-labs/fabriq-base` (branch **demo**)
   - `frontend-1/` ← `https://github.com/fabriq-labs/zeiv-v2` (branch **demo**)
-- Use a GitHub token for private repos: clone with `https://${GH_TOKEN}@github.com/...` (user must set `GH_TOKEN` or provide token; ask if missing).
+- Use a GitHub token for private repos: run `./clone-deps.sh` (requires `export GH_TOKEN=...`) or clone with `https://${GH_TOKEN}@github.com/...` (ask user for token if missing).
 - Do **not** commit from `backend/` or `frontend-1/` when working in the root-repo workspace. Only the root repo at `~/repos/fabriq` is committed from the VM.
 - When the user asks to build or run: ensure `backend/` and `frontend-1/` exist (clone on **demo** branch if needed), then run `docker compose` or the relevant build/deploy command.
 
 **Root repo (what the user cloned):** Deployment only — Dockerfile(s), nginx, start scripts, docker-compose, Cloud Build configs, docs. Path: **~/repos/fabriq**.
 
 **Build strategy:**
-- **Local dev:** From `~/repos/fabriq`, run `docker compose up` (uses `Dockerfile.dev`: frontend + backend + nginx + PostgreSQL). Port **8080**. Health: `http://localhost:8080/health`. Login: `admin@example.com` / `admin123`.
+- **Local dev:** From `~/repos/fabriq`, run `docker compose up` (single Dockerfile; `USE_EMBEDDED_PG=true` → embedded Postgres). Port **8080**. Health: `http://localhost:8080/health`. Login: `admin@example.com` / `admin123`. For external PG: `docker compose -f docker-compose.external-pg.yml up` with `DATABASE_URL` in `.env`.
 - **Production image:** `Dockerfile` (no DB). For Cloud Run/Railway with external PostgreSQL.
 - **Cloud Build:** From repo root, `gcloud builds submit --config=cloudbuild.yaml` (prod) or `cloudbuild-dev.yaml` (dev). Pass `_GH_TOKEN` in substitutions; Cloud Build clones backend/frontend from GitHub.
 

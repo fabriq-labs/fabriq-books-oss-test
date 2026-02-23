@@ -75,8 +75,8 @@ You only check in/out the **root repo** on the VM. Either:
 
 - **From your Mac:** clone the root repo to the VM and copy deployment files:
   ```bash
-  gcloud compute scp Dockerfile Dockerfile.dev docker-compose.yml nginx.conf start.sh start-with-pg.sh .dockerignore cloudbuild.yaml cloudbuild-dev.yaml fabriq-dev-vm:~/ --zone=asia-southeast1-b
-  gcloud compute ssh fabriq-dev-vm --zone=asia-southeast1-b --command="mkdir -p ~/repos/fabriq && mv ~/Dockerfile ~/Dockerfile.dev ~/docker-compose.yml ~/nginx.conf ~/start.sh ~/start-with-pg.sh ~/.dockerignore ~/cloudbuild.yaml ~/cloudbuild-dev.yaml ~/repos/fabriq/ 2>/dev/null; ls ~/repos/fabriq"
+  gcloud compute scp Dockerfile docker-compose.yml docker-compose.external-pg.yml nginx.conf start.sh start-with-pg.sh start-external.sh .dockerignore cloudbuild.yaml cloudbuild-dev.yaml fabriq-dev-vm:~/ --zone=asia-southeast1-b
+  gcloud compute ssh fabriq-dev-vm --zone=asia-southeast1-b --command="mkdir -p ~/repos/fabriq && mv ~/Dockerfile ~/docker-compose.yml ~/docker-compose.external-pg.yml ~/nginx.conf ~/start.sh ~/start-with-pg.sh ~/start-external.sh ~/.dockerignore ~/cloudbuild.yaml ~/cloudbuild-dev.yaml ~/repos/fabriq/ 2>/dev/null; ls ~/repos/fabriq"
   ```
 - **Or on the VM:** clone only the **root repo** into `~/repos/fabriq` (e.g. `mkdir -p ~/repos && git clone <root-repo-url> ~/repos/fabriq`). The agent will clone backend and frontend (demo) when you build.
 

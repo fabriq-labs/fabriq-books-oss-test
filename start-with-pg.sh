@@ -6,6 +6,13 @@ export BACKEND_PORT="4000"
 export PGDATA="${PGDATA:-/var/lib/postgresql/data}"
 export DATABASE_URL="${DATABASE_URL:-postgresql://fabriq:fabriq@127.0.0.1:5432/fabriq_db}"
 
+# Prisma: use whichever query engine was built (openssl-3.0.x or 1.1.x)
+PRISMA_CLIENT_DIR="/app/backend/node_modules/.prisma/client"
+if [ -d "$PRISMA_CLIENT_DIR" ]; then
+  ENGINE=$(ls "$PRISMA_CLIENT_DIR"/libquery_engine-linux-musl-*.so.node 2>/dev/null | head -1)
+  if [ -n "$ENGINE" ]; then export PRISMA_QUERY_ENGINE_LIBRARY="$ENGINE"; fi
+fi
+
 # ── PostgreSQL ──────────────────────────────────────────────────
 if [ ! -f "$PGDATA/PG_VERSION" ]; then
     echo "Initializing PostgreSQL..."
@@ -15,10 +22,11 @@ if [ ! -f "$PGDATA/PG_VERSION" ]; then
 
     echo "host all all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
     echo "listen_addresses = '*'" >> "$PGDATA/postgresql.conf"
+    echo "unix_socket_directories = '$PGDATA'" >> "$PGDATA/postgresql.conf"
 
-    su-exec postgres pg_ctl -D "$PGDATA" start -w -o "-p 5432"
-    su-exec postgres psql -p 5432 -c "CREATE USER fabriq WITH PASSWORD 'fabriq' SUPERUSER;"
-    su-exec postgres psql -p 5432 -c "CREATE DATABASE fabriq_db OWNER fabriq;"
+    su-exec postgres pg_ctl -D "$PGDATA" start -w -o "-p 5432 -c unix_socket_directories=$PGDATA"
+    su-exec postgres psql -h "$PGDATA" -p 5432 -c "CREATE USER fabriq WITH PASSWORD 'fabriq' SUPERUSER;"
+    su-exec postgres psql -h "$PGDATA" -p 5432 -c "CREATE DATABASE fabriq_db OWNER fabriq;"
 
     echo "Running database setup..."
     cd /app/backend
@@ -27,7 +35,11 @@ if [ ! -f "$PGDATA/PG_VERSION" ]; then
     cd /app
 else
     echo "Starting existing PostgreSQL..."
-    su-exec postgres pg_ctl -D "$PGDATA" start -w -o "-p 5432"
+    # Use PGDATA for socket/lock file so we don't need /run/postgresql in the container
+    if ! grep -q 'unix_socket_directories' "$PGDATA/postgresql.conf"; then
+        echo "unix_socket_directories = '$PGDATA'" >> "$PGDATA/postgresql.conf"
+    fi
+    su-exec postgres pg_ctl -D "$PGDATA" start -w -o "-p 5432 -c unix_socket_directories=$PGDATA"
 fi
 
 # ── Nginx ───────────────────────────────────────────────────────

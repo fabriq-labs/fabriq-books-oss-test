@@ -1,3 +1,6 @@
+# Build production image (single Dockerfile). Use with external PG: set DATABASE_URL at deploy.
+# Build: gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
+
 steps:
   # Clone backend (demo branch)
   - name: 'gcr.io/cloud-builders/git'
@@ -11,13 +14,14 @@ steps:
            'https://${_GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git',
            'frontend-1']
 
-  # Build Docker image
+  # Build Docker image (same Dockerfile as local; external PG at runtime via env)
+  # Tag with :latest only (SHORT_SHA is empty when submitting from local source)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/fabriq:latest', '-t', 'gcr.io/$PROJECT_ID/fabriq:$SHORT_SHA', '.']
+    args: ['build', '-f', 'Dockerfile', '-t', 'gcr.io/$PROJECT_ID/fabriq:latest', '.']
 
   # Push to GCR
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '--all-tags', 'gcr.io/$PROJECT_ID/fabriq']
+    args: ['push', 'gcr.io/$PROJECT_ID/fabriq:latest']
 
 images:
   - 'gcr.io/$PROJECT_ID/fabriq:latest'
