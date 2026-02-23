@@ -2,6 +2,7 @@
 # Manual: gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
 # Auto: create a trigger on push to main (see docs/BUILD_AND_DEPLOY.md § "Git trigger").
 
+
 steps:
   # Clone backend (demo branch)
   - name: 'gcr.io/cloud-builders/git'
