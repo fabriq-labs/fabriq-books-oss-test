@@ -189,19 +189,19 @@ model workflow_action {
   "effects": [
     {
       "type": "database",
-      "config": {
-        "method": "generate_po_from_pr"
-      }
+      "config": { "method": "generate_po_from_pr" },
+      "enabled": true
     },
     {
       "type": "database",
-      "config": {
-        "method": "send_workflow_notification_email"
-      }
+      "config": { "method": "send_workflow_notification_email" },
+      "enabled": false
     }
   ]
 }
 ```
+
+- **`enabled`** (optional): When `false`, the effect is **not** executed. Omitted or `true` means the effect runs. Use this to disable an effect without removing it from the config.
 
 ---
 
@@ -495,8 +495,12 @@ async execute(
     ? effects
     : (effects?.effects || []);
 
-  // 2. Execute each effect sequentially
+  // 2. Execute each effect sequentially (skip when enabled === false)
   for (const effect of normalizedEffects) {
+    if (effect.enabled === false) {
+      logger.info('Skipping disabled effect', { effect });
+      continue;
+    }
     try {
       await this.executeEffect(effect, context, authContext, tx);
     } catch (error) {
@@ -943,50 +947,7 @@ const invoiceActions = [
 
 ## Future Enhancements
 
-### 1. Side Effect Toggle Feature (Proposed)
-
-**Current Limitation**: Side effects are all-or-nothing per action. Users cannot enable/disable individual effects.
-
-**Proposed Enhancement**: Add `enabled` flag to each side effect.
-
-**Schema Change**:
-```json
-{
-  "effects": [
-    {
-      "type": "database",
-      "config": { "method": "generate_po_from_pr" },
-      "enabled": true  // NEW: Toggle individual effects
-    },
-    {
-      "type": "database",
-      "config": { "method": "send_workflow_notification_email" },
-      "enabled": false  // NEW: Disabled but kept in config
-    }
-  ]
-}
-```
-
-**Backend Change** (`SideEffectExecutor.ts`):
-```typescript
-async execute(effects, context, authContext, tx) {
-  const normalizedEffects = this.normalizeEffects(effects);
-
-  for (const effect of normalizedEffects) {
-    // Skip disabled effects
-    if (effect.enabled === false) {
-      logger.info('Skipping disabled effect', { effect });
-      continue;
-    }
-
-    await this.executeEffect(effect, context, authContext, tx);
-  }
-}
-```
-
-**Frontend Change**: Add toggle switches in WorkflowActionModal.
-
-### 2. Conditional Side Effects
+### 1. Conditional Side Effects
 
 Execute effects based on runtime conditions:
 
@@ -1006,7 +967,7 @@ Execute effects based on runtime conditions:
 }
 ```
 
-### 3. Parallel Side Effect Execution
+### 2. Parallel Side Effect Execution
 
 Currently effects run sequentially. Add option for parallel:
 
@@ -1017,7 +978,7 @@ Currently effects run sequentially. Add option for parallel:
 }
 ```
 
-### 4. Side Effect Retry Configuration
+### 3. Side Effect Retry Configuration
 
 Add retry logic for external integrations:
 
@@ -1036,7 +997,7 @@ Add retry logic for external integrations:
 }
 ```
 
-### 5. Async Side Effects
+### 4. Async Side Effects
 
 Execute non-critical effects outside transaction:
 
@@ -1052,7 +1013,7 @@ Execute non-critical effects outside transaction:
 }
 ```
 
-### 6. UI Improvements
+### 5. UI Improvements
 
 - **Visual Workflow Designer**: Drag-drop state/action builder
 - **Side Effect Management UI**: Configure effects per action

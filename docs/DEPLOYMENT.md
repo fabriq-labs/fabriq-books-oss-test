@@ -526,6 +526,16 @@ lucius.fox@wayneenterprises.in / password
 alfred.pennyworth@wayneenterprises.in / password
 ```
 
+**Resetting only demo postings (reconciliation demo)**  
+To drop and recreate just the 24 bank postings (and remove any payment receipts created by confirming matches) without touching the rest of the Indian demo data:
+
+```bash
+cd backend
+npx ts-node prisma/setup-IN/setup-indian-demo.ts --reset-postings
+```
+
+Use this after running reconciliations/confirmations in the UI when you want the posting list back to the initial demo state. See [RECONCILIATION_TOOL.md](./agent/RECONCILIATION_TOOL.md#seed-data--demo-indian-demo) for details.
+
 ### 2. US-CA Demo Data 🇺🇸
 
 **File**: `prisma/setup-US_CA/setup-us-ca-demo.ts`
