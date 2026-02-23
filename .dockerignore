@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# IDE / AI
+.cursor
+.claude
+.vscode
+
+# Dependencies (rebuilt in Docker)
+node_modules
+backend/node_modules
+frontend-1/node_modules
+
+# Build artifacts
+dist
+build
+*.tsbuildinfo
+
+# Non-deployment directories
+backups/
+trash/
+data/
+fabriqdata.com/
+docs/
+scripts/
+setup/
+
+# Logs
+*.log
+logs/
+
+# Environment files (secrets passed via env vars at runtime)
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend-1/.env
+frontend-1/.env.*
+
+# OS
+.DS_Store
+Thumbs.db

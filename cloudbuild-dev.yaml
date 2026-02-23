@@ -1,0 +1,34 @@
+steps:
+  # Clone backend (demo branch)
+  - name: 'gcr.io/cloud-builders/git'
+    args: ['clone', '--branch', 'demo', '--depth', '1',
+           'https://${_GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git',
+           'backend']
+
+  # Clone frontend (demo branch)
+  - name: 'gcr.io/cloud-builders/git'
+    args: ['clone', '--branch', 'demo', '--depth', '1',
+           'https://${_GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git',
+           'frontend-1']
+
+  # Build Docker image (dev: with embedded PostgreSQL)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-f', 'Dockerfile.dev',
+           '-t', 'gcr.io/$PROJECT_ID/fabriq-books-dev:latest',
+           '-t', 'gcr.io/$PROJECT_ID/fabriq-books-dev:$SHORT_SHA',
+           '.']
+
+  # Push to GCR
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', 'gcr.io/$PROJECT_ID/fabriq-books-dev']
+
+images:
+  - 'gcr.io/$PROJECT_ID/fabriq-books-dev:latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+
+substitutions:
+  _GH_TOKEN: ''
+
+timeout: '1800s'

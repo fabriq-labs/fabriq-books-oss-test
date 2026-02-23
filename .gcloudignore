@@ -1,0 +1,34 @@
+# Cloud Build clones backend/ and frontend-1/ via cloudbuild.yaml,
+# so we only upload the small deployment files (Dockerfile, nginx.conf, start.sh, etc.)
+
+# Source repos (cloned by Cloud Build from GitHub)
+backend/
+frontend-1/
+
+# Everything else that isn't needed
+.git
+.gitignore
+.cursor
+.claude
+.vscode
+node_modules
+dist
+build
+*.tsbuildinfo
+backups/
+trash/
+data/
+fabriqdata.com/
+docs/
+scripts/
+setup/
+*.log
+logs/
+.env
+.env.*
+.DS_Store
+Thumbs.db
+CLAUDE.md
+README.md
+*.code-workspace
+package*.json
