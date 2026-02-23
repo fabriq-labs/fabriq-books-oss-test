@@ -1,5 +1,6 @@
-# Build production image (single Dockerfile). Use with external PG: set DATABASE_URL at deploy.
-# Build: gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
+# Build production image and deploy to Cloud Run.
+# Manual: gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
+# Auto: create a trigger on push to main (see docs/BUILD_AND_DEPLOY.md § "Git trigger").
 
 steps:
   # Clone backend (demo branch)
@@ -14,14 +15,25 @@ steps:
            'https://${_GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git',
            'frontend-1']
 
-  # Build Docker image (same Dockerfile as local; external PG at runtime via env)
-  # Tag with :latest only (SHORT_SHA is empty when submitting from local source)
+  # Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-f', 'Dockerfile', '-t', 'gcr.io/$PROJECT_ID/fabriq:latest', '.']
 
   # Push to GCR
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/fabriq:latest']
+
+  # Deploy to Cloud Run (env vars remain from previous deploy or set in Console)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_SERVICE_NAME}'
+      - '--image=gcr.io/$PROJECT_ID/fabriq:latest'
+      - '--platform=managed'
+      - '--region=${_REGION}'
+      - '--allow-unauthenticated'
 
 images:
   - 'gcr.io/$PROJECT_ID/fabriq:latest'
@@ -31,5 +43,7 @@ options:
 
 substitutions:
   _GH_TOKEN: ''
+  _REGION: 'asia-southeast1'
+  _SERVICE_NAME: 'fabriq'
 
 timeout: '1200s'
