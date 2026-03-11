@@ -1,14 +1,27 @@
 # Single Dockerfile for both embedded-PG and external-PG. Mode at runtime via USE_EMBEDDED_PG.
-# Build: frontend + backend. Runtime: nginx + node + PostgreSQL (installed for embedded mode; optional use).
+# Build: clone repos → build frontend & backend → final nginx image.
+# Works the same on Cloud Build, Railway, and local docker build.
+# Pass GH_TOKEN as --build-arg (or set as build-time env in Railway).
+
+# Stage 0: Clone source repos from GitHub
+FROM alpine/git AS source
+ARG GH_TOKEN
+ARG BACKEND_BRANCH=demo
+ARG FRONTEND_BRANCH=demo
+WORKDIR /src
+RUN git clone --branch ${BACKEND_BRANCH} --depth 1 \
+      "https://${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend \
+ && git clone --branch ${FRONTEND_BRANCH} --depth 1 \
+      "https://${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
 
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
-COPY frontend-1/package*.json ./
+COPY --from=source /src/frontend-1/package*.json ./
 RUN npm ci
 
-COPY frontend-1/ ./
+COPY --from=source /src/frontend-1/ ./
 
 ENV VITE_API_BASE_URL=""
 ENV VITE_ENABLE_AI="true"
@@ -20,13 +33,12 @@ WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
 
-COPY backend/package*.json ./
-COPY backend/prisma ./prisma/
+COPY --from=source /src/backend/package*.json ./
+COPY --from=source /src/backend/prisma ./prisma/
 
-# Backend repo may not ship package-lock.json; use npm install so build works without it
 RUN npm install
 
-COPY backend/ ./
+COPY --from=source /src/backend/ ./
 
 # Ensure Prisma generates engine for Alpine runtime (openssl-3.0.x)
 RUN sed -i '/provider = "prisma-client-js"/a\

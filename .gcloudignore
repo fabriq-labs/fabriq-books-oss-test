@@ -6,6 +6,10 @@ backend/
 frontend-1/
 
 # Everything else that isn't needed
+
+# Python venv (large; not needed for Cloud Build)
+.venv/
+
 .git
 .gitignore
 .cursor
