@@ -6,6 +6,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GH_TOKEN: ${GH_TOKEN}
     image: fabriq:latest
     env_file:
       - .env
