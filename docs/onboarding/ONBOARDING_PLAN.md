@@ -1,8 +1,8 @@
 # Fabriq Books - Developer Onboarding Plan
 
-**Target**: Get developer productive by Day 4  
-**Focus**: Views, Forms, and Workflow Configuration  
-**Duration**: 4 days (with hands-on exercises)
+**Target**: Get developer productive by Day 4, integration-ready by Day 5  
+**Focus**: Views, Forms, Workflow Configuration, and ERP Integrations  
+**Duration**: 5 days (with hands-on exercises)
 
 ---
 
@@ -375,6 +375,7 @@ Submit    Approve        Approve
 - `docs/WORKFLOWS.md` - Workflow engine details
 - `docs/BUSINESS_DOMAIN.md` - Business context
 - `docs/DEPLOYMENT.md` - Setup and deployment
+- `docs/INTEGRATIONS.md` - ERP integration architecture (forward/reverse sync)
 
 ### Key Code Files
 - `backend/src/services/core/ModelService.ts` - Core CRUD
@@ -421,6 +422,57 @@ By end of Day 4, developer should be able to:
 - [ ] Use Prisma Studio to inspect data
 - [ ] Navigate codebase to find relevant files
 - [ ] Complete a real work task independently
+
+---
+
+## Day 5: ERP Integrations (Optional — for developers working on sync)
+
+### Session 10: ERP Integrations — Forward Sync with Zoho Books (3 hours)
+
+**Objective**: Set up the Python/DBT environment and run the Zoho Books forward sync pipeline
+
+**📖 Workbook**: Follow the detailed step-by-step instructions in [Integrations Session Workbook](./ONBOARDING_SESSION_INTEGRATIONS_WORKBOOK.md)
+
+The workbook covers:
+- Integration architecture overview (Forward Sync vs Reverse Sync)
+- Python virtual environment and DBT setup
+- Environment variable configuration (DB, encryption key, org_id, Zoho OAuth)
+- Running the full sync pipeline (`sync_and_transform.py`)
+- Tracing records through staging → integration → normalized layers
+- Troubleshooting common issues (incremental filters, missing tables)
+- Self-reading resources for Airbyte, DBT, and Zoho Books API
+
+**Completion Checklist**:
+- [ ] Python venv created with all dependencies
+- [ ] DBT installed and configured
+- [ ] Forward sync pipeline runs end-to-end
+- [ ] Can trace a record from raw datalake to normalized public table
+- [ ] Understands incremental processing and `FORCE_PROCESS_ALL`
+- [ ] Self-reading list reviewed (Airbyte, DBT, Zoho Books)
+
+---
+
+### Session 11: ERP Integrations — Reverse Sync (Zoho Books & PO Workflow) (2.5 hours)
+
+**Objective**: Understand how Fabriq pushes data to ERPs via workflow side effects and enable/verify Purchase Order → Zoho Books sync on approval.
+
+**📖 Workbook**: Follow the step-by-step instructions in [Integrations Reverse Sync Workbook](./ONBOARDING_SESSION_INTEGRATIONS_REVERSE_WORKBOOK.md)
+
+The workbook covers:
+- Reverse sync architecture (workflow-triggered, Node.js, connector factory)
+- Code exploration: `backend/src/lib/integrations/` (connectors, Zoho connector, mappers)
+- Workflow configuration: PO workflow, "Approve" action, and `sync_po_to_erp` side effect (disabled by default)
+- Enabling PO → Zoho sync (script or database update)
+- End-to-end test: approve a PO and verify sync in DB and Zoho Books
+- Tracing the full path: UI → WorkflowEngine → SideEffectExecutor → sync_purchase_order → connector
+- Troubleshooting (missing org/connection, effect disabled, token errors)
+
+**Completion Checklist**:
+- [ ] Can explain Forward vs Reverse sync and the connector factory pattern
+- [ ] Located workflowActionMap, sync_purchase_order, and createERPConnector
+- [ ] Verified org.erp_system_type and source_system; enabled sync_po_to_erp
+- [ ] Approved a PO and confirmed source_record_id and sync_status in DB
+- [ ] Self-reading (WORKFLOWS.md, INTEGRATIONS.md Reverse section, Zoho connector/mapper) reviewed
 
 ---
 

@@ -1,6 +1,6 @@
 # Fabriq – Build and Deploy Strategy
 
-**Use this doc on the cloud VM:** clone only the **root repo** there; backend and frontend are cloned from GitHub. Run the dev build with Docker Compose, verify, then use Cloud Build for production images.
+One **Dockerfile** that clones backend + frontend from GitHub, builds everything, and produces a single image. Works identically on **Cloud Build**, **Railway**, and **local `docker build`**. The only difference is how `GH_TOKEN` is passed.
 
 ---
 
@@ -8,290 +8,275 @@
 
 ### Three repos (not submodules)
 
-| Repo | Purpose | Where it lives |
-|------|--------|----------------|
-| **Root** (e.g. `fabriq-ws-setup`) | Deployment only: Dockerfile(s), nginx, start scripts, Cloud Build config, this doc | Checked out on your machine and on the **cloud VM** |
-| **Backend** (`fabriq-base`) | Node/Express API, Prisma, workflows, agent | Cloned from GitHub (branch `demo`) into `backend/` |
-| **Frontend** (`zeiv-v2`) | React/Vite app | Cloned from GitHub (branch `demo`) into `frontend-1/` |
+| Repo | Purpose |
+|------|---------|
+| **Root** (`fabriq-ws-setup`) | Deployment: Dockerfile, nginx, start scripts, Cloud Build config, docs |
+| **Backend** (`fabriq-base`) | Node/Express API, Prisma, workflows, agent |
+| **Frontend** (`zeiv-v2`) | React/Vite app |
 
-On the **cloud VM** you only check in/out the **root repo**. You do **not** commit `backend/` or `frontend-1/` there; they are cloned once (or updated with `git pull`) and used as build context.
+The Dockerfile clones backend and frontend from GitHub during the build (Stage 0). No need to have them in the build context.
 
-### Two build paths
+### Unified build
 
-| Path | When | How |
-|------|------|-----|
-| **Local Docker (VM)** | Dev/test on the VM | `docker compose up` (dev) or `docker build` + `docker run`. Uses `backend/` and `frontend-1/` cloned on the VM. |
-| **Cloud Build** | CI/production image | `gcloud builds submit` from VM (or Mac). Only root-repo files are uploaded; Cloud Build clones backend and frontend from GitHub. |
+| Platform | How `GH_TOKEN` is passed |
+|----------|--------------------------|
+| **Cloud Build** | `--substitutions="_GH_TOKEN=${GH_TOKEN}"` → passed as `--build-arg` |
+| **Railway** | Set `GH_TOKEN` as a build-time variable in the service settings |
+| **Local** | `docker build --build-arg GH_TOKEN=xxx .` or `GH_TOKEN=xxx docker compose build` |
 
 ### Image types (single Dockerfile)
 
-One **Dockerfile** builds one image (frontend + backend + nginx + PostgreSQL installed). Runtime mode is chosen by **USE_EMBEDDED_PG**:
+One image; runtime mode chosen by **USE_EMBEDDED_PG**:
 
 | Mode | USE_EMBEDDED_PG | Contains at runtime | Use |
 |------|-----------------|---------------------|-----|
 | **Embedded PG** | `true` or `1` | Postgres + backend + nginx (data in volume) | Local/VM: `docker compose up`. Demos. |
-| **External PG** | unset or `false` | Backend + nginx only; uses `DATABASE_URL` | Cloud Run, Railway, or `docker compose -f docker-compose.external-pg.yml up`. |
+| **External PG** | unset or `false` | Backend + nginx only; uses `DATABASE_URL` | Cloud Run, Railway, production. |
 
 ---
 
 ## 2. Root repo layout (what to commit)
 
-All of this lives in the **root repo** and is used on the VM and in Cloud Build:
-
 ```
 .
-├── Dockerfile              # Single image; mode via USE_EMBEDDED_PG at runtime
-├── docker-compose.yml      # Embedded PG (USE_EMBEDDED_PG=true)
+├── Dockerfile                      # Clones repos + builds image; mode via USE_EMBEDDED_PG at runtime
+├── docker-compose.yml              # Embedded PG (USE_EMBEDDED_PG=true)
 ├── docker-compose.external-pg.yml  # External PG (DATABASE_URL in .env)
-├── nginx.conf              # Nginx template (envsubst NGINX_PORT)
-├── start.sh                # Entrypoint: runs start-with-pg or start-external by env
-├── start-with-pg.sh        # Embedded: postgres + backend + nginx
-├── start-external.sh       # External: backend + nginx only
+├── nginx.conf                      # Nginx template (envsubst NGINX_PORT)
+├── start.sh                        # Entrypoint: runs start-with-pg or start-external by env
+├── start-with-pg.sh                # Embedded: postgres + backend + nginx
+├── start-external.sh               # External: backend + nginx only
 ├── .dockerignore
-├── .gcloudignore           # So only these files are uploaded to Cloud Build
-├── cloudbuild.yaml         # Cloud Build: production image
-├── cloudbuild-dev.yaml     # Cloud Build: dev image
+├── .gcloudignore
+├── cloudbuild.yaml                 # Cloud Build config (just docker build + push)
 ├── docs/
-│   ├── BUILD_AND_DEPLOY.md # This file
-│   └── VM_REMOTE_DEV.md    # VM creation and Cursor Remote SSH
-├── backend/                # NOT in root repo – clone from GitHub
-└── frontend-1/             # NOT in root repo – clone from GitHub
+│   ├── BUILD_AND_DEPLOY.md         # This file
+│   └── VM_REMOTE_DEV.md
+├── backend/                        # NOT committed – cloned from GitHub inside Dockerfile
+└── frontend-1/                     # NOT committed – cloned from GitHub inside Dockerfile
 ```
 
 ---
 
-## 3. One-time setup on the cloud VM
+## 3. Build the image
 
-Assumes you are **on the VM** (SSH or Cursor Remote SSH). Root repo is at **~/repos/fabriq** (user only clones the root repo; the agent clones backend/frontend if missing).
+All three platforms use the same Dockerfile. You need a **GitHub token** (`GH_TOKEN`) with repo access to clone the private repos during build.
 
-### 3.1 Clone backend and frontend (once)
+### 3.1 Local (docker build)
 
 ```bash
-cd ~/repos/fabriq
-
-# Use a GitHub token with repo access (classic token or fine-grained)
+cd ~/repos/fabriq   # or your root path
 export GH_TOKEN="your_github_token"
 
-git clone --branch demo --depth 1 "https://${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend
-git clone --branch demo --depth 1 "https://${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
+docker build --build-arg GH_TOKEN=${GH_TOKEN} -t fabriq:latest .
 ```
 
-To refresh later: `cd backend && git pull && cd ../frontend-1 && git pull && cd ..`
-
-### 3.2 Optional: persist GH_TOKEN for later
+Override branches if needed:
 
 ```bash
-# Store in a file only you can read (do not commit this)
-echo 'export GH_TOKEN="your_github_token"' >> ~/.fabriq-env
-chmod 600 ~/.fabriq-env
-# When needed: source ~/.fabriq-env
+docker build \
+  --build-arg GH_TOKEN=${GH_TOKEN} \
+  --build-arg BACKEND_BRANCH=feature-xyz \
+  --build-arg FRONTEND_BRANCH=demo \
+  -t fabriq:latest .
 ```
+
+### 3.2 Local (docker compose)
+
+```bash
+export GH_TOKEN="your_github_token"
+
+# Embedded PG (dev)
+docker compose build && docker compose up -d
+
+# External PG (production-like)
+docker compose -f docker-compose.external-pg.yml build
+docker compose -f docker-compose.external-pg.yml up -d
+```
+
+Docker Compose reads `GH_TOKEN` from the environment and passes it as a build arg.
+
+### 3.3 Cloud Build
+
+```bash
+export GH_TOKEN="your_github_token"
+
+gcloud builds submit --config=cloudbuild.yaml \
+  --substitutions="_GH_TOKEN=${GH_TOKEN}" .
+```
+
+Override branches:
+
+```bash
+gcloud builds submit --config=cloudbuild.yaml \
+  --substitutions="_GH_TOKEN=${GH_TOKEN},_BACKEND_BRANCH=feature-xyz,_FRONTEND_BRANCH=demo" .
+```
+
+Image: `gcr.io/<PROJECT_ID>/fabriq:latest`.
+
+### 3.4 Railway
+
+1. Connect the root repo in Railway.
+2. In the service's **Settings → Build**, add build-time variables:
+   - `GH_TOKEN` = your GitHub token
+   - `BACKEND_BRANCH` = `demo` (or whichever branch)
+   - `FRONTEND_BRANCH` = `demo`
+3. Railway will run `docker build --build-arg GH_TOKEN=... --build-arg BACKEND_BRANCH=... ...` automatically.
 
 ---
 
-## 4. Run the dev build locally (no Cloud Build)
-
-From the **root repo** on the VM, with `backend/` and `frontend-1/` present:
-
-### 4.1 Build and run with Docker Compose (embedded PostgreSQL)
+## 4. Run locally (embedded PostgreSQL)
 
 ```bash
-cd ~/repos/fabriq
+export GH_TOKEN="your_github_token"
 
 docker compose build
 docker compose up -d
 ```
 
-- Compose sets `USE_EMBEDDED_PG=true`, so the container runs in-container Postgres (same image as external-PG mode).
-- First run: builds the image (can take several minutes), inits PostgreSQL and runs demo data seed.
-- App: **http://localhost:8080** (on the VM). From your Mac use the VM’s external IP, e.g. **http://34.87.77.156:8080**, or Cursor port forwarding.
-
-### 4.2 Check that it works
-
-```bash
-# Container and health
-docker compose ps
-curl -s http://localhost:8080/health
-
-# Logs (first run will show Postgres init and backend startup)
-docker compose logs -f app
-```
-
-- Login: `admin@example.com` / `admin123` (change in production).
+- `USE_EMBEDDED_PG=true` is set by compose, so the container runs in-container Postgres.
+- App: **http://localhost:8080**. From your Mac: use the VM's external IP or Cursor port forwarding.
+- Login: `admin@example.com` / `admin123`.
 - Stop: `docker compose down`. Data persists in volume `fabriq_pgdata`.
 
-### 4.3 Rebuild after backend/frontend changes
+### Rebuild after changes
 
 ```bash
-cd ~/repos/fabriq
-# After git pull in backend/ or frontend-1/
 docker compose build --no-cache
 docker compose up -d
 ```
 
 ---
 
-## 5. Run production image locally (external PostgreSQL)
+## 5. Run locally (external PostgreSQL)
 
-Use this when you have a Postgres instance elsewhere (Cloud SQL, RDS, or a Postgres container/server). The app image has no database; it needs `DATABASE_URL` and `JWT_SECRET`.
+For when you have a Postgres instance elsewhere (Cloud SQL, RDS, Railway Postgres, etc.).
 
-### 5.1 One-time setup
+### 5.1 Setup
 
-1. **Backend and frontend** must be present (clone with `./clone-deps.sh` if needed).
+Create `.env` in the repo root:
 
-2. **Create or edit `.env`** in the repo root with at least:
-   ```bash
-   DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
-   JWT_SECRET="your-secret"
-   ```
-   Replace `USER`, `PASSWORD`, `HOST`, and `DBNAME` with your external Postgres details. If the DB is on the host machine from a container’s perspective, use `host.docker.internal` (Docker Desktop) or the host IP.
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
+JWT_SECRET="your-secret"
+```
 
-3. **Prepare the database once** (empty DB only). Either:
-   - Run schema + seed from your host (Node and Prisma installed):
-     ```bash
-     cd backend
-     DATABASE_URL="postgresql://..." npx prisma db push
-     DATABASE_URL="postgresql://..." node setup-db.js --demo-data=indian-demo --skip-tests
-     ```
-   - Or use a one-off container that mounts backend and runs the same commands against `DATABASE_URL`.
+Prepare the database once (empty DB only):
+
+```bash
+cd backend
+DATABASE_URL="postgresql://..." npx prisma db push
+DATABASE_URL="postgresql://..." node setup-db.js --demo-data=indian-demo --skip-tests
+```
 
 ### 5.2 Build and run
 
-**Option A – Docker Compose (recommended)**
-
 ```bash
-cd ~/repos/fabriq   # or your root path
+export GH_TOKEN="your_github_token"
 
 docker compose -f docker-compose.external-pg.yml build
 docker compose -f docker-compose.external-pg.yml up -d
 ```
 
-App is at **http://localhost:8080**. Logs: `docker compose -f docker-compose.external-pg.yml logs -f app`.
-
-**Option B – Plain Docker**
-
-```bash
-cd ~/repos/fabriq
-
-docker build -t fabriq:latest -f Dockerfile .
-docker run --rm -p 8080:8080 \
-  -e DATABASE_URL="postgresql://user:pass@host:5432/fabriq_db" \
-  -e JWT_SECRET="your-secret" \
-  --env-file .env \
-  fabriq:latest
-```
-
-(Omit `--env-file .env` if you pass all variables via `-e`.)
+App: **http://localhost:8080**.
 
 ---
 
-## 6. Cloud Build and deploy to Cloud Run
+## 6. Deploy to Cloud Run
 
-Only the **root-repo** files are uploaded (see `.gcloudignore`). Cloud Build clones `backend` and `frontend-1` from GitHub. One image; use external PG on Cloud Run (set `DATABASE_URL` at deploy).
-
-### 6.1 Build the image
-
-From the repo root, with `GH_TOKEN` set (GitHub token with repo access):
+### 6.1 Build (see §3.3)
 
 ```bash
-cd ~/repos/fabriq   # or your root path
-
-export GH_TOKEN="your_github_token"
-
 gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
 ```
 
-- Image: `gcr.io/<PROJECT_ID>/fabriq:latest` (and `:$SHORT_SHA`).
-
-### 6.2 Deploy to Cloud Run (using your .env)
-
-After the build succeeds, deploy and pass env vars from your `.env`:
+### 6.2 Deploy
 
 ```bash
-# Optional: set project and region
 export PROJECT_ID="your-gcp-project-id"
-export REGION="us-central1"
+export REGION="asia-southeast1"
 
 gcloud run deploy fabriq \
   --image gcr.io/${PROJECT_ID}/fabriq:latest \
   --platform managed \
   --region ${REGION} \
   --allow-unauthenticated \
-  --env-vars-file .env
+  --set-env-vars "DATABASE_URL=postgresql://...,JWT_SECRET=...,NODE_ENV=production"
 ```
 
-- If `.env` has comments or quoted values, Cloud Run may still accept it; if you get errors, use a cleaned file (one `KEY=VALUE` per line, no `#` or quotes) or pass only the required vars:
-
-  ```bash
-  gcloud run deploy fabriq \
-    --image gcr.io/${PROJECT_ID}/fabriq:latest \
-    --platform managed \
-    --region ${REGION} \
-    --allow-unauthenticated \
-    --set-env-vars "DATABASE_URL=postgresql://...,JWT_SECRET=...,NODE_ENV=production"
-  ```
-
-- The container runs in external-PG mode (no `USE_EMBEDDED_PG`), so `DATABASE_URL` and `JWT_SECRET` must be set.
-
-### 6.3 Dev image (optional; same Dockerfile, tag for embedded-PG use)
-
-```bash
-gcloud builds submit --config=cloudbuild-dev.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
-```
-
-- Image: `gcr.io/<PROJECT_ID>/fabriq-books-dev:latest`. Set `USE_EMBEDDED_PG=true` when running if you use it with a volume for Postgres.
+Or use `--env-vars-file .env` (one `KEY=VALUE` per line, no comments or quotes).
 
 ---
 
-## 7. Environment variables
+## 7. Deploy to Railway
+
+1. **Add Postgres**: Add a Postgres plugin in the Railway dashboard. It provides `DATABASE_URL` automatically.
+2. **Connect repo**: Connect the root repo. Set `Dockerfile` as the builder.
+3. **Build-time variables**: `GH_TOKEN`, `BACKEND_BRANCH`, `FRONTEND_BRANCH`.
+4. **Runtime variables**: `DATABASE_URL` (from Postgres plugin), `JWT_SECRET`, `NODE_ENV=production`, plus any optional ones from §8.
+5. **Health check**: Set path to `/health`.
+6. **Database setup**: Run Prisma push + seed once against the Railway Postgres URL (see §5.1).
+
+The container uses `PORT` from Railway (`start-external.sh` reads `PORT` env var for nginx).
+
+---
+
+## 8. Environment variables
 
 ### Frontend (build-time only)
 
-- Set in Dockerfile: `VITE_API_BASE_URL=""`, `VITE_ENABLE_AI="true"` (for dev). No runtime env needed in the container.
+Set in Dockerfile: `VITE_API_BASE_URL=""`, `VITE_ENABLE_AI="true"`. No runtime env needed.
 
 ### Backend (runtime)
 
-Set in Cloud Run / Railway / or `docker run` / `docker-compose`:
+Set in Cloud Run / Railway / docker run / docker-compose:
 
 | Variable | Required | Example / default |
 |----------|----------|--------------------|
-| `DATABASE_URL` | Yes (prod) | `postgresql://user:pass@host:5432/fabriq_db` |
+| `DATABASE_URL` | Yes | `postgresql://user:pass@host:5432/fabriq_db` |
 | `JWT_SECRET` | Yes | Any long secret string |
 | `NODE_ENV` | No | `production` or `development` |
-| `BACKEND_PORT` | No | Set by start scripts to `4000` |
+| `AUTH_PROVIDER` | No | `local` (default) |
 | `GOOGLE_CLOUD_PROJECT_ID` | For AI | GCP project ID |
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON_BASE64` | For AI | Base64 service-account JSON |
-| Others | Optional | See project docs (LLM, Langfuse, Slack, etc.) |
+| `LLM_MODEL` | For AI | e.g. `gemini-2.0-flash-001` |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | For AI | Gemini API key |
+| `STORAGE_TYPE`, `BUCKET_NAME`, `STORAGE_FOLDER_PATH` | For GCS | GCS config |
+| `ERP_CONFIG_ENCRYPTION_KEY` | For ERP | Encryption key |
+| `SMTP2GO_*` | For email | SMTP2GO credentials |
+| Others | Optional | See `.env` for full list |
+
+### Build-time args
+
+| Arg | Default | Purpose |
+|-----|---------|---------|
+| `GH_TOKEN` | (required) | GitHub token to clone private repos |
+| `BACKEND_BRANCH` | `demo` | Backend repo branch |
+| `FRONTEND_BRANCH` | `demo` | Frontend repo branch |
 
 ---
 
-## 8. Quick reference (on the VM)
+## 9. Quick reference
 
 ```bash
-# One-time: clone backend + frontend
-cd ~/repos/fabriq && source ~/.fabriq-env  # if you saved GH_TOKEN
-git clone --branch demo --depth 1 "https://${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend
-git clone --branch demo --depth 1 "https://${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
+# Persist GH_TOKEN (optional)
+echo 'export GH_TOKEN="your_github_token"' >> ~/.fabriq-env
+chmod 600 ~/.fabriq-env
+source ~/.fabriq-env
 
-# Dev: build and run (local, no Cloud Build)
+# Local dev (embedded PG)
 docker compose build && docker compose up -d
-curl -s http://localhost:8080/health
 
-# Prod image build (local)
-docker build -t fabriq:latest .
+# Local prod (external PG)
+docker compose -f docker-compose.external-pg.yml build
+docker compose -f docker-compose.external-pg.yml up -d
 
-# Cloud Build (prod)
+# Cloud Build
 gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
 
-# Cloud Build (dev image)
-gcloud builds submit --config=cloudbuild-dev.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
+# Deploy to Cloud Run
+gcloud run deploy fabriq-demo \
+  --image gcr.io/kickoff19-237210/fabriq:latest \
+  --platform managed --region asia-southeast1 \
+  --allow-unauthenticated --env-vars-file .env
 ```
-
----
-
-## 9. Reference for AI when you’re on the VM
-
-When you’re working on the **cloud VM** and reference this doc:
-
-- **Only the root repo** is checked in/out on the VM; `backend/` and `frontend-1/` are cloned from GitHub (branch `demo`) and are not part of the root repo.
-- **Local dev:** use `docker compose` from the root (see Section 4). Build and deploy strategy is in this doc; deployment files (Dockerfile, nginx, start scripts, cloudbuild) are in the root repo.
