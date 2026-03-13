@@ -1,6 +1,8 @@
-# Build production image and push to GCR.
+# Build production image, push to GCR, and deploy to Cloud Run.
 # The Dockerfile clones backend + frontend from GitHub using GH_TOKEN.
 # Manual: gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
+# Env vars (DATABASE_URL, JWT_SECRET, etc.) are not in build context; set them in Cloud Run
+# console or via: gcloud run services update fabriq-demo --region=asia-southeast1 --set-env-vars "KEY=val,..."
 
 steps:
   # Build Docker image (Dockerfile clones repos internally)
@@ -21,6 +23,18 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/fabriq:latest']
 
+  # Deploy to Cloud Run (env vars: set in Cloud Run console or use --set-env-vars / Secret Manager)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image=gcr.io/$PROJECT_ID/fabriq:latest'
+      - '--platform=managed'
+      - '--region=${_REGION}'
+      - '--allow-unauthenticated'
+
 options:
   machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
@@ -29,5 +43,7 @@ substitutions:
   _GH_TOKEN: ''
   _BACKEND_BRANCH: 'demo'
   _FRONTEND_BRANCH: 'demo'
+  _SERVICE_NAME: 'fabriq-us-demo'
+  _REGION: 'us-east4'
 
 timeout: '1200s'
