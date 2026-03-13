@@ -14,7 +14,6 @@ RUN git clone --branch ${BACKEND_BRANCH} --depth 1 \
  && git clone --branch ${FRONTEND_BRANCH} --depth 1 \
       "https://${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
       
-
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
