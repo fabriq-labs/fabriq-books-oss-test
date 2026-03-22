@@ -43,6 +43,8 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Backend development (adding models, APIs) | [docs/BACKEND.md](./docs/BACKEND.md) |
 | Frontend development (adding pages, forms) | [docs/FRONTEND.md](./docs/FRONTEND.md) |
 | Setting up / deploying the system | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) |
+| GCP: Cloud Build, Artifact Registry, Cloud Run, Cloud SQL, IAM, ADC | [docs/GCP_CLOUD_BUILD_AND_RUN.md](./docs/GCP_CLOUD_BUILD_AND_RUN.md) |
+| Railway: Artifact Registry image + Vertex/Gemini auth | [docs/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./docs/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md) |
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
@@ -51,6 +53,9 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
+| Agentic upgrade (sessions, pending actions, workbench) | [docs/AGENTIC_UPGRADE_IMPLEMENTATION.md](./docs/AGENTIC_UPGRADE_IMPLEMENTATION.md) |
+| Agentic upgrade v1 design plan | [docs/AGENTIC_UPGRADE_PLAN_WIP.md](./docs/AGENTIC_UPGRADE_PLAN_WIP.md) |
+| Agentic upgrade v2 (hybrid execution, builders) | [docs/AGENTIC_UPGRADE_V2_PLAN.md](./docs/AGENTIC_UPGRADE_V2_PLAN.md) |
 | View data_graph / datagraph schema (properties, selectProps, relationName, list behaviour) | [docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md](./docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md) |
 | Visual datagraph builder (design, summary) | [docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md](./docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md) |
 | Claude Web/Desktop prompts | [docs/CLAUDE_WEB_PROMPTS.md](./docs/CLAUDE_WEB_PROMPTS.md) |

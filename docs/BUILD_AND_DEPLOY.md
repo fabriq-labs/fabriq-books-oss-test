@@ -105,16 +105,20 @@ gcloud builds submit --config=cloudbuild.yaml \
   --substitutions="_GH_TOKEN=${GH_TOKEN}" .
 ```
 
-Override branches:
+Override branches and image tag:
 
 ```bash
 gcloud builds submit --config=cloudbuild.yaml \
-  --substitutions="_GH_TOKEN=${GH_TOKEN},_BACKEND_BRANCH=feature-xyz,_FRONTEND_BRANCH=demo" .
+  --substitutions="_GH_TOKEN=${GH_TOKEN},_BACKEND_BRANCH=feature-xyz,_FRONTEND_BRANCH=demo,_IMAGE_TAG=$(date +%Y%m%d-%H%M%S)" .
 ```
 
-Image: `gcr.io/<PROJECT_ID>/fabriq:latest`.
+Image: **`{REGION}-docker.pkg.dev/<PROJECT_ID>/fabriq/fabriq:{tag}`** (Artifact Registry; see `cloudbuild.yaml` substitutions `_REGION`, `_AR_REPO`, `_IMAGE_TAG`).
+
+**GCP setup (IAM, Artifact Registry, Cloud Run, impersonation, ADC):** [GCP_CLOUD_BUILD_AND_RUN.md](./GCP_CLOUD_BUILD_AND_RUN.md).
 
 ### 3.4 Railway
+
+**Build on Railway from Git** (same Dockerfile as Cloud Build):
 
 1. Connect the root repo in Railway.
 2. In the service's **Settings → Build**, add build-time variables:
@@ -122,6 +126,9 @@ Image: `gcr.io/<PROJECT_ID>/fabriq:latest`.
    - `BACKEND_BRANCH` = `demo` (or whichever branch)
    - `FRONTEND_BRANCH` = `demo`
 3. Railway will run `docker build --build-arg GH_TOKEN=... --build-arg BACKEND_BRANCH=... ...` automatically.
+
+**Run a pre-built image from Google Artifact Registry + Vertex (Gemini):**  
+[RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./RAILWAY_ARTIFACT_REGISTRY_VERTEX.md)
 
 ---
 

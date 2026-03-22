@@ -43,6 +43,8 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Backend development (adding models, APIs) | [docs/BACKEND.md](./docs/BACKEND.md) |
 | Frontend development (adding pages, forms) | [docs/FRONTEND.md](./docs/FRONTEND.md) |
 | Setting up / deploying the system | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) |
+| GCP: Cloud Build, Artifact Registry, Cloud Run, Cloud SQL, IAM, ADC | [GCP_CLOUD_BUILD_AND_RUN.md](./GCP_CLOUD_BUILD_AND_RUN.md) |
+| Railway: Artifact Registry image + Vertex/Gemini auth | [RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./RAILWAY_ARTIFACT_REGISTRY_VERTEX.md) |
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
