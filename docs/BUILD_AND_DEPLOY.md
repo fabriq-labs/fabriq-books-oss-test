@@ -1,6 +1,6 @@
 # Fabriq – Build and Deploy Strategy
 
-One **Dockerfile** that clones backend + frontend from GitHub, builds everything, and produces a single image. Works identically on **Cloud Build**, **Railway**, and **local `docker build`**. The only difference is how `GH_TOKEN` is passed.
+One **Dockerfile** that clones backend + frontend from GitHub, builds everything, and produces a single image. Works identically on **Cloud Build**, **GitHub Actions → GHCR**, **Railway**, and **local `docker build`**. The only difference is how `GH_TOKEN` is passed (and which registry receives the image).
 
 ---
 
@@ -10,7 +10,7 @@ One **Dockerfile** that clones backend + frontend from GitHub, builds everything
 
 | Repo | Purpose |
 |------|---------|
-| **Root** (`fabriq-ws-setup`) | Deployment: Dockerfile, nginx, start scripts, Cloud Build config, docs |
+| **Root** (`fabriq-ws-setup`) | Deployment: Dockerfile, nginx, start scripts, Cloud Build + optional GitHub Actions (GHCR), docs |
 | **Backend** (`fabriq-base`) | Node/Express API, Prisma, workflows, agent |
 | **Frontend** (`zeiv-v2`) | React/Vite app |
 
@@ -21,6 +21,7 @@ The Dockerfile clones backend and frontend from GitHub during the build (Stage 0
 | Platform | How `GH_TOKEN` is passed |
 |----------|--------------------------|
 | **Cloud Build** | `--substitutions="_GH_TOKEN=${GH_TOKEN}"` → passed as `--build-arg` |
+| **GitHub Actions (GHCR)** | Repository secret **`GH_TOKEN`** → workflow passes it as `--build-arg` (see `.github/workflows/docker-ghcr.yml`) |
 | **Railway** | Set `GH_TOKEN` as a build-time variable in the service settings |
 | **Local** | `docker build --build-arg GH_TOKEN=xxx .` or `GH_TOKEN=xxx docker compose build` |
 
@@ -48,13 +49,17 @@ One image; runtime mode chosen by **USE_EMBEDDED_PG**:
 ├── start-external.sh               # External: backend + nginx only
 ├── .dockerignore
 ├── .gcloudignore
-├── cloudbuild.yaml                 # Cloud Build config (just docker build + push)
+├── cloudbuild.yaml                 # Cloud Build: docker build + push (Artifact Registry) + optional Cloud Run deploy
+├── .github/workflows/docker-ghcr.yml  # GitHub Actions: same Docker build, push to GitHub Container Registry (GHCR)
 ├── docs/
 │   ├── BUILD_AND_DEPLOY.md         # This file
+│   ├── UBUNTU_DOCKER_COMPOSE_SETUP.md  # Pre-built image + Compose on Ubuntu
 │   └── VM_REMOTE_DEV.md
 ├── backend/                        # NOT committed – cloned from GitHub inside Dockerfile
 └── frontend-1/                     # NOT committed – cloned from GitHub inside Dockerfile
 ```
+
+**Pre-built image on Ubuntu (EC2, bare metal):** [UBUNTU_DOCKER_COMPOSE_SETUP.md](./UBUNTU_DOCKER_COMPOSE_SETUP.md) — Docker install (skip if present), first-time DB, Compose, logs.
 
 ---
 
@@ -116,7 +121,20 @@ Image: **`{REGION}-docker.pkg.dev/<PROJECT_ID>/fabriq/fabriq:{tag}`** (Artifact 
 
 **GCP setup (IAM, Artifact Registry, Cloud Run, impersonation, ADC):** [GCP_CLOUD_BUILD_AND_RUN.md](./GCP_CLOUD_BUILD_AND_RUN.md).
 
-### 3.4 Railway
+### 3.4 GitHub Actions → GitHub Container Registry (GHCR)
+
+Alternative to Cloud Build for **building and pushing** the same image: workflow **`.github/workflows/docker-ghcr.yml`**.
+
+1. In the GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**  
+   - Name: **`GH_TOKEN`** — PAT with read access to clone **fabriq-base** and **zeiv-v2** (same as Cloud Build `_GH_TOKEN`).
+2. The workflow uses the built-in **`GITHUB_TOKEN`** to log in to GHCR (`packages: write` is set in the YAML).
+3. **Triggers:** push to **`main`**, tags **`v*`**, or **workflow_dispatch** (optional backend/frontend branch inputs).
+
+**Image URL:** `ghcr.io/<owner-lowercase>/<repo-lowercase>:<tag>` (e.g. `:latest`, commit SHA, or semver). Find it under the repo’s **Packages** on GitHub.
+
+This workflow does **not** deploy to Cloud Run. Deploy manually (e.g. `gcloud run deploy --image=ghcr.io/...` with registry auth) or add a separate job with GCP credentials. For **Railway**, point the service at the GHCR image and configure GHCR pull credentials (similar idea to [RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./RAILWAY_ARTIFACT_REGISTRY_VERTEX.md), but for `ghcr.io`).
+
+### 3.5 Railway
 
 **Build on Railway from Git** (same Dockerfile as Cloud Build):
 
@@ -191,7 +209,11 @@ App: **http://localhost:8080**.
 
 ## 6. Deploy to Cloud Run
 
-### 6.1 Build (see §3.3)
+### 6.1 Build
+
+Use either **§3.3 Cloud Build** (Artifact Registry) or **§3.4 GitHub Actions** (GHCR), then deploy with the image URL your pipeline produced.
+
+**Cloud Build:**
 
 ```bash
 gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
@@ -278,8 +300,10 @@ docker compose build && docker compose up -d
 docker compose -f docker-compose.external-pg.yml build
 docker compose -f docker-compose.external-pg.yml up -d
 
-# Cloud Build
+# Cloud Build → Artifact Registry
 gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
+
+# Or: push to GHCR via GitHub Actions (.github/workflows/docker-ghcr.yml), then deploy with that image URL
 
 # Deploy to Cloud Run
 gcloud run deploy fabriq-demo \

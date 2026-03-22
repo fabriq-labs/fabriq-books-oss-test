@@ -2,9 +2,11 @@
 
 This guide covers **one-time Google Cloud setup** and **day-to-day commands** for the Fabriq **root** deployment repo: build with `cloudbuild.yaml`, push to **Artifact Registry**, deploy to **Cloud Run**, connect **Cloud SQL (PostgreSQL)**, and use **service accounts** + **ADC** on developer machines.
 
+**Alternative CI:** you can build the **same Dockerfile** with **GitHub Actions** and push to **GitHub Container Registry (GHCR)** — see [BUILD_AND_DEPLOY.md §3.4](./BUILD_AND_DEPLOY.md#34-github-actions--github-container-registry-ghcr) and [`.github/workflows/docker-ghcr.yml`](../.github/workflows/docker-ghcr.yml). GCP setup in *this* doc still applies if you deploy that image to Cloud Run (you will wire `gcloud run deploy --image` to `ghcr.io/...` and ensure the runtime can pull from GHCR, or mirror to Artifact Registry).
+
 For the overall Docker/build story (Dockerfile clones `fabriq-base` + `zeiv-v2`), see [BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md).
 
-**Sections:** [APIs](#one-time-enable-apis) · [Artifact Registry](#one-time-artifact-registry-docker) · [IAM](#service-accounts-and-iam) · [Cloud Build YAML](#cloudbuildyaml-reference-root-repo) · [Cloud Run deploy](#cloud-run-first-deploy-and-environment-variables) · [Cloud SQL + Run](#cloud-sql-postgresql--configuration) · [ADC](#application-default-credentials-adc) · [Cheat sheet](#copy-paste-full-developer-cheat-sheet)
+**Sections:** [APIs](#one-time-enable-apis) · [Artifact Registry](#one-time-artifact-registry-docker) · [IAM](#service-accounts-and-iam) · [Cloud Build YAML](#cloudbuildyaml-reference-root-repo) · [GitHub Actions + GHCR](#github-actions--github-container-registry-alternative) · [Cloud Run deploy](#cloud-run-first-deploy-and-environment-variables) · [Cloud SQL + Run](#cloud-sql-postgresql--configuration) · [ADC](#application-default-credentials-adc) · [Cheat sheet](#copy-paste-full-developer-cheat-sheet)
 
 ---
 
@@ -192,6 +194,21 @@ Steps (high level):
 3. `gcloud run deploy` with `--image=...:${_IMAGE_TAG}`  
 
 **Env vars for the app** (`DATABASE_URL`, `JWT_SECRET`, etc.) are **not** set in this YAML by default — set them on Cloud Run (console, `--env-vars-file`, or Secret Manager).
+
+---
+
+## GitHub Actions + GitHub Container Registry (alternative)
+
+Use this when you prefer **GitHub-hosted CI** instead of Cloud Build for the **build + registry push** step.
+
+| Item | Location / notes |
+|------|------------------|
+| Workflow | [`.github/workflows/docker-ghcr.yml`](../.github/workflows/docker-ghcr.yml) |
+| Registry | **GHCR** — `ghcr.io/<owner>/<repo>` (lowercase) |
+| Clone token | Repository Actions secret **`GH_TOKEN`** (same role as `_GH_TOKEN` in Cloud Build) |
+| Deploy | Not in this workflow; use **`gcloud run deploy --image=...`** (this doc) or another pipeline |
+
+Full walkthrough: [BUILD_AND_DEPLOY.md §3.4](./BUILD_AND_DEPLOY.md#34-github-actions--github-container-registry-ghcr).
 
 ---
 
@@ -648,6 +665,7 @@ node setup-db.js --demo-data=indian-demo --skip-tests
 
 ## Related files
 
-- [cloudbuild.yaml](../cloudbuild.yaml) — build, push, deploy  
+- [cloudbuild.yaml](../cloudbuild.yaml) — Cloud Build: build, push (Artifact Registry), deploy to Run  
+- [`.github/workflows/docker-ghcr.yml`](../.github/workflows/docker-ghcr.yml) — GitHub Actions: same build, push to GHCR  
 - [Dockerfile](../Dockerfile) — clone branches, build image  
 - [BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md) — multi-platform build overview  

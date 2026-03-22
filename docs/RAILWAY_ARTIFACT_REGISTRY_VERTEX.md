@@ -10,7 +10,9 @@ Railway is **not** on GCP, so there is **no metadata-based ADC**. You must suppl
 
 Railway can run a **pre-built image** from a **private** registry if you configure registry authentication.
 
-### Image reference
+**GitHub Container Registry (GHCR):** if you build with **GitHub Actions** (`.github/workflows/docker-ghcr.yml`), use `ghcr.io/<owner>/<repo>:<tag>` and configure Railway with **GitHub** / PAT-based auth for GHCR. Overview: [BUILD_AND_DEPLOY.md §3.4](./BUILD_AND_DEPLOY.md#34-github-actions--github-container-registry-ghcr).
+
+### Image reference (Google Artifact Registry)
 
 Use the same URL Cloud Build pushes, for example:
 
