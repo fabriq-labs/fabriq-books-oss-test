@@ -15,6 +15,10 @@ steps:
       - 'BACKEND_BRANCH=${_BACKEND_BRANCH}'
       - '--build-arg'
       - 'FRONTEND_BRANCH=${_FRONTEND_BRANCH}'
+      - '--build-arg'
+      - 'BUILD_TIME=${_BUILD_TIME}'
+      - '--build-arg'
+      - 'IMAGE_TAG=${_IMAGE_TAG}'
       - '-t'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/fabriq:latest'
       - '-t'
@@ -52,5 +56,7 @@ substitutions:
   _REGION: 'asia-southeast1'
   _AR_REPO: 'fabriq'
   _IMAGE_TAG: 'latest'
+  # Optional ISO-8601 UTC; empty → Dockerfile uses build-time clock for /app/build-info.json
+  _BUILD_TIME: ''
 
 timeout: '1200s'

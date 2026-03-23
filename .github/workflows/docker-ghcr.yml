@@ -54,6 +54,13 @@ jobs:
             echo "frontend=demo" >> "$GITHUB_OUTPUT"
           fi
 
+      # Human-readable tag for compose (e.g. knack-dev) + ISO build time for /app/build-info.json and OCI labels
+      - name: Image build metadata (time + tag)
+        id: build_meta
+        run: |
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
       - name: Image name (GHCR requires lowercase)
         id: image
         run: |
@@ -94,6 +101,8 @@ jobs:
             GH_TOKEN=${{ secrets.GH_TOKEN }}
             BACKEND_BRANCH=${{ steps.branches.outputs.backend }}
             FRONTEND_BRANCH=${{ steps.branches.outputs.frontend }}
+            BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
+            IMAGE_TAG=${{ steps.build_meta.outputs.image_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64

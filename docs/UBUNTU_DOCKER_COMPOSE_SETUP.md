@@ -171,6 +171,20 @@ services:
 
 Add `"5432:5432"` under `ports` only if you need Postgres from outside the host.
 
+### Human-readable `image:` tag
+
+Set **`image:`** to a **named tag** (e.g. `ghcr.io/your-org/fabriq:knack-dev`) rather than only `image: ghcr.io/.../fabriq@sha256:…`, so Compose files stay readable. CI still pushes digest-based tags for traceability; you can pin by digest in production if required.
+
+### Inspect embedded build metadata
+
+Official images include **`/app/build-info.json`** (backend/frontend git branch, commit, message, commit timestamp, Docker build time, image tag). From the host:
+
+```bash
+docker compose exec app cat /app/build-info.json
+```
+
+Details: [BUILD_AND_DEPLOY.md — Image build metadata](./BUILD_AND_DEPLOY.md#image-build-metadata-debugging).
+
 ---
 
 ## 7. Run as a daemon

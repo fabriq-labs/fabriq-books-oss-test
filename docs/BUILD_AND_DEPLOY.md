@@ -34,6 +34,25 @@ One image; runtime mode chosen by **USE_EMBEDDED_PG**:
 | **Embedded PG** | `true` or `1` | Postgres + backend + nginx (data in volume) | Local/VM: `docker compose up`. Demos. |
 | **External PG** | unset or `false` | Backend + nginx only; uses `DATABASE_URL` | Cloud Run, Railway, production. |
 
+### Image build metadata (debugging)
+
+Each build embeds **`/app/build-info.json`** (and a copy at **`/usr/share/nginx/html/build-info.json`**) with:
+
+- **backend** / **frontend**: clone branch, full **commit** SHA, **commitMessage** (full `git log -1` body), **commitDate** (ISO-8601 from Git)
+- **dockerImageBuildTime**: UTC time the image was built (CI passes `BUILD_TIME`; local builds default to build-time clock)
+- **dockerImageTag**: human-readable tag (GitHub Actions sets this to **`GITHUB_REF_NAME`**, e.g. branch `knack-dev` or tag `v1.0.0`)
+
+OCI **labels** on the image include `org.opencontainers.image.created`, `fabriq.backend.branch`, `fabriq.frontend.branch`, `fabriq.image.tag`.
+
+**Inspect in a running container**
+
+```bash
+docker compose exec app cat /app/build-info.json
+docker inspect --format '{{json .Config.Labels}}' "$(docker compose images -q app)"
+```
+
+**Compose:** Prefer a **named tag** (e.g. `ghcr.io/org/fabriq:knack-dev`) instead of pinning by digest only, so operators can see which branch/tag the image represents. The workflow still pushes SHA tags for traceability.
+
 ---
 
 ## 2. Root repo layout (what to commit)
@@ -51,6 +70,7 @@ One image; runtime mode chosen by **USE_EMBEDDED_PG**:
 ├── .gcloudignore
 ├── cloudbuild.yaml                 # Cloud Build: docker build + push (Artifact Registry) + optional Cloud Run deploy
 ├── .github/workflows/docker-ghcr.yml  # GitHub Actions: same Docker build, push to GitHub Container Registry (GHCR)
+├── docker-build-info.js            # Emits build-info.json during docker build (build-info stage)
 ├── docs/
 │   ├── BUILD_AND_DEPLOY.md         # This file
 │   ├── UBUNTU_DOCKER_COMPOSE_SETUP.md  # Pre-built image + Compose on Ubuntu
