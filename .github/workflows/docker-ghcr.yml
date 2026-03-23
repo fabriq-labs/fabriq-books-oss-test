@@ -38,20 +38,26 @@ jobs:
   build-push:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Single source of truth for clone branches when the workflow is not workflow_dispatch
+    # (push/tag: inputs.* is unavailable). Keep in sync with workflow_dispatch input defaults below.
+    env:
+      CLONE_BACKEND_DEFAULT: demo
+      CLONE_FRONTEND_DEFAULT: knack-dev
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set clone branches (workflow_dispatch overrides)
+      # workflow_dispatch: use UI inputs. push/tags: inputs are not set — use CLONE_*_DEFAULT.
+      - name: Set clone branches
         id: branches
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "backend=${{ inputs.backend_branch }}" >> "$GITHUB_OUTPUT"
             echo "frontend=${{ inputs.frontend_branch }}" >> "$GITHUB_OUTPUT"
           else
-            echo "backend=feature/gcloud-no-key" >> "$GITHUB_OUTPUT"
-            echo "frontend=demo" >> "$GITHUB_OUTPUT"
+            echo "backend=${CLONE_BACKEND_DEFAULT}" >> "$GITHUB_OUTPUT"
+            echo "frontend=${CLONE_FRONTEND_DEFAULT}" >> "$GITHUB_OUTPUT"
           fi
 
       # Human-readable tag for compose (e.g. knack-dev) + ISO build time for /app/build-info.json and OCI labels
