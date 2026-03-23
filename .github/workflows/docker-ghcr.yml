@@ -14,7 +14,7 @@ on:
     inputs:
       backend_branch:
         description: Backend branch (fabriq-base)
-        default: feature/gcloud-no-key
+        default: demo
         type: string
       frontend_branch:
         description: Frontend branch (zeiv-v2)
