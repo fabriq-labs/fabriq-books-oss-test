@@ -22,7 +22,7 @@ on:
         type: string
   push:
     branches:
-      - demo
+      - knack-dev
     tags:
       - 'v*'
 
