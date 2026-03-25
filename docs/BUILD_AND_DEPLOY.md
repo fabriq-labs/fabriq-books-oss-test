@@ -106,6 +106,8 @@ docker build \
   -t fabriq:latest .
 ```
 
+**Clone layer cache:** `git clone` runs in a fixed `RUN` line. BuildKit/GHA cache reuse that layer when the instruction text is unchanged—even if **`demo` / `knack-dev` gained new commits**. CI passes **`CACHEBUST`** (GitHub: `run_id` + `run_attempt` + `sha`; Cloud Build: `BUILD_ID`) so each build re-clones. Locally, bump cache with `--build-arg CACHEBUST=$(date +%s)` or `docker build --no-cache`.
+
 ### 3.2 Local (docker compose)
 
 ```bash

@@ -19,6 +19,8 @@ steps:
       - 'BUILD_TIME=${_BUILD_TIME}'
       - '--build-arg'
       - 'IMAGE_TAG=${_IMAGE_TAG}'
+      - '--build-arg'
+      - 'CACHEBUST=${BUILD_ID}'
       - '-t'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/fabriq:latest'
       - '-t'
