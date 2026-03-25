@@ -43,7 +43,7 @@ jobs:
     # (push/tag: inputs.* is unavailable). Keep in sync with workflow_dispatch input defaults below.
     env:
       CLONE_BACKEND_DEFAULT: demo
-      CLONE_FRONTEND_DEFAULT: knack-dev
+      CLONE_FRONTEND_DEFAULT: demo
 
     steps:
       - name: Checkout
