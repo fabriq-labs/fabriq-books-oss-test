@@ -2,7 +2,6 @@
 
 This is a multi-repository workspace that contains multiple git repositories:
 
-
 - **Root workspace** - Contains shared documentation, scripts, and workspace configuration
 - **backend/** - Backend API repository (Node.js/Express, PostgreSQL/Prisma)
 - **frontend-1/** - Frontend application repository (React/Vite)
