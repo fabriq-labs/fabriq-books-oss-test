@@ -18,10 +18,11 @@ on:
         type: string
       frontend_branch:
         description: Frontend branch (zeiv-v2)
-        default: knack-dev
+        default: demo
         type: string
   push:
     branches:
+      - demo
       - knack-dev
     tags:
       - 'v*'
