@@ -9,10 +9,11 @@ ARG GH_TOKEN
 ARG BACKEND_BRANCH=demo
 ARG FRONTEND_BRANCH=demo
 WORKDIR /src
-RUN git clone --branch ${BACKEND_BRANCH} --depth 1 \
-      "https://${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend \
- && git clone --branch ${FRONTEND_BRANCH} --depth 1 \
-      "https://${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
+ENV GIT_TERMINAL_PROMPT=0
+RUN git clone --branch "${BACKEND_BRANCH}" --depth 1 \
+      "https://x-access-token:${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend \
+ && git clone --branch "${FRONTEND_BRANCH}" --depth 1 \
+      "https://x-access-token:${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
       
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder

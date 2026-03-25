@@ -24,11 +24,6 @@ on:
         description: Skip Docker layer cache (fresh build)
         default: false
         type: boolean
-  push:
-    branches:
-      - knack-dev
-    tags:
-      - 'v*'
 
 permissions:
   contents: read
