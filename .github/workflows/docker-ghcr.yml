@@ -20,6 +20,10 @@ on:
         description: Frontend branch (zeiv-v2)
         default: knack-dev
         type: string
+      no_cache:
+        description: Skip Docker layer cache (fresh build)
+        default: false
+        type: boolean
   push:
     branches:
       - knack-dev
@@ -109,6 +113,7 @@ jobs:
             FRONTEND_BRANCH=${{ steps.branches.outputs.frontend }}
             BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
             IMAGE_TAG=${{ steps.build_meta.outputs.image_tag }}
-          cache-from: type=gha
+          no-cache: ${{ inputs.no_cache == true }}
+          cache-from: ${{ inputs.no_cache == true && '' || 'type=gha' }}
           cache-to: type=gha,mode=max
           platforms: linux/amd64
