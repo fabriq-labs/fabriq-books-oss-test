@@ -20,12 +20,10 @@ on:
         description: Frontend branch (zeiv-v2)
         default: demo
         type: string
-  push:
-    branches:
-      - demo
-      - knack-dev
-    tags:
-      - 'v*'
+      no_cache:
+        description: Skip Docker layer cache (fresh build)
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -61,12 +59,16 @@ jobs:
             echo "frontend=${CLONE_FRONTEND_DEFAULT}" >> "$GITHUB_OUTPUT"
           fi
 
-      # Human-readable tag for compose (e.g. knack-dev) + ISO build time for /app/build-info.json and OCI labels
+      # One human-readable image tag: <branch-name>:<timestamp> (timestamp part in tag only).
+      # Example final ref: ghcr.io/org/repo:knack-dev-20260325-143210
       - name: Image build metadata (time + tag)
         id: build_meta
         run: |
-          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          TAG_TS=$(date -u +%Y%m%d-%H%M%S)
+          SAFE_BRANCH=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
+          echo "build_time=${BUILD_TIME}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${SAFE_BRANCH}-${TAG_TS}" >> "$GITHUB_OUTPUT"
 
       - name: Image name (GHCR requires lowercase)
         id: image
@@ -91,11 +93,7 @@ jobs:
         with:
           images: ${{ steps.image.outputs.image }}
           tags: |
-            type=raw,value=knack-dev,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-            type=sha,prefix=
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ steps.build_meta.outputs.image_tag }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -110,7 +108,7 @@ jobs:
             FRONTEND_BRANCH=${{ steps.branches.outputs.frontend }}
             BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
             IMAGE_TAG=${{ steps.build_meta.outputs.image_tag }}
-            CACHEBUST=${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
-          cache-from: type=gha
+          no-cache: ${{ inputs.no_cache == true }}
+          cache-from: ${{ inputs.no_cache == true && '' || 'type=gha' }}
           cache-to: type=gha,mode=max
           platforms: linux/amd64

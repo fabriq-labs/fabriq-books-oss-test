@@ -12,11 +12,11 @@ ARG FRONTEND_BRANCH=demo
 # still caches without this—remote HEAD can move but the RUN string is unchanged.
 ARG CACHEBUST=1
 WORKDIR /src
-RUN echo "CACHEBUST=${CACHEBUST}" && \
-    git clone --branch ${BACKEND_BRANCH} --depth 1 \
-      "https://${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend \
- && git clone --branch ${FRONTEND_BRANCH} --depth 1 \
-      "https://${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
+ENV GIT_TERMINAL_PROMPT=0
+RUN git clone --branch "${BACKEND_BRANCH}" --depth 1 \
+      "https://x-access-token:${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend \
+ && git clone --branch "${FRONTEND_BRANCH}" --depth 1 \
+      "https://x-access-token:${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
       
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
