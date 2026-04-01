@@ -46,11 +46,18 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
+| **Workbench backend — onboarding reference** | [docs/agent/WORKBENCH_BACKEND.md](./docs/agent/WORKBENCH_BACKEND.md) |
+| Workbench — categorise expenses deep dive | [docs/agent/WORKBENCH_CATEGORIZE_EXPENSES.md](./docs/agent/WORKBENCH_CATEGORIZE_EXPENSES.md) |
 | Reconciliation tool (bank ↔ receipts/invoices) | [docs/agent/RECONCILIATION_TOOL.md](./docs/agent/RECONCILIATION_TOOL.md) |
 | AI transaction categorization | [docs/AI_AUTO_CATEGORIZATION.md](./docs/AI_Categorizer.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
+| Agentic upgrade (sessions, pending actions, workbench) | [docs/AGENTIC_UPGRADE_IMPLEMENTATION.md](./docs/AGENTIC_UPGRADE_IMPLEMENTATION.md) |
+| Agentic upgrade v1 design plan | [docs/AGENTIC_UPGRADE_PLAN_WIP.md](./docs/AGENTIC_UPGRADE_PLAN_WIP.md) |
+| Agentic upgrade v2 (hybrid execution, builders) | [docs/AGENTIC_UPGRADE_V2_PLAN.md](./docs/AGENTIC_UPGRADE_V2_PLAN.md) |
+| Workbench functional spec | [docs/agent/WORKBENCH_FUNCTIONAL_SPEC.md](./docs/agent/WORKBENCH_FUNCTIONAL_SPEC.md) |
+| Workbench implementation plan (phase log) | [docs/agent/WORKBENCH_IMPLEMENTATION_PLAN.md](./docs/agent/WORKBENCH_IMPLEMENTATION_PLAN.md) |
 | View data_graph / datagraph schema (properties, selectProps, relationName, list behaviour) | [docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md](./docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md) |
 | Visual datagraph builder (design, summary) | [docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md](./docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md) |
 | Claude Web/Desktop prompts | [docs/CLAUDE_WEB_PROMPTS.md](./docs/CLAUDE_WEB_PROMPTS.md) |
