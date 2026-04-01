@@ -1,4 +1,4 @@
-# Build production image, push to GCR, and deploy to Cloud Run.
+# Build production image, push to Artifact Registry, and deploy to Cloud Run.
 # The Dockerfile clones backend + frontend from GitHub using GH_TOKEN.
 # Manual: gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .
 # Env vars (DATABASE_URL, JWT_SECRET, etc.) are not in build context; set them in Cloud Run
@@ -15,13 +15,23 @@ steps:
       - 'BACKEND_BRANCH=${_BACKEND_BRANCH}'
       - '--build-arg'
       - 'FRONTEND_BRANCH=${_FRONTEND_BRANCH}'
+      - '--build-arg'
+      - 'BUILD_TIME=${_BUILD_TIME}'
+      - '--build-arg'
+      - 'IMAGE_TAG=${_IMAGE_TAG}'
+      - '--build-arg'
+      - 'CACHEBUST=${BUILD_ID}'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/fabriq:latest'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/fabriq:latest'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/fabriq:${_IMAGE_TAG}'
       - '.'
 
-  # Push to GCR
+  # Push to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/fabriq:latest']
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/fabriq:latest']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/fabriq:${_IMAGE_TAG}']
 
   # Deploy to Cloud Run (env vars: set in Cloud Run console or use --set-env-vars / Secret Manager)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -30,7 +40,7 @@ steps:
       - 'run'
       - 'deploy'
       - '${_SERVICE_NAME}'
-      - '--image=gcr.io/$PROJECT_ID/fabriq:latest'
+      - '--image=us-central1-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/fabriq:${_IMAGE_TAG}'
       - '--platform=managed'
       - '--region=${_REGION}'
       - '--allow-unauthenticated'
@@ -41,9 +51,14 @@ options:
 
 substitutions:
   _GH_TOKEN: ''
-  _BACKEND_BRANCH: 'demo'
+  # git clone --branch expects the remote branch name, not origin/...
+  _BACKEND_BRANCH: 'feature/gcloud-no-key'
   _FRONTEND_BRANCH: 'demo'
-  _SERVICE_NAME: 'fabriq-us-demo'
-  _REGION: 'us-east4'
+  _SERVICE_NAME: 'fabriq-sg-demo'
+  _REGION: 'asia-southeast1'
+  _AR_REPO: 'fabriq'
+  _IMAGE_TAG: 'latest'
+  # Optional ISO-8601 UTC; empty → Dockerfile uses build-time clock for /app/build-info.json
+  _BUILD_TIME: ''
 
 timeout: '1200s'

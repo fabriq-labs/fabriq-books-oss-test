@@ -1,0 +1,114 @@
+# Build the root Dockerfile and push to GitHub Container Registry (GHCR).
+# Replaces the Docker build + push portion of cloudbuild.yaml (Artifact Registry).
+# Cloud Run deploy is not included; use gcloud/cloud-deploy or a separate workflow with GCP auth.
+#
+# Required repo secret:
+#   GH_TOKEN — PAT with read access to fabriq-labs/fabriq-base and fabriq-labs/zeiv-v2 (same as Cloud Build _GH_TOKEN).
+#
+# GITHUB_TOKEN is used to log in to ghcr.io; enable "Packages: write" via permissions below.
+
+name: Docker build and push (GHCR)
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_branch:
+        description: Backend branch (fabriq-base)
+        default: demo
+        type: string
+      frontend_branch:
+        description: Frontend branch (zeiv-v2)
+        default: demo
+        type: string
+      no_cache:
+        description: Skip Docker layer cache (fresh build)
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-ghcr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Single source of truth for clone branches when the workflow is not workflow_dispatch
+    # (push/tag: inputs.* is unavailable). Keep in sync with workflow_dispatch input defaults below.
+    env:
+      CLONE_BACKEND_DEFAULT: demo
+      CLONE_FRONTEND_DEFAULT: demo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # workflow_dispatch: use UI inputs. push/tags: inputs are not set — use CLONE_*_DEFAULT.
+      - name: Set clone branches
+        id: branches
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "backend=${{ inputs.backend_branch }}" >> "$GITHUB_OUTPUT"
+            echo "frontend=${{ inputs.frontend_branch }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=${CLONE_BACKEND_DEFAULT}" >> "$GITHUB_OUTPUT"
+            echo "frontend=${CLONE_FRONTEND_DEFAULT}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # One human-readable image tag: <branch-name>:<timestamp> (timestamp part in tag only).
+      # Example final ref: ghcr.io/org/repo:knack-dev-20260325-143210
+      - name: Image build metadata (time + tag)
+        id: build_meta
+        run: |
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          TAG_TS=$(date -u +%Y%m%d-%H%M%S)
+          SAFE_BRANCH=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
+          echo "build_time=${BUILD_TIME}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${SAFE_BRANCH}-${TAG_TS}" >> "$GITHUB_OUTPUT"
+
+      - name: Image name (GHCR requires lowercase)
+        id: image
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${OWNER}/${REPO}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.image }}
+          tags: |
+            type=raw,value=${{ steps.build_meta.outputs.image_tag }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GH_TOKEN=${{ secrets.GH_TOKEN }}
+            BACKEND_BRANCH=${{ steps.branches.outputs.backend }}
+            FRONTEND_BRANCH=${{ steps.branches.outputs.frontend }}
+            BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
+            IMAGE_TAG=${{ steps.build_meta.outputs.image_tag }}
+          no-cache: ${{ inputs.no_cache == true }}
+          cache-from: ${{ inputs.no_cache == true && '' || 'type=gha' }}
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64

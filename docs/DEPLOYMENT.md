@@ -1,7 +1,7 @@
 # Fabriq Base - Deployment & Setup Guide
 
 **When to read**: Setting up a new instance, deploying to production, loading demo data
-**Related docs**: [ARCHITECTURE.md](./ARCHITECTURE.md), [AUTHENTICATION.md](./AUTHENTICATION.md)
+**Related docs**: [ARCHITECTURE.md](./ARCHITECTURE.md), [AUTHENTICATION.md](./AUTHENTICATION.md), [UBUNTU_DOCKER_COMPOSE_SETUP.md](./UBUNTU_DOCKER_COMPOSE_SETUP.md) (pre-built image + Docker Compose on Ubuntu)
 
 **Last Updated**: 2026-01-02
 **Purpose**: Complete guide for deploying and bootstrapping a new Fabriq instance

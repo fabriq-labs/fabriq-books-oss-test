@@ -8,12 +8,16 @@ FROM alpine/git AS source
 ARG GH_TOKEN
 ARG BACKEND_BRANCH=demo
 ARG FRONTEND_BRANCH=demo
+# Invalidate this layer when set to a new value (CI: run id). Same branch name + Dockerfile
+# still caches without this—remote HEAD can move but the RUN string is unchanged.
+ARG CACHEBUST=1
 WORKDIR /src
-RUN git clone --branch ${BACKEND_BRANCH} --depth 1 \
-      "https://${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend \
- && git clone --branch ${FRONTEND_BRANCH} --depth 1 \
-      "https://${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
-
+ENV GIT_TERMINAL_PROMPT=0
+RUN git clone --branch "${BACKEND_BRANCH}" --depth 1 \
+      "https://x-access-token:${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend \
+ && git clone --branch "${FRONTEND_BRANCH}" --depth 1 \
+      "https://x-access-token:${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
+      
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
@@ -48,8 +52,37 @@ RUN npx tsc && cp -r src/config dist/config 2>/dev/null || true
 RUN npx prisma generate
 # Do not prune: OpenTelemetry/Langfuse deps are in devDependencies but required at runtime
 
+# Stage 2b: Git + image metadata for debugging (SHA, message, commit date, branches, build time, tag)
+FROM node:20-alpine AS build-info
+RUN apk add --no-cache git
+COPY --from=source /src/backend /src/backend
+COPY --from=source /src/frontend-1 /src/frontend-1
+COPY docker-build-info.js /docker-build-info.js
+
+ARG BACKEND_BRANCH=demo
+ARG FRONTEND_BRANCH=demo
+ARG BUILD_TIME
+ARG IMAGE_TAG=unknown
+
+RUN export BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
+    export IMAGE_TAG="${IMAGE_TAG}" && \
+    export BACKEND_BRANCH="${BACKEND_BRANCH}" && \
+    export FRONTEND_BRANCH="${FRONTEND_BRANCH}" && \
+    node /docker-build-info.js
+
 # Stage 3: Final image (nginx + node + PostgreSQL; start script chosen by USE_EMBEDDED_PG)
 FROM nginx:alpine
+
+ARG BUILD_TIME
+ARG IMAGE_TAG=unknown
+ARG BACKEND_BRANCH=demo
+ARG FRONTEND_BRANCH=demo
+
+LABEL org.opencontainers.image.created="${BUILD_TIME}"
+LABEL org.opencontainers.image.title="fabriq"
+LABEL fabriq.backend.branch="${BACKEND_BRANCH}"
+LABEL fabriq.frontend.branch="${FRONTEND_BRANCH}"
+LABEL fabriq.image.tag="${IMAGE_TAG}"
 
 RUN apk add --no-cache \
     nodejs \
@@ -73,6 +106,8 @@ WORKDIR /app
 
 COPY --from=backend-builder /app /app/backend
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
+COPY --from=build-info /build-info.json /app/build-info.json
+COPY --from=build-info /build-info.json /usr/share/nginx/html/build-info.json
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 COPY start-with-pg.sh /start-with-pg.sh
