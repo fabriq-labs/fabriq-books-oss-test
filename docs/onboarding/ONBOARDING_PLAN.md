@@ -476,6 +476,36 @@ The workbook covers:
 
 ---
 
+## Optional: Agentic AI & Workbench (for developers on LLM / agent features)
+
+### Session 12: Agentic Features — Basics (2–3 hours)
+
+**Objective**: Understand `AgentService`, `ToolManager`, schema-driven CRUD tools, analytics and SQL tools (`advancedSqlQuery`, `analyticsQuery`), and posting-specific tools (`categorizePostings`, `suggestReconciliationMatches`).
+
+**📖 Workbook**: [Agentic Basics Workbook](./ONBOARDING_SESSION_AGENTIC_BASICS_WORKBOOK.md)
+
+**Completion Checklist**:
+- [ ] Can trace how tools delegate to `ModelService` and respect views/permissions
+- [ ] Knows the difference between `advancedSqlQuery` and `analyticsQuery` / `getAnalyticsContext`
+- [ ] Understands that `categorizePostings` is dry-run and approvals go through pending actions
+
+---
+
+### Session 13: Agentic Features — Workbench (2–3 hours)
+
+**Objective**: Understand agent sessions, templates, SSE live feed, session lifecycle, hybrid dispatcher, pending actions, executors, and `/workbench` routing.
+
+**📖 Workbook**: [Agentic Workbench Workbook](./ONBOARDING_SESSION_AGENTIC_WORKBENCH_WORKBOOK.md)
+
+**Related specs**: [WORKBENCH_FUNCTIONAL_SPEC.md](../WORKBENCH_FUNCTIONAL_SPEC.md), [WORKBENCH_IMPLEMENTATION_PLAN.md](../WORKBENCH_IMPLEMENTATION_PLAN.md)
+
+**Completion Checklist**:
+- [ ] Can explain session states and how SSE snapshots/events update the UI
+- [ ] Knows how pending actions connect to executors and session completion
+- [ ] Has located key files (`SessionEventBus`, `routes.ts` SSE, `PendingActionService`)
+
+---
+
 ## Next Steps After Onboarding
 
 1. **Week 2**: Work on real features with guidance

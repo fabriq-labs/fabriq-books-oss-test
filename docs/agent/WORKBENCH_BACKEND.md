@@ -2,7 +2,7 @@
 
 **Audience**: Backend developers onboarding to the workbench module
 **Assumes**: Familiarity with Fabriq's core architecture (models, views, org_id, Prisma, Express)
-**Last updated**: 2026-03-31 (Phase 4 + Phase 5 complete)
+**Last updated**: 2026-04-02 (Phase 4 + Phase 5 complete; action creation strategies documented)
 
 ---
 
@@ -579,37 +579,136 @@ pending_actions_count > completed_actions_count → status = 'awaiting_approval'
 
 `shouldAutoContinue()` then returns `false` (status is not `executing`), so the loop pauses. It resumes only when `PendingActionService.resolvePendingAction()` detects all actions are resolved and transitions status back to `executing`.
 
-### Deterministic builders
+### Action Creation — Two Strategies
 
-**File**: `backend/src/agent/builders/ActionBuilderRegistry.ts`
+When a session reaches an action step, pending actions must be created for human review. There are two fundamentally different strategies for creating these actions, and the choice between them reflects a deliberate design trade-off between **reliability** and **flexibility**.
 
-For known session types (e.g., reconciliation), the backend can build pending actions **without** an extra LLM round-trip. When `completeStep` is called for an action step:
+#### Strategy 1 — Deterministic Builder (backend creates actions from structured data)
 
-1. `ActionBuilderRegistry.get(goal_model, step, accumulated_context)` is checked
-2. If a builder matches (e.g., `ReconciliationActionBuilder`), it reads `accumulated_context.match_results` and creates pending actions directly
-3. The LLM never needs to call `queueActionBatch` for this step
+**Used by**: Reconciliation (`atpl_reconcile`)
+**Files**: `builders/ActionBuilderRegistry.ts`, `builders/ReconciliationActionBuilder.ts`
+
+In this strategy, the LLM never decides what actions to create. Instead:
+
+1. During an earlier analysis step, the LLM calls a tool that returns structured results (e.g., `suggestReconciliationMatches` returns match suggestions per posting)
+2. The tool stores those results in `accumulated_context` via `completeStep({ accumulated_context_update })`
+3. When `completeStep` fires for the action step, the backend checks `ActionBuilderRegistry.get(goal_model, step, accumulated_context)`
+4. If a builder matches, it reads the structured data from `accumulated_context` and creates pending actions **directly** — the LLM is never called for this step
+
+```
+suggestReconciliationMatches → accumulated_context.match_results
+                                         ↓
+                          completeStep (action step)
+                                         ↓
+                    ReconciliationActionBuilder.matches() → true
+                                         ↓
+                    ReconciliationActionBuilder.build()
+                      reads match_results, creates pending_action rows
+                                         ↓
+                           session → awaiting_approval
+```
+
+**How the builder decides what to create**: `ReconciliationActionBuilder.build()` iterates through `match_results` (an array of postings with their best match suggestions). For each posting that has at least one suggestion, it creates a pending action with `action_type: 'reconcile_posting'`. The payload contains `posting_id`, `match_type`, `match_id`, `match_reference`, and a preview of both sides of the match. The confidence score is copied from the suggestion's confidence level.
+
+The builder is pure data transformation — no LLM call, no network request, no nondeterminism. The `matches()` method self-selects based on whether `match_results` exists in the accumulated context, so it doesn't greedily intercept unrelated action steps (e.g., categorization).
+
+**Why this works for reconciliation**: The matching logic is fully deterministic (amount matching, reference extraction, date proximity scoring). Once the tool returns structured suggestions, there is exactly one correct way to turn them into pending actions. There is no judgement call for the LLM to make.
 
 Similarly, `ReportFormatterRegistry` can generate the final report deterministically from step summaries, skipping the LLM's report step entirely.
+
+#### Strategy 2 — LLM-Driven Queuing (the LLM decides what actions to create)
+
+**Used by**: Categorization (`atpl_categorise`)
+**Files**: `tools/categorizePostings.ts`, `tools/sessionTools.ts` (`queueActionBatchTool`)
+
+In this strategy, the LLM receives structured data from a tool, interprets it, and decides which actions to queue:
+
+1. During an analysis step, the LLM calls `categorizePostings(account_id)`, which runs AI categorization in **dry-run mode** — no database writes, only predictions returned
+2. The tool returns an array of predictions: `{ posting_id, predicted_account_id, confidence_score, reasoning }`
+3. The LLM receives these predictions as a tool result and **itself decides** to call `queueActionBatch` with `action_type: 'categorize_transaction'`
+4. The LLM constructs each action's `payload` from the prediction data, sets the title and confidence, and chooses `on_approve: 'execute_immediately'`
+
+```
+categorizePostings(account_id)
+  → runs AI categorizer in dry_run=true mode
+  → returns predictions[] to LLM
+                    ↓
+        LLM reads predictions, calls:
+        queueActionBatch({
+          action_type: 'categorize_transaction',
+          actions: [{
+            title: "Categorise AMAZON BUSINESS → Office Supplies",
+            payload: { posting_id, predicted_account_id, confidence_score },
+            confidence: 'high'
+          }, ...]
+        })
+                    ↓
+        queueActionBatchTool creates pending_action rows
+                    ↓
+        session → awaiting_approval
+```
+
+**Why the LLM is involved here**: Categorization predictions come from an AI model and may need filtering, grouping, or context-dependent decisions. The LLM can:
+- Skip predictions it considers unreliable based on the reasoning field
+- Adjust confidence labels based on the overall pattern it sees
+- Group actions meaningfully for the user (e.g., by category or date range)
+- Write human-readable titles and descriptions that summarise the prediction
+
+The template's system prompt instructs the LLM to call `queueActionBatch` after receiving categorization results, but the LLM has discretion over how to construct each action.
+
+#### The dry-run pattern
+
+Both strategies depend on a common principle: **the analysis tool does not write to the database**.
+
+| Tool | What it returns | Writes to DB? |
+|------|-----------------|---------------|
+| `suggestReconciliationMatches` | Match suggestions with confidence scores | No |
+| `categorizePostings` | Predictions with confidence scores | No (`dry_run: true`) |
+
+Database writes happen **only** in the executor, **only** after human approval. This is what makes the pending action / approval workflow trustworthy — the user reviews a proposal before anything changes.
+
+#### When to choose which strategy
+
+| | Deterministic Builder | LLM-Driven |
+|---|---|---|
+| **Use when** | The tool output maps 1:1 to pending actions with no interpretation needed | The tool output needs filtering, judgement, or presentation decisions |
+| **Reliability** | Guaranteed — no LLM variability, no risk of skipped actions | Depends on prompt quality — the LLM might skip `queueActionBatch` or format payloads incorrectly |
+| **LLM cost** | Saves one full LLM round-trip per action step | Costs one extra LLM turn to interpret results and create actions |
+| **Flexibility** | Fixed logic — adding new payload fields requires a code change | The LLM can adapt to new data shapes without code changes |
+| **Example** | Reconciliation: structured matches → structured actions | Categorization: AI predictions → human-readable action proposals |
+
+#### The shared execution layer
+
+Regardless of how a pending action was created (builder or LLM), the executor that runs on approval is **identical**. The executor reads the `payload` JSONB field and doesn't know or care whether a builder or the LLM wrote it. This decoupling is intentional — it means you can switch a template from LLM-driven to builder-driven (or vice versa) without changing the executor.
 
 ---
 
 ## 11. Pending Actions — Lifecycle
 
+### The Payload as Contract
+
+A pending action's `payload` is a **self-contained instruction**. It stores everything the executor needs to perform the action at approval time, with no need to re-run any AI or re-query any data. The payload is written once (at creation) and read once (at execution).
+
+This is the contract between action creation and action execution:
+
+| Action type | Payload fields | Who writes the payload | Who reads it |
+|-------------|---------------|----------------------|--------------|
+| `reconcile_posting` | `posting_id`, `match_type`, `match_id`, `match_reference`, `confidence_detail`, `preview` | `ReconciliationActionBuilder` | `ReconcilePostingExecutor` |
+| `categorize_transaction` | `posting_id`, `predicted_account_id`, `predicted_account_name`, `confidence_score` | LLM via `queueActionBatch` | `CategorizeTransactionExecutor` |
+| `create_posting` | Full posting fields (`description`, `amount`, `account_id`, etc.) | LLM via `queueAction` | `CreatePostingExecutor` |
+
+Because the payload captures a snapshot of the prediction at queue time, the executor doesn't need to call the AI model again. Approval is a fast, deterministic database write.
+
 ### Creation
 
-`queueActionBatch` (or `queueAction`) in `sessionTools.ts` creates `pending_action` records and emits:
+Actions are created by one of two paths:
+
+1. **Deterministic builder** — `ActionBuilderRegistry` intercepts `completeStep` on an action step and calls `createPendingActionBatch` directly (see section 10 above)
+2. **LLM tool call** — the LLM calls `queueActionBatch` (or `queueAction`), which calls `createPendingActionBatch` in `sessionTools.ts`
+
+Both paths create `pending_action` records and emit:
 - `action_queued` — once per action
 - `inbox_count_changed` — after the batch, with the new total
-
-Each action has a `payload` (JSON) that is action-type-specific. For `categorize_transaction`:
-```json
-{
-  "posting_id": "pos_...",
-  "predicted_account_id": "acc_...",
-  "confidence_score": 0.91,
-  "reasoning": "This is a utility payment based on description 'MSEDCL Bill'"
-}
-```
 
 ### Resolution
 
@@ -618,7 +717,7 @@ Each action has a `payload` (JSON) that is action-type-specific. For `categorize
 1. Update `pending_action` record: status, resolved_by, resolved_at, resolution_note
 2. If approved (`approved` or `approved_with_edits`):
    - Look up executor for `action_type` in `PendingActionExecutor` registry
-   - Call `executor.execute(action, auth)` — this writes to the database
+   - Call `executor.execute(action, auth)` — reads the payload and writes to the database
    - Store `execution_result` or `execution_error` on the record
 3. Increment `session.completed_actions_count`
 4. Check: `completed_actions_count >= pending_actions_count`?
@@ -634,11 +733,11 @@ Each executor is a simple object registered by `action_type`:
 
 | Action type | What the executor does |
 |-------------|----------------------|
-| `reconcile_posting` | Writes `matched_reference` to the posting, calls reconciliation confirmation logic |
+| `reconcile_posting` | Writes `matched_reference` to the posting, calls `confirmReconciliation()` to create payment receipt and set `reconciliation_status: 'MATCHED'` |
 | `create_posting` | Creates a `posting` record with `status: 'booked'` |
-| `categorize_transaction` | Determines money direction, calls `updatePostingWithCategorization()` |
+| `categorize_transaction` | Determines money direction via `determineTransactionDirection()`, calls `updatePostingWithCategorization()` to set the counter-account |
 
-Executors run **only on approval** — rejected actions do nothing.
+Executors run **only on approval** — rejected actions do nothing. Executors are **stateless** — they depend only on the payload and auth context, never on session state or prior LLM output.
 
 ---
 

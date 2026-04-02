@@ -49,6 +49,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
 | **Workbench backend — onboarding reference** | [docs/agent/WORKBENCH_BACKEND.md](./docs/agent/WORKBENCH_BACKEND.md) |
+| Diagnose a failed/stuck agent session | [docs/agent/debugging/SESSION_FAILURE_PATTERNS.md](./docs/agent/debugging/SESSION_FAILURE_PATTERNS.md) |
 | Workbench — categorise expenses deep dive | [docs/agent/WORKBENCH_CATEGORIZE_EXPENSES.md](./docs/agent/WORKBENCH_CATEGORIZE_EXPENSES.md) |
 | Reconciliation tool (bank ↔ receipts/invoices) | [docs/agent/RECONCILIATION_TOOL.md](./docs/agent/RECONCILIATION_TOOL.md) |
 | AI transaction categorization | [docs/AI_AUTO_CATEGORIZATION.md](./docs/AI_Categorizer.md) |
@@ -169,6 +170,25 @@ WHERE wi.model_id = 'RECORD_ID';
 3. **Follow conventions**: snake_case for DB, camelCase for TS
 4. **Check permissions** before any operation
 5. **Filter by org_id** for all data queries
+
+### Proactive Database Querying
+
+When debugging any issue — data state, workflow behaviour, permissions, record counts, missing fields — **query the database directly** using `psql`. Do not ask the user to run queries.
+
+**How**:
+```bash
+DATABASE_URL=$(grep "^DATABASE_URL=" backend/.env | head -1 | sed 's/DATABASE_URL="//;s/"$//') && psql "${DATABASE_URL}" -c "SELECT ..."
+```
+
+**Rules**:
+- SELECT only — no INSERT, UPDATE, DELETE, or DDL
+- Always filter business data by `org_id`
+- Metadata tables (`view`, `permission`, `role*`, `workflow_flow/state/action`) do not need `org_id`
+- Quote `"user"` — it is a reserved SQL word
+
+**Slash commands** (for focused sessions):
+- `/db` — basic queries (counts, single-table lookups, simple workflow checks)
+- `/db-advanced` — permission chains, cross-module tracing, workflow debugging, data integrity
 
 **Common Pitfalls to Avoid**:
 - ❌ Creating custom CRUD endpoints (use auto-generated ones)
