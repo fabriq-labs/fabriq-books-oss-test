@@ -10,6 +10,7 @@
 **frontend-1** is a React/TypeScript frontend for the Fabriq financial management platform. It provides a modern, metadata-driven UI that dynamically renders forms and tables based on backend view configurations. The application is a **unified platform** that includes Procurement, Sales, Accounting, and Investment modules.
 
 ### Key Features
+
 - **Dynamic UI from Metadata**: Tables and forms auto-generate from backend view definitions
 - **Workflow Support**: State-based routing and approval actions
 - **AI Chat Integration**: Context-aware chat assistant for all business tasks
@@ -38,14 +39,70 @@ npm install
 cp .env.example .env.local
 # Edit with VITE_API_BASE_URL=http://localhost:4000
 
-# Start development server (port 5173)
+# Start development server (port 5173) — pick a brand when prompted (TTY)
 npm run dev
 ```
+
+## Multi-brand (app) configuration
+
+The same codebase can ship **multiple white-label apps** (e.g. Fabriq vs Zeiv). Per-app copy, logos, and metadata live under `frontend-1/config/<brand>/`. Before `vite` runs, `config/scripts/select-brand.js` copies the chosen folder into `src/config/` (including `config.json`, `favicon.*`, `logo.*`).
+
+**How the brand is chosen**
+
+| Situation | Behavior |
+| --------- | -------- |
+| **CLI** | `node config/scripts/select-brand.js <brand> && vite` — brand is explicit |
+| **`npm run dev` / `start`** | Passes `--interactive`: numbered menu when stdin is a TTY; otherwise default **`fabriq`** |
+| **`npm run build`** | No prompt — always default **`fabriq`** unless you use `build:zeiv` etc. or pass a brand on the CLI |
+| **Any run without `--interactive` and without a CLI brand** | Default **`fabriq`** if `config/fabriq/` exists |
+
+Runtime code reads branding from `src/config/config.json` and assets via `src/config/brand.ts`. `vite.config.ts` replaces `__APP_NAME__` / `__APP_TAGLINE__` in `index.html` from that JSON.
+
+**npm scripts**
+
+```bash
+npm run dev              # --interactive: prompt (TTY) or default fabriq; Vite dev :5173
+npm run start            # same as dev
+npm run build            # default fabriq, no prompt; use build:zeiv for another brand
+npm run dev:fabriq       # dev with fabriq (no prompt)
+npm run dev:zeiv         # dev with zeiv (no prompt)
+npm run build:fabriq     # production build, fabriq
+npm run build:zeiv       # production build, zeiv
+npm run preview          # serve existing dist/ (after a build)
+```
+
+**Adding a new app / brand**
+
+1. Create a directory: `frontend-1/config/<brand>/` (lowercase slug, e.g. `acme`).
+2. Add **`config.json`** — copy an existing brand and adjust fields:
+
+   | Field                 | Purpose                                                                               |
+   | --------------------- | ------------------------------------------------------------------------------------- |
+   | `appName`             | Product name (browser title, UI)                                                      |
+   | `appTagline`          | Short subtitle                                                                        |
+   | `sidebarFallbackName` | Sidebar label when needed                                                             |
+   | `copyright`           | Footer / legal line                                                                   |
+   | `appId`               | Stable id (analytics, backend prompts, etc.) — keep unique per deployment if required |
+
+3. Optionally add **`favicon.svg`**, **`favicon.ico`**, **`logo.svg`** (or other extensions); the script copies files whose basename is `favicon` or `logo`.
+4. Register **npm scripts** in `frontend-1/package.json` for non-interactive use, mirroring existing ones:
+
+   `"dev:<brand>": "node config/scripts/select-brand.js <brand> && vite"`  
+   `"build:<brand>": "node config/scripts/select-brand.js <brand> && vite build"`
+
+5. Run `npm run dev:<brand>` or pick the new row in the interactive menu after a TTY `npm run dev`.
+
+**Docker / CI:** `npm run build` uses **`fabriq`** without prompting. To build another brand in the image, use `npm run build:zeiv` (or add a `build:<brand>` script) in the Dockerfile instead of plain `npm run build`.
 
 ## Directory Structure
 
 ```
 frontend-1/
+├── config/
+│   ├── fabriq/                 # Example brand: config.json, favicon, logo
+│   ├── zeiv/
+│   └── scripts/
+│       └── select-brand.js     # Copies config/<brand>/ → src/config/ before Vite
 ├── src/
 │   ├── main.tsx                    # React entry point
 │   ├── App.tsx                     # Route definitions
@@ -90,11 +147,13 @@ frontend-1/
 ## Key Commands
 
 ```bash
-npm run dev          # Start Vite dev server (port 5173)
-npm run build        # Production build
-npm run preview      # Preview production build
+npm run dev          # Vite dev (:5173); prompt for brand when TTY, else default fabriq
+npm run build        # Production build; default fabriq (no prompt)
+npm run preview      # Preview last build (dist/)
 npm run lint         # Run ESLint
 ```
+
+See [Multi-brand (app) configuration](#multi-brand-app-configuration) for `dev:fabriq`, `build:zeiv`, and adding a new brand.
 
 ## Core Concepts
 
@@ -104,18 +163,22 @@ The `Master.tsx` component is the heart of the UI - a **completely generic list 
 
 ```tsx
 // Usage in App.tsx
-<Route path="master/procurement/supplier" element={
-  <Master
-    type="supplier"              // Prisma model name
-    view="supplier_view"         // Backend view name
-    displayName="Suppliers"      // Human-readable name
-    filterConfig={{ enableFilters: true, enableSearch: true }}
-    defaultSortOption={{ field: 'name', direction: 'asc' }}
-  />
-} />
+<Route
+  path="master/procurement/supplier"
+  element={
+    <Master
+      type="supplier" // Prisma model name
+      view="supplier_view" // Backend view name
+      displayName="Suppliers" // Human-readable name
+      filterConfig={{ enableFilters: true, enableSearch: true }}
+      defaultSortOption={{ field: "name", direction: "asc" }}
+    />
+  }
+/>
 ```
 
 **What it does:**
+
 1. Fetches data + metadata from `/api/${type}/view/${view}/search`
 2. Passes metadata to `DynamicTable` for auto-column generation
 3. Handles pagination, filtering, search, sort
@@ -127,25 +190,26 @@ The `Master.tsx` component is the heart of the UI - a **completely generic list 
 The `Master` component supports custom bulk actions through the `bulkActions` prop. This allows model-specific bulk operations (like AI categorization) while keeping the component generic and reusable.
 
 **Type Definition** (`src/types/bulkActions.ts`):
+
 ```typescript
 interface BulkAction {
-  id: string;                    // Unique identifier
-  label: string;                  // Button label
-  icon?: React.ReactNode;         // Optional icon
-  variant?: 'default' | 'outline' | 'destructive' | 'secondary';
-  
+  id: string; // Unique identifier
+  label: string; // Button label
+  icon?: React.ReactNode; // Optional icon
+  variant?: "default" | "outline" | "destructive" | "secondary";
+
   // Handler function
   onClick: (
-    selectedRows: any[], 
-    context: { type: string; view: string }
+    selectedRows: any[],
+    context: { type: string; view: string },
   ) => Promise<void>;
-  
+
   // Optional visibility control
   isVisible?: (selectedRows: any[]) => boolean;
-  
+
   // Optional disabled state
   isDisabled?: (selectedRows: any[]) => boolean;
-  
+
   // Optional confirmation dialog
   confirmation?: {
     title: string;
@@ -157,6 +221,7 @@ interface BulkAction {
 ```
 
 **Usage Example** (from `Transactions.tsx`):
+
 ```tsx
 import { BulkAction } from "@/types/bulkActions";
 import { Sparkles } from "lucide-react";
@@ -174,13 +239,13 @@ const bulkActions: BulkAction[] = [
         toast({ title: "Cannot categorize", ... });
         return;
       }
-      
+
       // API call
       const result = await agentAPI.categorizeTransactionBatch({
         posting_ids: selectedRows.map(row => row.id),
         options: { ... }
       });
-      
+
       // Show success toast
       toast({ title: "Bulk categorization completed", ... });
     },
@@ -203,6 +268,7 @@ const bulkActions: BulkAction[] = [
 ```
 
 **Behavior:**
+
 - Custom bulk actions appear in the bulk action panel when 2+ rows are selected
 - Actions are rendered between the default "Edit" button and "Delete" button
 - Each action can control its own visibility and disabled state based on selected rows
@@ -214,12 +280,14 @@ const bulkActions: BulkAction[] = [
   - Handles errors (action handler should show error toasts)
 
 **Backward Compatibility:**
+
 - Routes without `bulkActions` prop continue to work normally
 - Default Edit and Delete buttons are always available (unless disabled via `listConfig`)
 
 ### 2. Routing Patterns
 
 **A. View-Based Routes** (master data):
+
 ```
 /master/{category}/{type}              → List page (Master component)
 /{type}/view/{viewId}                  → Create form
@@ -227,6 +295,7 @@ const bulkActions: BulkAction[] = [
 ```
 
 **B. State-Based Routes** (workflow entities):
+
 ```
 /{type}/state/{stateId}                → List by workflow state
 /{type}/{id}/state/{stateId}           → Detail page with actions
@@ -238,21 +307,21 @@ All API calls go through `src/api/api.ts`:
 
 ```typescript
 // List/Search
-viewAPI.search(type, view, page, pageSize, searchTerm, filters, sortOption)
+viewAPI.search(type, view, page, pageSize, searchTerm, filters, sortOption);
 
 // CRUD
-viewAPI.getById(type, id, view)
-viewAPI.create(type, view, data)
-viewAPI.update(type, id, view, data)
-viewAPI.delete(type, id, view)
+viewAPI.getById(type, id, view);
+viewAPI.create(type, view, data);
+viewAPI.update(type, id, view, data);
+viewAPI.delete(type, id, view);
 
 // Child relations
-viewAPI.addChild(type, id, view, childRelation, childData)
-viewAPI.deleteChild(type, id, view, childRelation, childId)
+viewAPI.addChild(type, id, view, childRelation, childData);
+viewAPI.deleteChild(type, id, view, childRelation, childId);
 
 // Workflow
-workflowAPI.update(workflowInstanceId, actionId, { comment })
-workflowAPI.getHistory(type, instanceId)
+workflowAPI.update(workflowInstanceId, actionId, { comment });
+workflowAPI.getHistory(type, instanceId);
 ```
 
 ### 4. Authentication Flow
@@ -265,7 +334,7 @@ workflowAPI.getHistory(type, instanceId)
 // 4. Protected routes → ProtectedRouteWithLoading wrapper
 
 // Cookie name: __session
-Cookies.get("__session")  // Retrieved in api.ts
+Cookies.get("__session"); // Retrieved in api.ts
 ```
 
 ### 5. Dynamic Table Generation
@@ -303,11 +372,11 @@ const { setPageContext } = useChatContext();
 
 useEffect(() => {
   setPageContext({
-    modelName: 'supplier',
-    viewName: 'supplier_view',
+    modelName: "supplier",
+    viewName: "supplier_view",
     recordId: id,
-    modelDisplayName: 'Supplier',
-    currentPath: location.pathname
+    modelDisplayName: "Supplier",
+    currentPath: location.pathname,
   });
 }, [id]);
 ```
@@ -330,47 +399,47 @@ export const SupplierForm = () => {
   const navigate = useNavigate();
   const [initialValues, setInitialValues] = useState({});
   const [metadata, setMetadata] = useState({});
-  
+
   // 1. Fetch data + metadata
   useEffect(() => {
     if (id) {
-      viewAPI.getById('supplier', id, viewId).then(res => {
+      viewAPI.getById("supplier", id, viewId).then((res) => {
         setInitialValues(res.data);
         setMetadata(res.metaData);
       });
     }
   }, [id, viewId]);
-  
+
   // 2. React Hook Form + Zod
   const form = useForm({
     resolver: zodResolver(supplierSchema),
-    defaultValues: initialValues
+    defaultValues: initialValues,
   });
-  
+
   // 3. Submit handler
   const onSubmit = async (data) => {
     if (id) {
-      await viewAPI.update('supplier', id, viewId, data);
+      await viewAPI.update("supplier", id, viewId, data);
     } else {
-      await viewAPI.create('supplier', viewId, data);
+      await viewAPI.create("supplier", viewId, data);
     }
     navigate(-1);
   };
-  
+
   // 4. Form fields
   return (
     <Form {...form}>
       <FormField name="name" label="Name" />
       <FormField name="email" label="Email" type="email" />
-      
+
       {/* Relation lookup */}
       <SearchDropDown
         instanceType="payment_terms"
         instanceSourceKey="payment_term_id"
         instanceValue={initialValues?.payment_terms}
-        onSelectItem={(item) => form.setValue('payment_term_id', item.id)}
+        onSelectItem={(item) => form.setValue("payment_term_id", item.id)}
       />
-      
+
       <Button type="submit">Save</Button>
     </Form>
   );
@@ -379,20 +448,21 @@ export const SupplierForm = () => {
 
 ## Key Components Reference
 
-| Component | Purpose | Location |
-|-----------|---------|----------|
-| `Master` | Generic list page | `pages/Master.tsx` |
-| `DynamicTable` | Metadata-driven table | `components/masters/DynamicTable.tsx` |
-| `columnGenerator` | Create columns from metadata | `components/masters/table-columns/` |
-| `SearchDropDown` | Relation lookup | `components/search_dropdown/` |
-| `ChatUI` | AI chat interface | `components/chat/ChatUI.tsx` |
-| `AppLayout` | Main app layout | `components/layout/AppLayout.tsx` |
-| `ProtectedRouteWithLoading` | Auth guard | `components/layout/` |
-| `FilterModal` | Advanced filters | `components/filter/FilterModal.tsx` |
+| Component                   | Purpose                      | Location                              |
+| --------------------------- | ---------------------------- | ------------------------------------- |
+| `Master`                    | Generic list page            | `pages/Master.tsx`                    |
+| `DynamicTable`              | Metadata-driven table        | `components/masters/DynamicTable.tsx` |
+| `columnGenerator`           | Create columns from metadata | `components/masters/table-columns/`   |
+| `SearchDropDown`            | Relation lookup              | `components/search_dropdown/`         |
+| `ChatUI`                    | AI chat interface            | `components/chat/ChatUI.tsx`          |
+| `AppLayout`                 | Main app layout              | `components/layout/AppLayout.tsx`     |
+| `ProtectedRouteWithLoading` | Auth guard                   | `components/layout/`                  |
+| `FilterModal`               | Advanced filters             | `components/filter/FilterModal.tsx`   |
 
 ## Adding a New Master Data Type
 
 1. **Add route in `App.tsx`**:
+
 ```tsx
 <Route path="master/category/mymodel" element={
   <Master type="my_model" view="my_model_view" displayName="My Model" />
@@ -404,6 +474,7 @@ export const SupplierForm = () => {
 2. **Create form component** (`components/forms/Masters/MyModelForm.tsx`)
 
 3. **Add to sidebar** (update `Sidebar.tsx`):
+
 ```tsx
 {
   title: "My Model",
@@ -420,6 +491,7 @@ export const SupplierForm = () => {
 ## Common Tasks
 
 ### Filter Syntax
+
 ```typescript
 // POST body for search
 {
@@ -435,10 +507,11 @@ export const SupplierForm = () => {
 ```
 
 ### Workflow Actions
+
 ```typescript
 // Execute workflow action
 await workflowAPI.update(workflowInstanceId, actionId, {
-  comment: "Approved - within budget"
+  comment: "Approved - within budget",
 });
 
 // Get workflow history
@@ -446,9 +519,10 @@ const history = await workflowAPI.getHistory(type, instanceId);
 ```
 
 ### File Uploads
+
 ```typescript
 const formData = new FormData();
-formData.append('file', file);
+formData.append("file", file);
 await attachmentAPI.create(type, recordId, formData);
 ```
 
@@ -477,6 +551,6 @@ await attachmentAPI.create(type, recordId, formData);
 ---
 
 **Related Documentation:**
+
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture
 - [BACKEND.md](./BACKEND.md) - Backend development
-
