@@ -10,9 +10,9 @@ services:
         GH_TOKEN: ${GH_TOKEN}
     image: fabriq:latest
     env_file:
-      - backend/.env
+      - .env
     volumes:
-      - ./backend/.env:/app/backend/.env:ro
+      - .env:/app/backend/.env:ro
     ports:
       - "8080:8080"
       - "8081:8081"

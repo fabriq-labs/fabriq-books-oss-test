@@ -10,10 +10,10 @@ services:
         GH_TOKEN: ${GH_TOKEN}
     image: fabriq:latest
     env_file:
-      - backend/.env
+      - .env
     volumes:
       # Same file on disk for Python run_dbt.py (loads quickbooks/.env / zoho .env — symlinked in start-sync-service.sh)
-      - ./backend/.env:/app/backend/.env:ro
+      - .env:/app/backend/.env:ro
     ports:
       - "8080:8080"
       - "8081:8081"
