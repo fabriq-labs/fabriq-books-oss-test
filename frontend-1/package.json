@@ -8,20 +8,18 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "node config/scripts/select-brand.js --interactive && vite",
-    "start": "node config/scripts/select-brand.js --interactive && vite",
-    "dev:fabriq": "node config/scripts/select-brand.js fabriq && vite",
-    "dev:zeiv": "node config/scripts/select-brand.js zeiv && vite",
+    "dev": "node config/scripts/select-brand.js && vite",
     "build": "node config/scripts/select-brand.js && vite build",
-    "build:fabriq": "node config/scripts/select-brand.js fabriq && vite build",
-    "build:zeiv": "node config/scripts/select-brand.js zeiv && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "@ai-sdk/react": "^1.2.12",
     "@hookform/resolvers": "^3.9.0",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -89,6 +87,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",

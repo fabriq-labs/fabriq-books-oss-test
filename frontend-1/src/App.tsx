@@ -49,6 +49,8 @@ import ConnectionDetailPage from "./pages/settings/ConnectionDetailPage";
 import TenantOnboardingPage from "./pages/settings/TenantOnboardingPage";
 import { SuperAdminGuard } from "./components/layout/SuperAdminGuard";
 import { PromptTemplateForm } from "./components/forms/Masters/PromptTemplateForm";
+import { AgentTemplateForm } from "./components/forms/Masters/AgentTemplateForm";
+import { AITemplatesPage } from "./pages/settings/AITemplatesPage";
 import { LLMTraceDetailPage } from "./components/forms/Masters/LLMTraceDetailPage";
 import { TaxMasterForm } from "./components/forms/Masters/TaxMasterForm";
 import { ViewForm } from "./components/forms/Masters/ViewForm";
@@ -82,6 +84,11 @@ import SimpleTransactionList from "./pages/reports/SimpleTransactionList";
 import Transactions from "./pages/Transactions";
 import { ReportControllerProvider } from "./contexts/ReportControllerContext";
 import { PaymentReceiptForm } from "./components/forms/Masters/PaymentReceiptForm";
+import WorkbenchPage from "./pages/workbench/WorkbenchPage";
+import { SessionView } from "./pages/workbench/SessionView";
+import { InboxPage } from "./pages/workbench/InboxPage";
+import { GoalSetter } from "./components/workbench/GoalSetter";
+
 import { ExchangeRateForm } from "./components/forms/Masters/ExchangeRateForm";
 // Create a client
 const queryClient = new QueryClient();
@@ -297,9 +304,12 @@ const AppRoutes: React.FC = () => {
                 <Route path="permission/:id/view/:viewId" element={<PermissionForm />} />
                 <Route path="permission/view/:viewId" element={<PermissionForm />} />
 
-                <Route path="settings/prompt-templates" element={<Master type="prompt_template" view="prompt_template_view" displayName="Prompt Templates" defaultFilters={{ app_name: { eq: appId } }} />} />
+                <Route path="settings/ai-templates" element={<AITemplatesPage />} />
+                <Route path="settings/prompt-templates" element={<AITemplatesPage />} />
                 <Route path="prompt_template/:id/view/:viewId" element={<PromptTemplateForm />} />
                 <Route path="prompt_template/view/:viewId" element={<PromptTemplateForm />} />
+                <Route path="settings/agent-templates/new" element={<AgentTemplateForm />} />
+                <Route path="settings/agent-templates/:id/edit" element={<AgentTemplateForm />} />
 
                 <Route path="settings/llm-traces" element={
                   <Master
@@ -330,6 +340,15 @@ const AppRoutes: React.FC = () => {
                 <Route path="investments/trades" element={<Master type="trade" view="trade_view" displayName="Trades" />} />
                 <Route path="trade/:id/view/:viewId" element={<TradeForm />} />
                 <Route path="trade/view/:viewId" element={<TradeForm />} />
+
+                {/* Agent Workbench */}
+                <Route path="workbench" element={<WorkbenchPage />}>
+                  <Route index element={<GoalSetter />} />
+                  {/* inbox routes must be declared before :sessionId */}
+                  <Route path="inbox" element={<InboxPage />} />
+                  <Route path="inbox/:actionId" element={<InboxPage />} />
+                  <Route path=":sessionId" element={<SessionView />} />
+                </Route>
 
                 {/* Catch all route */}
                 <Route path="*" element={<NotFound />} />

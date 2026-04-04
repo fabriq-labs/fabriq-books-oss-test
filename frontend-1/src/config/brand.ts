@@ -1,6 +1,6 @@
 /**
  * Brand config: app name, tagline, logo/favicon paths.
- * Populated from config/<brand>/ by config/scripts/select-brand.js.
+ * Populated from config/<APP_NAME>/ by config/scripts/select-brand.js.
  */
 import brandConfig from './config.json';
 

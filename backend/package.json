@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc && node -e \"require('fs').cpSync('src/config', 'dist/config', {recursive: true, force: true})\"",
     "start": "node dist/index.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "node -r dotenv/config ./node_modules/ts-node-dev/lib/bin.js --respawn --transpile-only src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "generate-types": "ts-node scripts/generateTypes.ts",

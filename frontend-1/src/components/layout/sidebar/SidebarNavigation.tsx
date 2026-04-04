@@ -15,6 +15,7 @@ import {
   Building2,
   Truck,
   FileText,
+  Bot,
 } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { NavGroup } from './NavGroup';
@@ -33,7 +34,8 @@ interface MasterNavItem {
 
 const directNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: BarChart3, label: 'Reports', path: '/reports' }
+  { icon: BarChart3, label: 'Reports', path: '/reports' },
+  { icon: Bot, label: 'Workbench', path: '/workbench' },
 ];
 
 const topLevelNavItems: MasterNavItem[] = [
@@ -134,7 +136,7 @@ const settingsNavItems: MasterNavItem[] = [
       { label: 'Connections', path: '/settings/connections' },
       { label: 'Views', path: '/settings/views' },
       { label: 'Permissions', path: '/settings/permissions' },
-      { label: 'Prompt Templates', path: '/settings/prompt-templates' },
+      { label: 'AI Templates', path: '/settings/ai-templates' },
       { label: 'LLM Traces', path: '/settings/llm-traces' },
       { label: 'Tenant Onboarding', path: '/settings/tenant-onboarding' }
     ]
