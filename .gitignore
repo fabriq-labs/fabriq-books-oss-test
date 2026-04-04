@@ -7,11 +7,13 @@ backups/
 
 # Common build artifacts and dependencies
 node_modules/
-dist/
-build/
-data/
-scripts/
 *.tsbuildinfo
+
+# Root-only directories (leading / = repo root only; don't exclude e.g. frontend-1/config/scripts/)
+/dist/
+/build/
+/data/
+/scripts/
 
 # Environment files
 .env
