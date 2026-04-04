@@ -17,6 +17,13 @@ fi
 # Replace env vars in nginx config template
 envsubst '${NGINX_PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
 
+# Python integration sync (POST /sync on port 8081); Node reads INTEGRATION_SYNC_URL
+export INTEGRATION_SYNC_PORT="${INTEGRATION_SYNC_PORT:-8081}"
+if [ "${INTEGRATION_SYNC_ENABLED}" != "false" ]; then
+  export INTEGRATION_SYNC_URL="${INTEGRATION_SYNC_URL:-http://127.0.0.1:${INTEGRATION_SYNC_PORT}}"
+fi
+sh /start-sync-service.sh
+
 echo "Starting backend on port ${BACKEND_PORT}..."
 cd /app/backend
 BACKEND_PORT="${BACKEND_PORT}" node dist/index.js &

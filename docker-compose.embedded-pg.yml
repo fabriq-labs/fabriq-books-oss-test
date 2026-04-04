@@ -1,0 +1,34 @@
+# Embedded PostgreSQL in the same container (legacy / offline demo). Binds host 5432 to the in-container DB.
+# Prefer docker-compose.yml + DATABASE_URL in backend/.env for Railway or local Postgres.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GH_TOKEN: ${GH_TOKEN}
+    image: fabriq:latest
+    env_file:
+      - backend/.env
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "5432:5432"
+    environment:
+      PORT: "8080"
+      USE_EMBEDDED_PG: "true"
+      NODE_ENV: "development"
+      INTEGRATION_SYNC_URL: "http://127.0.0.1:8081"
+    volumes:
+      - ./backend/.env:/app/backend/.env:ro
+      - fabriq_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  fabriq_pgdata:

@@ -1,5 +1,5 @@
-# External PostgreSQL: same image as embedded; USE_EMBEDDED_PG unset → use DATABASE_URL.
-# Requires DATABASE_URL and JWT_SECRET in .env. See docs/BUILD_AND_DEPLOY.md.
+# Alias: same as default docker-compose.yml (external DATABASE_URL). Kept for existing scripts/docs.
+# Prefer: docker compose up (uses backend/.env)
 
 services:
   app:
@@ -10,11 +10,15 @@ services:
         GH_TOKEN: ${GH_TOKEN}
     image: fabriq:latest
     env_file:
-      - .env
+      - backend/.env
+    volumes:
+      - ./backend/.env:/app/backend/.env:ro
     ports:
       - "8080:8080"
+      - "8081:8081"
     environment:
       PORT: "8080"
-      # USE_EMBEDDED_PG not set (or false) → start-external.sh, DATABASE_URL from .env
+      USE_EMBEDDED_PG: "false"
+      INTEGRATION_SYNC_URL: "http://127.0.0.1:8081"
 
 volumes: {}

@@ -52,6 +52,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Transaction categorization (AI), batch categorize | [docs/agent/AI_Categorizer.md](./docs/agent/AI_Categorizer.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
+| Railway sync button implementation (backend + frontend) | [docs/RAILWAY_SYNC_SERVICE_IMPLEMENTATION.md](./docs/RAILWAY_SYNC_SERVICE_IMPLEMENTATION.md) |
 | Agentic FinOps positioning, demo roadmap, GTM | [docs/positioning/](./docs/positioning/) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
 

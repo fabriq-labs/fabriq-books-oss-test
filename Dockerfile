@@ -1,23 +1,16 @@
 # Single Dockerfile for both embedded-PG and external-PG. Mode at runtime via USE_EMBEDDED_PG.
-# Build: clone repos → build frontend & backend → final nginx image.
+# Build: clone repos → build frontend, backend, Python sync service → final nginx image.
 # Works the same on Cloud Build, Railway, and local docker build.
-# Pass GH_TOKEN as --build-arg (or set as build-time env in Railway).
+# Build context must be the repo root with ./backend and ./frontend-1 (same layout as fabriq-base + zeiv-v2).
+# CI: checkout backend + frontend into context, or build from a monorepo that contains both directories.
+# Runtime: nginx + Node (8080 via PORT), Python FastAPI integration sync on 8081 (POST /sync, GET /health).
+# Node uses INTEGRATION_SYNC_URL (set by start scripts when sync is not disabled).
 
-# Stage 0: Clone source repos from GitHub
-FROM alpine/git AS source
-ARG GH_TOKEN
-ARG BACKEND_BRANCH=demo
-ARG FRONTEND_BRANCH=demo
-# Invalidate this layer when set to a new value (CI: run id). Same branch name + Dockerfile
-# still caches without this—remote HEAD can move but the RUN string is unchanged.
-ARG CACHEBUST=1
-WORKDIR /src
-ENV GIT_TERMINAL_PROMPT=0
-RUN git clone --branch "${BACKEND_BRANCH}" --depth 1 \
-      "https://x-access-token:${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend \
- && git clone --branch "${FRONTEND_BRANCH}" --depth 1 \
-      "https://x-access-token:${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
-      
+# Stage 0: Application source from build context
+FROM scratch AS source
+COPY backend /src/backend
+COPY frontend-1 /src/frontend-1
+
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
@@ -51,6 +44,32 @@ RUN sed -i '/provider = "prisma-client-js"/a\
 RUN npx tsc && cp -r src/config dist/config 2>/dev/null || true
 RUN npx prisma generate
 # Do not prune: OpenTelemetry/Langfuse deps are in devDependencies but required at runtime
+
+# Stage 2c: Python integration sync service (FastAPI: GET /health, POST /sync — port 8081 at runtime)
+# Matches backend/integrations/sync_service/Dockerfile layout: PYTHONPATH root contains zoho_books/, quickbooks/, sync_service/.
+FROM python:3.12-alpine AS sync-service-builder
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    postgresql-dev \
+    libffi-dev \
+    openssl-dev \
+    cargo \
+    rust
+
+WORKDIR /opt/fabriq-int
+COPY --from=source /src/backend/integrations/sync_service/requirements.txt ./sync_service/requirements.txt
+
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
+ && /opt/venv/bin/pip install --no-cache-dir -r sync_service/requirements.txt
+
+COPY --from=source /src/backend/integrations/zoho_books ./zoho_books
+COPY --from=source /src/backend/integrations/quickbooks ./quickbooks
+COPY --from=source /src/backend/integrations/shared ./shared
+COPY --from=source /src/backend/integrations/sync_service ./sync_service
+
+ENV PYTHONPATH=/opt/fabriq-int
 
 # Stage 2b: Git + image metadata for debugging (SHA, message, commit date, branches, build time, tag)
 FROM node:20-alpine AS build-info
@@ -100,9 +119,18 @@ RUN apk add --no-cache \
     postgresql16 \
     postgresql16-contrib \
     su-exec \
-    openssl
+    openssl \
+    libpq \
+    libstdc++
 
 WORKDIR /app
+
+COPY --from=sync-service-builder /opt/venv /opt/venv
+COPY --from=sync-service-builder /opt/fabriq-int /opt/fabriq-int
+# Venv symlinks point at python:3.12-alpine's /usr/local/bin/python; this image only has apk python3.
+RUN mkdir -p /usr/local/bin \
+ && ln -sf /usr/bin/python3 /usr/local/bin/python \
+ && ln -sf /usr/bin/python3 /usr/local/bin/python3
 
 COPY --from=backend-builder /app /app/backend
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
@@ -112,13 +140,15 @@ COPY --from=build-info /build-info.json /usr/share/nginx/html/build-info.json
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 COPY start-with-pg.sh /start-with-pg.sh
 COPY start-external.sh /start-external.sh
+COPY start-sync-service.sh /start-sync-service.sh
 COPY start.sh /start.sh
-RUN chmod +x /start.sh /start-with-pg.sh /start-external.sh
+RUN chmod +x /start.sh /start-with-pg.sh /start-external.sh /start-sync-service.sh
 
 RUN mkdir -p /app/backend/logs
 RUN mkdir -p /var/lib/postgresql/data && chown -R postgres:postgres /var/lib/postgresql
 
-EXPOSE 8080
+# Python sync API (POST /sync). Start scripts export INTEGRATION_SYNC_URL when the service is enabled.
+EXPOSE 8080 8081
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:${NGINX_PORT:-8080}/health || exit 1

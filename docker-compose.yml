@@ -1,6 +1,5 @@
-# Embedded PostgreSQL: single container (frontend + backend + nginx + in-container Postgres).
-# Same Dockerfile as external-PG; use USE_EMBEDDED_PG=true to run embedded DB.
-# Use from repo root after cloning backend/ and frontend-1/ (see docs/BUILD_AND_DEPLOY.md).
+# Single container: nginx + Node + Python sync. Database is external only (DATABASE_URL in backend/.env).
+# Do not set USE_EMBEDDED_PG=true — that starts Postgres inside the image. For embedded PG, use docker-compose.embedded-pg.yml.
 
 services:
   app:
@@ -11,22 +10,22 @@ services:
         GH_TOKEN: ${GH_TOKEN}
     image: fabriq:latest
     env_file:
-      - .env
+      - backend/.env
+    volumes:
+      # Same file on disk for Python run_dbt.py (loads quickbooks/.env / zoho .env — symlinked in start-sync-service.sh)
+      - ./backend/.env:/app/backend/.env:ro
     ports:
       - "8080:8080"
-      - "5432:5432"   # PostgreSQL (host + external; ensure firewall allows if needed)
+      - "8081:8081"
     environment:
       PORT: "8080"
-      USE_EMBEDDED_PG: "true"
+      USE_EMBEDDED_PG: "false"
       NODE_ENV: "development"
-    volumes:
-      - fabriq_pgdata:/var/lib/postgresql/data
+      # In-container backend must call the sync service on 8081 (not nginx 8080; localhost in .env is wrong inside Docker)
+      INTEGRATION_SYNC_URL: "http://127.0.0.1:8081"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 90s
-
-volumes:
-  fabriq_pgdata:
