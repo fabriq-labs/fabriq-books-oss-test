@@ -17,14 +17,14 @@ dist
 build
 *.tsbuildinfo
 
-# Non-deployment directories
-backups/
-trash/
-data/
-fabriqdata.com/
-docs/
-scripts/
-setup/
+# Non-deployment directories (leading / = repo root only — do not exclude e.g. frontend-1/config/scripts/)
+/backups/
+/trash/
+/data/
+/fabriqdata.com/
+/docs/
+/scripts/
+/setup/
 
 # Logs
 *.log
