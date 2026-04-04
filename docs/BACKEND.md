@@ -220,6 +220,10 @@ GOOGLE_APPLICATION_CREDENTIALS_JSON_BASE64="base64-encoded-key"
 PORT=4000
 AUTH_PROVIDER=local  # local | clerk
 REQUEST_BODY_LIMIT=25mb
+
+# Demo database reset (POST /api/admin/demo-database-reset; Super Admin; Settings UI)
+# In production set to true only if you intentionally expose this destructive API.
+ALLOW_DEMO_RESET_API=true
 ```
 
 ## Adding a New Model
@@ -273,6 +277,7 @@ npx prisma generate
 | `POST /api/agent/chat/stream` | AI chat (streaming) |
 | `POST /api/parse-document/{model}` | PDF extraction |
 | `POST /api/workflow/instances/{id}/actions/{actionId}` | Execute workflow action |
+| `POST /api/admin/demo-database-reset` | Super Admin: start `setup-db.js` in background. Body: `demoData` (`indian-demo` \| `us-ca-demo` \| `perfin-demo` \| `both` \| `nri`), optional `demoDataOnly` (adds `--demo-data-only`), optional `runTests` (default false; true omits `--skip-tests` and runs `npm test -- src/__tests__`). Disabled when `ALLOW_DEMO_RESET_API` is false and `NODE_ENV=production`. Child stdout/stderr is printed to the backend process console (`[demo-database-reset/setup-db …]`). |
 
 ## Search Query Filters
 
