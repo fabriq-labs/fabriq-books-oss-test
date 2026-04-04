@@ -169,6 +169,8 @@ Pre-defined task templates (seeded via SQL, not created by users). Each template
 | `goal_model` | Prisma model the agent should focus on, e.g. `posting` |
 | `default_mode` | `supervised` / `semi_auto` / `autonomous` |
 | `icon` | Lucide icon name for the UI card |
+| `focus_models` | `String[]` — model schemas to include in the system prompt. Empty = fall back to `RELATED_MODELS` constant |
+| `allowed_tools` | `String[]` — tools the LLM may call (besides core session tools). Empty = fall back to `getToolsForModel()` model-switch |
 
 Templates are seeded in `backend/prisma/seed-agent-templates.sql`.
 
@@ -461,23 +463,25 @@ File: `backend/src/agent/tools/analyticsQuery.ts` and `analyticsContext.ts`
 **Session tools** (only when `sessionId` is present):
 File: `backend/src/agent/tools/sessionTools.ts`
 
-- `createPlan` — Receives an array of steps, writes to `agent_session.plan`, sets status to `executing`
-- `completeStep` — Marks the current step complete, advances `current_step_index`, stores `result_summary` and `accumulated_context_update` into the session
-- `queueAction` — Creates a single `pending_action` record
-- `queueActionBatch` — Creates multiple `pending_action` records in one call, with a shared `batch_id`
+- `createPlan` — Receives an array of steps, writes to `agent_session.plan`, sets status to `executing`. **Core tool** — always injected, cannot be removed by `allowed_tools`.
+- `completeStep` — Marks the current step complete, advances `current_step_index`, stores `result_summary` and `accumulated_context_update` into the session. **Core tool** — always injected.
+- `queueActions` — Creates one or more `pending_action` records in a single call. `action_type` and `batch_id` are at the batch level; `actions` is an array of 1..N items. Replaces the former `queueAction` (single) and `queueActionBatch` (multiple) tools, which are kept as deprecated exports.
 
 ### How tools are selected and passed to the LLM
 
 **File**: `backend/src/agent/ToolManager.ts`, method `getUnifiedTools()`
 
 ```
-getUnifiedTools(modelName, auth, context, sessionId)
-  → model-specific tools for modelName
-  + analyticsQuery + getAnalyticsContext
-  + [createPlan, completeStep, queueAction, queueActionBatch] if sessionId present
+getUnifiedTools(modelName, auth, context, sessionId, allowedTools?)
+  → model-specific tools for modelName      (from getToolsForModel())
+  + analyticsQuery + getAnalyticsContext     (always)
+  + [createPlan, completeStep, queueActions] if sessionId present
+  → filter to [core tools + allowedTools]   if template.allowed_tools is non-empty
 ```
 
-All tools are passed as a single flat object to the AI SDK. **The LLM receives all tools simultaneously and decides which to use** — there is no pre-routing.
+When `allowed_tools` is declared on the template, the full tool set is built first and then filtered down to the declared list plus the two core session tools (`createPlan`, `completeStep`). This is the **security ceiling** — the request context cannot extend it. Templates with empty `allowed_tools` receive the full model-switch fallback (backward compatible).
+
+All tools are passed as a single flat object to the AI SDK. **The LLM receives all permitted tools simultaneously and decides which to use** — there is no pre-routing.
 
 ### Tool execution
 
@@ -497,7 +501,7 @@ This tool does **not write to the database**. It:
 2. Calls the AI categorizer in `dry_run: true` mode
 3. Returns structured predictions: posting details + predicted account + confidence + reasoning
 
-The agent then uses these predictions to call `queueActionBatch`, creating one `categorize_transaction` pending action per prediction. The actual categorization write happens in `CategorizeTransactionExecutor` only after the user approves.
+The agent then uses these predictions to call `queueActions` (with `action_type: 'categorize_transaction'`), creating one pending action per prediction in a single batch call. The actual categorization write happens in `CategorizeTransactionExecutor` only after the user approves.
 
 ---
 
@@ -947,12 +951,36 @@ All admin routes require `authMiddleware`. They do **not** enforce a Super Admin
 | `is_active` | Boolean | `false` = hidden in GoalSetter, still visible in admin UI |
 | `sort_order` | Int | Display order in GoalSetter (lower = first) |
 | `org_id` | String? | `null` = system template available to all orgs |
+| `focus_models` | String[] | Model schemas included in the system prompt. Empty array = fall back to `RELATED_MODELS[goal_model]`, then all accessible models |
+| `allowed_tools` | String[] | Tools the LLM may call (besides `createPlan` + `completeStep` which are always injected). Empty array = full model-switch fallback |
 
-### How `system_prompt` is merged at runtime
+### How templates shape the runtime
 
-When a session has a `template_id`, `AgentService` loads the template before assembling the prompt and prepends `template.system_prompt` to the base system prompt from `DynamicPromptManager`. The merged prompt is never stored — it is re-assembled on every request. This means editing a template's `system_prompt` takes effect immediately for all new LLM calls in sessions using that template.
+When a session has a `template_id`, `AgentService` loads the template **once at the start of each request** (before prompt assembly) and applies it in three ways:
 
-See [Section 7](#7-how-prompts-and-context-are-assembled) for the full prompt assembly sequence.
+**1. `system_prompt` merging**
+`template.system_prompt` is prepended to the base system prompt from `DynamicPromptManager`. The merged prompt is never stored — it is re-assembled on every LLM call. Edits to `system_prompt` take effect immediately for all new calls in sessions using that template.
+
+**2. `focus_models` — model schema scoping**
+If `focus_models` is non-empty, only those model schemas are included in the system prompt (intersected with the user's accessible models as a security gate). This prevents the LLM from seeing — and reasoning about — schema noise from unrelated models. Empty = `RELATED_MODELS[goal_model]` fallback, then all accessible models.
+
+Example for `atpl_categorise`:
+```
+focus_models: ["posting", "account", "category", "category_group"]
+```
+~1,400 fewer tokens per call vs the full posting-model schema set.
+
+**3. `allowed_tools` — tool scoping**
+If `allowed_tools` is non-empty, `ToolManager.getUnifiedTools()` filters the complete tool set down to `[createPlan, completeStep, ...allowed_tools]`. The LLM's decision space shrinks — it cannot accidentally call `suggestReconciliationMatches` in a categorisation session, or `categorizePostings` in a reconciliation session.
+
+Example for `atpl_categorise`:
+```
+allowed_tools: ["getAnalyticsContext", "analyticsQuery", "categorizePostings", "queueActions"]
+```
+
+Templates with empty `allowed_tools` receive the full tool set for `goal_model` (backward-compatible fallback for `atpl_custom` and any legacy templates).
+
+See [Section 7](#7-how-prompts-and-context-are-assembled) and [Section 8](#8-tools--definition-registration-and-execution) for the full prompt and tool assembly sequences.
 
 ### Frontend: Settings → AI Templates
 
@@ -981,8 +1009,20 @@ System templates are not seeded via Prisma migrations — they are inserted dire
    - Name the tools the agent should use and in what order
    - Include broad-search tips (e.g. `ILIKE '%keyword%'`)
    - Remind the agent to always queue actions, never write directly
-4. Set `is_active = true` and `sort_order` to control position in GoalSetter
-5. The template is live immediately — no restart needed
+4. Set `focus_models` to the minimal set of model schemas the agent needs (see `seed-agent-templates.sql` for examples). Fewer models = sharper prompt.
+5. Set `allowed_tools` to the exact tools the agent should call. Only include tools that are actually needed for the task. Leave empty only for `atpl_custom`-style free-form templates.
+6. Set `is_active = true` and `sort_order` to control position in GoalSetter
+7. The template is live immediately — no restart needed
+
+**Current tool inventory by template** (from `seed-agent-templates.sql`):
+
+| Template | `focus_models` | `allowed_tools` |
+|---|---|---|
+| `atpl_categorise` | posting, account, category, category_group | getAnalyticsContext, analyticsQuery, categorizePostings, queueActions |
+| `atpl_reconcile` | posting, account, payment_receipt, invoice | getAnalyticsContext, analyticsQuery, suggestReconciliationMatches, queueActions |
+| `atpl_book_transactions` | posting, account, category_group | getAnalyticsContext, analyticsQuery, queueActions |
+| `atpl_spending_analysis` | posting, account, category, category_group | getAnalyticsContext, analyticsQuery |
+| `atpl_custom` | *(empty — all accessible)* | *(empty — full fallback)* |
 
 ---
 

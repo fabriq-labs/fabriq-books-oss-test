@@ -62,6 +62,8 @@ WHERE id = '<SESSION_ID>';
 | 2 | [Plan Never Created](#2-plan-never-created) | `failed` | Some | None | < 5 min | LLM skipped `createPlan` tool call |
 | 3 | [Step Loop](#3-step-loop) | `failed` | Many | Yes | ~5 min | Auto-continuation cycling on same step |
 | 4 | [Awaiting Approval Abandoned](#4-awaiting-approval-abandoned) | `awaiting_approval` | Yes | Yes | Hours/days | User never reviewed; session not expired |
+| 5 | [Prompt Template Not Found](#5-prompt-template-not-found) | `failed` | None | None | ~0s | `APP_NAME` env mismatch or templates not seeded |
+| 6 | [Step Stalled — Data Not Found](#6-step-stalled--data-not-found) | `executing` | Some | Yes | ~5 min | LLM couldn't find required data, didn't call `completeStep` |
 
 ---
 
@@ -199,6 +201,112 @@ WHERE pa.session_id = '<SESSION_ID>' AND pa.status = 'pending';
 **Fix**
 - Add a configurable expiry to `awaiting_approval` sessions (e.g. 24h) in `SessionTimeoutService`
 - Or surface these as "stale" in the workbench UI with a nudge to the user
+
+---
+
+### 5. Prompt Template Not Found
+
+**Observed**: 2026-04-02, session `ses_63125234-be79-46c0-ade8-5d5fca9a73e5`
+
+**Symptoms**
+- `status = 'failed'`
+- `plan IS NULL`
+- Zero rows in `agent_message`
+- Zero rows in `llm_trace`, OR one trace with `error_message` containing "No prompt templates found for model: X, view: Y"
+- `last_active_at - started_at` ≈ 0s (failed immediately, before any LLM call)
+
+**Root Cause**
+
+`DynamicPromptManager` filters `prompt_template` by `app_name = process.env.APP_NAME`. If the `APP_NAME` environment variable differs from the value stored in `prompt_template.app_name` (or templates have not been seeded), the query returns zero rows and an error is thrown synchronously before the first LLM call.
+
+**Diagnostic confirmation**
+
+```sql
+-- Check if any templates exist for the expected app_name
+SELECT app_name, model_name, prompt_type, COUNT(*)
+FROM prompt_template
+GROUP BY app_name, model_name, prompt_type
+ORDER BY app_name, model_name;
+-- If no rows for the app_name that matches APP_NAME env var → this pattern
+
+-- Check the error in the trace (if one exists)
+SELECT error_message FROM llm_trace
+WHERE session_id = '<SESSION_ID>'
+ORDER BY created_at DESC LIMIT 1;
+-- Expected: "No prompt templates found for model: posting, view: posting_view"
+```
+
+**Fix**
+
+1. Ensure `APP_NAME` in your `.env` matches the `app_name` column in `prompt_template` rows.
+2. If templates are missing, run `seed-agent-templates.sql` against the target database.
+3. If using `USE_LOCAL_PROMPT=true`, verify the local `.txt` prompt files exist in `backend/prisma/metadata/prompt-templates/`.
+
+**Files to change**
+- `backend/.env` — verify `APP_NAME` value
+- `backend/prisma/seed-agent-templates.sql` — run to seed missing templates
+
+---
+
+### 6. Step Stalled — Data Not Found
+
+**Observed**: 2026-04-03, session `ses_64362f57-a29f-439e-bef5-631385783f25`
+
+**Symptoms**
+- `status = 'executing'`
+- `plan IS NOT NULL`, multiple steps defined
+- `current_step_index = 0` (or whichever step required the missing data)
+- Messages exist — 2–4 rows, all at the same `step_index`
+- LLM traces linked: 1–2, both `status = 'success'`, tools called include `advancedSqlQuery`
+- Zero pending actions
+- `last_active_at - started_at` ≈ 5 minutes (watchdog kills it eventually)
+- Assistant message content contains phrases like *"I couldn't find any accounts"* or *"Please ensure that..."*
+
+**Root Cause**
+
+The LLM ran SQL queries to find required data (e.g., a bank account, a supplier record) but the queries returned 0 rows. Instead of calling `completeStep` with a failure status, the LLM responded in plain text reporting the problem. Since `completeStep` was never called, `current_step_index` never advanced. Auto-continuation fired once more (the `stepAdvanced` guard allows one retry), got the same result, then correctly stopped. The session is now stuck in `executing` with no path forward until the watchdog fires.
+
+**Diagnostic confirmation**
+
+```sql
+-- Check step_index is stuck and assistant gave up
+SELECT role, step_index, left(content, 200) AS content_preview, tool_calls IS NOT NULL AS called_tool
+FROM agent_message
+WHERE session_id = '<SESSION_ID>'
+ORDER BY created_at;
+-- If all messages share the same step_index AND latest assistant row has no tool_calls → this pattern
+
+-- Confirm the SQL returned 0 rows (check trace steps for the query used)
+SELECT s.tool_calls, s.tool_results
+FROM llm_trace_step s
+JOIN llm_trace t ON s.trace_id = t.id
+WHERE t.session_id = '<SESSION_ID>'
+ORDER BY t.created_at, s.step_number;
+-- Look for advancedSqlQuery tool_results showing rowCount: 0
+```
+
+**Sub-variant: `{{org_id}}` placeholder not substituted**
+
+In this specific observed case, the LLM wrote SQL with a literal `{{org_id}}` placeholder:
+```sql
+SELECT id, name FROM account WHERE org_id = '{{org_id}}' AND name ILIKE '%checking%'
+```
+The `advancedSqlQuery` tool appends its own `org_id` filter but the LLM's WHERE clause compared against the string `'{{org_id}}'` literally, matching nothing. The data existed — the query was simply malformed.
+
+**Fix (immediate)**
+
+Update `SESSION_DIRECTIVE` in `backend/src/agent/prompt/constants.ts` to explicitly instruct:
+> *"If a query step cannot find required data, call `completeStep` with `status: 'failed'` and a result_summary explaining what was searched and what was missing. Never leave a step without calling `completeStep`."*
+
+For the `{{org_id}}` sub-variant, add a guard in `advancedSqlQuery` to detect and strip unsubstituted `{{...}}` placeholders before execution, or reject the query with a clear error.
+
+**Fix (future — user clarification flow)**
+
+Rather than failing the step, the agent should be able to pause and ask the user for input. See the planned `requestClarification` session tool design in `docs/agent/WORKBENCH_BACKEND.md`.
+
+**Files to change**
+- `backend/src/agent/prompt/constants.ts` — add `completeStep`-on-failure rule to `SESSION_DIRECTIVE`
+- `backend/src/agent/tools/analyticsQuery.ts` — detect unsubstituted `{{...}}` in query string
 
 ---
 

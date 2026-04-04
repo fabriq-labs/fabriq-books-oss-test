@@ -60,6 +60,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Agentic upgrade v1 design plan | [docs/AGENTIC_UPGRADE_PLAN_WIP.md](./docs/AGENTIC_UPGRADE_PLAN_WIP.md) |
 | Agentic upgrade v2 (hybrid execution, builders) | [docs/AGENTIC_UPGRADE_V2_PLAN.md](./docs/AGENTIC_UPGRADE_V2_PLAN.md) |
 | Workbench functional spec | [docs/agent/WORKBENCH_FUNCTIONAL_SPEC.md](./docs/agent/WORKBENCH_FUNCTIONAL_SPEC.md) |
+| Agent template focus: models + tools declaration plan | [docs/agent/TEMPLATE_FOCUS_PLAN.md](./docs/agent/TEMPLATE_FOCUS_PLAN.md) |
 | Workbench implementation plan (phase log) | [docs/agent/WORKBENCH_IMPLEMENTATION_PLAN.md](./docs/agent/WORKBENCH_IMPLEMENTATION_PLAN.md) |
 | View data_graph / datagraph schema (properties, selectProps, relationName, list behaviour) | [docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md](./docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md) |
 | Visual datagraph builder (design, summary) | [docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md](./docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md) |
