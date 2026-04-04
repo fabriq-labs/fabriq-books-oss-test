@@ -1,0 +1,11 @@
+id,budget_line,budget_period_id,bp_start_date,bp_end_date,allocated_budget,org_id
+buli_demo_it,IT Budget,bupe_demo_fy24,2023-04-01,2024-03-31,5000000,org_indian_demo
+buli_demo_ops,Operations Budget,bupe_demo_fy24,2023-04-01,2024-03-31,3000000,org_indian_demo
+buli_demo_it_fy25,IT Budget FY25,bupe_demo_fy25,2024-04-01,2025-03-31,5500000,org_indian_demo
+buli_demo_sales,Sales Budget,bupe_demo_fy24,2023-04-01,2024-03-31,4000000,org_indian_demo
+buli_demo_marketing,Marketing Budget,bupe_demo_fy24,2023-04-01,2024-03-31,1500000,org_indian_demo
+buli_demo_hr,HR Budget,bupe_demo_fy24,2023-04-01,2024-03-31,800000,org_indian_demo
+buli_demo_capex,Capex Budget,bupe_demo_fy24,2023-04-01,2024-03-31,2000000,org_indian_demo
+buli_demo_travel,Travel Budget,bupe_demo_fy24,2023-04-01,2024-03-31,500000,org_indian_demo
+buli_demo_training,Training Budget,bupe_demo_fy24,2023-04-01,2024-03-31,600000,org_indian_demo
+buli_demo_contingency,Contingency,bupe_demo_fy24,2023-04-01,2024-03-31,1000000,org_indian_demo

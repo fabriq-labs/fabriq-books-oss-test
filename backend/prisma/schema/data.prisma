@@ -1,0 +1,585 @@
+// Application-related entities
+
+model account {
+  id                    String                  @id @default(dbgenerated("'acco_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by            String?
+  modified_by           String?
+  created_at            DateTime                @default(now())
+  modified_at           DateTime                @updatedAt
+  org_id                String?
+  assigned_to           String?
+  sub_type              String?
+  name                  String?
+  parent_account_id     String?
+  code                  String?
+  type                  String[]
+  frequency             String?
+  balance               Decimal?                @db.Decimal(19, 4)
+  currency              String?
+  is_active             Boolean                 @default(true)
+  last_sync_at          DateTime?
+  inst_id               String?
+  classification        account_classification?
+  import_id             String?
+  // Fields merged from COA model
+  account_number        Int?
+  hq_account_id         String?
+  legal_entity_id       String?
+  status                String?
+  // Lineage fields for data integration tracking
+  source_system_id      String?                 @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_record_id      String? // Source system record ID (e.g., Zoho account_id)
+  source_updated_at     DateTime?               @default(now()) // Last updated in source system (default: now() for internal records)
+  ingest_batch_id       String? // FK to datalake.sync_batch
+  parent_account        account?                @relation("ParentChildRelation", fields: [parent_account_id], references: [id])
+  child_accounts        account[]               @relation("ParentChildRelation")
+  hq_account            account?                @relation("HQAccountRelation", fields: [hq_account_id], references: [id])
+  hq_mapped_accounts    account[]               @relation("HQAccountRelation")
+  organization          organization?           @relation(fields: [legal_entity_id], references: [id])
+  debit_postings        posting[]               @relation("debit_account")
+  credit_postings       posting[]               @relation("credit_account")
+  trades                trade[]
+  target_trades         trade[]                 @relation("target_account")
+  holdings              holding[]
+  payment_receipt       payment_receipt[]
+  credit_note           credit_note[]
+  // Relations from zeiv schema
+  budget_periods        budget_period[]
+  general_ledgers       general_ledger[]
+  purchase_requisitions purchase_requisition[]
+  purchase_orders       purchase_order[]
+  item_master_sales     item_master[]           @relation("ItemMaster_SalesAccount")
+  item_master_purchase  item_master[]           @relation("ItemMaster_PurchaseAccount")
+  project_masters       project_master[]
+  invoices              invoice[]
+
+  @@index([source_system_id, source_record_id])
+  @@index([source_updated_at])
+  @@map("account")
+}
+
+model category {
+  id             String          @id @default(dbgenerated("'cate_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by     String?
+  modified_by    String?
+  created_at     DateTime        @default(now())
+  modified_at    DateTime        @updatedAt
+  org_id         String?
+  assigned_to    String?
+  name           String
+  color          String
+  group_id       String?
+  category_group category_group? @relation(fields: [group_id], references: [id])
+  posting        posting[]
+
+  @@map("category")
+}
+
+model category_group {
+  id             String     @id @default(dbgenerated("'catg_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by     String?
+  modified_by    String?
+  created_at     DateTime   @default(now())
+  modified_at    DateTime   @updatedAt
+  org_id         String?
+  assigned_to    String?
+  name           String
+  category_group category[]
+
+  @@map("category_group")
+}
+
+model posting {
+  id                     String    @id @default(dbgenerated("'post_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by             String?
+  modified_by            String?
+  created_at             DateTime  @default(now())
+  modified_at            DateTime  @updatedAt
+  org_id                 String?
+  assigned_to            String?
+  account_id             String?
+  credit_account_id      String?
+  name                   String?
+  account_name           String?
+  value_date             DateTime?
+  posting_date           DateTime?
+  amount                 Decimal?  @db.Decimal(19, 4)
+  category_id            String?
+  category_name          String?
+  posting_type           String?
+  notes                  String?
+  description            String?
+  invoice_id             String? // Reference to invoice.id for tracking source
+  reversal_of_posting_id String? // Reference to original posting.id when this is a reversal
+  status                 String? // Status of posting (ACTIVE, REVERSED, etc.)
+  reversed_at            DateTime? // Timestamp when posting was reversed
+
+  // Trade relationship - one-to-one
+  trade_id String? @unique
+  trade    trade?  @relation("PostingToTrade", fields: [trade_id], references: [id])
+
+  // Asset reference for investment income
+  holding_id String?
+  holding    holding? @relation(fields: [holding_id], references: [id])
+
+  // Income categorization
+  income_type   income_type?
+  income_source income_source?
+
+  // AI categorization fields
+  ai_cat_score      Decimal?  @db.Decimal(5, 4) // AI confidence score (0.0000 to 1.0000)
+  ai_categorized_at DateTime? // Timestamp of AI categorization
+
+  // Bank/ledger reconciliation (agentic reconciliation demo)
+  reconciliation_status String? // 'UNMATCHED', 'SUGGESTED', 'MATCHED', 'CONFIRMED'
+  matched_reference     String? // e.g. "payment_receipt:payr_demo_001" or "invoice:inv_demo_001"
+  payment_receipt_id    String? @unique // FK to payment_receipt when matched (one-to-one)
+
+  account         account?         @relation("debit_account", fields: [account_id], references: [id])
+  credit_account  account?         @relation("credit_account", fields: [credit_account_id], references: [id])
+  category        category?        @relation(fields: [category_id], references: [id])
+  payment_receipt payment_receipt? @relation("PostingToPaymentReceipt", fields: [payment_receipt_id], references: [id])
+
+  @@map("posting")
+}
+
+model instrument {
+  id          String          @id @default(dbgenerated("'inst_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by  String?
+  modified_by String?
+  created_at  DateTime        @default(now())
+  modified_at DateTime        @updatedAt
+  org_id      String?
+  assigned_to String?
+  symbol      String
+  name        String
+  type        instrument_type
+  isin        String?         @unique
+  details     Json?
+
+  trades   trade[]
+  holdings holding[]
+
+  @@map("instrument")
+}
+
+model trade {
+  id                 String     @id @default(dbgenerated("'trad_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by         String?
+  modified_by        String?
+  created_at         DateTime   @default(now())
+  modified_at        DateTime   @updatedAt
+  org_id             String?
+  assigned_to        String?
+  instrument_id      String?
+  account_id         String?
+  target_account_id  String?
+  reference_trade_id String?
+  type               trade_type
+  trade_id           String?    @unique
+  isin               String?
+  quantity           Decimal
+  price              Decimal
+  brokerage          Decimal?
+  tax                Decimal?
+  net_amount         Decimal?
+  total_amount       Decimal?
+  exchange           String?
+  value_date         DateTime
+  name               String?
+
+  // Posting relationship - one-to-one (reverse relation)
+  posting_id String?  @unique
+  posting    posting? @relation("PostingToTrade")
+
+  instrument      instrument? @relation(fields: [instrument_id], references: [id])
+  account         account?    @relation(fields: [account_id], references: [id])
+  target_account  account?    @relation("target_account", fields: [target_account_id], references: [id])
+  reference_trade trade?      @relation("transfer_pair", fields: [reference_trade_id], references: [id])
+  related_trades  trade[]     @relation("transfer_pair")
+
+  @@map("trade")
+}
+
+model holding {
+  id          String   @id @default(dbgenerated("'hold_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by  String?
+  modified_by String?
+  created_at  DateTime @default(now())
+  modified_at DateTime @updatedAt
+  org_id      String?
+  assigned_to String?
+
+  // Core Position Fields
+  account_id    String
+  instrument_id String
+  quantity      Decimal @db.Decimal(19, 4)
+  average_cost  Decimal @db.Decimal(19, 4)
+
+  // Market Data (updated via batch processing)
+  current_price  Decimal? @db.Decimal(19, 4)
+  market_value   Decimal? @db.Decimal(19, 4)
+  unrealized_pnl Decimal? @db.Decimal(19, 4)
+  realized_pnl   Decimal? @db.Decimal(19, 4)
+
+  // Metadata
+  currency        String    @default("USD")
+  last_updated    DateTime  @default(now())
+  last_trade_date DateTime? // Last trade that affected this holding
+  is_active       Boolean   @default(true)
+  notes           String?
+  tags            String[]
+
+  // Relationships
+  account    account    @relation(fields: [account_id], references: [id])
+  instrument instrument @relation(fields: [instrument_id], references: [id])
+  postings   posting[]
+
+  // Unique constraint ensures one holding per instrument per account
+  @@unique([instrument_id, account_id])
+  @@map("holding")
+}
+
+enum instrument_type {
+  STOCK
+  BOND
+  MUTUAL_FUND
+  ETF
+  FOREX
+}
+
+enum trade_type {
+  BUY
+  SELL
+  DIVIDEND
+  INTEREST
+  SPLIT
+  TRANSFER
+}
+
+enum account_classification {
+  Assets
+  Liabilities
+  Income
+  Expense
+  Equity
+}
+
+// ── Forex: Currency reference & exchange rates ──────────────────────────
+
+model currency {
+  id             String   @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
+  code           String   @unique // ISO 4217: "USD", "INR", "PHP", "EUR"
+  name           String // "US Dollar", "Indian Rupee"
+  symbol         String? // "$", "₹", "₱"
+  decimal_places Int      @default(2)
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  modified_at    DateTime @updatedAt
+  org_id         String
+
+  @@map("currency")
+}
+
+model exchange_rate {
+  id             String             @id @default(dbgenerated("'exrt_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id         String
+  from_currency  String // ISO 4217 code, e.g. "PHP"
+  to_currency    String // ISO 4217 code, e.g. "USD" (typically org base currency)
+  effective_date DateTime           @db.Date
+  rate           Decimal            @db.Decimal(19, 6)
+  rate_type      exchange_rate_type @default(SPOT)
+  source         String? // "manual", "api:openexchangerates", etc.
+  created_by     String?
+  created_at     DateTime           @default(now())
+  modified_by    String?
+  modified_at    DateTime           @updatedAt
+  assigned_to    String?
+
+  @@unique([org_id, from_currency, to_currency, effective_date, rate_type])
+  @@index([org_id, from_currency, to_currency, effective_date])
+  @@map("exchange_rate")
+}
+
+enum exchange_rate_type {
+  SPOT
+  CLOSING
+  AVERAGE
+}
+
+enum income_type {
+  DIVIDEND
+  INTEREST
+  CAPITAL_GAIN
+  RENTAL_INCOME
+  ROYALTY
+  OTHER_INVESTMENT_INCOME
+}
+
+enum income_source {
+  STOCK
+  BOND
+  MUTUAL_FUND
+  ETF
+  DEPOSIT
+  REAL_ESTATE
+  OTHER
+}
+
+model expense_report {
+  id             String   @id @default(dbgenerated("'expr_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by     String? // Reference to user.id
+  modified_by    String? // Reference to user.id
+  created_at     DateTime @default(now())
+  modified_at    DateTime @updatedAt
+  org_id         String?
+  assigned_to    String? // Reference to user.id
+  wf_instance_id String? // Reference to workflow_instance.id
+  title          String
+  description    String?
+  amount         Decimal  @db.Decimal(19, 4)
+  currency       String   @default("USD")
+
+  @@map("expense_report")
+}
+
+// AI Activity Logging - tracks all AI automated tasks for audit and analytics
+model ai_activity_log {
+  id         String   @id @default(dbgenerated("'aial_' || gen_random_uuid()")) @db.VarChar(50)
+  created_at DateTime @default(now())
+  org_id     String
+  user_id    String? // User who triggered (null if system-initiated)
+
+  // Activity identification
+  activity_type String // 'categorize_transaction', 'extract_invoice', etc.
+  model_name    String // Target model: 'posting', 'invoice', etc.
+  record_id     String? // ID of affected record
+
+  // AI execution details
+  llm_model         String // 'gemini-2.0-flash-001', etc.
+  prompt_tokens     Int? // Token usage for cost tracking
+  completion_tokens Int?
+  duration_ms       Int? // Execution time in milliseconds
+
+  // Agentic execution tracking
+  steps_count Int? // Number of agentic steps/iterations
+  tools_used  Json? // Array: [{name, calls, success}]
+
+  // Result
+  confidence_score Decimal? @db.Decimal(5, 4)
+  prediction       Json? // The AI's prediction/output
+  applied          Boolean  @default(false) // Was the prediction applied?
+
+  // Context for debugging
+  input_summary String? @db.Text // Summary of input (for debugging)
+  reasoning     String? @db.Text // AI's reasoning
+  error         String? @db.Text // Error message if failed
+
+  @@index([org_id, activity_type])
+  @@index([org_id, model_name, record_id])
+  @@index([created_at])
+  @@map("ai_activity_log")
+}
+
+// LLM Observability - logs every agent request for prompt improvement
+model llm_trace {
+  id          String   @id @default(dbgenerated("'llmt_' || gen_random_uuid()")) @db.VarChar(50)
+  created_at  DateTime @default(now())
+  created_by  String?
+  modified_by String?
+  assigned_to String?
+  modified_at DateTime @updatedAt
+  org_id      String
+  user_id     String?
+  session_id  String?
+
+  model_name String? // business model: 'posting', 'invoice'
+  view_name  String?
+  record_id  String?
+  query_type String? // 'analytical' | 'transactional'
+
+  question  String @db.Text
+  llm_model String
+
+  prompt_tokens     Int?
+  completion_tokens Int?
+  total_tokens      Int?
+  duration_ms       Int?
+
+  steps_count  Int?
+  tools_called String[]
+
+  response_text String? @db.Text
+  status        String  @default("success")
+  error_message String? @db.Text
+  feedback      String? @db.Text
+
+  steps llm_trace_step[]
+
+  @@index([org_id, created_at])
+  @@index([org_id, model_name])
+  @@index([org_id, status])
+  @@map("llm_trace")
+}
+
+model llm_trace_step {
+  id          String   @id @default(dbgenerated("'llms_' || gen_random_uuid()")) @db.VarChar(50)
+  created_at  DateTime @default(now())
+  created_by  String?
+  modified_by String?
+  assigned_to String?
+  modified_at DateTime @updatedAt
+
+  trace_id String
+  trace    llm_trace @relation(fields: [trace_id], references: [id], onDelete: Cascade)
+
+  step_number       Int
+  prompt_tokens     Int?
+  completion_tokens Int?
+  duration_ms       Int?
+
+  tool_calls   Json? // [{toolName, args}]
+  tool_results Json? // [{toolName, result_preview}]
+  sql_queries  Json? // [{sql, description, reasoning}]
+
+  response_text String? @db.Text
+  status        String  @default("success")
+  error_message String? @db.Text
+
+  @@unique([trace_id, step_number])
+  @@index([trace_id])
+  @@map("llm_trace_step")
+}
+
+// ── Agentic Sessions & Pending Actions ──────────────────────────
+
+model agent_template {
+  id          String  @id @default(dbgenerated("'atpl_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id      String? // null = system-level template (available to all orgs)
+  name        String
+  description String
+  icon        String  // lucide icon name e.g. "arrow-right-left"
+  goal_model  String?
+  system_prompt String @db.Text
+  user_hint   String  // placeholder text shown to user in GoalSetter
+  default_mode  String   @default("supervised")
+  is_active     Boolean  @default(true)
+  sort_order    Int      @default(0)
+  focus_models  String[] @default([]) // models to include in system prompt; empty = RELATED_MODELS fallback
+  allowed_tools String[] @default([]) // tools the LLM may call; empty = model-switch fallback
+  created_at    DateTime @default(now())
+
+  sessions agent_session[]
+
+  @@index([org_id, is_active])
+  @@map("agent_template")
+}
+
+model agent_session {
+  id              String   @id @default(dbgenerated("'ses_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id          String
+  user_id         String
+
+  goal        String
+  name        String? // auto-generated short title e.g. "HDFC March Reconciliation"
+  goal_model  String?
+  template_id String? @db.VarChar(50)
+
+  plan            Json?
+
+  status          String   @default("planning")
+  // 'planning' | 'awaiting_approval' | 'executing'
+  // | 'paused' | 'completed' | 'failed' | 'abandoned'
+
+  current_step_index Int?
+
+  accumulated_context   Json?
+  clarification_request Json? // set by requestClarification tool; cleared by /clarify endpoint
+
+  pending_actions_count   Int @default(0)
+  completed_actions_count Int @default(0)
+
+  mode            String   @default("supervised")
+  // 'supervised' | 'semi_auto' | 'autonomous'
+
+  started_at      DateTime @default(now())
+  last_active_at  DateTime @updatedAt
+  completed_at    DateTime?
+  expires_at      DateTime?
+
+  template        agent_template?  @relation(fields: [template_id], references: [id])
+  messages        agent_message[]
+  pending_actions pending_action[]
+
+  @@index([org_id, user_id])
+  @@index([org_id, status])
+  @@map("agent_session")
+}
+
+model agent_message {
+  id           String   @id @default(dbgenerated("'msg_' || gen_random_uuid()")) @db.VarChar(50)
+  session_id   String
+  role         String   // 'user' | 'assistant' | 'tool'
+  content      String   @db.Text
+  tool_calls   Json?
+  tool_results Json?
+  step_index   Int?
+  created_at   DateTime @default(now())
+
+  session      agent_session @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id, created_at])
+  @@map("agent_message")
+}
+
+model pending_action {
+  id              String   @id @default(dbgenerated("'pa_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id          String
+  session_id      String?
+  created_by      String   // 'agent' or user_id
+  assigned_to     String?
+  assigned_role   String?
+
+  action_type     String
+  // V1: 'reconcile_posting'
+  // Future: 'invoice_match' | 'send_email' | 'escalate_collection'
+
+  batch_id        String?
+  batch_total     Int?
+
+  title           String
+  description     String?  @db.Text
+
+  payload         Json
+
+  confidence      String   // 'high' | 'medium' | 'low'
+  confidence_score Float?
+
+  status          String   @default("pending")
+  // 'pending' | 'approved' | 'approved_with_edits'
+  // | 'rejected' | 'deferred' | 'executed' | 'expired'
+
+  resolved_by     String?
+  resolved_at     DateTime?
+  resolution_note String?  @db.Text
+
+  on_approve      String
+  // 'execute_immediately' | 'queue_for_batch' | 'notify_only'
+
+  executed_at      DateTime?
+  execution_result Json?
+  execution_error  String?  @db.Text
+
+  defer_until     DateTime?
+  expires_at      DateTime?
+
+  created_at      DateTime @default(now())
+  modified_at     DateTime @updatedAt
+
+  session         agent_session? @relation(fields: [session_id], references: [id])
+
+  @@index([org_id, status])
+  @@index([session_id, status])
+  @@index([batch_id])
+  @@map("pending_action")
+}

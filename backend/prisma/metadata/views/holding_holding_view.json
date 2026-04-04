@@ -1,0 +1,200 @@
+{
+  "id": "view_d63012d4-e1a1-4bb0-aadf-2367d2c6e1d6",
+  "name": "holding_view",
+  "model_name": "holding",
+  "description": "Holding",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "required": true,
+      "permission": "read",
+      "displayName": "Id",
+      "isColumnShow": false
+    },
+    "tags": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Tags",
+      "isColumnShow": false
+    },
+    "notes": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Notes",
+      "isColumnShow": false
+    },
+    "account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Account",
+      "isColumnShow": false
+    },
+    "currency": {
+      "datatype": "string",
+      "required": true,
+      "permission": "read",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Currency",
+      "isColumnShow": true
+    },
+    "quantity": {
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Quantity",
+      "isColumnShow": true
+    },
+    "account_id": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "select",
+        "selectProps": {
+          "type": "holding",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceValue": "account",
+          "instanceSourceKey": "account_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "account.name"
+      },
+      "displayName": "Account",
+      "isColumnShow": true
+    },
+    "instrument": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "read"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Account",
+      "isColumnShow": false
+    },
+    "average_cost": {
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Cost",
+      "isColumnShow": true
+    },
+    "market_value": {
+      "datatype": "float",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "300",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Market Value",
+      "isColumnShow": false
+    },
+    "realized_pnl": {
+      "datatype": "float",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "300",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Realized P&L",
+      "isColumnShow": false
+    },
+    "current_price": {
+      "datatype": "float",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "300",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Current Price",
+      "isColumnShow": false
+    },
+    "instrument_id": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "select",
+        "selectProps": {
+          "type": "trade",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "instrument",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceValue": "instrument",
+          "instanceSourceKey": "instrument_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "instrument.name"
+      },
+      "displayName": "Instrument",
+      "isColumnShow": true
+    },
+    "unrealized_pnl": {
+      "datatype": "float",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "300",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Unrealized P&L",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

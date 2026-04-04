@@ -1,0 +1,11 @@
+location,address,city,state,country,zip_code,legal_entity_id
+Headquarters,123 Main Street,New York,New York,USA,10001,org_001
+Branch Office,456 Market Street,San Francisco,California,USA,94105,org_002
+Warehouse,789 Industrial Blvd,Dallas,Texas,USA,75201,org_003
+European HQ,12 Tech Park,Berlin,Berlin,Germany,10115,org_004
+Asia Office,77 Innovation Road,Singapore,Central Region,Singapore,048616,org_005
+Regional Hub,88 Business Park,Chicago,Illinois,USA,60601,org_006
+Service Center,555 Service Ave,Miami,Florida,USA,33101,org_007
+Remote Office,222 Remote Blvd,Denver,Colorado,USA,80202,org_008
+Logistics Base,999 Supply Street,Houston,Texas,USA,77001,org_009
+Support Center,321 Help Road,Los Angeles,California,USA,90001,org_010

@@ -1,0 +1,2 @@
+id,email,name,password,external_id,auth_provider,manager_id,org_id
+user_rajesh_kumar,rajesh.kumar@metalimits.com,Rajesh Kumar,$2b$10$l3y1oxbTGZoC5LnPxtnIx.nohwf5pTXCURo3LkCtNRdEikOPkz5Pu,rajesh.kumar@metalimits.com,local,,org_rajesh

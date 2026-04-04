@@ -1,0 +1,71 @@
+{
+  "id": "view_1877d94f-2a85-45ed-bdbd-df55d97e2c79",
+  "name": "supplier_items_view",
+  "model_name": "supplier_items",
+  "description": "Supplier Items",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "item_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "supplier_items",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "item_master",
+          "searchParams": "item_name",
+          "instanceLabel": "item_name",
+          "instanceSourceKey": "item_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Item Master",
+      "isColumnShow": true
+    },
+    "supplier": {
+      "select": {
+        "id": "read",
+        "supplier_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Supplier",
+      "isColumnShow": false
+    },
+    "item_master": {
+      "select": {
+        "id": "read",
+        "item_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "item_master",
+      "isColumnShow": false
+    },
+    "supplier_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "supplier_items",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "supplier",
+          "searchParams": "supplier_name",
+          "instanceLabel": "supplier_name",
+          "instanceSourceKey": "supplier_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Supplier",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

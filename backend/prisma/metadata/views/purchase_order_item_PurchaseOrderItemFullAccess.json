@@ -1,0 +1,68 @@
+{
+  "id": "view_7075d1c2-b0c2-43e3-bc50-cb268bbb686c",
+  "name": "PurchaseOrderItemFullAccess",
+  "model_name": "purchase_order_item",
+  "description": "Full access to purchase order item model",
+  "data_graph": {
+    "select": {
+      "id": true,
+      "uom": true,
+      "name": true,
+      "rate": true,
+      "org_id": true,
+      "status": true,
+      "item_id": true,
+      "product": {
+        "select": {
+          "id": true,
+          "item_name": true,
+          "item_type": true,
+          "unit_price": true,
+          "item_description": true
+        }
+      },
+      "quantity": true,
+      "item_code": true,
+      "item_name": true,
+      "item_type": true,
+      "created_at": true,
+      "created_by": true,
+      "item_total": true,
+      "product_id": true,
+      "assigned_to": true,
+      "instance_id": true,
+      "invoice_qty": true,
+      "modified_at": true,
+      "modified_by": true,
+      "supplier_id": true,
+      "need_by_date": true,
+      "ordered_amount": true,
+      "purchase_order": {
+        "select": {
+          "id": true,
+          "po_date": true,
+          "po_number": true,
+          "supplier_id": true,
+          "total_price": true
+        }
+      },
+      "invoiced_amount": true,
+      "item_description": true,
+      "ordered_quantity": true,
+      "purchase_requisition": {
+        "select": {
+          "id": true,
+          "pr_date": true,
+          "pr_number": true,
+          "requester": true,
+          "total_price": true
+        }
+      },
+      "purchase_order_item_no": true,
+      "purchase_requisition_id": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

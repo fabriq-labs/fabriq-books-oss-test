@@ -1,0 +1,255 @@
+{
+  "id": "view_da0c0aa4-3fab-4e4f-97da-996c1dfb2a69",
+  "name": "item_view_read_only",
+  "model_name": "item",
+  "description": "Item ",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "uom": {
+      "showNo": "7",
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "150",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "UOM",
+      "isColumnShow": true
+    },
+    "rate": {
+      "showNo": "4",
+      "datatype": "float",
+      "permission": "read",
+      "tableProps": {
+        "width": "100",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Rate",
+      "isColumnShow": true
+    },
+    "product": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "uom": {
+          "select": {
+            "id": true,
+            "name": true
+          }
+        },
+        "uom_id": "update",
+        "item_name": "update",
+        "unit_price": "update"
+      }
+    },
+    "quantity": {
+      "showNo": "3",
+      "datatype": "float",
+      "required": true,
+      "permission": "read",
+      "tableProps": {
+        "width": "100",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Quantity",
+      "isColumnShow": true
+    },
+    "supplier": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "supplier_name": "update"
+      },
+      "showNo": "8",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Supplier",
+      "isColumnShow": true
+    },
+    "item_code": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "item_name": {
+      "showNo": "1",
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Item Name",
+      "isColumnShow": true
+    },
+    "item_type": {
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Item Type",
+      "isColumnShow": false
+    },
+    "item_total": {
+      "showNo": "5",
+      "datatype": "float",
+      "permission": "read",
+      "tableProps": {
+        "width": "100",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Item Total",
+      "isColumnShow": true
+    },
+    "product_id": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "budget_line": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "budget_line": "update"
+      },
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Budget Line",
+      "isColumnShow": false
+    },
+    "cost_center": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "cost_center": "update"
+      },
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Cost Center",
+      "isColumnShow": false
+    },
+    "instance_id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "supplier_id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "need_by_date": {
+      "showNo": "6",
+      "datatype": "datetime",
+      "permission": "read",
+      "tableProps": {
+        "width": "120",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Need By Date",
+      "isColumnShow": true
+    },
+    "budget_period": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "budget_period": "read"
+      }
+    },
+    "budget_line_id": {
+      "showNo": "10",
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "item",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "budget_line",
+          "searchParams": "budget_line",
+          "instanceLabel": "budget_line",
+          "instanceSourceKey": "budget_line_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Budget Line",
+      "isColumnShow": true
+    },
+    "cost_center_id": {
+      "showNo": "10",
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "item",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "cost_center",
+          "searchParams": "cost_center",
+          "instanceLabel": "cost_center",
+          "instanceSourceKey": "cost_center_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Cost Center",
+      "isColumnShow": true
+    },
+    "budget_period_id": {
+      "showNo": "9",
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "item",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "budget_period",
+          "searchParams": "budget_period",
+          "instanceLabel": "budget_period",
+          "instanceSourceKey": "budget_period_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Budget Period",
+      "isColumnShow": true
+    },
+    "item_description": {
+      "showNo": "2",
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Item Description",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

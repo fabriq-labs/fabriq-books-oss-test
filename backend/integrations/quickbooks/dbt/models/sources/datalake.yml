@@ -1,0 +1,64 @@
+version: 2
+
+sources:
+  - name: datalake
+    description: "Airbyte-landed data from QuickBooks Online"
+    schema: datalake
+    tables:
+      - name: "qb_accounts"
+        description: "Raw account data from QuickBooks Online via Airbyte"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: _airbyte_extracted_at
+            description: "Airbyte extraction timestamp"
+          - name: _airbyte_generation_id
+            description: "Airbyte generation ID"
+          - name: _airbyte_meta
+            description: "Airbyte metadata"
+          - name: data
+            description: "JSONB data containing QuickBooks Account fields (Id, Name, AccountType, etc.)"
+      
+      - name: "qb_customers"
+        description: "Raw customer data from QuickBooks Online via Airbyte"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: _airbyte_extracted_at
+            description: "Airbyte extraction timestamp"
+          - name: _airbyte_generation_id
+            description: "Airbyte generation ID"
+          - name: _airbyte_meta
+            description: "Airbyte metadata"
+          - name: data
+            description: "JSONB data containing QuickBooks Customer fields (Id, DisplayName, PrimaryEmailAddr, etc.)"
+      
+      - name: "qb_vendors"
+        description: "Raw vendor data from QuickBooks Online via Airbyte"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: _airbyte_extracted_at
+            description: "Airbyte extraction timestamp"
+          - name: _airbyte_generation_id
+            description: "Airbyte generation ID"
+          - name: _airbyte_meta
+            description: "Airbyte metadata"
+          - name: data
+            description: "JSONB data containing QuickBooks Vendor fields (Id, DisplayName, PrimaryEmailAddr, etc.)"
+      
+      - name: "qb_items"
+        description: "Raw item data from QuickBooks Online via Airbyte"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: _airbyte_extracted_at
+            description: "Airbyte extraction timestamp"
+          - name: _airbyte_generation_id
+            description: "Airbyte generation ID"
+          - name: _airbyte_meta
+            description: "Airbyte metadata"
+          - name: data
+            description: "JSONB data containing QuickBooks Item fields (Id, Name, Type, etc.)"
+
+

@@ -1,0 +1,3 @@
+id,organization_name,legal_name,address,city,state,country,zip_code,website,is_it_headquartres,is_it_a_groupcompany,group_company_name,basecurrency_id,org_id
+org_rajesh_canada,Rajesh (Canada),Rajesh Kumar - Canada Assets,123 Personal Finance Street,Toronto,Ontario,Canada,M5V 1A1,,Yes,No,,,org_rajesh
+org_rajesh_india,Rajesh (India),Rajesh Kumar - India Assets,456 Finance Road,Chennai,Tamil Nadu,India,600001,,No,Yes,Rajesh Kumar,,org_rajesh

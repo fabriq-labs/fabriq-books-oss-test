@@ -1,0 +1,169 @@
+{
+  "id": "view_35b26fd1-7b8b-4aa8-a622-5bbf7906714d",
+  "name": "account_view",
+  "model_name": "account",
+  "description": "Account List",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "ID"
+    },
+    "code": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Code"
+    },
+    "name": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "displayName": "Name",
+      "isColumnShow": true
+    },
+    "type": {
+      "dataType": "string",
+      "listProps": {
+        "key": "type",
+        "type": "badge",
+        "label": "type"
+      },
+      "permission": "update",
+      "displayName": "Type",
+      "isColumnShow": false
+    },
+    "balance": {
+      "dataType": "decimal",
+      "permission": "update",
+      "displayName": "Balance",
+      "isColumnShow": true
+    },
+    "currency": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Currency",
+      "isColumnShow": true
+    },
+    "frequency": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Frequency"
+    },
+    "hq_account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "read"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Hq Account",
+      "isColumnShow": false
+    },
+    "organization": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "legal_name": "update",
+        "organization_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "hq_account_id": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "HQ Account ID",
+      "isColumnShow": false
+    },
+    "account_number": {
+      "dataType": "int",
+      "permission": "update",
+      "displayName": "Account Number"
+    },
+    "child_accounts": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update",
+        "child_accounts": "read",
+        "parent_account": "read",
+        "parent_account_id": "update"
+      },
+      "dataType": "table",
+      "required": true,
+      "displayName": "Child Accounts",
+      "isColumnShow": false
+    },
+    "classification": {
+      "dataType": "account_classification",
+      "permission": "update",
+      "displayName": "Classification",
+      "isColumnShow": true
+    },
+    "parent_account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Parent Account",
+      "isColumnShow": false
+    },
+    "legal_entity_id": {
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "business_unit",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "organization",
+          "searchParams": "legal_name",
+          "instanceLabel": "legal_name",
+          "instanceSourceKey": "legal_entity_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "organization.legal_name"
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": true
+    },
+    "parent_account_id": {
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "account",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "parent_account_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "parent_account.name"
+      },
+      "displayName": "Parent Account",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

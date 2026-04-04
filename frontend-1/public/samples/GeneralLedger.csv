@@ -1,0 +1,11 @@
+gl_number,gl_code,gl_name,description,legal_entity_id,status
+GL-0001,1001,Depreciation,Depreciation on fixed assets,Vertex Technologies,Active
+GL-0002,1002,Office Supplies,Expenses for office consumables,Vertex Technologies,Active
+GL-0003,2001,Cash,Cash available on hand,Vertex Technologies,Active
+GL-0004,2002,Receivables,Money to be received from clients,Vertex Technologies,Inactive
+GL-0005,3001,Sales Revenue,Income from product sales,Vertex Technologies,Active
+GL-0006,3002,Service Revenue,Income from services rendered,Vertex Technologies,Active
+GL-0007,4001,Payroll Payable,Salaries owed to employees,Vertex Technologies,Active
+GL-0008,4002,Tax Liability,Taxes to be paid,Vertex Technologies,Inactive
+GL-0009,1003,Maintenance,Upkeep and maintenance costs,Vertex Technologies,Active
+GL-0010,2003,Inventory,Stock of goods,Vertex Technologies,Active

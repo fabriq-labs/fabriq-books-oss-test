@@ -25,14 +25,14 @@ This onboarding plan introduces a developer to:
 **📖 Workbook**: Follow the detailed step-by-step instructions in [Session 1 Workbook](./ONBOARDING_SESSION1_WORKBOOK.md)
 
 The workbook covers:
-- Cloning workspace, backend, and frontend repositories
+- Cloning the monorepo and verifying `backend/` and `frontend-1/`
 - Configuring Cursor IDE workspace
 - Setting up environment variables
 - Database initialization
 - Verifying the complete setup
 
 **Completion Checklist**:
-- [ ] All repositories cloned and dependencies installed
+- [ ] Monorepo cloned and backend/frontend dependencies installed
 - [ ] Cursor workspace configured and opened
 - [ ] Backend and frontend servers running successfully
 - [ ] Can login and navigate the application

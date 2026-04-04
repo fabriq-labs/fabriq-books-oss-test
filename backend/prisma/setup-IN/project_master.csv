@@ -1,0 +1,11 @@
+id,project_code,project_name,legal_entity_id,project_start_date,project_end_date,budget_line_id,org_id
+proj_demo_alpha,PRJ-ALPHA,Digital Transformation Phase 1,org_indian_demo,2024-01-01,2024-12-31,buli_demo_it,org_indian_demo
+proj_demo_beta,PRJ-BETA,Operations Modernisation,org_indian_demo,2024-04-01,2025-03-31,buli_demo_ops,org_indian_demo
+proj_demo_gamma,PRJ-GAMMA,Sales Platform Upgrade,org_indian_demo,2024-06-01,2025-05-31,buli_demo_sales,org_indian_demo
+proj_demo_delta,PRJ-DELTA,Marketing Automation,org_indian_demo,2024-01-01,2024-06-30,buli_demo_marketing,org_indian_demo
+proj_demo_epsilon,PRJ-EPSILON,HR System Implementation,org_indian_demo,2024-03-01,2024-12-31,buli_demo_hr,org_indian_demo
+proj_demo_zeta,PRJ-ZETA,Office Expansion,org_indian_demo,2024-07-01,2025-06-30,buli_demo_capex,org_indian_demo
+proj_demo_eta,PRJ-ETA,Cloud Migration,org_indian_demo,2024-01-01,2025-06-30,buli_demo_it,org_indian_demo
+proj_demo_theta,PRJ-THETA,Compliance Framework,org_indian_demo,2024-04-01,2024-09-30,buli_demo_contingency,org_indian_demo
+proj_demo_iota,PRJ-IOTA,Customer Portal,org_indian_demo,2024-09-01,2025-02-28,buli_demo_it_fy25,org_indian_demo
+proj_demo_kappa,PRJ-KAPPA,Warehouse Upgrade,org_indian_demo,2024-10-01,2025-03-31,buli_demo_ops,org_indian_demo

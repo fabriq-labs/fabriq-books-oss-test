@@ -1,0 +1,84 @@
+{
+  "id": "view_exchange_rate_list",
+  "name": "exchange_rate_view",
+  "model_name": "exchange_rate",
+  "description": "Exchange Rates",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read"
+    },
+    "from_currency": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "150",
+        "columnType": "text"
+      },
+      "displayName": "From Currency",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "startswith"
+      },
+      "isColumnShow": true
+    },
+    "to_currency": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "150",
+        "columnType": "text"
+      },
+      "displayName": "To Currency",
+      "isColumnShow": true
+    },
+    "effective_date": {
+      "dataType": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "160",
+        "columnType": "date"
+      },
+      "displayName": "Effective Date",
+      "isColumnShow": true
+    },
+    "rate": {
+      "dataType": "decimal",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "160",
+        "columnType": "decimal"
+      },
+      "displayName": "Rate",
+      "isColumnShow": true
+    },
+    "rate_type": {
+      "dataType": "exchange_rate_type",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "140",
+        "columnType": "text"
+      },
+      "displayName": "Rate Type",
+      "isColumnShow": true
+    },
+    "source": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "width": "150",
+        "columnType": "text"
+      },
+      "displayName": "Source",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

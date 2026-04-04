@@ -1,0 +1,20 @@
+{
+  "id": "view_3f78a26e-3268-46c3-af40-eeb78922591c",
+  "name": "supplier_itemsFullAccess",
+  "model_name": "supplier_items",
+  "description": "Full access to supplier_items model",
+  "data_graph": {
+    "select": {
+      "id": true,
+      "org_id": true,
+      "created_at": true,
+      "created_by": true,
+      "assigned_to": true,
+      "modified_at": true,
+      "modified_by": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

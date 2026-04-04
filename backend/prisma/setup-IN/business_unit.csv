@@ -1,0 +1,11 @@
+id,business_unit,name,legal_entity_id,status,created_by,org_id
+bu_demo_hq,Headquarters,HQ,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_ops,Operations,Ops,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_sales,Sales,Sales BU,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_tech,Technology,Tech BU,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_support,Support,Support BU,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_east,East Region,East,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_west,West Region,West,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_north,North Region,North,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_south,South Region,South,org_indian_demo,Active,user_arjun_sharma,org_indian_demo
+bu_demo_shared,Shared Services,Shared,org_indian_demo,Active,user_arjun_sharma,org_indian_demo

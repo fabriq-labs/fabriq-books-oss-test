@@ -1,0 +1,15 @@
+value_date,description,amount
+2025-10-30,[TEST-RECON] NEFT - Infosys balance payment INV-002,35000
+2025-11-02,[TEST-RECON] RTGS - Wipro Ltd full payment INV-003,50000
+2025-11-10,[TEST-RECON] ACH CREDIT - Tata Consultancy INV-006,60000
+2025-11-12,[TEST-RECON] IMPS - Infosys Ltd INV-007,45000
+2025-11-15,[TEST-RECON] NEFT - Wipro advance deposit,25000
+2025-11-18,[TEST-RECON] Bank processing charges,-2500
+2025-11-20,[TEST-RECON] NEFT - Vendor payment to supplier,-15000
+2025-11-25,[TEST-RECON] RTGS - Unknown customer payment,75000
+2025-11-28,[TEST-RECON] Annual maintenance charges,-8500
+2025-12-01,[TEST-RECON] ACH CREDIT - Reliance Industries INV-009,55000
+2025-12-03,[TEST-RECON] UPI payment outward,-12000
+2025-12-05,[TEST-RECON] NEFT - HDFC Bank INV-010 settlement,70000
+2025-12-08,[TEST-RECON] Unidentified deposit,18000
+2025-12-10,[TEST-RECON] GST TDS deduction,-3000

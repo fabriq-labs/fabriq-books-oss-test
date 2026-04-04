@@ -1,10 +1,5 @@
 # Build the root Dockerfile and push to GitHub Container Registry (GHCR).
-# Replaces the Docker build + push portion of cloudbuild.yaml (Artifact Registry).
-# Cloud Run deploy is not included; use gcloud/cloud-deploy or a separate workflow with GCP auth.
-#
-# Required repo secret:
-#   GH_TOKEN — PAT with read access to fabriq-labs/fabriq-base and fabriq-labs/zeiv-v2 (same as Cloud Build _GH_TOKEN).
-#
+# Monorepo: no clone token; context includes backend/ and frontend-1/.
 # GITHUB_TOKEN is used to log in to ghcr.io; enable "Packages: write" via permissions below.
 
 name: Docker build and push (GHCR)
@@ -12,18 +7,16 @@ name: Docker build and push (GHCR)
 on:
   workflow_dispatch:
     inputs:
-      backend_branch:
-        description: Backend branch (fabriq-base)
-        default: demo
-        type: string
-      frontend_branch:
-        description: Frontend branch (zeiv-v2)
-        default: demo
-        type: string
       no_cache:
         description: Skip Docker layer cache (fresh build)
         default: false
         type: boolean
+
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -37,38 +30,29 @@ jobs:
   build-push:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Single source of truth for clone branches when the workflow is not workflow_dispatch
-    # (push/tag: inputs.* is unavailable). Keep in sync with workflow_dispatch input defaults below.
-    env:
-      CLONE_BACKEND_DEFAULT: demo
-      CLONE_FRONTEND_DEFAULT: demo
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      # workflow_dispatch: use UI inputs. push/tags: inputs are not set — use CLONE_*_DEFAULT.
-      - name: Set clone branches
-        id: branches
+      - name: Monorepo git metadata for image labels
+        id: git_meta
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "backend=${{ inputs.backend_branch }}" >> "$GITHUB_OUTPUT"
-            echo "frontend=${{ inputs.frontend_branch }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "backend=${CLONE_BACKEND_DEFAULT}" >> "$GITHUB_OUTPUT"
-            echo "frontend=${CLONE_FRONTEND_DEFAULT}" >> "$GITHUB_OUTPUT"
-          fi
+          MSG_B64=$(git log -1 --format=%B | base64 -w0)
+          COMMIT_DATE=$(git log -1 --format=%cI)
+          echo "msg_b64=${MSG_B64}" >> "$GITHUB_OUTPUT"
+          echo "commit_date=${COMMIT_DATE}" >> "$GITHUB_OUTPUT"
 
-      # One human-readable image tag: <branch-name>:<timestamp> (timestamp part in tag only).
-      # Example final ref: ghcr.io/org/repo:knack-dev-20260325-143210
       - name: Image build metadata (time + tag)
         id: build_meta
         run: |
           BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           TAG_TS=$(date -u +%Y%m%d-%H%M%S)
-          SAFE_BRANCH=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
+          SAFE_REF=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
           echo "build_time=${BUILD_TIME}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${SAFE_BRANCH}-${TAG_TS}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${SAFE_REF}-${TAG_TS}" >> "$GITHUB_OUTPUT"
 
       - name: Image name (GHCR requires lowercase)
         id: image
@@ -103,12 +87,14 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            GH_TOKEN=${{ secrets.GH_TOKEN }}
-            BACKEND_BRANCH=${{ steps.branches.outputs.backend }}
-            FRONTEND_BRANCH=${{ steps.branches.outputs.frontend }}
+            SOURCE_REF=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
+            SOURCE_COMMIT_MESSAGE_B64=${{ steps.git_meta.outputs.msg_b64 }}
+            SOURCE_COMMIT_DATE=${{ steps.git_meta.outputs.commit_date }}
             BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
             IMAGE_TAG=${{ steps.build_meta.outputs.image_tag }}
-          no-cache: ${{ inputs.no_cache == true }}
-          cache-from: ${{ inputs.no_cache == true && '' || 'type=gha' }}
+            CACHEBUST=${{ github.sha }}
+          no-cache: ${{ github.event_name == 'workflow_dispatch' && inputs.no_cache || false }}
+          cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64

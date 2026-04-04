@@ -1,0 +1,20 @@
+{
+  "id": "view_df855019-ef72-4c8c-8c11-4b0589f4e779",
+  "name": "tax_masterFullAccess",
+  "model_name": "tax_master",
+  "description": "Full access to tax_master model",
+  "data_graph": {
+    "select": {
+      "id": true,
+      "org_id": true,
+      "created_at": true,
+      "created_by": true,
+      "assigned_to": true,
+      "modified_at": true,
+      "modified_by": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

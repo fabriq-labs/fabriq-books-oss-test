@@ -1,0 +1,1 @@
+export { PromptTemplateForm } from '@/components/forms/Masters/PromptTemplateForm'; 

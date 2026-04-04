@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+startCommand = "python sync_and_transform.py"
+# Cron schedule: Configure in Railway dashboard
+# Recommended: Every 4 hours -> 0 */4 * * *
+# No healthcheck needed - service exits after completion
+

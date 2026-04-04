@@ -1,0 +1,11 @@
+id,cost_center,legal_entity_id,status,org_id
+cc_demo_001,CC-IT,org_indian_demo,Active,org_indian_demo
+cc_demo_002,CC-Operations,org_indian_demo,Active,org_indian_demo
+cc_demo_003,CC-Sales,org_indian_demo,Active,org_indian_demo
+cc_demo_004,CC-Marketing,org_indian_demo,Active,org_indian_demo
+cc_demo_005,CC-HR,org_indian_demo,Active,org_indian_demo
+cc_demo_006,CC-Admin,org_indian_demo,Active,org_indian_demo
+cc_demo_007,CC-R&D,org_indian_demo,Active,org_indian_demo
+cc_demo_008,CC-Logistics,org_indian_demo,Active,org_indian_demo
+cc_demo_009,CC-Finance,org_indian_demo,Active,org_indian_demo
+cc_demo_010,CC-Procurement,org_indian_demo,Active,org_indian_demo

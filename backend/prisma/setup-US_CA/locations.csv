@@ -1,0 +1,16 @@
+id,location,customer_id,legal_entity_id,address,city,state,country,zip_code,org_id
+loc_sf_headquarters,SF Headquarters,cust_pinnacle_solutions,org_techflow_us,"1234 Silicon Valley Drive",San Francisco,California,United States,94105,org_techflow_us
+loc_nyc_office,NYC Office,cust_pinnacle_solutions,org_techflow_us,"567 Madison Avenue",New York,New York,United States,10022,org_techflow_us
+loc_austin_warehouse,Austin Warehouse,cust_pinnacle_solutions,org_techflow_us,"890 Technology Boulevard",Austin,Texas,United States,78759,org_techflow_us
+loc_seattle_distribution,Seattle Distribution,cust_pinnacle_solutions,org_techflow_us,"456 Innovation Way",Seattle,Washington,United States,98109,org_techflow_us
+loc_denver_logistics,Denver Logistics,cust_pinnacle_solutions,org_techflow_us,"789 Supply Chain Drive",Denver,Colorado,United States,80239,org_techflow_us
+loc_boston_rnd,Boston R&D,cust_pinnacle_solutions,org_techflow_us,"321 Research Park",Boston,Massachusetts,United States,02129,org_techflow_us
+loc_miami_showroom,Miami Showroom,cust_pinnacle_solutions,org_techflow_us,"654 Tech Demo Center",Miami,Florida,United States,33139,org_techflow_us
+loc_chicago_support,Chicago Support,cust_pinnacle_solutions,org_techflow_us,"987 Customer Service Blvd",Chicago,Illinois,United States,60607,org_techflow_us
+loc_atlanta_sales,Atlanta Sales,cust_pinnacle_solutions,org_techflow_us,"147 Enterprise Drive",Atlanta,Georgia,United States,30326,org_techflow_us
+loc_la_manufacturing,LA Manufacturing,cust_pinnacle_solutions,org_techflow_us,"258 Production Street",Los Angeles,California,United States,90245,org_techflow_us
+loc_aether_delivery,Aether Corp Delivery,cust_aether_corp,org_techflow_us,"567 Market Street",San Francisco,California,United States,94102,org_techflow_us
+loc_nexus_delivery,Nexus Systems Delivery,cust_nexus_systems,org_techflow_us,"89 Broadway",New York,New York,United States,10001,org_techflow_us
+loc_vertex_delivery,Vertex Enterprises Delivery,cust_vertex_enterprises,org_techflow_us,"234 Innovation Way",Austin,Texas,United States,78701,org_techflow_us
+loc_orion_delivery,Orion Tech Delivery,cust_orion_tech,org_techflow_us,"456 Pike Place",Seattle,Washington,United States,98101,org_techflow_us
+loc_pinnacle_delivery,Pinnacle Solutions Delivery,cust_pinnacle_solutions,org_techflow_us,"789 Tech Center Drive",Denver,Colorado,United States,80202,org_techflow_us

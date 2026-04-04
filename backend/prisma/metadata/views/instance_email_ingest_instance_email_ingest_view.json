@@ -1,0 +1,97 @@
+{
+  "id": "view_1a453f6e-1647-426e-a045-a46923123993",
+  "name": "instance_email_ingest_view",
+  "model_name": "instance_email_ingest",
+  "description": "Email ingest list (from email)",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Id",
+      "isColumnShow": true
+    },
+    "org_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Org",
+      "isColumnShow": true
+    },
+    "gmail_message_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Gmail Message Id",
+      "isColumnShow": true
+    },
+    "gmail_thread_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Gmail Thread Id",
+      "isColumnShow": true
+    },
+    "from_email": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "From",
+      "isColumnShow": true
+    },
+    "to_email": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "To",
+      "isColumnShow": true
+    },
+    "subject": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Subject",
+      "isColumnShow": true
+    },
+    "received_at": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "Received At",
+      "isColumnShow": true
+    },
+    "body_snippet": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Body Snippet",
+      "isColumnShow": true
+    },
+    "model_name": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Model",
+      "isColumnShow": true
+    },
+    "status": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Status",
+      "isColumnShow": true
+    },
+    "error_message": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Error Message",
+      "isColumnShow": true
+    },
+    "instance_email_ingest_item": {
+      "type": "table",
+      "dataType": "table",
+      "displayName": "Items",
+      "isColumnShow": true,
+      "select": {
+        "id": "read",
+        "instance_email_ingest_id": "read",
+        "model_name": "read",
+        "attachment_filename": "read",
+        "extracted_data": "read",
+        "instance_id": "read",
+        "status": "read",
+        "staged_path": "read",
+        "rejection_reason": "read"
+      }
+    }
+  }
+}

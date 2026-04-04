@@ -10,11 +10,11 @@ Railway is **not** on GCP, so there is **no metadata-based ADC**. You must suppl
 
 Railway can run a **pre-built image** from a **private** registry if you configure registry authentication.
 
-**GitHub Container Registry (GHCR):** if you build with **GitHub Actions** (`.github/workflows/docker-ghcr.yml`), use `ghcr.io/<owner>/<repo>:<tag>` and configure Railway with **GitHub** / PAT-based auth for GHCR. Overview: [BUILD_AND_DEPLOY.md §3.4](./BUILD_AND_DEPLOY.md#34-github-actions--github-container-registry-ghcr).
+**GitHub Container Registry (GHCR):** if you build with **GitHub Actions** (`.github/workflows/docker-ghcr.yml`), use `ghcr.io/<owner>/<repo>:<tag>` and configure Railway with **GitHub** / PAT-based auth for GHCR. Overview: [BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md) (§ GitHub Actions → GHCR).
 
-### Image reference (Google Artifact Registry)
+### Image reference (Google Artifact Registry, optional)
 
-Use the same URL Cloud Build pushes, for example:
+If you use **Artifact Registry** instead of GHCR, use the image URL from your registry, for example:
 
 `us-central1-docker.pkg.dev/PROJECT_ID/fabriq/fabriq:latest`
 
@@ -106,5 +106,4 @@ Using the **Generative Language API** with an **API key** is a different product
 
 ## Related docs
 
-- [BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md) — Railway **build from Git** (Dockerfile + `GH_TOKEN`)
-- [GCP_CLOUD_BUILD_AND_RUN.md](./GCP_CLOUD_BUILD_AND_RUN.md) — Cloud Build, Artifact Registry, Cloud Run, ADC on GCP
+- [BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md) — Monorepo **Dockerfile**; CI via **GHCR** (GitHub Actions). Railway: build from Git using root Dockerfile (no clone token).

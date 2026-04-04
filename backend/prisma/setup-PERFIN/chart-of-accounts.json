@@ -1,0 +1,1014 @@
+[
+  {
+    "name": "Income",
+    "classification": "Income",
+    "types": ["INCOME"],
+    "code": "4000",
+    "children": [
+      {
+        "name": "Pensions and Retirement",
+        "classification": "Income",
+        "types": ["RETIREMENT"],
+        "code": "4100",
+        "children": [
+          {
+            "name": "Annuity",
+            "classification": "Income",
+            "types": ["M", "CI"],
+            "code": "4101"
+          },
+          {
+            "name": "Pension",
+            "classification": "Income",
+            "types": ["M", "CI"],
+            "code": "4102"
+          }
+        ]
+      },
+      {
+        "name": "Salary",
+        "classification": "Income",
+        "types": ["SALARY"],
+        "code": "4200",
+        "children": [
+          {
+            "name": "Base Salary",
+            "classification": "Income",
+            "types": ["M", "T"],
+            "code": "4201"
+          },
+          {
+            "name": "Bonus and Commissions",
+            "classification": "Income",
+            "types": ["Y", "T"],
+            "code": "4202"
+          },
+          {
+            "name": "Equity Compensation",
+            "classification": "Income",
+            "types": ["Q", "T"],
+            "code": "4203"
+          },
+          {
+            "name": "Reimbursements",
+            "classification": "Income",
+            "types": ["M", "T"],
+            "code": "4204"
+          }
+        ]
+      },
+      {
+        "name": "Business",
+        "classification": "Income",
+        "types": ["BUSINESS"],
+        "code": "4300",
+        "children": [
+          {
+            "name": "Freelance and Consulting",
+            "classification": "Income",
+            "types": ["M", "T"],
+            "code": "4301"
+          },
+          {
+            "name": "Small Business Profits",
+            "classification": "Income",
+            "types": ["Y", "T"],
+            "code": "4302"
+          }
+        ]
+      },
+      {
+        "name": "Income from Investments",
+        "classification": "Income",
+        "types": ["INVESTMENT"],
+        "code": "4400",
+        "children": [
+          {
+            "name": "Capital Gains (Loss)",
+            "classification": "Income",
+            "types": ["Y", "CI"],
+            "code": "4401"
+          },
+          {
+            "name": "Dividends",
+            "classification": "Income",
+            "types": ["Q", "CI"],
+            "code": "4402"
+          },
+          {
+            "name": "Interest",
+            "classification": "Income",
+            "types": ["Q", "CI"],
+            "code": "4403"
+          },
+          {
+            "name": "Rental",
+            "classification": "Income",
+            "types": ["M", "CI"],
+            "code": "4404"
+          },
+          {
+            "name": "Retirement Accounts",
+            "classification": "Income",
+            "types": ["Y", "CI"],
+            "code": "4405"
+          }
+        ]
+      },
+      {
+        "name": "Other Income",
+        "classification": "Income",
+        "types": ["OTHER"],
+        "code": "4500",
+        "children": [
+          {
+            "name": "Misc",
+            "classification": "Income",
+            "types": ["M", "T"],
+            "code": "4501"
+          },
+          {
+            "name": "Royalties and Licenses",
+            "classification": "Income",
+            "types": ["Y", "CI"],
+            "code": "4502"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Expense",
+    "classification": "Expense",
+    "types": ["EXPENSE"],
+    "code": "5000",
+    "children": [
+      {
+        "name": "Housing",
+        "classification": "Expense",
+        "types": ["HOUSING"],
+        "code": "5100",
+        "children": [
+          {
+            "name": "Rent and Mortgage",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5101"
+          },
+          {
+            "name": "Property Tax",
+            "classification": "Expense",
+            "types": ["Y", "C", "N"],
+            "code": "5102"
+          },
+          {
+            "name": "Gas",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5103"
+          },
+          {
+            "name": "Electricity",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5104"
+          },
+          {
+            "name": "Maintenance",
+            "classification": "Expense",
+            "types": ["Q", "C", "N"],
+            "code": "5105"
+          },
+          {
+            "name": "Communications",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5106"
+          },
+          {
+            "name": "Repairs",
+            "classification": "Expense",
+            "types": ["Q", "C", "N"],
+            "code": "5107"
+          }
+        ]
+      },
+      {
+        "name": "Transportation",
+        "classification": "Expense",
+        "types": ["TRANSPORTATION"],
+        "code": "5200",
+        "children": [
+          {
+            "name": "Fuel",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5201"
+          },
+          {
+            "name": "Maintenance Auto",
+            "classification": "Expense",
+            "types": ["Y", "C", "N"],
+            "code": "5202"
+          },
+          {
+            "name": "Insurance",
+            "classification": "Expense",
+            "types": ["Y", "C", "N"],
+            "code": "5203"
+          },
+          {
+            "name": "Public Transport",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5204"
+          }
+        ]
+      },
+      {
+        "name": "Daily Living",
+        "classification": "Expense",
+        "types": ["DAILY_LIVING"],
+        "code": "5300",
+        "children": [
+          {
+            "name": "Groceries and Food",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5301"
+          },
+          {
+            "name": "Child Education",
+            "classification": "Expense",
+            "types": ["Y", "C", "N"],
+            "code": "5302"
+          },
+          {
+            "name": "Child Extracurricular",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5303"
+          },
+          {
+            "name": "Child Other Expenses",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5304"
+          },
+          {
+            "name": "Washing and Cleaning",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5305"
+          },
+          {
+            "name": "Assistance",
+            "classification": "Expense",
+            "types": ["M", "C", "N"],
+            "code": "5306"
+          },
+          {
+            "name": "Medicine and Doctor",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5307"
+          }
+        ]
+      },
+      {
+        "name": "Protection",
+        "classification": "Expense",
+        "types": ["PROTECTION"],
+        "code": "5400",
+        "children": [
+          {
+            "name": "Life and Term",
+            "classification": "Expense",
+            "types": ["Y", "C", "O"],
+            "code": "5401"
+          },
+          {
+            "name": "Health",
+            "classification": "Expense",
+            "types": ["Y", "C", "O"],
+            "code": "5402"
+          },
+          {
+            "name": "Critical Illness",
+            "classification": "Expense",
+            "types": ["Y", "C", "O"],
+            "code": "5403"
+          },
+          {
+            "name": "Property",
+            "classification": "Expense",
+            "types": ["Y", "C", "O"],
+            "code": "5404"
+          },
+          {
+            "name": "Disability",
+            "classification": "Expense",
+            "types": ["Y", "C", "O"],
+            "code": "5405"
+          }
+        ]
+      },
+      {
+        "name": "Financial Obligations",
+        "classification": "Expense",
+        "types": ["FINANCIAL_OBLIGATIONS"],
+        "code": "5500",
+        "children": [
+          {
+            "name": "Home Loan EMI",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5501"
+          },
+          {
+            "name": "Auto Loan EMI",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5502"
+          },
+          {
+            "name": "Education Loan EMI",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5503"
+          },
+          {
+            "name": "Personal Loan EMI",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5504"
+          },
+          {
+            "name": "Consumer Loan EMI",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5505"
+          },
+          {
+            "name": "Credit Card EMI",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5506"
+          },
+          {
+            "name": "Taxes",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5507"
+          },
+          {
+            "name": "Home Loan Interest",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5508"
+          },
+          {
+            "name": "Car Loan Interest",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5509"
+          },
+          {
+            "name": "Education Loan Interest",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5510"
+          },
+          {
+            "name": "Personal Loan Interest",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5511"
+          },
+          {
+            "name": "Consumer Loans Interest",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5512"
+          },
+          {
+            "name": "Credit Card Interest",
+            "classification": "Expense",
+            "types": ["M", "C", "O"],
+            "code": "5513"
+          }
+        ]
+      },
+      {
+        "name": "Personal Wellbeing",
+        "classification": "Expense",
+        "types": ["PERSONAL_WELLBEING"],
+        "code": "5600",
+        "children": [
+          {
+            "name": "Clothing",
+            "classification": "Expense",
+            "types": ["Y", "D"],
+            "code": "5601"
+          },
+          {
+            "name": "Salon",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5602"
+          },
+          {
+            "name": "Books",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5603"
+          },
+          {
+            "name": "Wellness",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5604"
+          }
+        ]
+      },
+      {
+        "name": "Leisure",
+        "classification": "Expense",
+        "types": ["LEISURE"],
+        "code": "5700",
+        "children": [
+          {
+            "name": "Theatre",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5701"
+          },
+          {
+            "name": "Dining Out",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5702"
+          },
+          {
+            "name": "Entertainment",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5703"
+          },
+          {
+            "name": "Child Toys",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5704"
+          },
+          {
+            "name": "Shopping",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5705"
+          },
+          {
+            "name": "TV",
+            "classification": "Expense",
+            "types": ["M", "D"],
+            "code": "5706"
+          },
+          {
+            "name": "Subscriptions",
+            "classification": "Expense",
+            "types": ["Y", "D"],
+            "code": "5707"
+          }
+        ]
+      },
+      {
+        "name": "Vacation and Travel",
+        "classification": "Expense",
+        "types": ["VACATION_TRAVEL"],
+        "code": "5800",
+        "children": [
+          {
+            "name": "Vacation",
+            "classification": "Expense",
+            "types": ["Y", "D"],
+            "code": "5801"
+          }
+        ]
+      },
+      {
+        "name": "Miscellaneous",
+        "classification": "Expense",
+        "types": ["MISCELLANEOUS"],
+        "code": "5900",
+        "children": [
+          {
+            "name": "Gifting",
+            "classification": "Expense",
+            "types": ["Y", "D"],
+            "code": "5901"
+          },
+          {
+            "name": "Festivals",
+            "classification": "Expense",
+            "types": ["Y", "D"],
+            "code": "5902"
+          },
+          {
+            "name": "Charity",
+            "classification": "Expense",
+            "types": ["Y", "D"],
+            "code": "5903"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Assets",
+    "classification": "Assets",
+    "types": ["ASSET"],
+    "code": "1000",
+    "children": [
+      {
+        "name": "Bank and Cash",
+        "classification": "Assets",
+        "types": ["BANK_CASH"],
+        "code": "1100",
+        "children": [
+          {
+            "name": "Cash on Hand",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1101"
+          },
+          {
+            "name": "Bank Account 1",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1102"
+          },
+          {
+            "name": "Bank Account 2",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1103"
+          }
+        ]
+      },
+      {
+        "name": "Liquid and Equivalents",
+        "classification": "Assets",
+        "types": ["LIQUID"],
+        "code": "1200",
+        "children": [
+          {
+            "name": "Cash",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1201"
+          },
+          {
+            "name": "Savings Account",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1202"
+          },
+          {
+            "name": "FD and RD",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1203"
+          },
+          {
+            "name": "Treasury Bills",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1204"
+          },
+          {
+            "name": "Money Market Funds",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1205"
+          },
+          {
+            "name": "Tax Refunds",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1206"
+          },
+          {
+            "name": "Other Cash",
+            "classification": "Assets",
+            "types": ["ST"],
+            "code": "1207"
+          }
+        ]
+      },
+      {
+        "name": "Fixed, Personal and Large",
+        "classification": "Assets",
+        "types": ["FIXED_PERSONAL"],
+        "code": "1300",
+        "children": [
+          {
+            "name": "Principle Residence",
+            "classification": "Assets",
+            "types": ["LT", "RE"],
+            "code": "1301"
+          },
+          {
+            "name": "Second Residence",
+            "classification": "Assets",
+            "types": ["LT", "RE"],
+            "code": "1302"
+          },
+          {
+            "name": "Jewelry",
+            "classification": "Assets",
+            "types": ["LT", "COM"],
+            "code": "1303"
+          },
+          {
+            "name": "Automobiles",
+            "classification": "Assets",
+            "types": ["LT", "DA"],
+            "code": "1304"
+          },
+          {
+            "name": "Home Furnishings",
+            "classification": "Assets",
+            "types": ["LT", "DA"],
+            "code": "1305"
+          },
+          {
+            "name": "Collectibles",
+            "classification": "Assets",
+            "types": ["LT", "COM"],
+            "code": "1306"
+          },
+          {
+            "name": "Personal Loans Given",
+            "classification": "Assets",
+            "types": ["MT", "DEBT"],
+            "code": "1307"
+          }
+        ]
+      },
+      {
+        "name": "Investments",
+        "classification": "Assets",
+        "types": ["INVESTMENT"],
+        "code": "1400",
+        "children": [
+          {
+            "name": "Indian Equity",
+            "classification": "Assets",
+            "types": ["LT", "E"],
+            "code": "1401"
+          },
+          {
+            "name": "International Equity",
+            "classification": "Assets",
+            "types": ["LT", "E"],
+            "code": "1402"
+          },
+          {
+            "name": "Equity Mutual Funds",
+            "classification": "Assets",
+            "types": ["LT", "E"],
+            "code": "1403"
+          },
+          {
+            "name": "Medium-Term Debt",
+            "classification": "Assets",
+            "types": ["MT", "DEBT"],
+            "code": "1404"
+          },
+          {
+            "name": "Long-Term Debt",
+            "classification": "Assets",
+            "types": ["LT", "DEBT"],
+            "code": "1405"
+          },
+          {
+            "name": "REITs",
+            "classification": "Assets",
+            "types": ["LT", "RE"],
+            "code": "1406"
+          },
+          {
+            "name": "Gold and Commodity",
+            "classification": "Assets",
+            "types": ["MT", "COM"],
+            "code": "1407"
+          }
+        ]
+      },
+      {
+        "name": "Retirement",
+        "classification": "Assets",
+        "types": ["RETIREMENT"],
+        "code": "1500",
+        "children": [
+          {
+            "name": "Provident Fund",
+            "classification": "Assets",
+            "types": ["MT", "DEBT"],
+            "code": "1501"
+          },
+          {
+            "name": "National Pension Scheme",
+            "classification": "Assets",
+            "types": ["LT", "E"],
+            "code": "1502"
+          },
+          {
+            "name": "Public Provident Fund",
+            "classification": "Assets",
+            "types": ["MT", "DEBT"],
+            "code": "1503"
+          },
+          {
+            "name": "Annuity",
+            "classification": "Assets",
+            "types": ["LT", "DEBT"],
+            "code": "1504"
+          },
+          {
+            "name": "Endowment Plans",
+            "classification": "Assets",
+            "types": ["LT", "DEBT"],
+            "code": "1505"
+          },
+          {
+            "name": "Other Retirement Funds",
+            "classification": "Assets",
+            "types": ["LT", "DEBT"],
+            "code": "1506"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Liabilities",
+    "classification": "Liabilities",
+    "types": ["LIABILITY"],
+    "code": "2000",
+    "children": [
+      {
+        "name": "Taxes",
+        "classification": "Liabilities",
+        "types": ["TAX"],
+        "code": "2100",
+        "children": [
+          {
+            "name": "Advance Taxes",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2101"
+          },
+          {
+            "name": "Pending Tax Payments",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2102"
+          }
+        ]
+      },
+      {
+        "name": "Payables",
+        "classification": "Liabilities",
+        "types": ["PAYABLE"],
+        "code": "2200",
+        "children": [
+          {
+            "name": "Credit Card 1",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2201"
+          },
+          {
+            "name": "Credit Card 2",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2202"
+          },
+          {
+            "name": "Buy Now Pay Later (BNPL) 1",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2203"
+          },
+          {
+            "name": "Buy Now Pay Later (BNPL) 2",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2204"
+          }
+        ]
+      },
+      {
+        "name": "Debt and Loans",
+        "classification": "Liabilities",
+        "types": ["DEBT_LOANS"],
+        "code": "2300",
+        "children": [
+          {
+            "name": "Home Loan",
+            "classification": "Liabilities",
+            "types": ["S"],
+            "code": "2301"
+          },
+          {
+            "name": "Auto Loan",
+            "classification": "Liabilities",
+            "types": ["S"],
+            "code": "2302"
+          },
+          {
+            "name": "Appliance Loans",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2303"
+          },
+          {
+            "name": "Home Equity Loan",
+            "classification": "Liabilities",
+            "types": ["S"],
+            "code": "2304"
+          },
+          {
+            "name": "Education Loan",
+            "classification": "Liabilities",
+            "types": ["S"],
+            "code": "2305"
+          },
+          {
+            "name": "Personal Loans",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2306"
+          },
+          {
+            "name": "Hand Loans",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2307"
+          },
+          {
+            "name": "Credit Card Loan",
+            "classification": "Liabilities",
+            "types": ["US"],
+            "code": "2308"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Equity",
+    "classification": "Equity",
+    "types": ["EQUITY"],
+    "code": "3000",
+    "children": [
+      {
+        "name": "Earnings",
+        "classification": "Equity",
+        "types": ["EARNINGS"],
+        "code": "3100",
+        "children": [
+          {
+            "name": "Current Year Earnings",
+            "classification": "Equity",
+            "types": [],
+            "code": "3101"
+          },
+          {
+            "name": "Lifetime Earnings",
+            "classification": "Equity",
+            "types": [],
+            "code": "3102"
+          }
+        ]
+      },
+      {
+        "name": "Expenses",
+        "classification": "Equity",
+        "types": ["EXPENSES"],
+        "code": "3200",
+        "children": [
+          {
+            "name": "Current Year Expenses",
+            "classification": "Equity",
+            "types": [],
+            "code": "3201"
+          },
+          {
+            "name": "Lifetime Expenses",
+            "classification": "Equity",
+            "types": [],
+            "code": "3202"
+          }
+        ]
+      },
+      {
+        "name": "Closing",
+        "classification": "Equity",
+        "types": ["CLOSING"],
+        "code": "3300",
+        "children": [
+          {
+            "name": "Monthly Closing",
+            "classification": "Equity",
+            "types": [],
+            "code": "3301"
+          },
+          {
+            "name": "Yearly Closing",
+            "classification": "Equity",
+            "types": [],
+            "code": "3302"
+          }
+        ]
+      },
+      {
+        "name": "Retained - Savings & Investments",
+        "classification": "Equity",
+        "types": ["RETAINED"],
+        "code": "3400",
+        "children": [
+          {
+            "name": "Mutual Funds",
+            "classification": "Equity",
+            "types": ["E"],
+            "code": "3401"
+          },
+          {
+            "name": "Demat Accounts",
+            "classification": "Equity",
+            "types": ["E"],
+            "code": "3402"
+          },
+          {
+            "name": "Retirement",
+            "classification": "Equity",
+            "types": ["DEBT"],
+            "code": "3403"
+          },
+          {
+            "name": "Bonds, FD and RD",
+            "classification": "Equity",
+            "types": ["DEBT"],
+            "code": "3404"
+          },
+          {
+            "name": "Gold",
+            "classification": "Equity",
+            "types": ["COM"],
+            "code": "3405"
+          },
+          {
+            "name": "Real Estate and REIT",
+            "classification": "Equity",
+            "types": ["RE"],
+            "code": "3406"
+          },
+          {
+            "name": "Loans",
+            "classification": "Equity",
+            "types": ["DEBT"],
+            "code": "3407"
+          },
+          {
+            "name": "Current Year Savings",
+            "classification": "Equity",
+            "types": ["DEBT"],
+            "code": "3408"
+          }
+        ]
+      },
+      {
+        "name": "Historical Adjustments",
+        "classification": "Equity",
+        "types": ["ADJUSTMENT"],
+        "code": "3500",
+        "children": [
+          {
+            "name": "Previous Years' Retained Earnings",
+            "classification": "Equity",
+            "types": [],
+            "code": "3501"
+          },
+          {
+            "name": "Capital Gains Adjustments",
+            "classification": "Equity",
+            "types": [],
+            "code": "3502"
+          }
+        ]
+      }
+    ]
+  }
+]

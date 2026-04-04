@@ -1,0 +1,20 @@
+{
+  "name": "US-CA Demo Data",
+  "orgId": "org_techflow_us",
+  "userId": "user_madison_hall",
+  "buyerUserId": "user_emily_wilson",
+  "managerUserId": "user_daniel_lee",
+  "customerId": "cust_aether_corp",
+  "supplierId": "supp_global_chip",
+  "supplierId2": "supp_pacific_display",
+  "items": {
+    "productA": "item_ultra_laptop",
+    "serviceB": "item_it_consulting",
+    "productC": "item_4k_monitor",
+    "zohoProductName": "Cream Cheese",
+    "quickbooksProductName": "Pump"
+  },
+  "locationId": "loc_sf_headquarters",
+  "currency": "USD",
+  "description": "Test configuration for US-CA demo data (setup-US_CA)"
+}

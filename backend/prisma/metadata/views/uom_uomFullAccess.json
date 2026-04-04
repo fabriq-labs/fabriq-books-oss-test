@@ -1,0 +1,26 @@
+{
+  "id": "view_9f769b2e-75ef-40d8-a9a8-e5be6c85c69f",
+  "name": "uomFullAccess",
+  "model_name": "uom",
+  "description": "Full access to uom model",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "name": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Name",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

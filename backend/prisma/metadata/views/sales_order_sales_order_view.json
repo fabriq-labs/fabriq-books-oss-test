@@ -1,0 +1,330 @@
+{
+  "id": "view_4f7dfb59-2c75-4186-972b-7e456defa32a",
+  "name": "sales_order_view",
+  "model_name": "sales_order",
+  "description": "Sales Order",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "ID",
+      "isColumnShow": false
+    },
+    "notes": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Notes",
+      "isColumnShow": false
+    },
+    "org_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "status": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Status",
+      "isColumnShow": false
+    },
+    "invoice": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "invoice_date": "read",
+        "invoice_total": "read",
+        "balance_amount": "read",
+        "invoice_number": "read",
+        "invoice_status": "read"
+      },
+      "displayName": "Invoice",
+      "isColumnShow": false
+    },
+    "so_date": {
+      "dataType": "date",
+      "permission": "update",
+      "displayName": "SO Date",
+      "isColumnShow": true
+    },
+    "customer": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "customer_name": "update"
+      },
+      "displayName": "Customer",
+      "isColumnShow": false
+    },
+    "location": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "city": "update",
+        "state": "update",
+        "address": "update",
+        "country": "update",
+        "website": "update",
+        "location": "update",
+        "zip_code": "update"
+      },
+      "displayName": "Location",
+      "isColumnShow": false
+    },
+    "so_number": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "SO Number",
+      "isColumnShow": true
+    },
+    "created_at": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "Created At",
+      "isColumnShow": false
+    },
+    "created_by": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Created By",
+      "isColumnShow": false
+    },
+    "assigned_to": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Assigned",
+      "isColumnShow": false
+    },
+    "customer_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "customers",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "customers",
+          "searchParams": "customer_name",
+          "instanceLabel": "customer_name",
+          "instanceSourceKey": "customer_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Customer",
+      "isColumnShow": false
+    },
+    "location_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "location",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "location",
+          "searchParams": "location",
+          "instanceLabel": "location",
+          "instanceSourceKey": "location_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Location",
+      "isColumnShow": false
+    },
+    "modified_at": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "Modified At",
+      "isColumnShow": false
+    },
+    "modified_by": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Modified By",
+      "isColumnShow": false
+    },
+    "terms_and_conditions": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Terms and Conditions",
+      "isColumnShow": false
+    },
+    "total_amount": {
+      "dataType": "float",
+      "permission": "read",
+      "tableProps": {
+        "width": "150",
+        "columnType": "number"
+      },
+      "displayName": "Total Amount",
+      "isColumnShow": true
+    },
+    "payment_terms": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "no_of_days": "read",
+        "description": "read",
+        "payment_terms": "update"
+      },
+      "displayName": "Payment Terms",
+      "isColumnShow": false
+    },
+    "shipping_terms": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "description": "read",
+        "shipping_terms": "update"
+      },
+      "displayName": "Shipping Terms",
+      "isColumnShow": false
+    },
+    "wf_instance_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Workflow Instance",
+      "isColumnShow": false
+    },
+    "shipping_method": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "description": "read",
+        "shipping_method": "update"
+      },
+      "displayName": "Shipping Method",
+      "isColumnShow": false
+    },
+    "payment_terms_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "payment_terms",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "payment_terms",
+          "searchParams": "payment_terms",
+          "instanceLabel": "payment_terms",
+          "instanceSourceKey": "payment_terms_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Payment Terms",
+      "isColumnShow": false
+    },
+    "sales_order_items": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "created_at": "read",
+        "uom": "read",
+        "rate": "read",
+        "quantity": "read",
+        "item_name": "read",
+        "item_type": "update",
+        "line_total": "read",
+        "tax_rate": "read",
+        "tax_amount": "read",
+        "discount_rate": "read",
+        "discount_amount": "read",
+        "tax_rate_intra": "read",
+        "item_master": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "uom": {
+              "select": {
+                "id": "read",
+                "name": "read"
+              }
+            },
+            "uom_id": "update",
+            "supplier": {
+              "select": {
+                "id": "read",
+                "primary_email": "read",
+                "supplier_name": "read",
+                "supplier_address": "read"
+              }
+            },
+            "item_code": "read",
+            "item_name": "read",
+            "item_type": "read",
+            "unit_price": "update",
+            "supplier_id": "update",
+            "item_shortname": "update",
+            "item_description": "update"
+          }
+        },
+        "item_number": "read",
+        "item_master_id": "update",
+        "sales_order_id": "update",
+        "item_description": "update"
+      },
+      "displayName": "Sales Order Items",
+      "isColumnShow": false
+    },
+    "shipping_terms_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "shipping_terms",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "shipping_terms",
+          "searchParams": "shipping_terms",
+          "instanceLabel": "shipping_terms",
+          "instanceSourceKey": "shipping_terms_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Shipping Terms",
+      "isColumnShow": false
+    },
+    "workflow_instance": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "status": "read",
+        "current_state": "read",
+        "assigned_user_id": "read"
+      },
+      "displayName": "Workflow",
+      "isColumnShow": false
+    },
+    "shipping_method_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "shipping_method",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "shipping_method",
+          "searchParams": "shipping_method",
+          "instanceLabel": "shipping_method",
+          "instanceSourceKey": "shipping_method_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Shipping Method",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

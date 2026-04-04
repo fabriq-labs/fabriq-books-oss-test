@@ -1,0 +1,13 @@
+id,instance_id,line_total,invoiced_amount,org_id
+in_item_demo_001,inv_demo_001,100000,100000,org_indian_demo
+in_item_demo_002,inv_demo_002,75000,75000,org_indian_demo
+in_item_demo_003,inv_demo_003,50000,50000,org_indian_demo
+in_item_demo_004,inv_demo_004,120000,120000,org_indian_demo
+in_item_demo_005,inv_demo_005,80000,80000,org_indian_demo
+in_item_demo_006,inv_demo_006,60000,60000,org_indian_demo
+in_item_demo_007,inv_demo_007,45000,45000,org_indian_demo
+in_item_demo_008,inv_demo_008,90000,90000,org_indian_demo
+in_item_demo_009,inv_demo_009,55000,55000,org_indian_demo
+in_item_demo_010,inv_demo_010,70000,70000,org_indian_demo
+in_item_demo_011,inv_demo_011,35000,35000,org_indian_demo
+in_item_demo_012,inv_demo_012,48000,48000,org_indian_demo

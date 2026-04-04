@@ -1,0 +1,164 @@
+{
+  "id": "view_7488059b-ed21-48ab-b0ca-1a70ee64ec44",
+  "name": "locationFullAccess",
+  "model_name": "location",
+  "description": "Full access to location model",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "city": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "City",
+      "isColumnShow": true
+    },
+    "state": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "State",
+      "isColumnShow": true
+    },
+    "address": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Address",
+      "isColumnShow": true
+    },
+    "country": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Country",
+      "isColumnShow": true
+    },
+    "website": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Website",
+      "isColumnShow": false
+    },
+    "location": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Location",
+      "isColumnShow": true
+    },
+    "zip_code": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Zip Code",
+      "isColumnShow": true
+    },
+    "customers": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Customers",
+      "isColumnShow": false
+    },
+    "customer_id": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "location",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "customers",
+          "searchParams": "customer_name",
+          "instanceLabel": "customer_name",
+          "instanceSourceKey": "customer_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Customer",
+      "isColumnShow": false
+    },
+    "full_address": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Full Address",
+      "isColumnShow": false
+    },
+    "organization": {
+      "select": {
+        "id": "read",
+        "legal_name": "update",
+        "organization_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "legal_entity_id": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "business_unit",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "organization",
+          "searchParams": "organization_name",
+          "instanceLabel": "organization_name",
+          "instanceSourceKey": "legal_entity_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

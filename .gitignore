@@ -1,6 +1,3 @@
-# Ignore nested git repositories (they manage their own files)
-backend/
-frontend-1/
 fabriqdata.com/
 backups/
 

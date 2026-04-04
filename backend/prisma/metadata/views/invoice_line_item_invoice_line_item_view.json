@@ -1,0 +1,211 @@
+{
+  "id": "view_ae87f091-66f1-4604-a279-8815e05569b2",
+  "name": "invoice_line_item_view",
+  "model_name": "invoice_line_item",
+  "description": "Invoice Line Item",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "rate": {
+      "showNo": "6",
+      "datatype": "float",
+      "permission": "read",
+      "tableProps": {
+        "width": "70",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Rate",
+      "isColumnShow": true
+    },
+    "invoice": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "po_number": "update",
+        "supplier_name": "update",
+        "invoice_number": "update",
+        "supplier_remarks": "update"
+      }
+    },
+    "tax_rate": {
+      "showNo": "6",
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "70",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Tax Rate",
+      "isColumnShow": true
+    },
+    "tax_type": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "item_name": {
+      "showNo": "2",
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "130",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Item Name",
+      "isColumnShow": true
+    },
+    "item_type": {
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Item Type",
+      "isColumnShow": false
+    },
+    "po_number": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "line_total": {
+      "showNo": "7",
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "70",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Line Total",
+      "isColumnShow": true
+    },
+    "instance_id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "invoice_qty": {
+      "showNo": "5",
+      "datatype": "int",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "70",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Invoice Quantity",
+      "isColumnShow": true
+    },
+    "item_master": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "uom": {
+          "type": "table",
+          "select": {
+            "id": "update",
+            "name": "update"
+          }
+        },
+        "uom_id": "update",
+        "item_name": "update",
+        "item_type": "update",
+        "unit_price": "update",
+        "supplier_id": "update",
+        "item_shortname": "update",
+        "item_description": "update"
+      },
+      "showNo": "3",
+      "datatype": "float",
+      "tableProps": {
+        "width": "70",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Uom",
+      "isColumnShow": true
+    },
+    "need_by_date": {
+      "datatype": "datetime",
+      "permission": "read",
+      "tableProps": {
+        "width": "150",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Need By Date",
+      "isColumnShow": false
+    },
+    "item_master_id": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "ordered_amount": {
+      "datatype": "float",
+      "permission": "update"
+    },
+    "invoiced_amount": {
+      "datatype": "float",
+      "permission": "update"
+    },
+    "line_tax_amount": {
+      "showNo": "6",
+      "datatype": "float",
+      "required": true,
+      "permission": "read",
+      "tableProps": {
+        "width": "70",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Line Tax Amount",
+      "isColumnShow": true
+    },
+    "item_description": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "ordered_quantity": {
+      "datatype": "float",
+      "permission": "update"
+    },
+    "purchase_order_item_id": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "purchase_requisition_id": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "purchase_order_line_item": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "invoice_qty": "read",
+        "need_by_date": "read",
+        "ordered_amount": "read",
+        "ordered_quantity": "read"
+      },
+      "showNo": "4",
+      "datatype": "float",
+      "tableProps": {
+        "width": "70",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "PO Qty",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

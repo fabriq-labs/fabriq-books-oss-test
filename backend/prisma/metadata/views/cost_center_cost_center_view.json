@@ -1,0 +1,70 @@
+{
+  "id": "view_a2b8cf69-2d98-4dbe-a8b3-10de11e652b6",
+  "name": "cost_center_view",
+  "model_name": "cost_center",
+  "description": "Cost Center",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "status": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Status",
+      "isColumnShow": true
+    },
+    "cost_center": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Cost Center",
+      "isColumnShow": true
+    },
+    "organization": {
+      "select": {
+        "id": "read",
+        "legal_name": "update",
+        "organization_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "legal_entity_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "cost center",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "organization",
+          "searchParams": "legal_name",
+          "instanceLabel": "legal_name",
+          "instanceSourceKey": "legal_entity_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "organization.legal_name"
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

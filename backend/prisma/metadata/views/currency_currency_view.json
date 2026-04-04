@@ -1,0 +1,71 @@
+{
+  "id": "view_currency_list",
+  "name": "currency_view",
+  "model_name": "currency",
+  "description": "Currency (ISO 4217)",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read"
+    },
+    "code": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "120",
+        "columnType": "text"
+      },
+      "displayName": "Code",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "startswith"
+      },
+      "isColumnShow": true
+    },
+    "name": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text"
+      },
+      "displayName": "Name",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "contains"
+      },
+      "isColumnShow": true
+    },
+    "symbol": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "width": "80",
+        "columnType": "text"
+      },
+      "displayName": "Symbol",
+      "isColumnShow": true
+    },
+    "decimal_places": {
+      "dataType": "int",
+      "permission": "update",
+      "tableProps": {
+        "width": "120",
+        "columnType": "int"
+      },
+      "displayName": "Decimal Places",
+      "isColumnShow": false
+    },
+    "is_active": {
+      "dataType": "boolean",
+      "permission": "update",
+      "displayName": "Active",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

@@ -1,0 +1,4 @@
+id,name,slug,settings,external_mapping,active_subscription,erp_system_type
+org_indian_demo,Demo Tech Solutions India Pvt Ltd,demo-india,"{""timezone"":""Asia/Kolkata"",""currency"":""INR""}","{""erp_system"":""demo_erp""}",true,zoho_books
+org_mumbai_branch,Mumbai Tech Hub,mumbai-tech,"{""timezone"":""Asia/Kolkata"",""currency"":""INR""}","{""parent_org"":""org_indian_demo""}",true,zoho_books
+org_bangalore_office,Bangalore Innovation Center,bangalore-innovate,"{""timezone"":""Asia/Kolkata"",""currency"":""INR""}","{""parent_org"":""org_indian_demo""}",true,zoho_books

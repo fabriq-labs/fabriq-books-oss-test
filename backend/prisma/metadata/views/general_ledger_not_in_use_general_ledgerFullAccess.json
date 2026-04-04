@@ -1,0 +1,20 @@
+{
+  "id": "view_8a5d2a3f-0b26-44d9-b911-a1d60b5e08be",
+  "name": "general_ledgerFullAccess",
+  "model_name": "general_ledger-not-in-use",
+  "description": "Full access to general_ledger model",
+  "data_graph": {
+    "select": {
+      "id": true,
+      "org_id": true,
+      "created_at": true,
+      "created_by": true,
+      "assigned_to": true,
+      "modified_at": true,
+      "modified_by": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

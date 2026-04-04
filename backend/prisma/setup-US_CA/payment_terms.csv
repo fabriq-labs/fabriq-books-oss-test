@@ -1,0 +1,5 @@
+id,payment_terms,description,no_of_days,org_id,legal_entity_id
+pay_us_net15,Net 15,Due in 15 days,15,org_techflow_us,org_techflow_us
+pay_us_net30,Net 30,Due in 30 days,30,org_techflow_us,org_techflow_us
+pay_us_net45,Net 45,Due in 45 days,45,org_techflow_us,org_techflow_us
+pay_us_due_receipt,Due on Receipt,Payment due upon receipt,0,org_techflow_us,org_techflow_us

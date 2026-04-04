@@ -1,0 +1,962 @@
+model organization {
+  id                   String                 @id @default(dbgenerated("concat('org_', gen_random_uuid())")) @db.VarChar(50)
+  organization_name    String
+  legal_name           String
+  address              String
+  city                 String
+  state                String
+  country              String
+  zip_code             String
+  website              String?
+  is_it_headquartres   String
+  is_it_a_groupcompany String
+  group_company_name   String?
+  basecurrency_id      String?
+  created_by           String?
+  created_at           DateTime?
+  modified_by          String?
+  modified_at          DateTime               @default(now())
+  org_id               String
+  assigned_to          String?
+  name                 String?
+  currency_master      currency_master?       @relation(fields: [basecurrency_id], references: [id])
+  business_unit        business_unit[]
+  location             location[]
+  employee_master      employee_master[]
+  cost_center          cost_center[]
+  payment_terms        payment_terms[]
+  account              account[]
+  general_ledger       general_ledger[]
+  project_master       project_master[]
+  department           department[]
+  purchase_requisition purchase_requisition[]
+  purchase_order       purchase_order[]
+  invoice              invoice[]
+}
+
+model budget_period {
+  id                   String                 @id @default(dbgenerated("concat('bupe_',  gen_random_uuid())")) @db.VarChar(50)
+  budget_period        String?
+  from_date            DateTime?
+  to_date              DateTime?
+  account_id           String?
+  status               String?
+  created_by           String
+  created_at           DateTime?
+  created_date         DateTime?              @default(now())
+  modified_by          String?
+  assigned_to          String?
+  org_id               String?
+  modified_at          DateTime?
+  account              account?               @relation(fields: [account_id], references: [id])
+  budget_line          budget_line[]
+  purchase_requisition purchase_requisition[]
+  purchase_order       purchase_order[]
+  item                 item[]
+}
+
+model item_category {
+  id               String        @id @default(dbgenerated("concat('item_',  gen_random_uuid())")) @db.VarChar(50)
+  item_category    String
+  item_subcategory String?
+  created_by       String?
+  created_at       DateTime?
+  modified_by      String?
+  modified_at      DateTime      @default(now())
+  org_id           String
+  assigned_to      String?
+  name             String?
+  item_master      item_master[]
+}
+
+model uom {
+  id          String        @id @default(dbgenerated("concat('uom_',  gen_random_uuid())")) @db.VarChar(50)
+  name        String?
+  created_by  String?
+  created_at  DateTime?
+  modified_by String?
+  modified_at DateTime      @default(now())
+  org_id      String?
+  assigned_to String?
+  item_master item_master[]
+}
+
+model list_data {
+  id          String    @id @default(dbgenerated("concat('uom_',  gen_random_uuid())")) @db.VarChar(50)
+  name        String?
+  created_by  String?
+  created_at  DateTime?
+  modified_by String?
+  modified_at DateTime  @default(now())
+  org_id      String?
+  assigned_to String?
+}
+
+model user_master {
+  id          String    @id @default(dbgenerated("concat('user_',  gen_random_uuid())")) @db.VarChar(50)
+  user        String    @unique @db.VarChar(255)
+  password    String?   @db.VarChar(255)
+  name        String?
+  created_by  String?
+  created_at  DateTime?
+  modified_by String?
+  modified_at DateTime  @default(now())
+  org_id      String
+  assigned_to String?
+}
+
+model shipping_method {
+  id              String           @id @default(dbgenerated("concat('ship_',  gen_random_uuid())")) @db.VarChar(50)
+  shipping_method String
+  description     String
+  status          String?
+  created_by      String?
+  created_at      DateTime?
+  modified_by     String?
+  modified_at     DateTime         @default(now())
+  org_id          String
+  assigned_to     String?
+  name            String?
+  supplier        supplier[]
+  purchase_order  purchase_order[]
+  sales_order     sales_order[]
+}
+
+model shipping_terms {
+  id             String           @id @default(dbgenerated("concat('ship_',  gen_random_uuid())")) @db.VarChar(50)
+  shipping_terms String
+  description    String
+  status         String?
+  created_by     String?
+  created_at     DateTime?
+  modified_by    String?
+  modified_at    DateTime         @default(now())
+  org_id         String
+  assigned_to    String?
+  name           String?
+  supplier       supplier[]
+  purchase_order purchase_order[]
+  sales_order    sales_order[]
+}
+
+model tax_master {
+  id             String        @id @default(dbgenerated("concat('tax_',  gen_random_uuid())")) @db.VarChar(50)
+  tax_name       String
+  tax_code       String
+  tax_rate       Int
+  effective_from DateTime
+  geo            String
+  expires_on     DateTime?
+  status         String?
+  created_by     String?
+  created_at     DateTime?
+  modified_by    String?
+  modified_at    DateTime      @default(now())
+  org_id         String
+  assigned_to    String?
+  name           String?
+  item_master    item_master[] @relation("ItemMaster_TaxMaster")
+  tax_rate_intra item_master[] @relation("ItemMaster_TaxRateIntra")
+}
+
+model payment_terms {
+  id              String           @id @default(dbgenerated("concat('pay_',  gen_random_uuid())")) @db.VarChar(50)
+  payment_terms   String
+  description     String
+  legal_entity_id String?
+  no_of_days      Int?
+  status          String?
+  created_by      String?
+  created_at      DateTime?
+  modified_by     String?
+  modified_at     DateTime         @default(now())
+  org_id          String
+  assigned_to     String?
+  name            String?
+  supplier        supplier[]
+  organization    organization?    @relation(fields: [legal_entity_id], references: [id])
+  purchase_order  purchase_order[]
+  customers       customers[]
+  sales_order     sales_order[]
+}
+
+model business_unit {
+  id              String            @id @default(dbgenerated("concat('busi_',  gen_random_uuid())")) @db.VarChar(50)
+  business_unit   String?
+  name            String?
+  legal_entity_id String?
+  status          String?
+  created_by      String
+  created_at      DateTime?
+  modified_by     String?
+  modified_at     DateTime          @default(now())
+  org_id          String?
+  assigned_to     String?
+  organization    organization?     @relation(fields: [legal_entity_id], references: [id])
+  employee_master employee_master[]
+  department      department[]
+}
+
+model attachment {
+  id          String   @id @default(dbgenerated("concat('attach_', gen_random_uuid())")) @db.VarChar(50)
+  path        String
+  instance_id String
+  type_id     Int?
+  type_name   String
+  name        String
+  created_by  String?
+  created_at  DateTime @default(now())
+  modified_by String?
+  modified_at DateTime @default(now())
+  org_id      String?
+  assigned_to String?
+}
+
+model instance_email_ingest {
+  id               String    @id @default(dbgenerated("concat('emig_', gen_random_uuid())")) @db.VarChar(50)
+  org_id           String?
+  gmail_message_id String?
+  gmail_thread_id  String?
+  from_email       String?
+  to_email         String?
+  subject          String?
+  received_at      DateTime?
+  body_snippet     String?
+  model_name       String?
+  status           String?
+  error_message    String?
+  created_by       String?
+  created_at       DateTime? @default(now())
+  modified_by      String?
+  modified_at      DateTime? @default(now())
+  processed_at     DateTime?
+
+  instance_email_ingest_item instance_email_ingest_item[]
+
+  @@index([org_id, gmail_message_id])
+  @@index([status])
+}
+
+model instance_email_ingest_item {
+  id                       String    @id @default(dbgenerated("concat('emig_item_', gen_random_uuid())")) @db.VarChar(50)
+  org_id                   String?
+  instance_email_ingest_id String
+  model_name               String?
+  attachment_filename      String?
+  extracted_data           Json?
+  instance_id              String?
+  status                   String?
+  staged_path              String?
+  rejection_reason         String?
+  created_by               String?
+  created_at               DateTime? @default(now())
+  modified_by              String?
+  modified_at              DateTime? @default(now())
+
+  instance_email_ingest instance_email_ingest @relation(fields: [instance_email_ingest_id], references: [id])
+
+  @@index([instance_email_ingest_id])
+  @@index([status])
+}
+
+model location {
+  id                   String                 @id @default(dbgenerated("concat('loca_',  gen_random_uuid())")) @db.VarChar(50)
+  location             String
+  name                 String?
+  legal_entity_id      String?
+  customer_id          String?
+  address              String
+  city                 String
+  state                String
+  country              String
+  zip_code             String
+  website              String?
+  full_address         String?
+  created_by           String?
+  created_at           DateTime?
+  modified_by          String?
+  modified_at          DateTime               @default(now())
+  org_id               String?
+  assigned_to          String?
+  employee_master      employee_master[]
+  organization         organization?          @relation(fields: [legal_entity_id], references: [id])
+  customers            customers?             @relation(fields: [customer_id], references: [id])
+  purchase_requisition purchase_requisition[]
+  purchase_order       purchase_order[]
+  invoice              invoice[]
+  sales_order          sales_order[]
+  delivery_challan     delivery_challan[]
+  credit_note          credit_note[]
+  quote                quote[]
+}
+
+model supplier {
+  id                        String                @id @default(dbgenerated("concat('supp_',  gen_random_uuid())")) @db.VarChar(50)
+  supplier_name             String
+  supplier_address          String
+  city                      String
+  state                     String
+  name                      String?
+  country                   String
+  zip_code                  String
+  primary_phone             String?
+  alternative_phone         String?
+  primary_email             String
+  secondary_email           String?
+  po_email                  String?
+  status                    String
+  industry                  String
+  website                   String?
+  employee_count            Int?
+  legal_name                String
+  legal_registration_number String?
+  business_classification   String
+  buyer_review_added        String
+  onboarded_date            DateTime
+  created_by                String?
+  modified_by               String?
+  org_id                    String
+  assigned_to               String?
+  created_at                DateTime?             @default(now()) @db.Timestamp(6)
+  modified_at               DateTime?             @default(now()) @db.Timestamp(6)
+  supplier_id               String?
+  payment_term_id           String?
+  shipping_term_id          String?
+  shipping_method_id        String?
+  preferred_currency_id     String?
+  products                  item_master[]
+  shipping_method           shipping_method?      @relation(fields: [shipping_method_id], references: [id])
+  shipping_terms            shipping_terms?       @relation(fields: [shipping_term_id], references: [id])
+  payment_terms             payment_terms?        @relation(fields: [payment_term_id], references: [id])
+  currency_master           currency_master?      @relation(fields: [preferred_currency_id], references: [id])
+  supplier_items            supplier_items[]
+  item                      item[]
+  purchase_order_item       purchase_order_item[]
+  purchase_order            purchase_order[]
+  // Lineage fields for data integration tracking
+  source_system_id          String?               @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_record_id          String? // Source system record ID (e.g., Zoho contact_id)
+  source_updated_at         DateTime?             @default(now()) // Last updated in source system (default: now() for internal records)
+  ingest_batch_id           String? // FK to datalake.sync_batch
+
+  @@index([source_system_id, source_record_id])
+  @@index([source_updated_at])
+}
+
+model customers {
+  id                    String             @id @default(dbgenerated("concat('cust_',  gen_random_uuid())")) @db.VarChar(50)
+  customer_name         String
+  customer_address      String
+  city                  String
+  state                 String
+  country               String
+  zip_code              String
+  primary_phone         String?
+  primary_email         String
+  industry              String
+  website               String?
+  created_by            String?
+  modified_by           String?
+  org_id                String
+  assigned_to           String?
+  created_at            DateTime?          @default(now()) @db.Timestamp(6)
+  modified_at           DateTime?          @default(now()) @db.Timestamp(6)
+  payment_term_id       String?
+  preferred_currency_id String?
+  payment_terms         payment_terms?     @relation(fields: [payment_term_id], references: [id])
+  currency_master       currency_master?   @relation(fields: [preferred_currency_id], references: [id])
+  invoice               invoice[]
+  location              location[]
+  payment_receipt       payment_receipt[]
+  sales_order           sales_order[]
+  delivery_challan      delivery_challan[]
+  credit_note           credit_note[]
+  quote                 quote[]
+  // Lineage fields for data integration tracking
+  source_system_id      String?            @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_record_id      String? // Source system record ID (e.g., Zoho contact_id)
+  source_updated_at     DateTime?          @default(now()) // Last updated in source system (default: now() for internal records)
+  ingest_batch_id       String? // FK to datalake.sync_batch
+
+  @@index([source_system_id, source_record_id])
+  @@index([source_updated_at])
+}
+
+model cost_center {
+  id                   String                 @id @default(dbgenerated("concat('cost_',  gen_random_uuid())")) @db.VarChar(50)
+  cost_center          String
+  legal_entity_id      String?
+  status               String?
+  created_by           String?
+  created_at           DateTime?
+  modified_by          String?
+  modified_at          DateTime               @default(now())
+  org_id               String
+  assigned_to          String?
+  name                 String?
+  employee_master      employee_master[]
+  organization         organization?          @relation(fields: [legal_entity_id], references: [id])
+  purchase_requisition purchase_requisition[]
+  item                 item[]
+}
+
+model department {
+  id                   String                 @id @default(dbgenerated("concat('dept_',  gen_random_uuid())")) @db.VarChar(50)
+  name                 String
+  created_by           String?
+  modified_by          String?
+  created_at           DateTime?              @default(now()) @db.Timestamp(6)
+  modified_at          DateTime?              @default(now()) @db.Timestamp(6)
+  org_id               String?
+  assigned_to          String?
+  legal_entity_id      String
+  business_unit_id     String?
+  employee_master      employee_master[]
+  organization         organization?          @relation(fields: [legal_entity_id], references: [id])
+  business_unit        business_unit?         @relation(fields: [business_unit_id], references: [id])
+  purchase_requisition purchase_requisition[]
+  purchase_order       purchase_order[]
+
+  user user[]
+}
+
+model budget_line {
+  id                   String                 @id @default(dbgenerated("concat('buli_',  gen_random_uuid())")) @db.VarChar(50)
+  budget_line          String?
+  budget_period_id     String?
+  bp_start_date        DateTime?
+  bp_end_date          DateTime?
+  allocated_budget     Float
+  available_budget     Float?
+  wip_budget           Float?
+  utilized_budget      Float?
+  created_by           String
+  created_at           DateTime?
+  created_date         DateTime               @default(now())
+  modified_by          String?
+  modified_at          DateTime?
+  org_id               String
+  assigned_to          String?
+  budget_period        budget_period?         @relation(fields: [budget_period_id], references: [id])
+  project_master       project_master[]
+  purchase_requisition purchase_requisition[]
+  purchase_order       purchase_order[]
+  item                 item[]
+}
+
+model item_master {
+  id                    String                  @id @default(dbgenerated("concat('prod_',  gen_random_uuid())")) @db.VarChar(50)
+  item_code             String?                 @unique @db.VarChar(20)
+  item_name             String
+  name                  String?
+  item_shortname        String?
+  item_description      String
+  item_type             String?
+  sales_account_id      String?
+  purchase_account_id   String?
+  unit_price            Float?
+  uom_id                String?
+  stockable             String?
+  item_status           String?
+  lead_time             Float?
+  expiry_date           DateTime?               @default(now()) @db.Timestamp(6)
+  supplier_id           String?
+  preferred_supplier    String?
+  search_keywords       String?
+  created_at            DateTime?               @default(now()) @db.Timestamp(6)
+  created_by            String?
+  modified_by           String?
+  modified_at           DateTime?               @default(now()) @db.Timestamp(6)
+  assigned_to           String?
+  org_id                String?
+  product_id            String?
+  item_category_id      String?
+  tax_master_id         String?
+  tax_rate_intra_id     String?
+  currency_master_id    String?
+  supplier              supplier?               @relation(fields: [supplier_id], references: [id])
+  item_category         item_category?          @relation(fields: [item_category_id], references: [id])
+  uom                   uom?                    @relation(fields: [uom_id], references: [id])
+  tax_master            tax_master?             @relation("ItemMaster_TaxMaster", fields: [tax_master_id], references: [id])
+  tax_rate_intra        tax_master?             @relation("ItemMaster_TaxRateIntra", fields: [tax_rate_intra_id], references: [id])
+  currency_master       currency_master?        @relation(fields: [currency_master_id], references: [id])
+  sales_account         account?                @relation("ItemMaster_SalesAccount", fields: [sales_account_id], references: [id])
+  purchase_account      account?                @relation("ItemMaster_PurchaseAccount", fields: [purchase_account_id], references: [id])
+  pr_items              item[]
+  supplier_items        supplier_items[]
+  puchase_order_item    purchase_order_item[]
+  invoice_line_item     invoice_line_item[]
+  sales_order_item      sales_order_item[]
+  delivery_challan_item delivery_challan_item[]
+  credit_note_item      credit_note_item[]
+  quote_item            quote_item[]
+  // Lineage fields for data integration tracking
+  source_system_id      String?                 @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_record_id      String? // Source system record ID (e.g., external system item ID)
+  source_updated_at     DateTime?               @default(now()) // Last updated in source system (default: now() for internal records)
+  ingest_batch_id       String? // FK to datalake.sync_batch
+
+  @@index([source_system_id, source_record_id])
+  @@index([source_updated_at])
+}
+
+model general_ledger {
+  id              String        @id @default(dbgenerated("concat('gl_',  gen_random_uuid())")) @db.VarChar(50)
+  gl_number       String?
+  gl_code         Int
+  gl_name         String
+  description     String
+  account_id      String?
+  legal_entity_id String?
+  status          String?
+  created_by      String
+  created_at      DateTime?
+  modified_by     String?
+  modified_at     DateTime      @default(now())
+  org_id          String?
+  assigned_to     String?
+  account         account?      @relation(fields: [account_id], references: [id])
+  organization    organization? @relation(fields: [legal_entity_id], references: [id])
+}
+
+model employee_master {
+  id               String         @id @default(dbgenerated("concat('emp_',  gen_random_uuid())")) @db.VarChar(50)
+  name             String?
+  first_name       String
+  last_name        String?
+  email            String
+  legal_entity_id  String
+  business_unit_id String?
+  user_id          String
+  user_role_id     String
+  manager          String
+  location_id      String
+  cost_center_id   String
+  department_id    String
+  created_by       String?
+  created_at       DateTime?
+  modified_by      String?
+  modified_at      DateTime?      @default(now())
+  org_id           String
+  assigned_to      String?
+  department       department?    @relation(fields: [department_id], references: [id])
+  business_unit    business_unit? @relation(fields: [business_unit_id], references: [id])
+  location         location?      @relation(fields: [location_id], references: [id])
+  cost_center      cost_center?   @relation(fields: [cost_center_id], references: [id])
+  organization     organization?  @relation(fields: [legal_entity_id], references: [id])
+  manager_user     user           @relation("ManagerRelation", fields: [manager], references: [id])
+  user             user           @relation("EmployeeUserRelation", fields: [user_id], references: [id])
+  user_role        role           @relation(fields: [user_role_id], references: [id])
+}
+
+model supplier_items {
+  id          String       @id @default(dbgenerated("concat('supp_',  gen_random_uuid())")) @db.VarChar(50)
+  supplier_id String?
+  item_id     String?
+  created_by  String?
+  created_at  DateTime?
+  modified_by String?
+  modified_at DateTime?    @default(now())
+  org_id      String?
+  assigned_to String?
+  name        String?
+  supplier    supplier?    @relation(fields: [supplier_id], references: [id])
+  item_master item_master? @relation(fields: [item_id], references: [id])
+}
+
+model project_master {
+  id                   String                 @id @default(dbgenerated("concat('proj_',  gen_random_uuid())")) @db.VarChar(50)
+  project_code         String?                @unique
+  project_name         String?
+  legal_entity_id      String?
+  project_start_date   DateTime?
+  project_end_date     DateTime?
+  budget_line_id       String?
+  account_id           String?
+  created_by           String
+  created_at           DateTime?
+  created_date         DateTime?              @default(now())
+  modified_by          String?
+  modified_at          DateTime?              @updatedAt
+  assigned_to          String?
+  org_id               String?
+  available_budget     Float?
+  account_name         String?
+  budget_line          budget_line?           @relation(fields: [budget_line_id], references: [id])
+  account              account?               @relation(fields: [account_id], references: [id])
+  organization         organization?          @relation(fields: [legal_entity_id], references: [id])
+  purchase_requisition purchase_requisition[]
+  purchase_order       purchase_order[]
+  quote                quote[]
+}
+
+model purchase_requisition {
+  id                   String                @id @default(dbgenerated("concat('preq_',  gen_random_uuid())")) @db.VarChar(50)
+  pr_number            String?
+  pr_date              DateTime?             @default(now())
+  on_behalf_of         Boolean?
+  on_budget            Boolean?
+  budget_level         String?
+  on_project           Boolean?
+  on_behalf_of_user    String?
+  on_behalf_department String?
+  requester            String?
+  requester_department String?
+  deliver_to           String?
+  account_id           String?
+  purchase_reason      String?
+  attach               String?
+  request_for_project  Boolean?
+  project_name         String?
+  budget_period        String?
+  budget_line          String?
+  created_at           DateTime?             @default(now())
+  created_by           String?
+  behalf_user_id       String?
+  modified_by          String?
+  modified_at          DateTime?             @updatedAt
+  assigned_to          String?
+  org_id               String?
+  total_price          Float?                @default(0.00)
+  comment              String?
+  status               String?
+  cost_center_id       String?
+  name                 String?
+  location_id          String?
+  legal_entity_id      String?
+  items                item[]
+  wf_instance_id       String?
+  workflow_instance    workflow_instance?    @relation(fields: [wf_instance_id], references: [id])
+  location             location?             @relation(fields: [location_id], references: [id])
+  cost_center          cost_center?          @relation(fields: [cost_center_id], references: [id])
+  department           department?           @relation(fields: [department_id], references: [id])
+  account              account?              @relation(fields: [account_id], references: [id])
+  budget_line_obj      budget_line?          @relation(fields: [budget_line], references: [id])
+  budget_period_obj    budget_period?        @relation(fields: [budget_period], references: [id])
+  project_master_obj   project_master?       @relation(fields: [project_name], references: [id])
+  organization         organization?         @relation(fields: [legal_entity_id], references: [id])
+  department_id        String?               @db.VarChar(50)
+  purchase_order       purchase_order[]
+  purchase_order_item  purchase_order_item[]
+  invoice_line_item    invoice_line_item[]
+  create_user          user?                 @relation(fields: [created_by], references: [id], name: "created_user")
+  behalf_user          user?                 @relation(fields: [on_behalf_of_user], references: [id], name: "behalf_user")
+}
+
+model item {
+  id                  String                @id @default(dbgenerated("concat('item_',  gen_random_uuid())")) @db.VarChar(50)
+  item_number         String?
+  item_name           String?
+  instance_id         String?
+  product_id          String?
+  item_code           String?
+  item_description    String?
+  item_type           String?
+  uom                 String?
+  rate                Float?
+  quantity            Float?
+  item_total          Float?
+  need_by_date        DateTime?
+  supplier_id         String?
+  created_at          DateTime?             @default(now())
+  created_by          String?
+  modified_by         String?
+  modified_at         DateTime?             @updatedAt
+  org_id              String?
+  budget_period_id    String?
+  budget_line_id      String?
+  cost_center_id      String?
+  pr_details          purchase_requisition? @relation(fields: [instance_id], references: [id])
+  product             item_master?          @relation(fields: [product_id], references: [id])
+  supplier            supplier?             @relation(fields: [supplier_id], references: [id])
+  budget_period       budget_period?        @relation(fields: [budget_period_id], references: [id])
+  budget_line         budget_line?          @relation(fields: [budget_line_id], references: [id])
+  cost_center         cost_center?          @relation(fields: [cost_center_id], references: [id])
+  purchase_order_item purchase_order_item[]
+
+  @@unique([instance_id, item_number])
+}
+
+model purchase_order {
+  id                   String                @id @default(dbgenerated("concat('po_',  gen_random_uuid())")) @db.VarChar(50)
+  po_number            String?               @unique
+  pr_number            String?
+  po_date              DateTime?             @default(now())
+  pr_date              DateTime?
+  on_behalf            Boolean?
+  on_behalf_of         Boolean?
+  on_behalf_department String?
+  requester            String?
+  requester_department String?
+  wf_instance_id       String?
+  deliver_to           String?
+  location_id          String?
+  account_id           String?
+  purchase_reason      String?
+  request_for_project  Boolean?
+  project_master_id    String?
+  budget_period_id     String?
+  budget_line_id       String?
+  created_at           DateTime?             @default(now())
+  created_by           String?
+  modified_by          String?
+  modified_at          DateTime?             @updatedAt
+  assigned_to          String?
+  org_id               String?
+  total_price          Float?                @default(0.00)
+  department_id        String?               @db.VarChar(50)
+  comment              String?
+  status               String?
+  purchase_id          String?
+  need_by_date         DateTime?
+  pr_total             Float?
+  delivery_address     String?
+  shipping_method_id   String?
+  shipping_terms_id    String?
+  payment_terms_id     String?
+  supplier_id          String?
+  legal_entity_id      String?
+  workflow_instance    workflow_instance?    @relation(fields: [wf_instance_id], references: [id])
+  department           department?           @relation(fields: [department_id], references: [id])
+  account              account?              @relation(fields: [account_id], references: [id])
+  budget_line          budget_line?          @relation(fields: [budget_line_id], references: [id])
+  budget_period        budget_period?        @relation(fields: [budget_period_id], references: [id])
+  project_master       project_master?       @relation(fields: [project_master_id], references: [id])
+  purchase_requisition purchase_requisition? @relation(fields: [purchase_id], references: [id])
+  supplier_details     supplier?             @relation(fields: [supplier_id], references: [id])
+  location             location?             @relation(fields: [location_id], references: [id])
+  organization         organization?         @relation(fields: [legal_entity_id], references: [id])
+  shipping_method      shipping_method?      @relation(fields: [shipping_method_id], references: [id])
+  shipping_terms       shipping_terms?       @relation(fields: [shipping_terms_id], references: [id])
+  payment_terms        payment_terms?        @relation(fields: [payment_terms_id], references: [id])
+  purchase_order_item  purchase_order_item[]
+  name                 String?
+  invoice              invoice[]
+  // Lineage fields for data integration tracking
+  source_system_id     String?               @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_record_id     String? // Source system record ID (e.g., external system PO ID)
+  source_updated_at    DateTime?             @default(now()) // Last updated in source system (default: now() for internal records)
+  ingest_batch_id      String? // FK to datalake.sync_batch
+  // External sync status (for Fabriq → external system sync)
+  sync_status          String? // 'pending' | 'synced' | 'failed' - status of sync to external system
+
+  @@index([source_system_id, source_record_id])
+  @@index([source_updated_at])
+}
+
+model purchase_order_item {
+  id                      String               @id @default(dbgenerated("concat('po_item_',  gen_random_uuid())")) @db.VarChar(50)
+  purchase_order_item_no  String?
+  purchase_requisition_id String
+  instance_id             String
+  product_id              String
+  item_code               String?
+  item_description        String?
+  item_type               String?
+  uom                     String?
+  rate                    Float?
+  quantity                Float?
+  item_total              Float?
+  need_by_date            DateTime?
+  supplier_id             String?
+  created_at              DateTime?            @default(now())
+  created_by              String?
+  modified_by             String?
+  modified_at             DateTime?            @updatedAt
+  org_id                  String?
+  item_id                 String?
+  item_name               String?
+  ordered_quantity        Int?
+  ordered_amount          Float?
+  invoice_qty             Int?
+  invoiced_amount         String?
+  assigned_to             String?
+  status                  String?
+  purchase_requisition    purchase_requisition @relation(fields: [purchase_requisition_id], references: [id])
+  product                 item_master?         @relation(fields: [product_id], references: [id])
+  item                    item?                @relation(fields: [item_id], references: [id])
+  purchase_order          purchase_order       @relation(fields: [instance_id], references: [id])
+  name                    String?
+  supplier                supplier?            @relation(fields: [supplier_id], references: [id])
+  invoice_line_item       invoice_line_item[]
+  invoice                 invoice[]
+}
+
+model currency_master {
+  id              String            @id @default(dbgenerated("concat('cur_', gen_random_uuid())")) @db.VarChar(50)
+  base_currency   String
+  from_currency   String
+  effective_from  DateTime
+  currency_value  Float?
+  status          String?
+  created_by      String?
+  created_at      DateTime?
+  modified_by     String?
+  modified_at     DateTime          @default(now())
+  org_id          String
+  assigned_to     String?
+  name            String?
+  supplier        supplier[]
+  organization    organization[]
+  item_master     item_master[]
+  org             org[]
+  customers       customers[]
+  payment_receipt payment_receipt[]
+}
+
+model invoice {
+  id                           String    @id @default(dbgenerated("concat('invoice_',  gen_random_uuid())")) @db.VarChar(50)
+  invoice_number               String?
+  invoice_date                 DateTime  @default(now())
+  invoice_version              Int?
+  invoice_status               String?
+  invoice_type                 String? // 'SALES' or 'PURCHASE' (business classification)
+  transaction_type             String? // transaction type (renewal, invoice, etc.)
+  supplier_name                String?
+  attach                       String?
+  supplier_remarks             String?
+  shipping_terms               String?
+  shipping_method              String?
+  payment_terms                String?
+  remit_to                     String?
+  wf_instance_id               String?
+  bill_to                      String?
+  deliver_to                   String?
+  requester_name               String?
+  requester_email              String?
+  ap_comment                   String?
+  po_number                    String?
+  account_id                   String?
+  additional_tax               Float?
+  shipping_cost                Float?
+  tax_on_shipping              Float?
+  handling_cost                Float?
+  tax_on_handling              Float?
+  misc_cost                    Float?
+  tax_on_misc                  Float?
+  invoice_net_total            Float?
+  shipping_handling_misc_total Float?
+  invoice_total                Float?
+  balance_amount               Float?
+  purchase_order_id            String?
+  legal_entity_id              String?
+  purchase_order_item_id       String?
+  sales_order_id               String?
+  name                         String?
+  status                       String?
+  created_by                   String?
+  created_at                   DateTime? @default(now())
+  modified_by                  String?
+  modified_at                  DateTime? @default(now())
+  org_id                       String?
+  tax_total                    Float?
+  assigned_to                  String?
+  location_id                  String?
+  customer_id                  String?
+  terms_and_conditions         String?
+  notes                        String?
+  // Lineage fields for data integration tracking
+  source_system_id             String?   @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_record_id             String? // Source system record ID (e.g., Zoho invoice_id)
+  source_updated_at            DateTime? @default(now()) // Last updated in source system (default: now() for internal records)
+  ingest_batch_id              String? // FK to datalake.sync_batch
+
+  workflow_instance   workflow_instance?   @relation(fields: [wf_instance_id], references: [id])
+  purchase_order      purchase_order?      @relation(fields: [purchase_order_id], references: [id])
+  purchase_order_item purchase_order_item? @relation(fields: [purchase_order_item_id], references: [id])
+  location            location?            @relation(fields: [location_id], references: [id])
+  customers           customers?           @relation(fields: [customer_id], references: [id])
+  sales_order         sales_order?         @relation(fields: [sales_order_id], references: [id])
+  account             account?             @relation(fields: [account_id], references: [id])
+  organization        organization?        @relation(fields: [legal_entity_id], references: [id])
+  invoice_line_item   invoice_line_item[]
+  payment_receipt     payment_receipt[]
+  credit_note         credit_note[]
+
+  @@index([source_system_id, source_record_id])
+  @@index([source_updated_at])
+}
+
+model invoice_line_item {
+  id                       String                @id @default(dbgenerated("concat('in_item__',  gen_random_uuid())")) @db.VarChar(50)
+  item_name                String?
+  item_number              String?
+  item_description         String?
+  item_type                String?
+  rate                     Float?
+  ordered_quantity         Float?
+  ordered_amount           Float?
+  invoice_qty              Int?
+  line_total               Float?
+  invoiced_amount          Float?
+  tax_type                 String?
+  tax_rate                 Float?
+  tax_rate_intra           Float?
+  line_tax_amount          Float?
+  po_number                String?
+  purchase_order_item_id   String?
+  item_master_id           String?
+  instance_id              String
+  purchase_requisition_id  String?
+  name                     String?
+  created_by               String?
+  need_by_date             DateTime?
+  created_at               DateTime              @default(now())
+  modified_by              String?
+  modified_at              DateTime              @default(now())
+  org_id                   String?
+  assigned_to              String?
+  purchase_order_line_item purchase_order_item?  @relation(fields: [purchase_order_item_id], references: [id])
+  item_master              item_master?          @relation(fields: [item_master_id], references: [id])
+  invoice                  invoice               @relation(fields: [instance_id], references: [id])
+  purchase_requisition     purchase_requisition? @relation(fields: [purchase_requisition_id], references: [id])
+  credit_note_item         credit_note_item[]
+}
+
+enum payment_type {
+  FULL
+  PARTIAL
+  ADVANCE
+}
+
+model payment_receipt {
+  id                String        @id @default(dbgenerated("concat('payr_', gen_random_uuid())")) @db.VarChar(50)
+  receipt_number    String?       @unique
+  receipt_date      DateTime?     @default(now())
+  customer_id       String?
+  invoice_id        String? // Direct reference to invoice (null for advance payments)
+  payment_reference String?
+  amount            Float?
+  payment_method    String?
+  currency_id       String?
+  exchange_rate     Float?        @default(1.00)
+  base_amount       Float?
+  payment_type      payment_type? // 'FULL', 'PARTIAL', 'ADVANCE'
+  notes             String?
+  account_id        String?
+  status            String?
+  created_by        String?
+  modified_by       String?
+  created_at        DateTime?     @default(now())
+  modified_at       DateTime?     @updatedAt
+  org_id            String?
+  assigned_to       String?
+  // Lineage fields for data integration tracking
+  source_system_id  String?       @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_record_id  String? // Source system record ID (e.g., Zoho payment_id)
+  source_updated_at DateTime?     @default(now()) // Last updated in source system (default: now() for internal records)
+  ingest_batch_id   String? // FK to datalake.sync_batch
+
+  // Back-relation from posting (posting.payment_receipt_id points here)
+  posting posting? @relation("PostingToPaymentReceipt")
+
+  // Relationships
+  customers       customers?       @relation(fields: [customer_id], references: [id])
+  invoice         invoice?         @relation(fields: [invoice_id], references: [id])
+  currency_master currency_master? @relation(fields: [currency_id], references: [id])
+
+  account account? @relation(fields: [account_id], references: [id])
+
+  @@index([source_system_id, source_record_id])
+  @@index([source_updated_at])
+}

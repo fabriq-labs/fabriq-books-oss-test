@@ -1,0 +1,155 @@
+{
+  "id": "view_simple_posting_62dd-48b4-b50d-20f24edbc969",
+  "name": "posting_simple_view",
+  "model_name": "posting",
+  "description": "Simple Posting View for non-accounting users",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "ID",
+      "isColumnShow": false
+    },
+    "amount": {
+      "orderNo": 5,
+      "datatype": "float",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Amount",
+      "isColumnShow": true
+    },
+    "account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update",
+        "type": "read",
+        "classification": "read"
+      },
+      "orderNo": 3,
+      "dataType": "table",
+      "required": true,
+      "displayName": "Account",
+      "isColumnShow": false
+    },
+    "category": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "displayName": "Category",
+      "isColumnShow": false
+    },
+    "account_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "posting",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "account_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Account",
+      "isColumnShow": true
+    },
+    "value_date": {
+      "orderNo": 1,
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Value Date",
+      "isColumnShow": true
+    },
+    "category_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "select",
+        "selectProps": {
+          "type": "posting",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "category",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "category_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Category",
+      "isColumnShow": true
+    },
+    "description": {
+      "orderNo": 2,
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Description",
+      "isColumnShow": true
+    },
+    "credit_account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update",
+        "type": "read",
+        "classification": "read"
+      },
+      "orderNo": 4,
+      "dataType": "table",
+      "required": false,
+      "displayName": "Credit Account",
+      "isColumnShow": false
+    },
+    "credit_account_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "posting",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "credit_account_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Credit Account",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

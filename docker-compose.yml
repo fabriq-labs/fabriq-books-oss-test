@@ -1,14 +1,14 @@
-# Embedded PostgreSQL: single container (frontend + backend + nginx + in-container Postgres).
-# Same Dockerfile as external-PG; use USE_EMBEDDED_PG=true to run embedded DB.
-# Use from repo root after cloning backend/ and frontend-1/ (see docs/BUILD_AND_DEPLOY.md).
+# Sample: embedded PostgreSQL — frontend + backend + nginx + Postgres in one container.
+# Monorepo: build context includes backend/ and frontend-1/. See docs/BUILD_AND_DEPLOY.md.
+#
+# Optional build-args (for /app/build-info.json): SOURCE_REF, SOURCE_COMMIT, SOURCE_COMMIT_DATE,
+# SOURCE_COMMIT_MESSAGE, CACHEBUST — e.g. SOURCE_COMMIT=$(git rev-parse HEAD) docker compose build
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        GH_TOKEN: ${GH_TOKEN}
     image: fabriq:latest
     env_file:
       - .env

@@ -9,33 +9,22 @@
 When you connect to the VM (workspace at `~/repos/fabriq`), paste this into the agent chat:
 
 ```
-I'm on the Fabriq cloud VM. Workspace is ~/repos/fabriq (root repo only). Read docs/AGENT_PROMPT_CLOUD_VM.md and docs/BUILD_AND_DEPLOY.md. You must clone backend and frontend (demo branch) into this tree if missing; I only cloned the root repo. Use docker compose for local dev (port 8080). For Cloud Build use gcloud builds submit with GH_TOKEN.
+I'm on the Fabriq cloud VM. Workspace is ~/repos/fabriq (full monorepo: backend/, frontend-1/, Dockerfile, docs). Read docs/AGENT_PROMPT_CLOUD_VM.md and docs/BUILD_AND_DEPLOY.md. Use docker compose for the all-in-one stack (port 8080). CI builds the same Dockerfile and pushes to GHCR via GitHub Actions — no gcloud Cloud Build.
 ```
 
 ---
 
 ## Context for the agent
 
-You are on a **GCP cloud VM** (Singapore). The workspace is **~/repos/fabriq** — the **root repo only**. The user does **not** clone backend or frontend; that is your job.
+You are on a **GCP cloud VM** (Singapore). The workspace is **~/repos/fabriq** — the **monorepo** (single Git checkout). It must include **`backend/`** and **`frontend-1/`**; the **Dockerfile** copies them at build time.
 
 **Your responsibilities:**
-- **Clone backend and frontend** into this workspace if they are missing:
-  - `backend/` ← `https://github.com/fabriq-labs/fabriq-base` (branch **demo**)
-  - `frontend-1/` ← `https://github.com/fabriq-labs/zeiv-v2` (branch **demo**)
-- Use a GitHub token for private repos: run `./clone-deps.sh` (requires `export GH_TOKEN=...`) or clone with `https://${GH_TOKEN}@github.com/...` (ask user for token if missing).
-- Do **not** commit from `backend/` or `frontend-1/` when working in the root-repo workspace. Only the root repo at `~/repos/fabriq` is committed from the VM.
-- When the user asks to build or run: ensure `backend/` and `frontend-1/` exist (clone on **demo** branch if needed), then run `docker compose` or the relevant build/deploy command.
+- If `backend/` or `frontend-1/` is missing, the tree is incomplete — **clone or pull the full monorepo** (do not clone legacy separate repos).
+- When the user asks to build or run: from `~/repos/fabriq`, use **`docker compose`** or **`docker build`** as in [BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md).
 
-**Root repo (what the user cloned):** Deployment only — Dockerfile(s), nginx, start scripts, docker-compose, Cloud Build configs, docs. Path: **~/repos/fabriq**.
+**Build / run:**
+- **Local on VM:** `docker compose build && docker compose up -d` (embedded Postgres, port **8080**). Health: `http://localhost:8080/health`. Login: `admin@example.com` / `admin123`. External DB: `docker compose -f docker-compose.external-pg.yml` with `DATABASE_URL` in `.env`.
+- **Image only:** `docker build -t fabriq:latest .` (no `GH_TOKEN`).
+- **CI:** GitHub Actions workflow **Docker build and push (GHCR)** — see `.github/workflows/docker-ghcr.yml`.
 
-**Build strategy:**
-- **Local dev:** From `~/repos/fabriq`, run `docker compose up` (single Dockerfile; `USE_EMBEDDED_PG=true` → embedded Postgres). Port **8080**. Health: `http://localhost:8080/health`. Login: `admin@example.com` / `admin123`. For external PG: `docker compose -f docker-compose.external-pg.yml up` with `DATABASE_URL` in `.env`.
-- **Production image:** `Dockerfile` (no DB). For Cloud Run/Railway with external PostgreSQL.
-- **Cloud Build:** From repo root, `gcloud builds submit --config=cloudbuild.yaml` (prod) or `cloudbuild-dev.yaml` (dev). Pass `_GH_TOKEN` in substitutions; Cloud Build clones backend/frontend from GitHub.
-
-**When the user asks to build, run, or deploy:**
-1. **Local dev:** If `backend/` or `frontend-1/` are missing, clone them (demo branch) using `GH_TOKEN`; then `docker compose build` and `docker compose up -d` (or `docker compose up` for logs).
-2. **Production image locally:** `docker build -t fabriq:latest .` and run with `DATABASE_URL` and `JWT_SECRET`.
-3. **Cloud Build:** `gcloud builds submit --config=cloudbuild.yaml --substitutions="_GH_TOKEN=${GH_TOKEN}" .` (or `cloudbuild-dev.yaml`). Ensure `GH_TOKEN` is set or ask the user.
-
-**Reference:** Full steps and env vars: `docs/BUILD_AND_DEPLOY.md`. VM and SSH: `docs/VM_REMOTE_DEV.md`.
+**Reference:** [BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md), [VM_REMOTE_DEV.md](./VM_REMOTE_DEV.md).

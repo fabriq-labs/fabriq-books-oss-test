@@ -1,0 +1,319 @@
+{
+  "id": "view_8297b3a1-ec66-4a05-900b-a06ec97ee3f0",
+  "name": "delivery_challan_view",
+  "model_name": "delivery_challan",
+  "description": "Delivery Challan List",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "ID",
+      "isColumnShow": false
+    },
+    "notes": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Notes",
+      "isColumnShow": false
+    },
+    "org_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "customer": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "customer_name": "update"
+      },
+      "displayName": "Customer",
+      "isColumnShow": false
+    },
+    "location": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "city": "update",
+        "state": "update",
+        "address": "update",
+        "country": "update",
+        "website": "update",
+        "location": "update",
+        "zip_code": "update"
+      },
+      "displayName": "Location",
+      "isColumnShow": false
+    },
+    "created_at": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "Created At",
+      "isColumnShow": false
+    },
+    "created_by": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Created By",
+      "isColumnShow": false
+    },
+    "assigned_to": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Assigned",
+      "isColumnShow": false
+    },
+    "customer_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "customers",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "customers",
+          "searchParams": "customer_name",
+          "instanceLabel": "customer_name",
+          "instanceSourceKey": "customer_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Customer",
+      "isColumnShow": false
+    },
+    "driver_name": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Driver Name",
+      "isColumnShow": false
+    },
+    "location_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "location",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "location",
+          "searchParams": "location",
+          "instanceLabel": "location",
+          "instanceSourceKey": "location_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Location",
+      "isColumnShow": false
+    },
+    "modified_at": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "Modified At",
+      "isColumnShow": false
+    },
+    "modified_by": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Modified By",
+      "isColumnShow": false
+    },
+    "sales_order": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "so_number": "update"
+      },
+      "displayName": "Sales Order",
+      "isColumnShow": false
+    },
+    "challan_date": {
+      "dataType": "date",
+      "permission": "update",
+      "displayName": "Challan Date",
+      "isColumnShow": true
+    },
+    "challan_type": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Challan Type",
+      "isColumnShow": true
+    },
+    "total_amount": {
+      "dataType": "float",
+      "permission": "read",
+      "tableProps": {
+        "width": "150",
+        "columnType": "number"
+      },
+      "displayName": "Total Amount",
+      "isColumnShow": true
+    },
+    "delivery_date": {
+      "dataType": "date",
+      "permission": "update",
+      "displayName": "Delivery Date",
+      "isColumnShow": false
+    },
+    "challan_number": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Challan Number",
+      "isColumnShow": true
+    },
+    "delivery_notes": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Delivery Notes",
+      "isColumnShow": false
+    },
+    "sales_order_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "delivery_challan",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "sales_order",
+          "searchParams": "so_number",
+          "instanceLabel": "so_number",
+          "instanceSourceKey": "sales_order_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Sales Order",
+      "isColumnShow": false
+    },
+    "vehicle_number": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Vehicle Number",
+      "isColumnShow": false
+    },
+    "delivery_status": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Delivery Status",
+      "isColumnShow": true
+    },
+    "reference_number": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Reference Number",
+      "isColumnShow": false
+    },
+    "terms_and_conditions": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Terms And Conditions",
+      "isColumnShow": false
+    },
+    "status": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Status",
+      "isColumnShow": false
+    },
+    "delivery_challan_items": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "uom": "read",
+        "rate": "read",
+        "org_id": "read",
+        "tax_rate": "read",
+        "item_code": "read",
+        "item_name": "read",
+        "item_type": "read",
+        "created_at": "read",
+        "created_by": "read",
+        "line_total": "read",
+        "tax_amount": "read",
+        "item_master": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "uom": {
+              "select": {
+                "id": "read",
+                "name": "read"
+              }
+            },
+            "uom_id": "update",
+            "supplier": {
+              "select": {
+                "id": "read",
+                "primary_email": "read",
+                "supplier_name": "read",
+                "supplier_address": "read"
+              }
+            },
+            "item_code": "read",
+            "item_name": "read",
+            "item_type": "read",
+            "unit_price": "update",
+            "supplier_id": "update",
+            "item_shortname": "update",
+            "item_description": "update"
+          }
+        },
+        "modified_at": "read",
+        "modified_by": "read",
+        "discount_rate": "read",
+        "item_master_id": "update",
+        "delivery_status": "read",
+        "discount_amount": "read",
+        "delivery_challan": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "challan_date": "read",
+            "challan_type": "read",
+            "total_amount": "read",
+            "delivery_date": "read",
+            "challan_number": "read",
+            "delivery_status": "read"
+          }
+        },
+        "item_description": "read",
+        "quantity_ordered": "read",
+        "quantity_pending": "read",
+        "sales_order_item": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "uom": "read",
+            "rate": "read",
+            "quantity": "read",
+            "item_name": "read",
+            "item_type": "read",
+            "line_total": "read",
+            "item_number": "read",
+            "item_master_id": "read",
+            "sales_order_id": "read",
+            "item_description": "read"
+          }
+        },
+        "backorder_quantity": "read",
+        "quantity_delivered": "read",
+        "delivery_challan_id": "update",
+        "sales_order_item_id": "update"
+      },
+      "displayName": "Delivery Challan Items",
+      "isColumnShow": false
+    },
+    "partial_delivery_reason": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Partial Delivery Reason",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

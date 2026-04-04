@@ -1,0 +1,6 @@
+id,name,color,group_id,org_id
+cate_us_payroll,Payroll,#4CAF50,catg_us_operating,org_techflow_us
+cate_us_office,Office Supplies,#2196F3,catg_us_operating,org_techflow_us
+cate_us_infra,Infrastructure Equipment,#9C27B0,catg_us_capital,org_techflow_us
+cate_us_subscription,SaaS Subscriptions,#FF9800,catg_us_expense,org_techflow_us
+cate_us_service_revenue,Service Revenue,#3F51B5,catg_us_income,org_techflow_us

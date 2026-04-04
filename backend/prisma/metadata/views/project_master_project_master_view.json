@@ -1,0 +1,187 @@
+{
+  "id": "view_92f930a3-aafe-415f-9065-03a458ff7345",
+  "name": "project_master_view",
+  "model_name": "project_master",
+  "description": "Manager",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "update",
+        "name": "read"
+      },
+      "dataType": "table",
+      "displayName": "Account"
+    },
+    "account_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "general_ledger",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "account_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "account.name"
+      },
+      "displayName": "Charts of Date",
+      "isColumnShow": true
+    },
+    "budget_line": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "budget_line": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Budget Line",
+      "isColumnShow": false
+    },
+    "account_name": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Account Name",
+      "isColumnShow": false
+    },
+    "organization": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "legal_name": "update",
+        "organization_name": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "project_code": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Project Code",
+      "isColumnShow": true
+    },
+    "project_name": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Project Name",
+      "isColumnShow": true
+    },
+    "budget_line_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "project_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "budget_line",
+          "searchParams": "budget_line",
+          "instanceLabel": "budget_line",
+          "instanceSourceKey": "budget_line_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "budget_line.budget_line"
+      },
+      "displayName": "Budget Line",
+      "isColumnShow": true
+    },
+    "legal_entity_id": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "project_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "organization",
+          "searchParams": "legal_name",
+          "instanceLabel": "legal_name",
+          "instanceSourceKey": "legal_entity_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "organization.legal_name"
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": true
+    },
+    "available_budget": {
+      "datatype": "float",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Available Budget",
+      "isColumnShow": false
+    },
+    "project_end_date": {
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Project End Date",
+      "isColumnShow": true
+    },
+    "project_start_date": {
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Project Start Date",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

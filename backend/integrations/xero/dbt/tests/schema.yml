@@ -1,0 +1,120 @@
+version: 2
+
+models:
+  # Staging models
+  - name: stg_xero_invoices
+    description: "Staging view for Xero invoices (ACCREC and ACCPAY)"
+    columns:
+      - name: invoice_id
+        description: "Xero invoice UUID"
+        tests:
+          - not_null
+      - name: type
+        description: "Invoice type: ACCREC or ACCPAY"
+        tests:
+          - accepted_values:
+              values: ['ACCREC', 'ACCPAY']
+      - name: status
+        description: "Invoice status"
+        tests:
+          - accepted_values:
+              values: ['DRAFT', 'SUBMITTED', 'AUTHORISED', 'PAID', 'VOIDED', 'DELETED']
+
+  - name: stg_xero_contacts
+    description: "Staging view for Xero contacts (customers and suppliers)"
+    columns:
+      - name: contact_id
+        description: "Xero contact UUID"
+        tests:
+          - not_null
+      - name: name
+        description: "Contact name"
+        tests:
+          - not_null
+
+  - name: stg_xero_payments
+    description: "Staging view for Xero payments"
+    columns:
+      - name: payment_id
+        description: "Xero payment UUID"
+        tests:
+          - not_null
+
+  # Integration metadata models
+  - name: source_system
+    description: "Source system catalog"
+    columns:
+      - name: id
+        tests:
+          - not_null
+          - unique
+      - name: system_type
+        tests:
+          - not_null
+
+  - name: sync_batch
+    description: "Sync batch audit trail"
+    columns:
+      - name: id
+        tests:
+          - not_null
+          - unique
+      - name: source_system_id
+        tests:
+          - not_null
+
+  # Normalized models
+  - name: invoice
+    description: "Normalized invoices (sales and purchase)"
+    columns:
+      - name: id
+        tests:
+          - not_null
+      - name: source_record_id
+        tests:
+          - not_null
+          - unique
+      - name: invoice_type
+        tests:
+          - accepted_values:
+              values: ['SALES', 'PURCHASE', 'ACCREC', 'ACCPAY']
+
+  - name: customers
+    description: "Normalized customers from Xero contacts"
+    columns:
+      - name: id
+        tests:
+          - not_null
+      - name: source_record_id
+        # Not null only for integration-created records; legacy records may have null
+        tests:
+          - unique
+      - name: customer_name
+        tests:
+          - not_null
+
+  - name: supplier
+    description: "Normalized suppliers from Xero contacts"
+    columns:
+      - name: id
+        tests:
+          - not_null
+      - name: source_record_id
+        # Not null only for integration-created records; legacy records may have null
+        tests:
+          - unique
+      - name: supplier_name
+        tests:
+          - not_null
+
+  - name: payment_receipt
+    description: "Normalized payment receipts"
+    columns:
+      - name: id
+        tests:
+          - not_null
+      - name: source_record_id
+        tests:
+          - not_null
+          - unique
+

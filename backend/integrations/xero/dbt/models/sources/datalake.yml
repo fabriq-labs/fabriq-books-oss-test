@@ -1,0 +1,118 @@
+version: 2
+
+sources:
+  - name: datalake
+    description: "PyAirbyte-landed data from Xero"
+    schema: datalake
+    tables:
+      - name: "xero_invoices"
+        description: "Raw invoice data from Xero via PyAirbyte (includes both ACCREC and ACCPAY)"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: InvoiceID
+            description: "Xero invoice UUID"
+          - name: InvoiceNumber
+            description: "Invoice number"
+          - name: Type
+            description: "Invoice type: ACCREC (sales) or ACCPAY (purchase/bill)"
+          - name: Status
+            description: "Invoice status: DRAFT, SUBMITTED, AUTHORISED, PAID, VOIDED"
+          - name: Total
+            description: "Invoice total amount"
+          - name: SubTotal
+            description: "Invoice subtotal (before tax)"
+          - name: TotalTax
+            description: "Total tax amount"
+          - name: AmountDue
+            description: "Outstanding balance"
+          - name: AmountPaid
+            description: "Amount already paid"
+          - name: AmountCredited
+            description: "Amount credited"
+          - name: Date
+            description: "Invoice date"
+          - name: DueDate
+            description: "Due date"
+          - name: UpdatedDateUTC
+            description: "Last update timestamp (UTC)"
+          - name: Reference
+            description: "Reference/PO number"
+          - name: CurrencyCode
+            description: "Currency code (e.g., USD, GBP)"
+          - name: CurrencyRate
+            description: "Exchange rate"
+          - name: Contact
+            description: "Contact object (JSONB with ContactID, Name, etc.)"
+          - name: LineItems
+            description: "Line items array (JSONB)"
+          # Airbyte metadata columns
+          - name: _airbyte_extracted_at
+            description: "Airbyte extraction timestamp"
+          - name: _airbyte_generation_id
+            description: "Airbyte generation ID"
+          - name: _airbyte_meta
+            description: "Airbyte metadata"
+      
+      - name: "xero_contacts"
+        description: "Raw contact data from Xero via PyAirbyte (customers and suppliers)"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: ContactID
+            description: "Xero contact UUID"
+          - name: Name
+            description: "Contact name"
+          - name: FirstName
+            description: "First name"
+          - name: LastName
+            description: "Last name"
+          - name: EmailAddress
+            description: "Primary email address"
+          - name: Phones
+            description: "Phone numbers array (JSONB)"
+          - name: Addresses
+            description: "Addresses array (JSONB)"
+          - name: Website
+            description: "Website URL"
+          - name: IsCustomer
+            description: "Is this a customer (has sales invoices)"
+          - name: IsSupplier
+            description: "Is this a supplier (has purchase bills)"
+          - name: ContactStatus
+            description: "Contact status: ACTIVE, ARCHIVED"
+          - name: UpdatedDateUTC
+            description: "Last update timestamp (UTC)"
+          - name: _airbyte_extracted_at
+          - name: _airbyte_generation_id
+          - name: _airbyte_meta
+      
+      - name: "xero_payments"
+        description: "Raw payment data from Xero via PyAirbyte"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: PaymentID
+            description: "Xero payment UUID"
+          - name: Date
+            description: "Payment date"
+          - name: Amount
+            description: "Payment amount"
+          - name: Reference
+            description: "Payment reference"
+          - name: PaymentType
+            description: "Payment type"
+          - name: Status
+            description: "Payment status"
+          - name: UpdatedDateUTC
+            description: "Last update timestamp (UTC)"
+          - name: Invoice
+            description: "Related invoice object (JSONB with InvoiceID)"
+          - name: Account
+            description: "Account object (JSONB)"
+          - name: CurrencyRate
+            description: "Exchange rate"
+          - name: _airbyte_extracted_at
+          - name: _airbyte_generation_id
+          - name: _airbyte_meta
+

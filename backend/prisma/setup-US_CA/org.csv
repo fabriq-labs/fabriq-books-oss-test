@@ -1,0 +1,2 @@
+id,name,slug,settings,external_mapping,active_subscription,erp_system_type
+org_techflow_us,TechFlow Solutions Inc,techflow-us,"{""timezone"":""America/Los_Angeles"",""currency"":""USD""}","{""erp_system"":""demo_erp_us""}",true,quickbooks

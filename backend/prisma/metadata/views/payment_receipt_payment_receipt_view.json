@@ -1,0 +1,217 @@
+{
+  "id": "view_d82a2a0b-5175-4672-9036-7435fdf78146",
+  "name": "payment_receipt_view",
+  "model_name": "payment_receipt",
+  "description": "Payment Receipt List",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read",
+      "displayName": "ID"
+    },
+    "notes": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Notes",
+      "isColumnShow": false
+    },
+    "amount": {
+      "datatype": "float",
+      "permission": "update",
+      "displayName": "Amount",
+      "isColumnShow": true
+    },
+    "status": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Status",
+      "isColumnShow": false
+    },
+    "account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "update",
+        "name": "update",
+        "type": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Account",
+      "isColumnShow": false
+    },
+    "invoice": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "invoice_date": "update",
+        "invoice_total": "update",
+        "invoice_number": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Invoice",
+      "isColumnShow": false
+    },
+    "customers": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "city": "update",
+        "state": "update",
+        "country": "update",
+        "website": "update",
+        "industry": "update",
+        "zip_code": "update",
+        "customer_name": "update",
+        "primary_email": "update",
+        "primary_phone": "update",
+        "customer_address": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Customers",
+      "isColumnShow": false
+    },
+    "account_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "payment_receipt",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "account_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Account",
+      "isColumnShow": false
+    },
+    "invoice_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "payment_receipt",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "invoice",
+          "searchParams": "invoice_number",
+          "instanceLabel": "invoice_number",
+          "instanceSourceKey": "invoice_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Invoice",
+      "isColumnShow": true
+    },
+    "base_amount": {
+      "datatype": "float",
+      "permission": "update",
+      "displayName": "Base Amount",
+      "isColumnShow": false
+    },
+    "currency_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "payment_receipt",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "currency_master",
+          "searchParams": "base_currency",
+          "instanceLabel": "base_currency",
+          "instanceSourceKey": "currency_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Currency Master",
+      "isColumnShow": false
+    },
+    "customer_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "payment_receipt",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "customers",
+          "searchParams": "customer_name",
+          "instanceLabel": "customer_name",
+          "instanceSourceKey": "customer_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Customers",
+      "isColumnShow": false
+    },
+    "payment_type": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Payment Type",
+      "isColumnShow": true
+    },
+    "receipt_date": {
+      "datatype": "date",
+      "permission": "update",
+      "displayName": "Receipt Date"
+    },
+    "exchange_rate": {
+      "datatype": "float",
+      "permission": "update",
+      "displayName": "Exchange Rate",
+      "isColumnShow": false
+    },
+    "payment_method": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Payment Method",
+      "isColumnShow": true
+    },
+    "receipt_number": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Receipt Number"
+    },
+    "currency_master": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "base_currency": "update",
+        "from_currency": "update",
+        "effective_from": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Currency Master",
+      "isColumnShow": false
+    },
+    "payment_reference": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "payment_reference",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

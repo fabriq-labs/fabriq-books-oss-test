@@ -1,0 +1,129 @@
+{
+  "id": "view_30ab2100-a130-4852-9fff-3339b84c1198",
+  "name": "general_ledger_view",
+  "model_name": "general_ledger",
+  "description": "Manager",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "status": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Status",
+      "isColumnShow": true
+    },
+    "account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "update",
+        "name": "read"
+      },
+      "dataType": "table",
+      "displayName": "Account"
+    },
+    "gl_code": {
+      "datatype": "int",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "int",
+        "defaultValue": ""
+      },
+      "displayName": "GL Code",
+      "isColumnShow": false
+    },
+    "gl_name": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "GL Name",
+      "isColumnShow": true
+    },
+    "gl_number": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "GL Number",
+      "isColumnShow": true
+    },
+    "account_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "general_ledger",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "account_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Charts of Date",
+      "isColumnShow": true
+    },
+    "description": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Description",
+      "isColumnShow": true
+    },
+    "organization": {
+      "select": {
+        "id": "read",
+        "legal_name": "update",
+        "organization_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "legal_entity_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "cost center",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "organization",
+          "searchParams": "organization_name",
+          "instanceLabel": "organization_name",
+          "instanceSourceKey": "legal_entity_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

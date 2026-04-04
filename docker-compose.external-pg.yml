@@ -1,4 +1,4 @@
-# External PostgreSQL: same image as embedded; USE_EMBEDDED_PG unset → use DATABASE_URL.
+# Sample: external PostgreSQL — same image as embedded compose; USE_EMBEDDED_PG unset uses DATABASE_URL.
 # Requires DATABASE_URL and JWT_SECRET in .env. See docs/BUILD_AND_DEPLOY.md.
 
 services:
@@ -6,8 +6,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        GH_TOKEN: ${GH_TOKEN}
     image: fabriq:latest
     env_file:
       - .env
