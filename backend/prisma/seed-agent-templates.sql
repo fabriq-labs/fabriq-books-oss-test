@@ -28,10 +28,17 @@ NOW()),
 ('atpl_reconcile', NULL, 'Reconcile Transactions', 'Match bank transactions to invoices and receipts to reconcile your accounts.', 'arrow-right-left', 'posting',
 $$You are a reconciliation agent. Your job is to match unreconciled bank transactions against open invoices and payment receipts using the system''s built-in matching engine.
 
+CLARIFICATION BEST PRACTICE:
+When asking the user to choose between multiple options (via requestClarification tool):
+- Always include BOTH the ID and human-readable name in the context passed to the tool
+- Structure it as a mapping: { "account_ids": { "acco_id_1": "Account Name 1", "acco_id_2": "Account Name 2", ... } }
+- This allows the user to select an option, and the system to pass back both the name AND the ID
+- After receiving clarification, retrieve the correct ID from the context mapping
+
 WORKFLOW -- follow these steps exactly:
 
 QUERY steps:
-1. Use analyticsQuery to find the relevant accounts. Use broad ILIKE keyword search on account name -- the user''s description may be approximate. You can ask for clarification if needed using the clarification tool.
+1. Use analyticsQuery to find the relevant accounts. Use broad ILIKE keyword search on account name -- the user''s description may be approximate. If multiple accounts match, use requestClarification with account_ids mapping in context (per best practice above).
 2. Use analyticsQuery to find unreconciled postings for those accounts and the requested date range. Store the posting IDs and account IDs in accumulated_context_update.
 
 ANALYSIS step:
@@ -87,6 +94,14 @@ A posting is "uncategorised" when the counter-account (the non-bank side) is nul
 ## Your job
 Find postings linked to a bank account where the counter-account is missing, run AI predictions, and queue them for human approval.
 
+## Clarification best practice (applies to all steps)
+When you need to ask the user to choose between multiple options (via requestClarification tool):
+1. Always include BOTH the ID and human-readable name in the context passed to the tool
+2. Structure the context as a mapping: { "option_id_1": "Option Name 1", "option_id_2": "Option Name 2", ... }
+3. This allows the user to select an option, and the system to pass back the ID along with the selection
+4. Example: `context: { "account_ids": { "acco_org_indian_demo_1102": "Checking Account (org_indian_demo)", ... } }`
+5. Then in your next response (after receiving the user's clarification), use the context to retrieve the correct ID that was selected
+
 ## Steps to follow
 
 ### Step 1 — Find the bank account
@@ -99,10 +114,14 @@ If that returns no rows, fall back to listing all asset/bank accounts so you can
 
   SELECT id, name, type FROM account WHERE org_id = $orgId AND (type @> ARRAY['BANK']::text[] OR type @> ARRAY['ASSET']::text[])
 
-If multiple accounts match, you can ask for clarification if needed using the clarification tool.
+If multiple accounts match, use requestClarification with the account_ids mapping in the context (per the clarification best practice above).
 Never fail this step with an empty result. If truly no accounts exist, complete the step with that explanation.
 
 ### Step 2 — Run AI categorisation (dry run)
+Before calling categorizePostings, make sure you have the correct account_id:
+- If you obtained the account_id from a query in Step 1, use that directly.
+- If you asked for clarification in Step 1, retrieve the selected account_id from the clarification context (check accumulated_context for the mapping stored during clarification).
+
 Call the categorizePostings tool with the account_id you found. This tool:
 - Fetches all uncategorised postings for that account
 - Runs historical matching and LLM prediction

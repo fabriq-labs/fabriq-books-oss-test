@@ -13,8 +13,13 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ clarificat
   const [freeText, setFreeText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Support both old format (simple array) and new format (ID mapping)
   const available = clarification.context?.available;
+  const accountIds = clarification.context?.account_ids;
+
   const hasOptions = Array.isArray(available) && available.length > 0;
+  const hasIdMapping = accountIds && typeof accountIds === 'object' && Object.keys(accountIds).length > 0;
+  const showOptions = hasOptions || hasIdMapping;
 
   const handleChipClick = async (option: string) => {
     if (isSubmitting) return;
@@ -47,27 +52,48 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ clarificat
 
       <p className="text-sm text-gray-800 mb-3">{clarification.question}</p>
 
-      {hasOptions ? (
+      {showOptions ? (
         <div className="flex flex-wrap gap-2">
-          {available.map((option) => (
-            <button
-              key={option}
-              onClick={() => handleChipClick(option)}
-              disabled={isSubmitting}
-              className={cn(
-                'px-3 py-1.5 rounded-full text-sm border transition-colors',
-                selected === option
-                  ? 'bg-amber-500 border-amber-500 text-white'
-                  : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100',
-                isSubmitting && 'opacity-50 cursor-not-allowed'
-              )}
-            >
-              {isSubmitting && selected === option ? (
-                <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
-              ) : null}
-              {option}
-            </button>
-          ))}
+          {hasIdMapping
+            ? Object.entries(accountIds).map(([id, name]) => (
+                <button
+                  key={id}
+                  onClick={() => handleChipClick(name as string)}
+                  disabled={isSubmitting}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                    selected === (name as string)
+                      ? 'bg-amber-500 border-amber-500 text-white'
+                      : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100',
+                    isSubmitting && 'opacity-50 cursor-not-allowed'
+                  )}
+                  title={`ID: ${id}`}
+                >
+                  {isSubmitting && selected === (name as string) ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
+                  ) : null}
+                  {name}
+                </button>
+              ))
+            : available.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => handleChipClick(option)}
+                  disabled={isSubmitting}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                    selected === option
+                      ? 'bg-amber-500 border-amber-500 text-white'
+                      : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100',
+                    isSubmitting && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  {isSubmitting && selected === option ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
+                  ) : null}
+                  {option}
+                </button>
+              ))}
         </div>
       ) : (
         <div className="flex gap-2">

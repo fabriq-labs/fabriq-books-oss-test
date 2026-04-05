@@ -1,6 +1,6 @@
 # Fabriq Financial Suite - AI Context Guide
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-04-04
 
 ---
 
@@ -48,20 +48,24 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
-| **Workbench backend — onboarding reference** | [docs/agent/WORKBENCH_BACKEND.md](./docs/agent/WORKBENCH_BACKEND.md) |
+| In-app conversational chat (history, PageContext, SDK, prompt selection) | [docs/agent/CONVERSATION.md](./docs/agent/CONVERSATION.md) |
+| **Agent docs index + reading order** | [docs/agent/README.md](./docs/agent/README.md) |
+| Agent system architecture + file map | [docs/agent/ARCHITECTURE.md](./docs/agent/ARCHITECTURE.md) |
+| Agent database schema (session, message, pending_action) | [docs/agent/DATA_MODELS.md](./docs/agent/DATA_MODELS.md) |
+| Session states, auto-continuation, completion paths | [docs/agent/SESSION_LIFECYCLE.md](./docs/agent/SESSION_LIFECYCLE.md) |
+| All agent tools: parameters, returns, side effects | [docs/agent/TOOLS_REFERENCE.md](./docs/agent/TOOLS_REFERENCE.md) |
+| Prompt assembly, template merging, DynamicPromptManager | [docs/agent/PROMPT_SYSTEM.md](./docs/agent/PROMPT_SYSTEM.md) |
+| Builders, executors, hybrid dispatcher | [docs/agent/BUILDERS_EXECUTORS.md](./docs/agent/BUILDERS_EXECUTORS.md) |
+| All agent HTTP endpoints | [docs/agent/API_REFERENCE.md](./docs/agent/API_REFERENCE.md) |
+| LLM traces, token usage, feedback workflow | [docs/agent/OBSERVABILITY.md](./docs/agent/OBSERVABILITY.md) |
+| Running tests, prompt harness, E2E patterns | [docs/agent/TESTING.md](./docs/agent/TESTING.md) |
 | Diagnose a failed/stuck agent session | [docs/agent/debugging/SESSION_FAILURE_PATTERNS.md](./docs/agent/debugging/SESSION_FAILURE_PATTERNS.md) |
-| Workbench — categorise expenses deep dive | [docs/agent/WORKBENCH_CATEGORIZE_EXPENSES.md](./docs/agent/WORKBENCH_CATEGORIZE_EXPENSES.md) |
-| Reconciliation tool (bank ↔ receipts/invoices) | [docs/agent/RECONCILIATION_TOOL.md](./docs/agent/RECONCILIATION_TOOL.md) |
-| AI transaction categorization | [docs/AI_AUTO_CATEGORIZATION.md](./docs/AI_Categorizer.md) |
+| Bank reconciliation feature (pipeline, confirm, frontend) | [docs/agent/features/RECONCILIATION.md](./docs/agent/features/RECONCILIATION.md) |
+| Transaction categorization feature (ML, batch, executor) | [docs/agent/features/CATEGORIZATION.md](./docs/agent/features/CATEGORIZATION.md) |
+| Posting domain model, contra-account as category | [docs/agent/features/POSTING_DOMAIN.md](./docs/agent/features/POSTING_DOMAIN.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
-| Agentic upgrade (sessions, pending actions, workbench) | [docs/AGENTIC_UPGRADE_IMPLEMENTATION.md](./docs/AGENTIC_UPGRADE_IMPLEMENTATION.md) |
-| Agentic upgrade v1 design plan | [docs/AGENTIC_UPGRADE_PLAN_WIP.md](./docs/AGENTIC_UPGRADE_PLAN_WIP.md) |
-| Agentic upgrade v2 (hybrid execution, builders) | [docs/AGENTIC_UPGRADE_V2_PLAN.md](./docs/AGENTIC_UPGRADE_V2_PLAN.md) |
-| Workbench functional spec | [docs/agent/WORKBENCH_FUNCTIONAL_SPEC.md](./docs/agent/WORKBENCH_FUNCTIONAL_SPEC.md) |
-| Agent template focus: models + tools declaration plan | [docs/agent/TEMPLATE_FOCUS_PLAN.md](./docs/agent/TEMPLATE_FOCUS_PLAN.md) |
-| Workbench implementation plan (phase log) | [docs/agent/WORKBENCH_IMPLEMENTATION_PLAN.md](./docs/agent/WORKBENCH_IMPLEMENTATION_PLAN.md) |
 | View data_graph / datagraph schema (properties, selectProps, relationName, list behaviour) | [docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md](./docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md) |
 | Visual datagraph builder (design, summary) | [docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md](./docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md) |
 | Claude Web/Desktop prompts | [docs/CLAUDE_WEB_PROMPTS.md](./docs/CLAUDE_WEB_PROMPTS.md) |
