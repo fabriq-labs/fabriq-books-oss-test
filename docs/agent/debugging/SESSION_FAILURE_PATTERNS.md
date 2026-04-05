@@ -64,6 +64,8 @@ WHERE id = '<SESSION_ID>';
 | 4 | [Awaiting Approval Abandoned](#4-awaiting-approval-abandoned) | `awaiting_approval` | Yes | Yes | Hours/days | User never reviewed; session not expired |
 | 5 | [Prompt Template Not Found](#5-prompt-template-not-found) | `failed` | None | None | ~0s | `APP_NAME` env mismatch or templates not seeded |
 | 6 | [Step Stalled — Data Not Found](#6-step-stalled--data-not-found) | `executing` | Some | Yes | ~5 min | LLM couldn't find required data, didn't call `completeStep` |
+| 7 | [Action Step Creates No Actions](#7-action-step-creates-no-actions) | `completed` | Yes | Yes | ~0s | Builder ran but `accumulated_context` was empty |
+| 8 | [Bulk Approve Skips Execution](#8-bulk-approve-skips-execution) | `awaiting_approval` | Yes | Yes | Immediate | `updateMany` bypassed executor registry |
 
 ---
 
@@ -302,11 +304,106 @@ For the `{{org_id}}` sub-variant, add a guard in `advancedSqlQuery` to detect an
 
 **Fix (future — user clarification flow)**
 
-Rather than failing the step, the agent should be able to pause and ask the user for input. See the planned `requestClarification` session tool design in `docs/agent/WORKBENCH_BACKEND.md`.
+The `requestClarification` tool is already implemented — see [../TOOLS_REFERENCE.md](../TOOLS_REFERENCE.md#requestclarification) for details.
 
 **Files to change**
 - `backend/src/agent/prompt/constants.ts` — add `completeStep`-on-failure rule to `SESSION_DIRECTIVE`
 - `backend/src/agent/tools/analyticsQuery.ts` — detect unsubstituted `{{...}}` in query string
+
+---
+
+### 7. Action Step Creates No Actions
+
+**Symptoms**
+- `status = 'completed'` (session completed suspiciously fast)
+- `pending_actions_count = 0`
+- Plan has an action step; it shows `status = 'completed'`
+- No rows in `pending_action` for the session
+
+**Root Cause**
+
+`ActionBuilderRegistry` intercepted the action step (because `matches()` returned `true`), but found no data to act on — `accumulated_context` was missing the key the builder expected (e.g. `match_results` for reconciliation). The builder created 0 pending actions and the hybrid dispatcher slid the session forward to completed.
+
+This happens when the LLM's analysis step called `completeStep` but omitted `accumulated_context_update`, or wrote the results under a different key name.
+
+**Diagnostic confirmation**
+
+```sql
+-- Check what's in accumulated_context
+SELECT accumulated_context
+FROM agent_session
+WHERE id = '<SESSION_ID>';
+-- If missing 'match_results' (reconciliation) or 'predictions' key → this pattern
+
+-- Check the analysis step's result_summary
+SELECT plan
+FROM agent_session
+WHERE id = '<SESSION_ID>';
+-- Look at step index N-1 (analysis step) result_summary — did it describe finding data?
+```
+
+**Fix**
+
+The analysis step's `SESSION_DIRECTIVE` instructs: *"pass the FULL structured tool output in `accumulated_context_update` under a descriptive key"*. If this isn't happening, strengthen the template's `system_prompt` to explicitly name the key (e.g., `"Store the full match_results array under the key 'match_results' in accumulated_context_update"`).
+
+**Files to check**
+- `backend/src/agent/builders/ActionBuilderRegistry.ts` — verify `matches()` only returns `true` when required data exists
+- Template `system_prompt` — add explicit `accumulated_context_update` key instruction
+
+---
+
+### 8. Bulk Approve Skips Execution
+
+**Symptoms**
+- Pending actions are marked `approved` but the database records are not updated
+- `execution_result` is null; `execution_error` is null on the `pending_action` rows
+- Posting `reconciliation_status` or `credit_account_id` unchanged after bulk approve
+
+**Root Cause**
+
+`bulkApproveByConfidence` previously used `prisma.pending_action.updateMany` which sets `status = 'approved'` in bulk but bypasses the executor registry. Executors only run when `PendingActionService.resolvePendingAction()` is called per-action (which looks up the executor and calls `execute()`).
+
+**Fix**
+
+`PendingActionService.bulkApproveByConfidence` must iterate and call `resolvePendingAction` for each matching action, not use `updateMany`.
+
+**Diagnostic confirmation**
+
+```sql
+-- Check if pending actions are approved but not executed
+SELECT id, action_type, status, execution_result, execution_error
+FROM pending_action
+WHERE session_id = '<SESSION_ID>'
+  AND status = 'approved'
+  AND execution_result IS NULL
+  AND execution_error IS NULL;
+-- If rows exist → bulk approve bypassed executors
+```
+
+---
+
+## Investigative Tips
+
+### "How do I see what prompt the LLM received?"
+
+The system prompt is never stored to the database — it is assembled fresh on every request. To inspect it:
+
+1. Check `llm_trace.prompt_tokens` — if very low (< 1000), the system prompt was stripped
+2. Check `agent_message` where `role = 'user'` ordered by `created_at` — these are the user turns
+3. Call `GET /api/agent/sessions/:id/trace` for the full assembled timeline
+4. To see the exact system prompt: add a temporary `console.log(allMessages[0].content)` in `AgentService` around the `allMessages` construction (look for the system message insertion before the `streamText` / `generateText` call)
+
+### "Tool results are not in the LLM's next response"
+
+The LLM sees tool results as `tool` role messages in `allMessages`. If the LLM appears to ignore results:
+
+1. Check `agent_message.tool_results` — are they being written after the call?
+2. Check `llm_trace_step.tool_results` — is the result preview populated?
+3. Large tool results (e.g. full SQL result sets) may cause truncation. `analyticsQuery` returns a row limit and column metadata to mitigate this.
+
+### "LLM not calling createPlan (system prompt missing)"
+
+Check that `allMessages[0].role === 'system'` includes both the session context block and the `SESSION_DIRECTIVE` text. In `handleStreamingRequest`, the `messages` parameter passed to `streamText` should be `allMessages` — **not** a separate `system:` parameter alongside a different `messages` array. If `tools_called` is empty in `llm_trace`, verify `sessionId` was passed through to `ToolManager.getUnifiedTools`.
 
 ---
 
@@ -347,6 +444,8 @@ When you encounter a session failure not covered above:
 
 ## Related Docs
 
-- [WORKBENCH_BACKEND.md](../WORKBENCH_BACKEND.md) — full session lifecycle and architecture
-- [WORKBENCH_IMPLEMENTATION_PLAN.md](../WORKBENCH_IMPLEMENTATION_PLAN.md) — phase log and known issues
+- [../SESSION_LIFECYCLE.md](../SESSION_LIFECYCLE.md) — full session lifecycle and state machine
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) — system architecture and file map
+- [../DATA_MODELS.md](../DATA_MODELS.md) — session table schemas
+- [../OBSERVABILITY.md](../OBSERVABILITY.md) — trace review UI and diagnostic SQL
 - Session tables: `agent_session`, `agent_message`, `llm_trace`, `pending_action`
