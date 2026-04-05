@@ -912,6 +912,7 @@ export function createAgentRouter() {
         question: clarificationRequest?.question ?? '',
         answer: response,
         context: clarificationRequest?.context ?? {},
+        input_schema: clarificationRequest?.input_schema ?? null,
       });
 
       // Persist clarification as a user message so LLM sees it in history

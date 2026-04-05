@@ -22,14 +22,14 @@ function StatusIcon({ step, isCurrent, isAwaiting }: { step: PlanStep; isCurrent
   return <div className="h-4 w-4 rounded-full border-2 border-gray-200 shrink-0 mt-0.5" />;
 }
 
-export const StepCard: React.FC<StepCardProps> = ({
+function StepCardInner({
   step,
   isCurrent,
   isAwaiting,
   clarification,
   events,
   onClarify,
-}) => {
+}: StepCardProps) {
   const isDone = step.status === 'completed';
   const isFailed = step.status === 'failed';
   const hasClarified = step.status === 'completed' &&
@@ -96,7 +96,9 @@ export const StepCard: React.FC<StepCardProps> = ({
       </div>
     </div>
   );
-};
+}
+
+export const StepCard = React.memo(StepCardInner);
 
 /** Convert a raw args_preview string into a compact readable summary */
 function summariseArgs(preview: string): string {

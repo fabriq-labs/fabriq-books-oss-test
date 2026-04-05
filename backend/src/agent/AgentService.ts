@@ -312,7 +312,7 @@ export class AgentService {
             // Session name generation: fires once, after the plan is created (first turn, createPlan tool used)
             const planJustCreated = (toolCalls ?? []).some((tc: any) => tc.toolName === 'createPlan');
             if (planJustCreated && !sess.name) {
-              this.generateSessionName(sessionId, sess.goal, orgId).catch(() => {});
+              this.generateSessionName(sessionId, sess.goal, orgId, sess.template_id || undefined).catch(() => {});
             }
           } catch { /* non-critical */ }
         },
@@ -459,13 +459,27 @@ export class AgentService {
    * Generate a short 4-6 word session name using the LLM and store it on the session.
    * Called fire-and-forget after the plan is created.
    */
-  private async generateSessionName(sessionId: string, goal: string, orgId: string): Promise<void> {
+  private async generateSessionName(sessionId: string, goal: string, orgId: string, templateId?: string): Promise<void> {
     try {
+      // Fetch template name if templateId is provided
+      let templateName = '';
+      if (templateId) {
+        const template = await prisma.agent_template.findUnique({
+          where: { id: templateId },
+          select: { name: true },
+        });
+        templateName = template?.name || '';
+      }
+
+      const taskContext = templateName
+        ? `${templateName}: "${goal}"`
+        : `financial task: "${goal}"`;
+
       const { text } = await generateText({
         model: getModel('agent'),
         messages: [{
           role: 'user',
-          content: `Generate a concise 4-6 word title for this financial task: "${goal}". Reply with ONLY the title, no punctuation, no quotes.`,
+          content: `Generate a concise 4-6 word title for this ${taskContext}. Reply with ONLY the title, no punctuation, no quotes.`,
         }],
         maxTokens: 20,
       });
@@ -473,7 +487,7 @@ export class AgentService {
       if (name) {
         await updateAgentSession(sessionId, { name } as any);
         sessionEventBus.emitSessionEvent(sessionId, orgId, 'session_status_changed', { field: 'name', name });
-        logger.info('Session name generated', { sessionId, name });
+        logger.info('Session name generated', { sessionId, name, templateId });
       }
     } catch (err: any) {
       logger.warn('Session name generation failed', { sessionId, error: err.message });
@@ -723,7 +737,7 @@ export class AgentService {
             });
             const planJustCreated = (toolCalls ?? []).some((tc: any) => tc.toolName === 'createPlan');
             if (planJustCreated && !sess.name) {
-              this.generateSessionName(sessionId, sess.goal, sess.org_id).catch(() => {});
+              this.generateSessionName(sessionId, sess.goal, sess.org_id, sess.template_id || undefined).catch(() => {});
             }
           } catch { /* non-critical */ }
         },

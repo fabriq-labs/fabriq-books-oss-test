@@ -99,6 +99,7 @@ export const ReconciliationActionBuilder: ActionBuilder = {
       pendingActions,
       summary: `Queued ${pendingActions.length} reconciliation match(es) for review (${high} high, ${med} medium, ${low} low confidence)`,
       contextUpdate: {
+        unmatched_count: matchResults.length,
         queued_matches: pendingActions.length,
         confidence_breakdown: { high, medium: med, low },
       },

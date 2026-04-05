@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Wifi, WifiOff, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AgentSession } from '@/contexts/AgentSessionContext';
@@ -29,15 +29,43 @@ function ConnectionBadge({ status }: { status: ConnectionStatus }) {
   );
 }
 
-export const ExecutingViewV2: React.FC<ExecutingViewV2Props> = ({
+function ExecutingViewV2Inner({
   session,
   events,
   connectionStatus,
   onClarify,
-}) => {
+}: ExecutingViewV2Props) {
   const plan = session.plan || [];
   const currentIdx = session.current_step_index ?? 0;
   const isAwaitingInput = session.status === 'awaiting_input';
+
+  // Preserve array identity across renders — only update if event count changes
+  const stableStepArraysRef = useRef<Map<number, SessionEvent[]>>(new Map());
+
+  const eventsByStep = useMemo(() => {
+    const tempMap = new Map<number, SessionEvent[]>();
+    for (const e of events) {
+      const idx = e.data?.step_index;
+      if (idx !== undefined) {
+        if (!tempMap.has(idx)) tempMap.set(idx, []);
+        tempMap.get(idx)!.push(e);
+      }
+    }
+
+    // Restore stable references if array length unchanged
+    let anyChanged = tempMap.size !== stableStepArraysRef.current.size;
+    for (const [idx, newArr] of tempMap) {
+      const prevArr = stableStepArraysRef.current.get(idx);
+      if (prevArr && prevArr.length === newArr.length) {
+        tempMap.set(idx, prevArr); // reuse old reference
+      } else {
+        anyChanged = true;
+      }
+    }
+    if (!anyChanged) return stableStepArraysRef.current;
+    stableStepArraysRef.current = tempMap;
+    return tempMap;
+  }, [events]);
 
   if (plan.length === 0) {
     return (
@@ -59,9 +87,7 @@ export const ExecutingViewV2: React.FC<ExecutingViewV2Props> = ({
 
       <div className="flex-1 overflow-auto px-5 py-4 space-y-2">
         {plan.map((step, i) => {
-          const stepEvents = events.filter(
-            (e) => e.data?.step_index === step.index || e.data?.step_index === i
-          );
+          const stepEvents = eventsByStep.get(i) || [];
           const isCurrent = i === currentIdx;
           const isStepAwaiting = isAwaitingInput && isCurrent;
 
@@ -80,4 +106,6 @@ export const ExecutingViewV2: React.FC<ExecutingViewV2Props> = ({
       </div>
     </div>
   );
-};
+}
+
+export const ExecutingViewV2 = React.memo(ExecutingViewV2Inner);

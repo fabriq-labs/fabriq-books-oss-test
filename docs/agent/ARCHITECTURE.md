@@ -260,6 +260,74 @@ Templates are not seeded via Prisma migrations. To add one:
 
 ---
 
+## Frontend Component Rendering Optimization
+
+**File**: `frontend-1/src/components/workbench/ExecutingViewV2.tsx` and related session components
+
+The Workbench step pane receives a high volume of SSE events during execution (step started, tool called, step completed, status changed, heartbeat). To prevent unnecessary re-renders and visual flicker:
+
+### Pattern 1: Stable Array References in useMemo
+
+When grouping immutable events into derived data structures (e.g., `eventsByStep: Map<number, SessionEvent[]>`), use a ref-backed preservation strategy:
+
+```typescript
+const stableStepArraysRef = useRef<Map<number, SessionEvent[]>>(new Map());
+
+const eventsByStep = useMemo(() => {
+  const tempMap = new Map<number, SessionEvent[]>();
+  // ... build tempMap from events ...
+  
+  // Restore stable references if array length unchanged
+  for (const [idx, newArr] of tempMap) {
+    const prevArr = stableStepArraysRef.current.get(idx);
+    if (prevArr?.length === newArr.length) {
+      tempMap.set(idx, prevArr);  // reuse old reference
+    }
+  }
+  
+  stableStepArraysRef.current = tempMap;
+  return tempMap;
+}, [events]);
+```
+
+This allows child components to skip re-renders when event counts are stable (even if new events arrived), reducing thrashing during SSE storms.
+
+### Pattern 2: Memoization with Field-Level Equality
+
+For components receiving composite props (e.g., `session: AgentSession`), use `React.memo()` with a custom equality function that only checks mutable fields:
+
+```typescript
+export const SessionHeader = React.memo(SessionHeaderInner, (prev, next) => {
+  const a = prev.session, b = next.session;
+  if (a === b) return true;  // object identity — skip render
+  // Only re-render if these specific fields changed:
+  return !(
+    a.name !== b.name || a.goal !== b.goal || a.status !== b.status ||
+    a.current_step_index !== b.current_step_index || a.plan !== b.plan
+  );
+});
+```
+
+Ignoring callback props and shallow object mutations prevents re-renders when parents re-create props but data is unchanged.
+
+### Pattern 3: SSE as Notification, Not State
+
+SSE events (e.g., `session_status_changed`) are **signals** that the server state has changed, not the source of truth. Do not attempt optimistic local patching:
+
+```typescript
+// ❌ BAD: Races with fresh API call
+if (eventType === 'session_status_changed') {
+  setSnapshot(prev => ({ ...prev, session: { ...prev.session, status } }));
+}
+
+// ✅ GOOD: Let consumer fetch fresh data
+// SessionView watches for 'session_status_changed' and calls sessionAPI.get()
+```
+
+See [SESSION_LIFECYCLE.md § Frontend Session State Synchronization](./SESSION_LIFECYCLE.md) for details.
+
+---
+
 ## Planned Features
 
 ### BullMQ Worker Queue

@@ -350,6 +350,31 @@ Wire format: `data: ${JSON.stringify({ id, type, sessionId, orgId, timestamp, da
 
 ---
 
+## Frontend Session State Synchronization
+
+**File**: `frontend-1/src/hooks/useSessionEvents.ts`
+
+The frontend maintains a local session snapshot in React state by consuming SSE events. When `session_status_changed` is emitted, the **frontend immediately fetches fresh session data** via `sessionAPI.get()` rather than attempting to patch the local snapshot with optimistic state.
+
+**Why not patch locally?** Patching the snapshot on status-change events would create a partial session object (e.g., the original plan + the new status) that races with the fresh API fetch. This causes a transient UI state where the UI renders stale step data momentarily before the fresh data arrives, resulting in visual flicker.
+
+**Correct pattern**:
+```typescript
+// ❌ BAD: Optimistic patching
+if (eventType === 'session_status_changed') {
+  setSnapshot(prev => ({ ...prev, session: { ...prev.session, status: newStatus } }));
+}
+// This creates a stale partial-session that races with the API fetch.
+
+// ✅ GOOD: Let the consumer fetch fresh data
+// SessionView watches for 'session_status_changed' in events and calls:
+sessionAPI.get(sessionId)  // Fresh, complete session object
+```
+
+This applies to any event that signals a state transition. SSE events are **notification signals**, not the source of truth for mutable state. The backend is authoritative.
+
+---
+
 ## Known Limitations
 
 | Issue | Current behaviour | Planned fix |

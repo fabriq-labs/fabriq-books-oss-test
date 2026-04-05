@@ -112,14 +112,12 @@ export function useSessionEvents(sessionId: string | null | undefined): UseSessi
 
           setEvents((prev) => [...prev, { type: eventType, data: eventData, id: eventId }]);
 
-          // Patch snapshot status optimistically on status change
-          if (eventType === 'session_status_changed') {
-            setSnapshot((prev: any) =>
-              prev
-                ? { ...prev, session: { ...(prev.session ?? {}), status: eventData.status } }
-                : prev
-            );
-          }
+          // NOTE: We intentionally do NOT patch `snapshot` on status changes.
+          // The consumer (SessionView) already fetches fresh session data via
+          // sessionAPI.get() when it sees 'session_status_changed' in events.
+          // Patching snapshot here would create a stale partial-session object
+          // (original plan + new status) that would race with the fresh fetch,
+          // causing the UI to flash back to older step statuses.
         },
 
         onerror: (err) => {

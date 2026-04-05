@@ -74,8 +74,14 @@ export const SessionView: React.FC = () => {
     const latest = events[events.length - 1];
 
     if (latest.type === 'session_status_changed') {
-      // Re-fetch full session to get updated plan/step index
+      // Re-fetch full session to get updated plan/step index and pending_actions_count
       sessionAPI.get(sessionId).then(setSession).catch(() => {});
+      // If transitioning to awaiting_approval, also refetch pending actions immediately
+      if (latest.data?.status === 'awaiting_approval') {
+        pendingActionAPI.list({ session_id: sessionId })
+          .then((actions) => setPendingActions(Array.isArray(actions) ? actions : []))
+          .catch(() => {});
+      }
       void refreshSessions();
     }
 

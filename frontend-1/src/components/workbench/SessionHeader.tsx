@@ -65,11 +65,11 @@ function StepDot({
   );
 }
 
-export const SessionHeader: React.FC<SessionHeaderProps> = ({
+function SessionHeaderInner({
   session,
   viewMode,
   onViewModeChange,
-}) => {
+}: SessionHeaderProps) {
   const plan = session.plan || [];
   const currentIdx = session.current_step_index ?? 0;
   const isAwaitingInput = session.status === 'awaiting_input';
@@ -130,4 +130,20 @@ export const SessionHeader: React.FC<SessionHeaderProps> = ({
       )}
     </div>
   );
-};
+}
+
+export const SessionHeader = React.memo(SessionHeaderInner, (prev, next) => {
+  if (prev.viewMode !== next.viewMode) return false;
+  if (prev.onViewModeChange !== next.onViewModeChange) return false;
+  const a = prev.session;
+  const b = next.session;
+  if (a === b) return true;
+  return (
+    a.name === b.name &&
+    a.goal === b.goal &&
+    a.mode === b.mode &&
+    a.status === b.status &&
+    a.current_step_index === b.current_step_index &&
+    a.plan === b.plan
+  );
+});

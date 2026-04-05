@@ -310,6 +310,8 @@ export function suggestReconciliationMatchesTool(auth: AuthContext) {
       uiHint: string;
       data: PostingWithSuggestions[];
       columns: Array<{ field: string; label: string }>;
+      unmatched_count: number;
+      matches_with_suggestions: number;
       description: string;
     }> => {
       const orgId = auth.user?.org_id;
@@ -333,6 +335,8 @@ export function suggestReconciliationMatchesTool(auth: AuthContext) {
             uiHint: 'reconciliation_suggestions',
             data: [],
             columns: [],
+            unmatched_count: 0,
+            matches_with_suggestions: 0,
             description: `Posting ${postingId} not found or not in your organization.`,
           };
         }
@@ -344,6 +348,8 @@ export function suggestReconciliationMatchesTool(auth: AuthContext) {
             uiHint: 'reconciliation_suggestions',
             data: [],
             columns: [],
+            unmatched_count: 0,
+            matches_with_suggestions: 0,
             description: `This transaction is already matched to ${ref}.`,
           };
         }
@@ -355,6 +361,7 @@ export function suggestReconciliationMatchesTool(auth: AuthContext) {
           tolerance,
           lookback
         );
+        const hasSuggestions = singleResult && singleResult.suggestions.length > 0 ? 1 : 0;
         return {
           tool: 'suggestReconciliationMatches',
           uiHint: 'reconciliation_suggestions',
@@ -366,6 +373,8 @@ export function suggestReconciliationMatchesTool(auth: AuthContext) {
             { field: 'posting_date', label: 'Date' },
             { field: 'suggestions', label: 'Suggestions' },
           ],
+          unmatched_count: 1,
+          matches_with_suggestions: hasSuggestions,
           description:
             singleResult && singleResult.suggestions.length > 0
               ? `Found ${singleResult.suggestions.length} suggested match(es) for this transaction.`
@@ -381,6 +390,8 @@ export function suggestReconciliationMatchesTool(auth: AuthContext) {
           uiHint: 'reconciliation_suggestions',
           data: [],
           columns: [],
+          unmatched_count: 0,
+          matches_with_suggestions: 0,
           description: `Bank account "${accountId}" not found. Use the account ID (UUID) from context.modelContext.selectedAccountId, not the account name.`,
         };
       }
@@ -538,6 +549,8 @@ export function suggestReconciliationMatchesTool(auth: AuthContext) {
         uiHint: 'reconciliation_suggestions',
         data: result,
         columns,
+        unmatched_count: count,
+        matches_with_suggestions: withSuggestions,
         description:
           count === 0
             ? 'No unmatched transactions found for this bank account.'

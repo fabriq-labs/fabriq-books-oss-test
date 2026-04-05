@@ -13,13 +13,16 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ clarificat
   const [freeText, setFreeText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Support both old format (simple array) and new format (ID mapping)
+  // Extract options from input_schema (new format) or fall back to legacy context format
+  const inputSchema = (clarification as any)?.input_schema;
+  const schemaOptions = inputSchema?.options;
   const available = clarification.context?.available;
   const accountIds = clarification.context?.account_ids;
 
+  const hasSchemaOptions = Array.isArray(schemaOptions) && schemaOptions.length > 0;
   const hasOptions = Array.isArray(available) && available.length > 0;
   const hasIdMapping = accountIds && typeof accountIds === 'object' && Object.keys(accountIds).length > 0;
-  const showOptions = hasOptions || hasIdMapping;
+  const showOptions = hasSchemaOptions || hasOptions || hasIdMapping;
 
   const handleChipClick = async (option: string) => {
     if (isSubmitting) return;
@@ -54,7 +57,27 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ clarificat
 
       {showOptions ? (
         <div className="flex flex-wrap gap-2">
-          {hasIdMapping
+          {hasSchemaOptions
+            ? schemaOptions.map((option: any) => (
+                <button
+                  key={option.id}
+                  onClick={() => handleChipClick(option.label)}
+                  disabled={isSubmitting}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                    selected === option.label
+                      ? 'bg-amber-500 border-amber-500 text-white'
+                      : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100',
+                    isSubmitting && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  {isSubmitting && selected === option.label ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
+                  ) : null}
+                  {option.label}
+                </button>
+              ))
+            : hasIdMapping
             ? Object.entries(accountIds).map(([id, name]) => (
                 <button
                   key={id}
@@ -75,25 +98,29 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ clarificat
                   {name}
                 </button>
               ))
-            : available.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => handleChipClick(option)}
-                  disabled={isSubmitting}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm border transition-colors',
-                    selected === option
-                      ? 'bg-amber-500 border-amber-500 text-white'
-                      : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100',
-                    isSubmitting && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  {isSubmitting && selected === option ? (
-                    <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
-                  ) : null}
-                  {option}
-                </button>
-              ))}
+            : available.map((option) => {
+                const optionLabel = typeof option === 'string' ? option : option.label;
+                const optionKey = typeof option === 'string' ? option : option.id;
+                return (
+                  <button
+                    key={optionKey}
+                    onClick={() => handleChipClick(optionLabel)}
+                    disabled={isSubmitting}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                      selected === optionLabel
+                        ? 'bg-amber-500 border-amber-500 text-white'
+                        : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    {isSubmitting && selected === optionLabel ? (
+                      <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
+                    ) : null}
+                    {optionLabel}
+                  </button>
+                );
+              })}
         </div>
       ) : (
         <div className="flex gap-2">
