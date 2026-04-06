@@ -2,7 +2,7 @@
 
 VM for building and testing the Docker image before deploying to Cloud Run.
 
-**Full build and deploy strategy:** see **[BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md)** (root-repo-only workflow, Docker Compose, Cloud Build).
+**Full build and deploy strategy:** see **[BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md)** (monorepo Dockerfile, Docker Compose, GitHub Actions → GHCR).
 
 ## VM details
 
@@ -71,25 +71,21 @@ You’re now editing and running on the VM. To disconnect: close the remote wind
 
 ## 2. Get the root repo on the VM
 
-You only check in/out the **root repo** on the VM. Either:
+Use the **monorepo** on the VM (`backend/` and `frontend-1/` are part of the same Git tree). Either:
 
-- **From your Mac:** clone the root repo to the VM and copy deployment files:
+- **From your Mac:** copy deployment assets if you are only syncing a subset (normally just **git clone** the full repo on the VM instead):
   ```bash
-  gcloud compute scp Dockerfile docker-compose.yml docker-compose.external-pg.yml nginx.conf start.sh start-with-pg.sh start-external.sh .dockerignore cloudbuild.yaml cloudbuild-dev.yaml fabriq-dev-vm:~/ --zone=asia-southeast1-b
-  gcloud compute ssh fabriq-dev-vm --zone=asia-southeast1-b --command="mkdir -p ~/repos/fabriq && mv ~/Dockerfile ~/docker-compose.yml ~/docker-compose.external-pg.yml ~/nginx.conf ~/start.sh ~/start-with-pg.sh ~/start-external.sh ~/.dockerignore ~/cloudbuild.yaml ~/cloudbuild-dev.yaml ~/repos/fabriq/ 2>/dev/null; ls ~/repos/fabriq"
+  gcloud compute scp Dockerfile docker-compose.yml docker-compose.external-pg.yml nginx.conf start.sh start-with-pg.sh start-external.sh .dockerignore docker-build-info.js fabriq-dev-vm:~/ --zone=asia-southeast1-b
+  gcloud compute ssh fabriq-dev-vm --zone=asia-southeast1-b --command="mkdir -p ~/repos/fabriq && mv ~/Dockerfile ~/docker-compose.yml ~/docker-compose.external-pg.yml ~/nginx.conf ~/start.sh ~/start-with-pg.sh ~/start-external.sh ~/.dockerignore ~/docker-build-info.js ~/repos/fabriq/ 2>/dev/null; ls ~/repos/fabriq"
   ```
-- **Or on the VM:** clone only the **root repo** into `~/repos/fabriq` (e.g. `mkdir -p ~/repos && git clone <root-repo-url> ~/repos/fabriq`). The agent will clone backend and frontend (demo) when you build.
+- **Or on the VM (recommended):** `mkdir -p ~/repos && git clone <monorepo-url> ~/repos/fabriq` so **`backend/`** and **`frontend-1/`** are present.
 
-## 3. On the VM: run with Docker Compose (agent clones backend + frontend if missing)
+## 3. On the VM: run with Docker Compose
 
-See **[BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md)** and **[AGENT_PROMPT_CLOUD_VM.md](./AGENT_PROMPT_CLOUD_VM.md)**. Ask the agent to build/run; it clones backend and frontend (demo) into the repo if needed. Manual:
+See **[BUILD_AND_DEPLOY.md](./BUILD_AND_DEPLOY.md)** and **[AGENT_PROMPT_CLOUD_VM.md](./AGENT_PROMPT_CLOUD_VM.md)**. From a full checkout:
 
 ```bash
 cd ~/repos/fabriq
-export GH_TOKEN="your_github_token"
-git clone --branch demo --depth 1 "https://${GH_TOKEN}@github.com/fabriq-labs/fabriq-base.git" backend
-git clone --branch demo --depth 1 "https://${GH_TOKEN}@github.com/fabriq-labs/zeiv-v2.git" frontend-1
-
 docker compose build
 docker compose up -d
 curl -s http://localhost:8080/health

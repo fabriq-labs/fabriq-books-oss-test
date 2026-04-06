@@ -1,0 +1,11 @@
+id,first_name,last_name,email,legal_entity_id,business_unit_id,user_id,role_name,manager,location_id,cost_center_id,department_id,org_id
+emp_demo_arjun,Arjun,Sharma,arjun.sharma@demo-india.com,org_indian_demo,bu_demo_ops,user_arjun_sharma,Employee,user_arjun_sharma,loc_mumbai_hq,cc_demo_001,dept_demo_procurement,org_indian_demo
+emp_demo_priya,Priya,Patel,priya.patel@demo-india.com,org_indian_demo,bu_demo_hq,user_priya_patel,Finance Team,user_arjun_sharma,loc_mumbai_hq,cc_demo_001,dept_demo_finance,org_indian_demo
+emp_demo_rahul,Rahul,Verma,rahul.verma@demo-india.com,org_indian_demo,bu_demo_ops,user_rahul_verma,Employee,user_arjun_sharma,loc_bangalore_main,cc_demo_002,dept_demo_delivery,org_indian_demo
+emp_demo_ananya,Ananya,Singh,ananya.singh@demo-india.com,org_indian_demo,bu_demo_sales,user_ananya_singh,Employee,user_arjun_sharma,loc_delhi_branch,cc_demo_003,dept_demo_sales,org_indian_demo
+emp_demo_vikram,Vikram,Joshi,vikram.joshi@demo-india.com,org_indian_demo,bu_demo_hq,user_vikram_joshi,Employee,user_sanjay_gupta,loc_mumbai_hq,cc_demo_009,dept_demo_finance,org_indian_demo
+emp_demo_kavya,Kavya,Nair,kavya.nair@demo-india.com,org_indian_demo,bu_demo_hq,user_kavya_nair,Finance Team,user_vikram_joshi,loc_chennai_office,cc_demo_009,dept_demo_finance,org_indian_demo
+emp_demo_rohit,Rohit,Kumar,rohit.kumar@demo-india.com,org_indian_demo,bu_demo_ops,user_rohit_kumar,Employee,user_vikram_joshi,loc_hyderabad_center,cc_demo_008,dept_demo_delivery,org_indian_demo
+emp_demo_meera,Meera,Rao,meera.rao@demo-india.com,org_indian_demo,bu_demo_ops,user_meera_rao,Employee,user_vikram_joshi,loc_bangalore_main,cc_demo_010,dept_demo_procurement,org_indian_demo
+emp_demo_sanjay,Sanjay,Gupta,sanjay.gupta@demo-india.com,org_indian_demo,bu_demo_hq,user_sanjay_gupta,Employee,user_sanjay_gupta,loc_mumbai_hq,cc_demo_001,dept_demo_hr,org_indian_demo
+emp_demo_divya,Divya,Menon,divya.menon@demo-india.com,org_indian_demo,bu_demo_tech,user_divya_menon,Finance Team,user_sanjay_gupta,loc_pune_facility,cc_demo_007,dept_demo_engineering,org_indian_demo

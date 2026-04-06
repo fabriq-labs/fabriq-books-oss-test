@@ -1,0 +1,43 @@
+{
+  "id": "view_05c658fb-17eb-45bd-9a1d-a63486398753",
+  "name": "ref_source_view",
+  "model_name": "ref_source",
+  "description": "52",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "name": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "group": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "entities": {
+      "datatype": "Json",
+      "permission": "update"
+    },
+    "image_url": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "is_source": {
+      "datatype": "boolean",
+      "permission": "read"
+    },
+    "app_config": {
+      "datatype": "Json",
+      "permission": "update"
+    },
+    "description": {
+      "datatype": "string",
+      "permission": "update"
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

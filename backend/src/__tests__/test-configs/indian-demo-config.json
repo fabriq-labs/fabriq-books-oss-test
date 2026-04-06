@@ -1,0 +1,20 @@
+{
+  "name": "Kavya Nair",
+  "orgId": "org_indian_demo",
+  "userId": "user_kavya_nair",
+  "managerUserId": "user_vikram_joshi",
+  "buyerUserId": "user_arjun_sharma",
+  "customerId": "cust_tata_consultancy",
+  "supplierId": "supp_dell_india",
+  "supplierId2": "supp_lenovo_india",
+  "items": {
+    "productA": "item_dell_laptop",
+    "serviceB": "item_dell_desktop",
+    "productC": "item_dell_monitor",
+    "zohoProductName": "Cream Cheese",
+    "quickbooksProductName": "Pump"
+  },
+  "locationId": "loc_bangalore_main",
+  "currency": "INR",
+  "description": "Test configuration for Indian demo data (setup-IN)"
+}

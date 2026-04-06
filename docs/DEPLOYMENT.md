@@ -85,9 +85,9 @@ Step 5: Run Tests (Optional)
 ### Quick Start
 
 ```bash
-# Clone repository
-git clone https://github.com/fabriq-labs/fabriq-base.git
-cd fabriq-base
+# Clone monorepo and enter backend app directory
+git clone https://github.com/fabriq-labs/fabriq-ws-setup.git fabriq
+cd fabriq/backend
 
 # Install dependencies
 npm install
@@ -1051,7 +1051,8 @@ curl http://localhost:4000/api/role \
 ### 5. Test Frontend
 
 ```bash
-# Start frontend (in zeiv-v2 directory)
+# Start frontend (from monorepo: cd frontend-1)
+cd ../frontend-1
 npm run dev
 
 # Open browser

@@ -1,0 +1,103 @@
+{
+  "id": "view_455402c8-7e5b-4877-83f4-fb28389cb53d",
+  "name": "tax_master_view",
+  "model_name": "tax_master",
+  "description": "Tax Master",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "geo": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Geo",
+      "isColumnShow": true
+    },
+    "status": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Status",
+      "isColumnShow": true
+    },
+    "tax_code": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Tax Code",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "startswith"
+      },
+      "isColumnShow": true
+    },
+    "tax_name": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Tax Name",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "startswith"
+      },
+      "isColumnShow": true
+    },
+    "tax_rate": {
+      "datatype": "int",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "int",
+        "defaultValue": ""
+      },
+      "displayName": "Tax Rate",
+      "isColumnShow": true
+    },
+    "expires_on": {
+      "datatype": "date",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Expires ON",
+      "isColumnShow": true
+    },
+    "effective_from": {
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Effective From",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

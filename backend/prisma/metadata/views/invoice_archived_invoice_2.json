@@ -1,0 +1,456 @@
+{
+  "id": "view_a1389214-8cdb-428d-8e84-8062a41ed877",
+  "name": "invoice_2",
+  "model_name": "invoice archived",
+  "description": "Manager",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read"
+    },
+    "coa": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "name": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "status": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "bill_to": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update"
+    },
+    "location": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "city": "update",
+        "state": "update",
+        "address": "update",
+        "country": "update",
+        "website": "update",
+        "location": "update",
+        "zip_code": "update"
+      }
+    },
+    "remit_to": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "customers": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "city": "update",
+        "state": "update",
+        "country": "update",
+        "zip_code": "update",
+        "customer_name": "update",
+        "primary_email": "update",
+        "primary_phone": "update",
+        "payment_term_id": "update",
+        "customer_address": "update",
+        "preferred_currency_id": "update"
+      },
+      "payment_terms": {
+        "type": "table",
+        "select": {
+          "id": "read",
+          "description": "update",
+          "payment_terms": "update"
+        }
+      },
+      "currency_master": {
+        "type": "table",
+        "select": {
+          "id": "read",
+          "base_currency": "update",
+          "from_currency": "update",
+          "currency_value": "update",
+          "effective_from": "update"
+        }
+      }
+    },
+    "misc_cost": {
+      "dataType": "float",
+      "permission": "update"
+    },
+    "po_number": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "tax_total": {
+      "dataType": "float",
+      "permission": "update"
+    },
+    "ap_comment": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "deliver_to": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update"
+    },
+    "customer_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "invoice",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "customers",
+          "searchParams": "customer_name",
+          "instanceLabel": "customer_name",
+          "instanceSourceKey": "customer_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Customers",
+      "isColumnShow": false
+    },
+    "location_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "invoice",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "location",
+          "searchParams": "location",
+          "instanceLabel": "location",
+          "instanceSourceKey": "location_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Location",
+      "isColumnShow": false
+    },
+    "invoice_date": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "Invoice Date",
+      "isColumnShow": true
+    },
+    "invoice_type": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update"
+    },
+    "invoice_total": {
+      "dataType": "float",
+      "permission": "update",
+      "displayName": "Invoice Total",
+      "isColumnShow": true
+    },
+    "payment_terms": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "shipping_cost": {
+      "dataType": "float",
+      "permission": "update"
+    },
+    "supplier_name": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Supplier Name",
+      "isColumnShow": true
+    },
+    "additional_tax": {
+      "dataType": "float",
+      "permission": "update"
+    },
+    "balance_amount": {
+      "dataType": "float",
+      "permission": "update",
+      "displayName": "Balance Amount",
+      "isColumnShow": false
+    },
+    "invoice_number": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "displayName": "Invoice Number",
+      "isColumnShow": true
+    },
+    "invoice_status": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "purchase_order": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "status": "update",
+        "comment": "update",
+        "pr_date": "read",
+        "location": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "city": "read",
+            "state": "read",
+            "address": "read",
+            "country": "read",
+            "location": "read",
+            "zip_code": "read"
+          }
+        },
+        "pr_total": "update",
+        "po_number": "read",
+        "pr_number": "read",
+        "requester": "update",
+        "deliver_to": "update",
+        "location_id": "update",
+        "purchase_id": "update",
+        "supplier_id": "update",
+        "total_price": "update",
+        "need_by_date": "update",
+        "delivery_address": "update",
+        "supplier_details": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "city": "update",
+            "state": "update",
+            "country": "update",
+            "po_email": "update",
+            "zip_code": "update",
+            "legal_name": "update",
+            "primary_email": "update",
+            "primary_phone": "update",
+            "supplier_name": "update",
+            "secondary_email": "update",
+            "supplier_address": "update"
+          }
+        },
+        "chart_of_accounts": "update",
+        "purchase_requisition": {
+          "type": "table",
+          "select": {
+            "id": "true",
+            "attach": "true",
+            "pr_date": "true",
+            "pr_number": "true",
+            "requester": "true",
+            "total_price": "true",
+            "purchase_reason": "true",
+            "request_for_project": "true",
+            "requester_department": "true"
+          }
+        },
+        "requester_department": "update"
+      }
+    },
+    "requester_name": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update"
+    },
+    "shipping_terms": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "wf_instance_id": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "invoice_version": {
+      "dataType": "int",
+      "permission": "update"
+    },
+    "payment_receipt": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "notes": "update",
+        "amount": "update",
+        "status": "update",
+        "account": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "name": "read"
+          }
+        },
+        "invoice": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "invoice_date": "read",
+            "invoice_type": "read",
+            "invoice_total": "read",
+            "balance_amount": "read",
+            "invoice_number": "read",
+            "invoice_status": "read",
+            "invoice_version": "read",
+            "invoice_net_total": "read",
+            "shipping_handling_misc_total": "read"
+          }
+        },
+        "customers": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "customer_name": "read"
+          }
+        },
+        "account_id": "update",
+        "invoice_id": "update",
+        "base_amount": "update",
+        "currency_id": "update",
+        "payment_type": "update",
+        "receipt_date": "update",
+        "exchange_rate": "update",
+        "payment_method": "update",
+        "receipt_number": "update",
+        "currency_master": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "base_currency": "read"
+          }
+        },
+        "payment_reference": "update"
+      }
+    },
+    "requester_email": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "shipping_method": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "tax_on_handling": {
+      "dataType": "float",
+      "permission": "update"
+    },
+    "tax_on_shipping": {
+      "dataType": "float",
+      "permission": "update"
+    },
+    "supplier_remarks": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "invoice_line_item": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "rate": "read",
+        "tax_rate": "read",
+        "tax_type": "read",
+        "created_at": "read",
+        "line_total": "read",
+        "instance_id": "read",
+        "invoice_qty": "read",
+        "item_master": {
+          "type": "table",
+          "select": {
+            "uom": {
+              "type": "table",
+              "select": {
+                "id": "read",
+                "name": "update"
+              }
+            },
+            "uom_id": "update",
+            "item_name": "update",
+            "item_type": "update",
+            "unit_price": "update",
+            "item_description": "update"
+          }
+        },
+        "item_number": "read",
+        "item_master_id": "update",
+        "ordered_amount": "read",
+        "invoiced_amount": "read",
+        "line_tax_amount": "read",
+        "ordered_quantity": "read",
+        "purchase_order_item_id": "read",
+        "purchase_requisition_id": "read",
+        "purchase_order_line_item": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "quantity": "read",
+            "invoice_qty": "read",
+            "ordered_amount": "read",
+            "invoiced_amount": "read",
+            "ordered_quantity": "read"
+          }
+        }
+      }
+    },
+    "invoice_net_total": {
+      "dataType": "float",
+      "permission": "update",
+      "displayName": "Invoice Net Total",
+      "isColumnShow": true
+    },
+    "purchase_order_id": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "purchase_order_item": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "rate": "read",
+        "quantity": "read",
+        "supplier": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "city": "update",
+            "state": "update",
+            "country": "update",
+            "po_email": "update",
+            "zip_code": "update",
+            "legal_name": "update",
+            "primary_email": "update",
+            "primary_phone": "update",
+            "supplier_name": "update",
+            "secondary_email": "update",
+            "supplier_address": "update"
+          }
+        },
+        "item_type": "read",
+        "created_at": "read",
+        "instance_id": "read",
+        "invoice_qty": "read",
+        "supplier_id": "read",
+        "ordered_amount": "read",
+        "ordered_quantity": "read",
+        "purchase_requisition_id": "read"
+      }
+    },
+    "terms_and_conditions": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update"
+    },
+    "purchase_order_item_id": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "shipping_handling_misc_total": {
+      "dataType": "float",
+      "permission": "update"
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

@@ -275,7 +275,7 @@ Business metadata for each model including:
 
 ### 3. Automatic Route Generation Pattern
 
-The backend automatically generates identical REST routes for every model in `fabriq-base/src/rest/routes.ts`:
+The backend automatically generates identical REST routes for every model in `backend/src/rest/routes.ts`:
 
 ```typescript
 // Backend automatically creates these routes for ALL models:

@@ -1,0 +1,35 @@
+{
+  "id": "view_4328f0c2-1296-410b-bfee-6d4039419b53",
+  "name": "source_view",
+  "model_name": "source",
+  "description": "Source",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "name": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "principal": {
+      "datatype": "string",
+      "permission": "update"
+    },
+    "user_info": {
+      "datatype": "Json",
+      "permission": "update"
+    },
+    "credentials": {
+      "datatype": "Json",
+      "permission": "update"
+    },
+    "connection_id": {
+      "datatype": "string",
+      "permission": "update"
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

@@ -1,0 +1,4 @@
+id,organization_name,legal_name,address,city,state,country,zip_code,website,is_it_headquartres,is_it_a_groupcompany,group_company_name,basecurrency_id,org_id
+org_techflow_us,TechFlow Solutions Inc,TechFlow Solutions Incorporated,"1234 Silicon Valley Drive",San Francisco,California,United States,94105,https://techflowsolutions.com,Yes,No,,cur_seed_techflow_us_usd,org_techflow_us
+org_techflow_us_west,TechFlow West Operations,TechFlow West Operations LLC,"850 Market Street",San Francisco,California,United States,94102,https://west.techflowsolutions.com,No,Yes,TechFlow Solutions Inc,cur_seed_techflow_us_usd,org_techflow_us
+org_techflow_us_east,TechFlow East Operations,TechFlow East Operations LLC,"200 Park Avenue",New York,New York,United States,10166,https://east.techflowsolutions.com,No,Yes,TechFlow Solutions Inc,cur_seed_techflow_us_usd,org_techflow_us

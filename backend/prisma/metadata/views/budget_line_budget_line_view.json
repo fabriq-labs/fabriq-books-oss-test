@@ -1,0 +1,107 @@
+{
+  "id": "view_32d23458-de47-44ea-af68-6c72a2897993",
+  "name": "budget_line_view",
+  "model_name": "budget_line",
+  "description": "Manager",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "bp_end_date": {
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "BP End Date",
+      "isColumnShow": true
+    },
+    "budget_line": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "string",
+        "defaultValue": ""
+      },
+      "displayName": "Budget Line",
+      "isColumnShow": true
+    },
+    "bp_start_date": {
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "BP Start Date",
+      "isColumnShow": true
+    },
+    "budget_period": {
+      "select": {
+        "id": "read",
+        "budget_period": "update"
+      },
+      "dataType": "table",
+      "displayName": "Budget Period",
+      "isColumnShow": false
+    },
+    "allocated_budget": {
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Allocated Budget",
+      "isColumnShow": true
+    },
+    "available_budget": {
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Available Budget",
+      "isColumnShow": false
+    },
+    "budget_period_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "budget_line",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "budget_period",
+          "searchParams": "budget_period",
+          "instanceLabel": "budget_period",
+          "instanceSourceKey": "budget_period_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "budget_period.budget_period"
+      },
+      "displayName": "Budget Period",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

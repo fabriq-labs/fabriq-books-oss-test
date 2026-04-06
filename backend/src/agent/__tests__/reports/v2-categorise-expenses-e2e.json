@@ -1,0 +1,18 @@
+{
+  "sessionId": "ses_3b24b927-8477-483b-b8bd-0b0bbd3f8e29",
+  "goal": "Categorise uncategorised expense postings for account acco_org_indian_demo_1102",
+  "templateUsed": "Categorise Expenses",
+  "sessionName": "Categorize Indian Demo Expenses",
+  "finalStatus": "completed",
+  "pendingActionsCount": 0,
+  "categoriseActionsCount": 0,
+  "categorizePostingsToolCallCount": 1,
+  "sseEventCount": 24,
+  "sseEventTypes": [
+    "session_status_changed",
+    "tool_called",
+    "step_completed",
+    "step_started"
+  ],
+  "samplePredictions": []
+}

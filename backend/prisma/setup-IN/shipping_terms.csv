@@ -1,0 +1,11 @@
+id,shipping_terms,description,status,org_id
+st_demo_fob,FOB,Free on Board,Active,org_indian_demo
+st_demo_cif,CIF,Customer pickup at warehouse,Active,org_indian_demo
+st_demo_exw,EXW,Ex Works,Active,org_indian_demo
+st_demo_dap,DAP,Delivered at Place,Active,org_indian_demo
+st_demo_ddp,DDP,Delivered Duty Paid,Active,org_indian_demo
+st_demo_cfr,CFR,Cost and Freight,Active,org_indian_demo
+st_demo_cpt,CPT,Carriage Paid To,Active,org_indian_demo
+st_demo_cip,CIP,Carriage and Insurance Paid,Active,org_indian_demo
+st_demo_fca,FCA,Free Carrier,Active,org_indian_demo
+st_demo_dpu,DPU,Delivered at Place Unloaded,Active,org_indian_demo

@@ -1,0 +1,45 @@
+{
+  "id": "view_13f8ff0f-0caf-4505-b504-a4e83ea438b8",
+  "name": "item_categoryFullAccess",
+  "model_name": "item_category",
+  "description": "Full access to item_category model",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "item_category": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Item Category",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "startswith"
+      },
+      "isColumnShow": true
+    },
+    "item_subcategory": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Item Subcategory",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "startswith"
+      },
+      "isColumnShow": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

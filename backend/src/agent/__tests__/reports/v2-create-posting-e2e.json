@@ -1,0 +1,15 @@
+{
+  "sessionId": "ses_322b1544-52ae-4afe-b3b3-6d036d90685c",
+  "templateUsed": "Book Transactions",
+  "sessionName": "Book Checking Transactions",
+  "finalStatus": "executing",
+  "pendingActionsCount": 0,
+  "executedActionsCount": 0,
+  "sseEventCount": 18,
+  "sseEventTypes": [
+    "session_status_changed",
+    "tool_called",
+    "step_completed",
+    "step_started"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "id": "view_29419509-6cd6-4545-98d6-6c9aaee3e503",
+  "name": "shipping_method_view",
+  "model_name": "shipping_method",
+  "description": "Shipping Method",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "status": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Status",
+      "isColumnShow": false
+    },
+    "description": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Description",
+      "isColumnShow": true
+    },
+    "shipping_method": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Shipping Method",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

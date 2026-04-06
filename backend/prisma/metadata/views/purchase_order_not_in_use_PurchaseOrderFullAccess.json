@@ -1,0 +1,477 @@
+{
+  "id": "view_b1686bd8-3440-40e4-8ab1-6d07bd2968a6",
+  "name": "PurchaseOrderFullAccess",
+  "model_name": "purchase_order-not-in-use",
+  "description": "Full access to purchase order model",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "ID",
+      "isColumnShow": false
+    },
+    "coa": {
+      "select": {
+        "id": "read",
+        "coa_code": "update",
+        "account_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Account"
+    },
+    "status": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "status",
+      "isColumnShow": false
+    },
+    "comment": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Comment",
+      "isColumnShow": true
+    },
+    "po_date": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "ID",
+      "isColumnShow": false
+    },
+    "pr_date": {
+      "dataType": "date",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "date",
+        "defaultValue": null
+      },
+      "displayName": "PR Date",
+      "isColumnShow": true
+    },
+    "location": {
+      "select": {
+        "id": "read",
+        "city": "update",
+        "name": "update",
+        "state": "update",
+        "address": "update",
+        "country": "update",
+        "location": "update",
+        "zip_code": "update",
+        "legal_entity_id": "update"
+      },
+      "dataType": "table",
+      "displayName": "Location"
+    },
+    "pr_total": {
+      "dataType": "float",
+      "permission": "read",
+      "displayName": "pr_total",
+      "isColumnShow": false
+    },
+    "on_behalf": {
+      "dataType": "boolean",
+      "permission": "update",
+      "displayName": "on_behalf",
+      "isColumnShow": false
+    },
+    "po_number": {
+      "dataType": "string",
+      "permission": "read",
+      "tableProps": {
+        "columnType": "string",
+        "defaultValue": ""
+      },
+      "displayName": "Po Number",
+      "isColumnShow": true
+    },
+    "pr_number": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "PR Number",
+      "isColumnShow": true
+    },
+    "requester": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "requester",
+      "isColumnShow": false
+    },
+    "created_at": {
+      "datatype": "date",
+      "permission": "update"
+    },
+    "deliver_to": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "deliver_to",
+      "isColumnShow": false
+    },
+    "budget_line": {
+      "select": {
+        "id": "read",
+        "budget_line": "update"
+      },
+      "dataType": "table",
+      "displayName": "Budget Line"
+    },
+    "location_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "location_id",
+      "isColumnShow": false
+    },
+    "modified_at": {
+      "datatype": "date",
+      "permission": "update"
+    },
+    "purchase_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "purchase_id",
+      "isColumnShow": false
+    },
+    "supplier_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "supplier_id",
+      "isColumnShow": false
+    },
+    "total_price": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "total_price",
+      "isColumnShow": false
+    },
+    "need_by_date": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "need_by_date",
+      "isColumnShow": false
+    },
+    "on_behalf_of": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "on_behalf_of",
+      "isColumnShow": false
+    },
+    "organization": {
+      "select": {
+        "id": "read",
+        "city": "update",
+        "state": "update",
+        "address": "update",
+        "country": "update",
+        "website": "update",
+        "zip_code": "update",
+        "legal_name": "update",
+        "organization_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Organization"
+    },
+    "budget_period": {
+      "select": {
+        "id": "read",
+        "budget_period": "update"
+      },
+      "dataType": "table",
+      "displayName": "Budget Period"
+    },
+    "department_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "department_id",
+      "isColumnShow": false
+    },
+    "payment_terms": {
+      "select": {
+        "id": "read",
+        "payment_terms": "update"
+      },
+      "dataType": "table",
+      "displayName": "Payment Terms"
+    },
+    "budget_line_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "purchase_order",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "budget_line",
+          "searchParams": "budget_line",
+          "instanceLabel": "budget_line",
+          "instanceSourceKey": "budget_line_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Budget Line",
+      "isColumnShow": true
+    },
+    "project_master": {
+      "select": {
+        "id": "read",
+        "project_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Project Master"
+    },
+    "shipping_terms": {
+      "select": {
+        "id": "read",
+        "shipping_terms": "update"
+      },
+      "dataType": "table",
+      "displayName": "Shipping Terms"
+    },
+    "wf_instance_id": {
+      "dataType": "string",
+      "permission": "read",
+      "isColumnShow": false
+    },
+    "legal_entity_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "legal_entity_id",
+      "isColumnShow": false
+    },
+    "purchase_reason": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Purchase Reason",
+      "isColumnShow": true
+    },
+    "shipping_method": {
+      "select": {
+        "id": "read",
+        "shipping_method": "update"
+      },
+      "dataType": "table",
+      "displayName": "Shipping Method"
+    },
+    "budget_period_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "purchase_order",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "budget_period",
+          "searchParams": "budget_period",
+          "instanceLabel": "budget_period",
+          "instanceSourceKey": "budget_period_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Budget Period",
+      "isColumnShow": true
+    },
+    "delivery_address": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "payment_terms_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "purchase_order",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "payment_terms",
+          "searchParams": "payment_terms",
+          "instanceLabel": "payment_terms",
+          "instanceSourceKey": "payment_terms_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Payment Terms",
+      "isColumnShow": true
+    },
+    "supplier_details": {
+      "select": {
+        "id": "read",
+        "city": "update",
+        "state": "update",
+        "country": "update",
+        "zip_code": "update",
+        "primary_email": "update",
+        "primary_phone": "update",
+        "supplier_name": "update",
+        "onboarded_date": "update",
+        "supplier_address": "update"
+      },
+      "dataType": "table",
+      "displayName": "Supplier"
+    },
+    "chart_of_accounts": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "purchase_order",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "coa",
+          "searchParams": "coa_code",
+          "instanceLabel": "coa_code",
+          "instanceSourceKey": "chart_of_accounts"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Charts of Date",
+      "isColumnShow": true
+    },
+    "project_master_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "purchase_order",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "project_master",
+          "searchParams": "project_name",
+          "instanceLabel": "project_name",
+          "instanceSourceKey": "project_master_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Project Name",
+      "isColumnShow": true
+    },
+    "shipping_terms_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "purchase_order",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "shipping_terms",
+          "searchParams": "shipping_terms",
+          "instanceLabel": "shipping_terms",
+          "instanceSourceKey": "shipping_terms_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Shipping Terms",
+      "isColumnShow": true
+    },
+    "shipping_method_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "purchase_order",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "shipping_method",
+          "searchParams": "shipping_method",
+          "instanceLabel": "shipping_method",
+          "instanceSourceKey": "shipping_method_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Shipping Method",
+      "isColumnShow": true
+    },
+    "purchase_order_item": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "rate": "update",
+        "product": {
+          "type": "table",
+          "select": {
+            "uom": {
+              "type": "table",
+              "select": {
+                "id": "read",
+                "name": "update"
+              }
+            },
+            "uom_id": "read",
+            "item_name": "read",
+            "item_type": "read",
+            "unit_price": "read",
+            "item_description": "read"
+          }
+        },
+        "quantity": "update",
+        "supplier": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "city": "update",
+            "state": "update",
+            "country": "update",
+            "po_email": "update",
+            "zip_code": "update",
+            "legal_name": "update",
+            "primary_email": "update",
+            "primary_phone": "update",
+            "supplier_name": "update",
+            "secondary_email": "update",
+            "supplier_address": "update"
+          }
+        },
+        "item_code": "update",
+        "item_name": "update",
+        "item_type": "update",
+        "item_total": "update",
+        "product_id": "update",
+        "instance_id": "update",
+        "supplier_id": "update",
+        "need_by_date": "update",
+        "ordered_amount": "update",
+        "item_description": "update",
+        "ordered_quantity": "update"
+      },
+      "dataType": "table",
+      "displayName": "Purchase Order Item"
+    },
+    "request_for_project": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "request_for_project",
+      "isColumnShow": false
+    },
+    "on_behalf_department": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "on_behalf_department",
+      "isColumnShow": false
+    },
+    "requester_department": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "requester_department",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

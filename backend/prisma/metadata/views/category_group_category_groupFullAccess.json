@@ -1,0 +1,27 @@
+{
+  "id": "view_46fa556e-8554-4b2c-8ce1-2680ac179d2e",
+  "name": "category_groupFullAccess",
+  "model_name": "category_group",
+  "description": "Full access to category group model",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "name": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Name",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

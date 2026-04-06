@@ -25,14 +25,14 @@ This onboarding plan introduces a developer to:
 **📖 Workbook**: Follow the detailed step-by-step instructions in [Session 1 Workbook](./ONBOARDING_SESSION1_WORKBOOK.md)
 
 The workbook covers:
-- Cloning workspace, backend, and frontend repositories
+- Cloning the monorepo and verifying `backend/` and `frontend-1/`
 - Configuring Cursor IDE workspace
 - Setting up environment variables
 - Database initialization
 - Verifying the complete setup
 
 **Completion Checklist**:
-- [ ] All repositories cloned and dependencies installed
+- [ ] Monorepo cloned and backend/frontend dependencies installed
 - [ ] Cursor workspace configured and opened
 - [ ] Backend and frontend servers running successfully
 - [ ] Can login and navigate the application
@@ -473,6 +473,36 @@ The workbook covers:
 - [ ] Verified org.erp_system_type and source_system; enabled sync_po_to_erp
 - [ ] Approved a PO and confirmed source_record_id and sync_status in DB
 - [ ] Self-reading (WORKFLOWS.md, INTEGRATIONS.md Reverse section, Zoho connector/mapper) reviewed
+
+---
+
+## Optional: Agentic AI & Workbench (for developers on LLM / agent features)
+
+### Session 12: Agentic Features — Basics (2–3 hours)
+
+**Objective**: Understand `AgentService`, `ToolManager`, schema-driven CRUD tools, analytics and SQL tools (`advancedSqlQuery`, `analyticsQuery`), and posting-specific tools (`categorizePostings`, `suggestReconciliationMatches`).
+
+**📖 Workbook**: [Agentic Basics Workbook](./ONBOARDING_SESSION_AGENTIC_BASICS_WORKBOOK.md)
+
+**Completion Checklist**:
+- [ ] Can trace how tools delegate to `ModelService` and respect views/permissions
+- [ ] Knows the difference between `advancedSqlQuery` and `analyticsQuery` / `getAnalyticsContext`
+- [ ] Understands that `categorizePostings` is dry-run and approvals go through pending actions
+
+---
+
+### Session 13: Agentic Features — Workbench (2–3 hours)
+
+**Objective**: Understand agent sessions, templates, SSE live feed, session lifecycle, hybrid dispatcher, pending actions, executors, and `/workbench` routing.
+
+**📖 Workbook**: [Agentic Workbench Workbook](./ONBOARDING_SESSION_AGENTIC_WORKBENCH_WORKBOOK.md)
+
+**Related specs**: [WORKBENCH_FUNCTIONAL_SPEC.md](../WORKBENCH_FUNCTIONAL_SPEC.md), [WORKBENCH_IMPLEMENTATION_PLAN.md](../WORKBENCH_IMPLEMENTATION_PLAN.md)
+
+**Completion Checklist**:
+- [ ] Can explain session states and how SSE snapshots/events update the UI
+- [ ] Knows how pending actions connect to executors and session completion
+- [ ] Has located key files (`SessionEventBus`, `routes.ts` SSE, `PendingActionService`)
 
 ---
 

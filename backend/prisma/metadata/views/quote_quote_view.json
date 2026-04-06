@@ -1,0 +1,288 @@
+{
+  "id": "view_165f2dee-7cbc-438a-a8db-46fa4b1bada5",
+  "name": "quote_view",
+  "model_name": "quote",
+  "description": "Quote List",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "ID",
+      "isColumnShow": false
+    },
+    "org_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "status": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Status",
+      "isColumnShow": false
+    },
+    "project": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "project_name": "update"
+      },
+      "displayName": "project",
+      "isColumnShow": false
+    },
+    "customer": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "customer_name": "update"
+      },
+      "displayName": "Customer",
+      "isColumnShow": false
+    },
+    "location": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "city": "update",
+        "state": "update",
+        "address": "update",
+        "country": "update",
+        "website": "update",
+        "location": "update",
+        "zip_code": "update"
+      },
+      "displayName": "Location",
+      "isColumnShow": false
+    },
+    "created_at": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "Created At",
+      "isColumnShow": false
+    },
+    "created_by": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Created By",
+      "isColumnShow": false
+    },
+    "project_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "project_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "project_master",
+          "searchParams": "project_name",
+          "instanceLabel": "project_name",
+          "instanceSourceKey": "project_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Sales Order",
+      "isColumnShow": false
+    },
+    "quote_date": {
+      "dataType": "date",
+      "permission": "update",
+      "displayName": "Quote Date",
+      "isColumnShow": true
+    },
+    "assigned_to": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Assigned",
+      "isColumnShow": false
+    },
+    "customer_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "customers",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "customers",
+          "searchParams": "customer_name",
+          "instanceLabel": "customer_name",
+          "instanceSourceKey": "customer_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Customer",
+      "isColumnShow": false
+    },
+    "expiry_date": {
+      "dataType": "date",
+      "permission": "update",
+      "displayName": "Expiry Date",
+      "isColumnShow": false
+    },
+    "location_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "location",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "location",
+          "searchParams": "location",
+          "instanceLabel": "location",
+          "instanceSourceKey": "location_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Location",
+      "isColumnShow": false
+    },
+    "modified_at": {
+      "dataType": "date",
+      "permission": "read",
+      "displayName": "Modified At",
+      "isColumnShow": false
+    },
+    "modified_by": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Modified By",
+      "isColumnShow": false
+    },
+    "quote_items": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "uom": "read",
+        "rate": "read",
+        "quote": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "quote_date": "read",
+            "expiry_date": "read",
+            "quote_number": "read",
+            "total_amount": "read"
+          }
+        },
+        "org_id": "read",
+        "quantity": "read",
+        "quote_id": "read",
+        "tax_rate": "read",
+        "item_name": "read",
+        "item_type": "read",
+        "created_at": "read",
+        "created_by": "read",
+        "line_total": "read",
+        "tax_amount": "read",
+        "item_master": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "uom": {
+              "select": {
+                "id": "read",
+                "name": "read"
+              }
+            },
+            "uom_id": "update",
+            "supplier": {
+              "select": {
+                "id": "read",
+                "primary_email": "read",
+                "supplier_name": "read",
+                "supplier_address": "read"
+              }
+            },
+            "item_code": "read",
+            "item_name": "read",
+            "item_type": "read",
+            "unit_price": "update",
+            "supplier_id": "update",
+            "item_shortname": "update",
+            "item_description": "update"
+          }
+        },
+        "item_number": "read",
+        "modified_at": "read",
+        "modified_by": "read",
+        "discount_rate": "read",
+        "item_master_id": "update",
+        "discount_amount": "read",
+        "item_description": "read"
+      },
+      "displayName": "Quote Items",
+      "isColumnShow": false
+    },
+    "sales_order": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "so_number": "update"
+      },
+      "displayName": "Sales Order",
+      "isColumnShow": false
+    },
+    "quote_number": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Quote Number",
+      "isColumnShow": true
+    },
+    "total_amount": {
+      "dataType": "float",
+      "permission": "read",
+      "tableProps": {
+        "width": "150",
+        "columnType": "number"
+      },
+      "displayName": "Total Amount",
+      "isColumnShow": true
+    },
+    "customer_notes": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Customer Notes",
+      "isColumnShow": false
+    },
+    "sales_order_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "delivery_challan",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "sales_order",
+          "searchParams": "so_number",
+          "instanceLabel": "so_number",
+          "instanceSourceKey": "sales_order_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Sales Order",
+      "isColumnShow": false
+    },
+    "reference_number": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Reference Number",
+      "isColumnShow": false
+    },
+    "terms_and_conditions": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Terms And Conditions",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

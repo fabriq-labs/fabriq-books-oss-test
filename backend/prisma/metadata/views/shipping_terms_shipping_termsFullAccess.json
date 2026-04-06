@@ -1,0 +1,20 @@
+{
+  "id": "view_06233fcb-b724-4a7f-83db-9e795ee6a30b",
+  "name": "shipping_termsFullAccess",
+  "model_name": "shipping_terms",
+  "description": "Full access to shipping_terms model",
+  "data_graph": {
+    "select": {
+      "id": true,
+      "org_id": true,
+      "created_at": true,
+      "created_by": true,
+      "assigned_to": true,
+      "modified_at": true,
+      "modified_by": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

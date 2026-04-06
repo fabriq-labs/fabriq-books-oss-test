@@ -1,0 +1,23 @@
+## POSTING SCHEMA REFERENCE
+
+Tables and key columns:
+- **posting**: id, org_id, amount, posting_date, value_date, description, notes, account_id (debit side), credit_account_id (credit side), reconciliation_status
+- **account**: id, org_id, name, code, type (text array — e.g. `'{BANK,CHECKING}'`), classification (Assets / Liabilities / Equity / Income / Expense)
+
+Schema rules:
+- Always filter by `org_id` on every query (posting.org_id, account.org_id)
+- `account.type` is a **text array** — never use `=` or `ILIKE` on it; use containment: `account.type @> ARRAY['BANK']::text[]`
+- The counter/contra account is the non-bank side of a double-entry posting
+- Do NOT use `posting.category_id` or `posting.category_name` for categorisation queries
+
+{{#if context.modelContext.selectedAccountId}}
+Selected account: **{{context.modelContext.selectedAccountName}}** (id: `{{context.modelContext.selectedAccountId}}`)
+{{/if}}
+{{#if context.recordId}}
+Current record id: `{{context.recordId}}`
+{{/if}}
+
+Available models:
+{{accessibleModels}}
+
+Current date: {{currentDate}}

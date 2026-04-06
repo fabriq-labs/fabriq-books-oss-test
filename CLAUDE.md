@@ -1,6 +1,6 @@
 # Fabriq Financial Suite - AI Context Guide
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-04-04
 
 ---
 
@@ -44,19 +44,29 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Frontend development (adding pages, forms) | [docs/FRONTEND.md](./docs/FRONTEND.md) |
 | Multi-brand / white-label frontend (`config/<brand>/`, select-brand) | [docs/FRONTEND.md#multi-brand-app-configuration](./docs/FRONTEND.md#multi-brand-app-configuration) |
 | Setting up / deploying the system | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) |
-| GCP: Cloud Build, Artifact Registry, Cloud Run, Cloud SQL, IAM, ADC | [docs/GCP_CLOUD_BUILD_AND_RUN.md](./docs/GCP_CLOUD_BUILD_AND_RUN.md) |
+| Container image build & run (Dockerfile, GHCR, compose) | [docs/BUILD_AND_DEPLOY.md](./docs/BUILD_AND_DEPLOY.md) |
 | Railway: Artifact Registry image + Vertex/Gemini auth | [docs/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./docs/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md) |
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
-| Reconciliation tool (bank ↔ receipts/invoices) | [docs/agent/RECONCILIATION_TOOL.md](./docs/agent/RECONCILIATION_TOOL.md) |
-| AI transaction categorization | [docs/AI_AUTO_CATEGORIZATION.md](./docs/AI_Categorizer.md) |
+| In-app conversational chat (history, PageContext, SDK, prompt selection) | [docs/agent/CONVERSATION.md](./docs/agent/CONVERSATION.md) |
+| **Agent docs index + reading order** | [docs/agent/README.md](./docs/agent/README.md) |
+| Agent system architecture + file map | [docs/agent/ARCHITECTURE.md](./docs/agent/ARCHITECTURE.md) |
+| Agent database schema (session, message, pending_action) | [docs/agent/DATA_MODELS.md](./docs/agent/DATA_MODELS.md) |
+| Session states, auto-continuation, completion paths | [docs/agent/SESSION_LIFECYCLE.md](./docs/agent/SESSION_LIFECYCLE.md) |
+| All agent tools: parameters, returns, side effects | [docs/agent/TOOLS_REFERENCE.md](./docs/agent/TOOLS_REFERENCE.md) |
+| Prompt assembly, template merging, DynamicPromptManager | [docs/agent/PROMPT_SYSTEM.md](./docs/agent/PROMPT_SYSTEM.md) |
+| Builders, executors, hybrid dispatcher | [docs/agent/BUILDERS_EXECUTORS.md](./docs/agent/BUILDERS_EXECUTORS.md) |
+| All agent HTTP endpoints | [docs/agent/API_REFERENCE.md](./docs/agent/API_REFERENCE.md) |
+| LLM traces, token usage, feedback workflow | [docs/agent/OBSERVABILITY.md](./docs/agent/OBSERVABILITY.md) |
+| Running tests, prompt harness, E2E patterns | [docs/agent/TESTING.md](./docs/agent/TESTING.md) |
+| Diagnose a failed/stuck agent session | [docs/agent/debugging/SESSION_FAILURE_PATTERNS.md](./docs/agent/debugging/SESSION_FAILURE_PATTERNS.md) |
+| Bank reconciliation feature (pipeline, confirm, frontend) | [docs/agent/features/RECONCILIATION.md](./docs/agent/features/RECONCILIATION.md) |
+| Transaction categorization feature (ML, batch, executor) | [docs/agent/features/CATEGORIZATION.md](./docs/agent/features/CATEGORIZATION.md) |
+| Posting domain model, contra-account as category | [docs/agent/features/POSTING_DOMAIN.md](./docs/agent/features/POSTING_DOMAIN.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
-| Agentic upgrade (sessions, pending actions, workbench) | [docs/AGENTIC_UPGRADE_IMPLEMENTATION.md](./docs/AGENTIC_UPGRADE_IMPLEMENTATION.md) |
-| Agentic upgrade v1 design plan | [docs/AGENTIC_UPGRADE_PLAN_WIP.md](./docs/AGENTIC_UPGRADE_PLAN_WIP.md) |
-| Agentic upgrade v2 (hybrid execution, builders) | [docs/AGENTIC_UPGRADE_V2_PLAN.md](./docs/AGENTIC_UPGRADE_V2_PLAN.md) |
 | View data_graph / datagraph schema (properties, selectProps, relationName, list behaviour) | [docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md](./docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md) |
 | Visual datagraph builder (design, summary) | [docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md](./docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md) |
 | Claude Web/Desktop prompts | [docs/CLAUDE_WEB_PROMPTS.md](./docs/CLAUDE_WEB_PROMPTS.md) |
@@ -166,6 +176,25 @@ WHERE wi.model_id = 'RECORD_ID';
 3. **Follow conventions**: snake_case for DB, camelCase for TS
 4. **Check permissions** before any operation
 5. **Filter by org_id** for all data queries
+
+### Proactive Database Querying
+
+When debugging any issue — data state, workflow behaviour, permissions, record counts, missing fields — **query the database directly** using `psql`. Do not ask the user to run queries.
+
+**How**:
+```bash
+DATABASE_URL=$(grep "^DATABASE_URL=" backend/.env | head -1 | sed 's/DATABASE_URL="//;s/"$//') && psql "${DATABASE_URL}" -c "SELECT ..."
+```
+
+**Rules**:
+- SELECT only — no INSERT, UPDATE, DELETE, or DDL
+- Always filter business data by `org_id`
+- Metadata tables (`view`, `permission`, `role*`, `workflow_flow/state/action`) do not need `org_id`
+- Quote `"user"` — it is a reserved SQL word
+
+**Slash commands** (for focused sessions):
+- `/db` — basic queries (counts, single-table lookups, simple workflow checks)
+- `/db-advanced` — permission chains, cross-module tracing, workflow debugging, data integrity
 
 **Common Pitfalls to Avoid**:
 - ❌ Creating custom CRUD endpoints (use auto-generated ones)

@@ -1,0 +1,275 @@
+{
+  "id": "view_12d60d46-e549-4838-bafa-0e715c872e2e",
+  "name": "employee_masterFullAccess",
+  "model_name": "employee_master",
+  "description": "Full access to employee_master model",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "user": {
+      "select": {
+        "id": "read",
+        "name": "update",
+        "email": "update"
+      },
+      "dataType": "table",
+      "displayName": "User",
+      "isColumnShow": false
+    },
+    "email": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Email",
+      "isColumnShow": true
+    },
+    "manager": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "employee_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "user",
+          "searchParams": "email",
+          "instanceLabel": "email",
+          "instanceSourceKey": "manager"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Manager",
+      "isColumnShow": false
+    },
+    "user_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "employee_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "user",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "user_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "User",
+      "isColumnShow": false
+    },
+    "location": {
+      "select": {
+        "id": "read",
+        "location": "update"
+      },
+      "dataType": "table",
+      "displayName": "Location",
+      "isColumnShow": false
+    },
+    "last_name": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Last Name",
+      "isColumnShow": true
+    },
+    "user_role": {
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "dataType": "table",
+      "displayName": "user_role",
+      "isColumnShow": false
+    },
+    "department": {
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Department",
+      "isColumnShow": false
+    },
+    "first_name": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "First Name",
+      "isColumnShow": true
+    },
+    "cost_center": {
+      "select": {
+        "id": "read",
+        "cost_center": "update"
+      },
+      "dataType": "table",
+      "displayName": "Cost Center",
+      "isColumnShow": false
+    },
+    "location_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "employee_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "location",
+          "searchParams": "location",
+          "instanceLabel": "location",
+          "instanceSourceKey": "location_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Location",
+      "isColumnShow": true
+    },
+    "manager_user": {
+      "select": {
+        "id": "read",
+        "name": "update",
+        "email": "update"
+      },
+      "dataType": "table",
+      "displayName": "Manager",
+      "isColumnShow": false
+    },
+    "organization": {
+      "select": {
+        "id": "read",
+        "legal_name": "update",
+        "organization_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "user_role_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "employee_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "role",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "user_role_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "User Role",
+      "isColumnShow": false
+    },
+    "business_unit": {
+      "select": {
+        "id": "read",
+        "business_unit": "update"
+      },
+      "dataType": "table",
+      "displayName": "Business Unit",
+      "isColumnShow": false
+    },
+    "department_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "employee_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "department",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "name"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Department",
+      "isColumnShow": true
+    },
+    "cost_center_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "employee_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "cost_center",
+          "searchParams": "cost_center",
+          "instanceLabel": "cost_center",
+          "instanceSourceKey": "cost_center_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Cost Center",
+      "isColumnShow": true
+    },
+    "legal_entity_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "employee_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "organization",
+          "searchParams": "organization_name",
+          "instanceLabel": "organization_name",
+          "instanceSourceKey": "legal_entity_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": true
+    },
+    "business_unit_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "employee_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "business_unit",
+          "searchParams": "business_unit",
+          "instanceLabel": "business_unit",
+          "instanceSourceKey": "business_unit_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Business Unit",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

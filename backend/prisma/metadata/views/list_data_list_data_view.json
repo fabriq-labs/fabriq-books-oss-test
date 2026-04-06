@@ -1,0 +1,15 @@
+{
+  "id": "view_0861e153-9ddb-4805-8b3e-59410efb9760",
+  "name": "list_data_view",
+  "model_name": "list_data",
+  "description": "List Data",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

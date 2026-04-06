@@ -1,0 +1,48 @@
+{
+  "id": "view_b2671b07-648b-4398-a079-2effd79cd674",
+  "name": "shipping_terms_view",
+  "model_name": "shipping_terms",
+  "description": "Shipping Terms",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "status": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Status",
+      "isColumnShow": false
+    },
+    "description": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Description",
+      "isColumnShow": true
+    },
+    "shipping_terms": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Shipping Terms",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

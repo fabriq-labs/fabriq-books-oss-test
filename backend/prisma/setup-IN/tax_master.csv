@@ -1,0 +1,11 @@
+id,tax_name,tax_code,tax_rate,effective_from,geo,status,org_id
+tax_demo_gst18,GST 18%,GST18,18,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_gst12,GST 12%,GST12,12,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_gst5,GST 5%,GST5,5,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_gst0,GST 0%,GST0,0,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_igst18,IGST 18%,IGST18,18,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_igst12,IGST 12%,IGST12,12,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_cgst9,CGST 9%,CGST9,9,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_sgst9,SGST 9%,SGST9,9,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_cess,Cess 1%,CESS1,1,2022-07-01T00:00:00Z,IN,Active,org_indian_demo
+tax_demo_tds,TDS 10%,TDS10,10,2022-07-01T00:00:00Z,IN,Active,org_indian_demo

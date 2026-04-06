@@ -1,0 +1,17 @@
+{
+  "id": "view_4c2b7769-7263-43c4-a9bb-7dc10efaa8a8",
+  "name": "expenseFullAccess",
+  "model_name": "expense_report",
+  "description": "partial access to ep model",
+  "data_graph": {
+    "select": {
+      "id": true,
+      "title": true,
+      "amount": true,
+      "currency": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

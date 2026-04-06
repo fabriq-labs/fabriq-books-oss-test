@@ -1,0 +1,62 @@
+{
+  "id": "view_a5dd54ef-14bb-45f0-8978-cb58074bd7c2",
+  "name": "permission_view",
+  "model_name": "permission",
+  "description": "Full access to permission model",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read",
+      "displayName": "ID"
+    },
+    "view": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "View",
+      "isColumnShow": false
+    },
+    "access": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "displayName": "Access",
+      "isColumnShow": true
+    },
+    "view_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "permission",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "view",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "view_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "View",
+      "isColumnShow": true
+    },
+    "field_name": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "displayName": "Name",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": "user_pooja_saxena"
+}

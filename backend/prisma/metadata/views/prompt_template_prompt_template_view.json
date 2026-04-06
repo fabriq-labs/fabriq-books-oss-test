@@ -1,0 +1,95 @@
+{
+  "id": "view_6642a441-39ac-4ee5-8d7b-c27b0c76401c",
+  "name": "prompt_template_view",
+  "model_name": "prompt_template",
+  "description": "prompt_template",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read"
+    },
+    "view": {
+      "select": {
+        "id": "read",
+        "model_name": "update"
+      },
+      "dataType": "table",
+      "tableProps": {
+        "width": "150",
+        "columnKey": "model_name",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Model Name"
+    },
+    "context": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Context",
+      "isColumnShow": true
+    },
+    "version": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "100",
+        "columnType": "number",
+        "defaultValue": 1
+      },
+      "displayName": "Version",
+      "isColumnShow": true
+    },
+    "priority": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "100",
+        "columnType": "number",
+        "defaultValue": 0
+      },
+      "displayName": "Priority",
+      "isColumnShow": true
+    },
+    "is_default": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "100",
+        "columnType": "checkbox",
+        "defaultValue": false
+      },
+      "displayName": "Is Default",
+      "isColumnShow": true
+    },
+    "prompt_text": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "textarea",
+        "defaultValue": ""
+      },
+      "displayName": "Prompt Text",
+      "isColumnShow": false
+    },
+    "prompt_type": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "150",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Prompt Type",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

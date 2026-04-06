@@ -1,0 +1,13 @@
+{
+  "id": "ptem_d0c5e2b5-3291-4dc6-b1c5-dc2cd0045647",
+  "view_id": "view_e110af2c-27df-4039-b599-65e53f9f99be",
+  "prompt_type": "default",
+  "is_default": true,
+  "version": 1,
+  "priority": 0,
+  "context": null,
+  "created_by": "2d9d64e9-634b-41e1-896f-434472283988",
+  "modified_by": "2d9d64e9-634b-41e1-896f-434472283988",
+  "org_id": "52",
+  "app_name": "fabriq"
+}

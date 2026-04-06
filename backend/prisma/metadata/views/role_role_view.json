@@ -1,0 +1,45 @@
+{
+  "id": "view_206aa841-11f5-40bb-9ca9-1c21664bd009",
+  "name": "role_view",
+  "model_name": "role",
+  "description": "Role List",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read"
+    },
+    "name": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Name",
+      "isColumnShow": true
+    },
+    "role_views": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "view": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "name": "read"
+          }
+        }
+      },
+      "listProps": {
+        "key": "id",
+        "type": "badge",
+        "label": "view.name"
+      },
+      "displayName": "Roles"
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": "user_pooja_saxena"
+}

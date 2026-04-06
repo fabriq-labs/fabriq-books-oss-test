@@ -1,0 +1,70 @@
+{
+  "id": "view_31c48c03-4b6e-4228-a54f-17c68894151d",
+  "name": "business_unit_view",
+  "model_name": "business_unit",
+  "description": "Business Unit",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "status": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Status",
+      "isColumnShow": true
+    },
+    "organization": {
+      "select": {
+        "id": "read",
+        "legal_name": "update",
+        "organization_name": "update"
+      },
+      "dataType": "table",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
+    "business_unit": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Business Unit",
+      "isColumnShow": true
+    },
+    "legal_entity_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "business_unit",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "organization",
+          "searchParams": "legal_name",
+          "instanceLabel": "legal_name",
+          "instanceSourceKey": "legal_entity_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "organization.legal_name"
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

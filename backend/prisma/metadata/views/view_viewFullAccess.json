@@ -1,0 +1,63 @@
+{
+  "id": "view_2b52d4d1-af85-4c1f-9abf-8a7d167eb748",
+  "name": "viewFullAccess",
+  "model_name": "view",
+  "description": "Full access to view model",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read"
+    },
+    "name": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "150",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Name",
+      "isColumnShow": true
+    },
+    "model_name": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "150",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Name",
+      "isColumnShow": true
+    },
+    "description": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "description",
+      "isColumnShow": false
+    },
+    "prompt_template": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "prompt_type": "read"
+      },
+      "listProps": {
+        "key": "id",
+        "type": "badge",
+        "label": "prompt_type",
+        "isEdit": true,
+        "editPath": "/prompt-templates"
+      },
+      "displayName": "Prompt Template"
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

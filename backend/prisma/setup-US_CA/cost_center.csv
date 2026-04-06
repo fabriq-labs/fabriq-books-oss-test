@@ -1,0 +1,5 @@
+id,cost_center,legal_entity_id,status,org_id
+cc_us_it,CC-IT,org_techflow_us,Active,org_techflow_us
+cc_us_ops,CC-Operations,org_techflow_us,Active,org_techflow_us
+cc_us_sales,CC-Sales,org_techflow_us,Active,org_techflow_us
+cc_us_finance,CC-Finance,org_techflow_us,Active,org_techflow_us

@@ -1,0 +1,20 @@
+{
+  "id": "view_891751ae-6249-4f8c-be81-931fa06526e3",
+  "name": "shipping_methodFullAccess",
+  "model_name": "shipping_method",
+  "description": "Full access to shipping_method model",
+  "data_graph": {
+    "select": {
+      "id": true,
+      "org_id": true,
+      "created_at": true,
+      "created_by": true,
+      "assigned_to": true,
+      "modified_at": true,
+      "modified_by": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

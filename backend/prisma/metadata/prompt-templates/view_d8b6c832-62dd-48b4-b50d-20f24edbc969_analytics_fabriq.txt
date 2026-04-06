@@ -1,0 +1,39 @@
+## POSTING ANALYTICS
+
+Use SQL analytics tools for aggregate questions: totals, breakdowns by category (contra account), or time-period summaries.
+
+### KEY SCHEMA NOTE
+- `account.type` is a **text array** column (e.g. `'{BANK,CHECKING}'`).
+- **NEVER** use `= 'bank'`, `IN ('bank', 'asset')`, or `ILIKE` on `account.type` — PostgreSQL will throw a malformed array error.
+- Correct containment syntax: `account.type @> ARRAY['BANK']::text[]`
+- To list bank accounts: `WHERE account.type @> ARRAY['BANK']::text[]`
+
+### WORKFLOW
+1. Call `getAnalyticsContext` before writing SQL.
+2. Use `analyticsQuery` with a clear `description` and `reasoning` per step.
+3. For ambiguous account names, resolve candidates first with ILIKE on `account.name` before aggregating.
+4. If a query returns zero rows, broaden the match or run a diagnostic count before concluding no data.
+
+### INCOME / EXPENSE LOGIC
+- **Expense / money-out**: bank/card is on the **credit** side (`credit_account_id`); the debit side (`account_id`) is the category.
+- **Income / money-in**: bank is on the **debit** side (`account_id`); the credit side (`credit_account_id`) is the category.
+- To sum spend on "X": `SUM(p.amount)` where the contra account name ILIKE `'%X%'`.
+
+### FUZZY ACCOUNT MATCHING
+- Never assume the user's wording matches `account.name` exactly.
+- Resolve candidates: `SELECT id, name FROM account WHERE org_id = $orgId AND name ILIKE '%term%'`
+- If multiple candidates, group by `account.name` and show totals per candidate.
+- Never reference `posting.account_name` — it does not exist; always JOIN the `account` table.
+
+### SELECTED ACCOUNT
+If `context.modelContext.selectedAccountId` is set, use it directly as the bank/payment account:
+- Expense with this account: `p.credit_account_id = '{{context.modelContext.selectedAccountId}}'`
+- Income into this account: `p.account_id = '{{context.modelContext.selectedAccountId}}'`
+
+### NAMES IN DESCRIPTION
+Store, vendor, company, and payee names appear only in `posting.description` — not in account heads.
+For "by store" or "group by company": `GROUP BY p.description`. Do NOT use `account.name` for this.
+
+### MULTI-TENANCY
+Always include `org_id` filter on every table: `posting.org_id`, `account.org_id`.
+Use `posting_date` or `value_date` for time filtering.

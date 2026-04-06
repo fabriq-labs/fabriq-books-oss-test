@@ -1,0 +1,23 @@
+{
+  "id": "view_7a2f0dc1-28bf-4dce-8381-ac399953606b",
+  "name": "meta_task_view",
+  "model_name": "meta_task",
+  "description": "Task Status View",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "output": {
+      "datatype": "json",
+      "permission": "read"
+    },
+    "status": {
+      "datatype": "string",
+      "permission": "update"
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

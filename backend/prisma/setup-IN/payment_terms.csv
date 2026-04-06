@@ -1,0 +1,11 @@
+id,payment_terms,description,no_of_days,org_id,legal_entity_id
+pay_demo_net15,Net 15,Due in 15 days,15,org_indian_demo,org_indian_demo
+pay_demo_net30,Net 30,Due in 30 days,30,org_indian_demo,org_indian_demo
+pay_demo_due_on_receipt,Due on Receipt,Payment due upon receipt of invoice,0,org_indian_demo,org_indian_demo
+pay_demo_net7,Net 7,Due in 7 days,7,org_indian_demo,org_indian_demo
+pay_demo_net45,Net 45,Due in 45 days,45,org_indian_demo,org_indian_demo
+pay_demo_net60,Net 60,Due in 60 days,60,org_indian_demo,org_indian_demo
+pay_demo_2_10_net30,2/10 Net 30,2% discount if paid within 10 days otherwise due in 30 days,30,org_indian_demo,org_indian_demo
+pay_demo_cod,Cash on Delivery,Payment at time of delivery,0,org_indian_demo,org_indian_demo
+pay_demo_advance,Advance,100% advance payment required,0,org_indian_demo,org_indian_demo
+pay_demo_net90,Net 90,Due in 90 days,90,org_indian_demo,org_indian_demo

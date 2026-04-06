@@ -1,0 +1,20 @@
+{
+  "id": "view_bcc227b6-ac1a-4b49-be07-94667755fdf0",
+  "name": "departmentFullAccess",
+  "model_name": "department",
+  "description": "Full access to department model",
+  "data_graph": {
+    "select": {
+      "id": true,
+      "org_id": true,
+      "created_at": true,
+      "created_by": true,
+      "assigned_to": true,
+      "modified_at": true,
+      "modified_by": true
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

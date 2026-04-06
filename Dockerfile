@@ -5,6 +5,8 @@
 # CI: checkout backend + frontend into context, or build from a monorepo that contains both directories.
 # Runtime: nginx + Node (8080 via PORT), Python FastAPI integration sync on 8081 (POST /sync, GET /health).
 # Node uses INTEGRATION_SYNC_URL (set by start scripts when sync is not disabled).
+# Build: COPY monorepo backend/ + frontend-1/ → build → final nginx image.
+# CI: GitHub Actions → GHCR. Optional build-args: SOURCE_* for /app/build-info.json.
 
 # Stage 0: Application source from build context
 FROM scratch AS source
@@ -15,10 +17,10 @@ COPY frontend-1 /src/frontend-1
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
-COPY --from=source /src/frontend-1/package*.json ./
+COPY frontend-1/package*.json ./
 RUN npm ci
 
-COPY --from=source /src/frontend-1/ ./
+COPY frontend-1/ ./
 
 ENV VITE_API_BASE_URL=""
 ENV VITE_ENABLE_AI="true"
@@ -30,12 +32,12 @@ WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
 
-COPY --from=source /src/backend/package*.json ./
-COPY --from=source /src/backend/prisma ./prisma/
+COPY backend/package*.json ./
+COPY backend/prisma ./prisma/
 
 RUN npm install
 
-COPY --from=source /src/backend/ ./
+COPY backend/ ./
 
 # Ensure Prisma generates engine for Alpine runtime (openssl-3.0.x)
 RUN sed -i '/provider = "prisma-client-js"/a\
@@ -72,21 +74,32 @@ COPY --from=source /src/backend/integrations/sync_service ./sync_service
 ENV PYTHONPATH=/opt/fabriq-int
 
 # Stage 2b: Git + image metadata for debugging (SHA, message, commit date, branches, build time, tag)
+# Stage 2b: Image metadata for debugging (monorepo commit, ref, build time, tag)
 FROM node:20-alpine AS build-info
-RUN apk add --no-cache git
-COPY --from=source /src/backend /src/backend
-COPY --from=source /src/frontend-1 /src/frontend-1
+WORKDIR /work
+COPY backend /src/backend
+COPY frontend-1 /src/frontend-1
 COPY docker-build-info.js /docker-build-info.js
 
-ARG BACKEND_BRANCH=demo
-ARG FRONTEND_BRANCH=demo
+ARG SOURCE_REF=unknown
+ARG SOURCE_COMMIT=unknown
+ARG SOURCE_COMMIT_MESSAGE=
+ARG SOURCE_COMMIT_MESSAGE_B64=
+ARG SOURCE_COMMIT_DATE=
 ARG BUILD_TIME
 ARG IMAGE_TAG=unknown
+# Bust cache when CI passes a new value (e.g. commit SHA).
+ARG CACHEBUST=1
 
-RUN export BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
-    export IMAGE_TAG="${IMAGE_TAG}" && \
-    export BACKEND_BRANCH="${BACKEND_BRANCH}" && \
-    export FRONTEND_BRANCH="${FRONTEND_BRANCH}" && \
+ENV SOURCE_REF=${SOURCE_REF}
+ENV SOURCE_COMMIT=${SOURCE_COMMIT}
+ENV SOURCE_COMMIT_MESSAGE=${SOURCE_COMMIT_MESSAGE}
+ENV SOURCE_COMMIT_MESSAGE_B64=${SOURCE_COMMIT_MESSAGE_B64}
+ENV SOURCE_COMMIT_DATE=${SOURCE_COMMIT_DATE}
+ENV IMAGE_TAG=${IMAGE_TAG}
+
+RUN BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
+    export BUILD_TIME && \
     node /docker-build-info.js
 
 # Stage 3: Final image (nginx + node + PostgreSQL; start script chosen by USE_EMBEDDED_PG)
@@ -94,13 +107,13 @@ FROM nginx:alpine
 
 ARG BUILD_TIME
 ARG IMAGE_TAG=unknown
-ARG BACKEND_BRANCH=demo
-ARG FRONTEND_BRANCH=demo
+ARG SOURCE_REF=unknown
 
 LABEL org.opencontainers.image.created="${BUILD_TIME}"
 LABEL org.opencontainers.image.title="fabriq"
-LABEL fabriq.backend.branch="${BACKEND_BRANCH}"
-LABEL fabriq.frontend.branch="${FRONTEND_BRANCH}"
+LABEL fabriq.source.ref="${SOURCE_REF}"
+LABEL fabriq.backend.branch="${SOURCE_REF}"
+LABEL fabriq.frontend.branch="${SOURCE_REF}"
 LABEL fabriq.image.tag="${IMAGE_TAG}"
 
 RUN apk add --no-cache \

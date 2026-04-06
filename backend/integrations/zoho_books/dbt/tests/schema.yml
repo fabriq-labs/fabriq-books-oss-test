@@ -1,0 +1,142 @@
+version: 2
+
+models:
+  - name: stg_zoho_invoices
+    description: "Staging model for Zoho Books invoices"
+    columns:
+      - name: invoice_id
+        description: "Zoho invoice ID"
+        tests:
+          - not_null
+
+      - name: total
+        description: "Invoice total amount"
+        tests:
+          - not_null
+
+      - name: updated_time
+        description: "Last update timestamp"
+        tests:
+          - not_null
+
+  - name: invoice
+    description: "Normalized invoice model in public schema"
+    columns:
+      - name: id
+        description: "Generated surrogate key"
+        tests:
+          - not_null
+          - unique
+
+      - name: source_record_id
+        description: "Zoho invoice ID"
+        tests:
+          # Only enforce lineage for Zoho-ingested invoices.
+          # App-created invoices may exist in `public.invoice` without Zoho lineage fields.
+          - not_null:
+              config:
+                where: "source_system_id in (select id from public.source_system where system_type = 'zoho_books' and is_active = true)"
+          - unique
+
+      - name: invoice_total
+        description: "Invoice total amount"
+        tests:
+          - not_null
+
+      - name: source_updated_at
+        description: "Source system last update"
+        tests:
+          - not_null
+
+      - name: ingest_batch_id
+        description: "Reference to sync batch"
+        tests:
+          # Only enforce lineage for Zoho-ingested invoices.
+          - not_null:
+              config:
+                where: "source_system_id in (select id from public.source_system where system_type = 'zoho_books' and is_active = true)"
+
+      - name: modified_at
+        description: "Last modified timestamp"
+        tests:
+          - not_null
+
+# Additional custom tests
+tests:
+  - name: staging_row_count_check
+    description: "Ensure staging has reasonable row counts"
+    model: stg_zoho_invoices
+    given: []
+    then:
+      - row_count: ">0"
+
+  - name: normalized_invoice_balance_check
+    description: "Ensure normalized invoices have valid totals"
+    model: invoice
+    given: []
+    then:
+      - field: invoice_total
+        condition: ">= 0"
+
+  - name: stg_zoho_items
+    description: "Staging model for Zoho Books items"
+    columns:
+      - name: item_id
+        description: "Zoho item ID"
+        tests:
+          - not_null
+
+      - name: name
+        description: "Item name"
+        tests:
+          - not_null
+
+  - name: item_master
+    description: "Normalized item_master model in public schema"
+    columns:
+      - name: id
+        description: "Generated surrogate key"
+        tests:
+          - not_null
+          - unique
+
+      - name: source_record_id
+        description: "Zoho item ID"
+        tests:
+          - not_null
+          - unique
+
+      - name: item_name
+        description: "Item name"
+        tests:
+          - not_null
+
+      - name: item_description
+        description: "Item description"
+        tests:
+          - not_null
+
+      - name: item_type
+        description: "Item type"
+        tests:
+          - not_null
+
+      - name: unit_price
+        description: "Unit price"
+        tests:
+          - not_null
+
+      - name: source_updated_at
+        description: "Source system last update"
+        tests:
+          - not_null
+
+      - name: ingest_batch_id
+        description: "Reference to sync batch"
+        tests:
+          - not_null
+
+      - name: modified_at
+        description: "Last modified timestamp"
+        tests:
+          - not_null

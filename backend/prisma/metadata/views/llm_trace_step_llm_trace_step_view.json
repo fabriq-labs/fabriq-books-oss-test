@@ -1,0 +1,125 @@
+{
+  "id": "view_llm_trace_step_001",
+  "name": "llm_trace_step_view",
+  "model_name": "llm_trace_step",
+  "description": "LLM Trace Step",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Id",
+      "isColumnShow": false
+    },
+    "step_number": {
+      "orderNo": 1,
+      "datatype": "number",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "100",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Step",
+      "isColumnShow": true
+    },
+    "prompt_tokens": {
+      "orderNo": 2,
+      "datatype": "number",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "120",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Prompt Tokens",
+      "isColumnShow": true
+    },
+    "completion_tokens": {
+      "orderNo": 3,
+      "datatype": "number",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "120",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Completion Tokens",
+      "isColumnShow": true
+    },
+    "duration_ms": {
+      "orderNo": 4,
+      "datatype": "number",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "120",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Duration (ms)",
+      "isColumnShow": true
+    },
+    "status": {
+      "orderNo": 5,
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "100",
+        "columnType": "badge",
+        "defaultValue": ""
+      },
+      "displayName": "Status",
+      "isColumnShow": true
+    },
+    "tool_calls": {
+      "datatype": "json",
+      "required": false,
+      "permission": "read",
+      "displayName": "Tool Calls",
+      "isColumnShow": false
+    },
+    "tool_results": {
+      "datatype": "json",
+      "required": false,
+      "permission": "read",
+      "displayName": "Tool Results",
+      "isColumnShow": false
+    },
+    "sql_queries": {
+      "datatype": "json",
+      "required": false,
+      "permission": "read",
+      "displayName": "SQL Queries",
+      "isColumnShow": false
+    },
+    "response_text": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Response",
+      "isColumnShow": false
+    },
+    "error_message": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Error Message",
+      "isColumnShow": false
+    },
+    "trace_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Trace ID",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "1",
+  "created_by": null,
+  "modified_by": null
+}

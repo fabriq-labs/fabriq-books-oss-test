@@ -1,0 +1,69 @@
+{
+  "id": "view_c136f29e-6a17-42e5-b2f2-c48d67477e10",
+  "name": "currency_master_view",
+  "model_name": "currency_master",
+  "description": "Currency Master",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "base_currency": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Base Currency",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "startswith"
+      },
+      "isColumnShow": true
+    },
+    "from_currency": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "From Currency",
+      "searchProps": {
+        "isSearch": true,
+        "operation": "startswith"
+      },
+      "isColumnShow": true
+    },
+    "currency_value": {
+      "datatype": "float",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Currency value",
+      "isColumnShow": false
+    },
+    "effective_from": {
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Effective From",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

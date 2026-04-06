@@ -1,0 +1,117 @@
+{
+  "id": "view_089b6608-109d-4c35-80e7-f6f051c11ceg",
+  "name": "accountFullAccess",
+  "model_name": "account-not-in-use",
+  "description": "Full access to account model",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read",
+      "displayName": "ID"
+    },
+    "code": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Code"
+    },
+    "name": {
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "displayName": "Name",
+      "isColumnShow": true
+    },
+    "type": {
+      "datatype": "string",
+      "listProps": {
+        "key": "type",
+        "type": "badge",
+        "label": "type"
+      },
+      "permission": "update",
+      "displayName": "Type",
+      "isColumnShow": true
+    },
+    "balance": {
+      "datatype": "float",
+      "permission": "update",
+      "displayName": "Balance",
+      "isColumnShow": true
+    },
+    "currency": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Currency",
+      "isColumnShow": true
+    },
+    "frequency": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Frequency"
+    },
+    "account_number": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Account Number"
+    },
+    "hq_account_id": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "HQ Account ID",
+      "isColumnShow": true
+    },
+    "child_accounts": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update",
+        "child_accounts": "read",
+        "parent_account": "read",
+        "parent_account_id": "update"
+      },
+      "required": true,
+      "displayName": "Child Accounts"
+    },
+    "classification": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Classification",
+      "isColumnShow": true
+    },
+    "parent_account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Parent Account",
+      "isColumnShow": false
+    },
+    "parent_account_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "account",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "parent_account_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Parent Account",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "1",
+  "created_by": "user_b62fe19a-64f1-4623-b00b-5fce3a5c8c90",
+  "modified_by": "user_pooja_saxena"
+}

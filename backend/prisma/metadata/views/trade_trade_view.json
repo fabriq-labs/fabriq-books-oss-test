@@ -1,0 +1,243 @@
+{
+  "id": "view_f3def97d-a1f7-4800-b5ed-acce401e7c8b",
+  "name": "trade_view",
+  "model_name": "trade",
+  "description": "Trade",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Id",
+      "isColumnShow": false
+    },
+    "tax": {
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Tax",
+      "isColumnShow": false
+    },
+    "isin": {
+      "orderNo": 2,
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "ISIN",
+      "isColumnShow": true
+    },
+    "name": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Name",
+      "isColumnShow": false
+    },
+    "type": {
+      "orderNo": 3,
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Type",
+      "isColumnShow": true
+    },
+    "price": {
+      "orderNo": 5,
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Price",
+      "isColumnShow": true
+    },
+    "account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "read"
+      },
+      "displayName": "Account"
+    },
+    "quantity": {
+      "orderNo": 6,
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Quantity",
+      "isColumnShow": true
+    },
+    "brokerage": {
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Brokerage",
+      "isColumnShow": false
+    },
+    "account_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "select",
+        "selectProps": {
+          "type": "trade",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "account_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "account.name"
+      },
+      "displayName": "Account",
+      "isColumnShow": false
+    },
+    "instrument": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Instrument",
+      "isColumnShow": false
+    },
+    "net_amount": {
+      "datatype": "float",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Net Amount",
+      "isColumnShow": false
+    },
+    "value_date": {
+      "orderNo": 4,
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Value Date",
+      "isColumnShow": true
+    },
+    "total_amount": {
+      "orderNo": 7,
+      "datatype": "float",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Total",
+      "isColumnShow": true
+    },
+    "instrument_id": {
+      "orderNo": 1,
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "select",
+        "selectProps": {
+          "type": "trade",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "instrument",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "instrument_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "instrument.name"
+      },
+      "displayName": "Instrument",
+      "isColumnShow": true
+    },
+    "target_account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "read"
+      },
+      "displayName": "Target Account"
+    },
+    "target_account_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "300",
+        "columnType": "select",
+        "selectProps": {
+          "type": "trade",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "target_account_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Target Account",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

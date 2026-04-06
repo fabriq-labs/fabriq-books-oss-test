@@ -1,0 +1,168 @@
+{
+  "id": "view_d0f8c34b-cc35-4635-bf03-099f8c86559d",
+  "name": "organization_view",
+  "model_name": "organization",
+  "description": "Organization",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "permission": "read"
+    },
+    "city": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "City",
+      "isColumnShow": true
+    },
+    "state": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "State",
+      "isColumnShow": true
+    },
+    "org_id": {
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Org Id",
+      "isColumnShow": false
+    },
+    "address": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Address",
+      "isColumnShow": true
+    },
+    "country": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Country",
+      "isColumnShow": false
+    },
+    "website": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Website",
+      "isColumnShow": false
+    },
+    "zip_code": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Zip Code",
+      "isColumnShow": false
+    },
+    "legal_name": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Legal Name",
+      "isColumnShow": true
+    },
+    "basecurrency_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "currency_master",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "organization",
+          "searchParams": "organization_name",
+          "instanceLabel": "organization_name",
+          "instanceSourceKey": "basecurrency_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "currency_master.base_currency"
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": false
+    },
+    "currency_master": {
+      "select": {
+        "id": "read",
+        "base_currency": "update",
+        "from_currency": "update"
+      },
+      "dataType": "table",
+      "displayName": "Currency Master"
+    },
+    "organization_name": {
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Organization Name",
+      "isColumnShow": true
+    },
+    "is_it_headquartres": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Is It Headquartres",
+      "isColumnShow": false
+    },
+    "is_it_a_groupcompany": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Is It a Groupcompany",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

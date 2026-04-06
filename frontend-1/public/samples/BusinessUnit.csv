@@ -1,0 +1,11 @@
+business_unit,status,legal_entity_id
+Sales,active,org_001
+Marketing,inactive,org_002
+Engineering,active,org_003
+Operations,active,org_004
+Finance,inactive,org_005
+HR,active,org_006
+Customer Support,active,org_007
+IT,active,org_008
+Legal,inactive,org_009
+R&D,active,org_010

@@ -1,0 +1,8 @@
+payment_terms,description,legal_entity_id,no_of_days,status
+Advance Payment,Full payment in advance,Vertex Technologies,0,Active
+Immediate,Payment due immediately,Vertex Technologies,0,Active
+End of Month,Payment due at month end,Vertex Technologies,30,Inactive
+15 Days,Payment due in 15 days,Vertex Technologies,15,Active
+Quarterly,Payment every quarter,Vertex Technologies,90,Active
+Bi-weekly,Payment every 2 weeks,Vertex Technologies,14,Active
+Net 90,Payment due within 90 days,Vertex Technologies,90,Inactive

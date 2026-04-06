@@ -1,0 +1,29 @@
+{
+  "id": "view_e1dcae4f-5b3b-4d96-9d57-1bdcd53b73af",
+  "name": "instance_email_ingest_item_view",
+  "model_name": "instance_email_ingest_item",
+  "description": "Email ingest item (for update after process invoice)",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Id",
+      "isColumnShow": true
+    },
+    "status": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Status",
+      "isColumnShow": true
+    },
+    "instance_id": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Instance Id",
+      "isColumnShow": true
+    }
+  },
+  "org_id": null,
+  "created_by": null,
+  "modified_by": null
+}

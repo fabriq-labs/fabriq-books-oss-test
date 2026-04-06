@@ -1,0 +1,325 @@
+{
+  "id": "view_d8b6c832-62dd-48b4-b50d-20f24edbc969",
+  "name": "posting_view",
+  "model_name": "posting",
+  "description": "Posting",
+  "data_graph": {
+    "id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "ID",
+      "isColumnShow": false
+    },
+    "notes": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Notes",
+      "isColumnShow": false
+    },
+    "trade": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "tax": "update",
+        "isin": "update",
+        "name": "update",
+        "type": "update",
+        "price": "update",
+        "account": {
+          "select": {
+            "id": "read",
+            "name": "update"
+          }
+        },
+        "quantity": "update",
+        "brokerage": "update",
+        "account_id": "update",
+        "instrument": {
+          "select": {
+            "id": "read",
+            "name": "update"
+          }
+        },
+        "net_amount": "update",
+        "value_date": "update",
+        "total_amount": "update",
+        "instrument_id": "update",
+        "target_account": {
+          "select": {
+            "id": "read",
+            "name": "update"
+          }
+        },
+        "target_account_id": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Trade",
+      "isColumnShow": false
+    },
+    "amount": {
+      "orderNo": 5,
+      "datatype": "float",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Amount",
+      "isColumnShow": true
+    },
+    "account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "orderNo": 3,
+      "dataType": "table",
+      "required": true,
+      "displayName": "Debit Account",
+      "isColumnShow": false
+    },
+    "holding": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "quantity": "update",
+        "average_cost": "update",
+        "instrument_id": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Holding",
+      "isColumnShow": false
+    },
+    "trade_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Trade",
+      "isColumnShow": false
+    },
+    "account_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "posting",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "account_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "account.name"
+      },
+      "displayName": "Debit Account",
+      "isColumnShow": true
+    },
+    "holding_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Trade",
+      "isColumnShow": false
+    },
+    "value_date": {
+      "orderNo": 1,
+      "datatype": "date",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Value Date",
+      "isColumnShow": true
+    },
+    "description": {
+      "orderNo": 2,
+      "datatype": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Description",
+      "isColumnShow": true
+    },
+    "income_type": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Income Type",
+      "isColumnShow": false
+    },
+    "posting_date": {
+      "datatype": "date",
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Posting Date",
+      "isColumnShow": false
+    },
+    "posting_type": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "select",
+        "selectProps": {
+          "type": "posting",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "posting",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "posting_type"
+        },
+        "defaultValue": [
+          {
+            "id": "Credit",
+            "name": "Credit"
+          },
+          {
+            "id": "Debit",
+            "name": "Debit"
+          }
+        ]
+      },
+      "displayName": "Posting Type",
+      "isColumnShow": false
+    },
+    "income_source": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "500",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Income Source",
+      "isColumnShow": false
+    },
+    "credit_account": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "name": "update"
+      },
+      "orderNo": 4,
+      "dataType": "table",
+      "required": false,
+      "displayName": "Credit Account",
+      "isColumnShow": false
+    },
+    "credit_account_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "posting",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "credit_account_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "credit_account.name"
+      },
+      "displayName": "Credit Account",
+      "isColumnShow": true
+    },
+    "reconciliation_status": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Reconciliation Status",
+      "isColumnShow": false
+    },
+    "matched_reference": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Matched Reference",
+      "isColumnShow": false
+    },
+    "payment_receipt_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Payment Receipt",
+      "isColumnShow": false
+    },
+    "payment_receipt": {
+      "type": "table",
+      "dataType": "table",
+      "required": false,
+      "displayName": "Linked Receipt",
+      "isColumnShow": false,
+      "select": {
+        "id": "read",
+        "receipt_number": "read",
+        "amount": "read",
+        "receipt_date": "read",
+        "invoice_id": "read",
+        "invoice": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "invoice_number": "read",
+            "invoice_total": "read",
+            "invoice_date": "read",
+            "customers": {
+              "type": "table",
+              "select": {
+                "id": "read",
+                "customer_name": "read"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}
