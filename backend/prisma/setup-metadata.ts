@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
+import {
+  hashStableDemoApiKey,
+  stableMetadataAdminApiKeyPlaintext,
+} from './demo-stable-api-keys';
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
@@ -64,6 +68,7 @@ async function main() {
     console.log('');
     console.log('👤 Creating initial admin user...');
     const hashedPassword = await hash('admin123', 10);
+    const adminApiKeyHash = await hashStableDemoApiKey(stableMetadataAdminApiKeyPlaintext());
     const adminUser = await prisma.user.upsert({
       where: { email: 'admin@example.com' },
       update: {
@@ -71,6 +76,7 @@ async function main() {
         external_id: 'admin-1',
         auth_provider: 'local',
         password: hashedPassword,
+        api_key: adminApiKeyHash,
       },
       create: {
         email: 'admin@example.com',
@@ -78,6 +84,7 @@ async function main() {
         external_id: 'admin-1',
         auth_provider: 'local',
         password: hashedPassword,
+        api_key: adminApiKeyHash,
         role_users: {
           create: {
             role_id: superAdminRole.id,
@@ -86,6 +93,7 @@ async function main() {
       },
     });
     console.log(`  ✓ Admin user: ${adminUser.email} (password: admin123)`);
+    console.log(`  ✓ Admin stable X-API-Key plaintext: ${stableMetadataAdminApiKeyPlaintext()} (see prisma/demo-stable-api-keys.ts)`);
 
     console.log('');
     // Get summary counts

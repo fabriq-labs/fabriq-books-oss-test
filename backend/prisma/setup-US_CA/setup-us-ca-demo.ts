@@ -3,6 +3,12 @@ import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
 import { setupCurrencyMaster } from '../setup-currency-master';
 import prisma from '../../src/lib/prisma';
+import {
+  hashStableDemoApiKey,
+  stableUsCaDemoApiKeyPlaintext,
+} from '../demo-stable-api-keys';
+import { buildAirbyteExtractionConfigFromEnv } from '../setup-airbyte-extraction-config';
+
 const csv = require('csv-parser');
 
 interface CsvRow {
@@ -230,6 +236,10 @@ async function setupUsCaDemoData() {
               },
             };
 
+            const extractionConfig = buildAirbyteExtractionConfigFromEnv(
+              process.env.AIRBYTE_CONNECTION_ID_QUICKBOOKS
+            );
+
             // Prisma middleware automatically encrypts connection_config before saving
             // Check if record exists
             const existing = await prisma.source_system.findFirst({
@@ -245,10 +255,18 @@ async function setupUsCaDemoData() {
                 where: { id: existing.id },
                 data: {
                   connection_config: connectionConfig as any,
+                  ...(extractionConfig ? { extraction_config: extractionConfig as any } : {}),
                   modified_at: new Date(),
                 },
               });
               console.log(`  ✓ Updated QuickBooks Online connection for org ${orgId} (id: ${existing.id})`);
+              if (extractionConfig) {
+                console.log('    ✓ Airbyte extraction_config applied (US demo / QuickBooks)');
+              } else {
+                console.log(
+                  '    ⚠️  Skipping extraction_config: set AIRBYTE_CLIENT_ID, AIRBYTE_CLIENT_SECRET, AIRBYTE_CONNECTION_ID_QUICKBOOKS'
+                );
+              }
             } else {
               // Insert new record (middleware encrypts automatically)
               const newRecord = await prisma.source_system.create({
@@ -257,10 +275,18 @@ async function setupUsCaDemoData() {
                   system_type: 'quickbooks',
                   name: 'QuickBooks Online Production',
                   connection_config: connectionConfig as any,
+                  ...(extractionConfig ? { extraction_config: extractionConfig as any } : {}),
                   is_active: true,
                 },
               });
               console.log(`  ✓ Created QuickBooks Online connection for org ${orgId} (id: ${newRecord.id})`);
+              if (extractionConfig) {
+                console.log('    ✓ Airbyte extraction_config applied (US demo / QuickBooks)');
+              } else {
+                console.log(
+                  '    ⚠️  Skipping extraction_config: set AIRBYTE_CLIENT_ID, AIRBYTE_CLIENT_SECRET, AIRBYTE_CONNECTION_ID_QUICKBOOKS'
+                );
+              }
             }
           } catch (error) {
             console.error('  ❌ Error setting up QuickBooks Online connection:', error);
@@ -523,6 +549,7 @@ async function setupUsCaDemoData() {
     const userData = await loadCsvData(path.join(__dirname, 'users.csv'));
 
     for (const user of userData) {
+      const apiKeyHash = await hashStableDemoApiKey(stableUsCaDemoApiKeyPlaintext(user.id));
       await prisma.user.upsert({
         where: { id: user.id },
         update: {
@@ -533,6 +560,7 @@ async function setupUsCaDemoData() {
           auth_provider: user.auth_provider,
           manager_id: user.manager_id || null,
           org_id: user.org_id,
+          api_key: apiKeyHash,
         },
         create: {
           id: user.id,
@@ -543,10 +571,11 @@ async function setupUsCaDemoData() {
           auth_provider: user.auth_provider,
           manager_id: user.manager_id || null,
           org_id: user.org_id,
+          api_key: apiKeyHash,
         },
       });
     }
-    console.log(`  ✓ Loaded ${userData.length} users`);
+    console.log(`  ✓ Loaded ${userData.length} users (stable X-API-Key per user: fabriq-us-ca-demo-<user_id> — see prisma/demo-stable-api-keys.ts)`);
 
     // ===== 8. LOAD AND INSERT ROLE-USER DATA =====
     console.log('🔗 Loading role-user assignments...');

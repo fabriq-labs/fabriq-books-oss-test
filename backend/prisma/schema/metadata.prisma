@@ -12,7 +12,7 @@ model org {
   active_subscription Boolean          @default(false)
   basecurrency_id     String?
   base_currency       String?          @default("USD") // ISO 4217 code for the org's reporting currency
-  erp_system_type     String?          // ERP system type for this organization (e.g., 'zoho_books', 'xero', 'quickbooks')
+  erp_system_type     String? // ERP system type for this organization (e.g., 'zoho_books', 'xero', 'quickbooks')
   currency_master     currency_master? @relation(fields: [basecurrency_id], references: [id])
   users               user[]           @relation("UserOrg")
 
@@ -20,33 +20,33 @@ model org {
 }
 
 model user {
-  id            String                 @id @default(dbgenerated("'user_' || gen_random_uuid()"))
-  email         String                 @unique
-  name          String?
-  password      String?                // For internal auth provider
-  external_id   String                 @unique @map("auth_id") // For external auth systems
-  auth_provider String? // e.g., 'clerk', 'supertokens', 'internal'
-  created_at    DateTime               @default(now())
-  modified_at   DateTime               @updatedAt
-  created_by    String? // Reference to user.id
-  modified_by   String? // Reference to user.id
-  org_id        String?
-  org           org?                   @relation("UserOrg", fields: [org_id], references: [id])
-  manager_id    String? // Reference to manager's user id
-  manager       user?                  @relation("ManagerReport", fields: [manager_id], references: [id])
-  reports       user[]                 @relation("ManagerReport")
-  role_users    role_user[]            @relation("UserToRoleUser")
-  wf_histories  workflow_history[]     @relation("workflow_action")
-  comments      comment[]              @relation("UserComments")
-  department_id String?                @db.VarChar(50)
-  prs_created   purchase_requisition[] @relation(name: "created_user")
-  prs_behalf    purchase_requisition[] @relation(name: "behalf_user")
-  department    department?            @relation(fields: [department_id], references: [id])
-  employees     employee_master[]      @relation("EmployeeUserRelation")
-  managers      employee_master[]      @relation("ManagerRelation")
-  assigned_workflow_states workflow_state[] @relation("AssignedUserToWorkflowState")
-  external_config Json?                @default("{}") // For storing external service configurations (e.g., Slack user ID)
-  api_key         String?              @db.VarChar(255) // Bcrypt-hashed API key for programmatic access
+  id                       String                 @id @default(dbgenerated("'user_' || gen_random_uuid()"))
+  email                    String                 @unique
+  name                     String?
+  password                 String? // For internal auth provider
+  external_id              String                 @unique @map("auth_id") // For external auth systems
+  auth_provider            String? // e.g., 'clerk', 'supertokens', 'internal'
+  created_at               DateTime               @default(now())
+  modified_at              DateTime               @updatedAt
+  created_by               String? // Reference to user.id
+  modified_by              String? // Reference to user.id
+  org_id                   String?
+  org                      org?                   @relation("UserOrg", fields: [org_id], references: [id])
+  manager_id               String? // Reference to manager's user id
+  manager                  user?                  @relation("ManagerReport", fields: [manager_id], references: [id])
+  reports                  user[]                 @relation("ManagerReport")
+  role_users               role_user[]            @relation("UserToRoleUser")
+  wf_histories             workflow_history[]     @relation("workflow_action")
+  comments                 comment[]              @relation("UserComments")
+  department_id            String?                @db.VarChar(50)
+  prs_created              purchase_requisition[] @relation(name: "created_user")
+  prs_behalf               purchase_requisition[] @relation(name: "behalf_user")
+  department               department?            @relation(fields: [department_id], references: [id])
+  employees                employee_master[]      @relation("EmployeeUserRelation")
+  managers                 employee_master[]      @relation("ManagerRelation")
+  assigned_workflow_states workflow_state[]       @relation("AssignedUserToWorkflowState")
+  external_config          Json?                  @default("{}") // For storing external service configurations (e.g., Slack user ID)
+  api_key                  String?                @db.VarChar(255) // Bcrypt-hashed API key for programmatic access
 
   @@map("user")
 }
@@ -162,37 +162,37 @@ model workflow_flow {
 }
 
 model workflow_state {
-  id                  String              @id @default(dbgenerated("'wsta_' || gen_random_uuid()"))
-  flow_id             String
-  name                String
-  description         String?
-  sequence            Int                 @default(0) // Display order, fallback to created_at if same
-  is_initial          Boolean             @default(false)
-  is_final            Boolean             @default(false)
-  is_active           Boolean             @default(true)
-  skip                Boolean             @default(false) // If true, automatically skip this state
-  skip_target_state_id String?           // Target state to skip to (required if skip=true and multiple actions exist)
-  entry_conditions    Json? // Conditions that must be met to enter this state
-  exit_conditions     Json? // Conditions that must be met to exit this state
-  assigned_for        String // 'ROLE', 'USER', or 'EXPRESSION'
-  assigned_role_id    String? // Reference to role.id when assigned_for is 'ROLE'
-  assigned_user_id    String? // Reference to user.id when assigned_for is 'USER'
-  assigned_expression String? // Expression to evaluate when assigned_for is 'EXPRESSION'
-  created_by          String?
-  modified_by         String?
-  created_at          DateTime            @default(now())
-  modified_at         DateTime            @default(now())
-  org_id              String?
-  flow                workflow_flow       @relation(fields: [flow_id], references: [id])
-  source_actions      workflow_action[]   @relation("source_state")
-  target_actions      workflow_action[]   @relation("target_state")
-  assigned_role       role?               @relation("RoleToWorkflowState", fields: [assigned_role_id], references: [id])
-  assigned_user       user?               @relation("AssignedUserToWorkflowState", fields: [assigned_user_id], references: [id])
-  skip_target_state   workflow_state?     @relation("SkipTargetState", fields: [skip_target_state_id], references: [id])
-  skipped_by_states   workflow_state[]    @relation("SkipTargetState")
-  from_history        workflow_history[]  @relation("FromStateHistory")
-  to_history          workflow_history[]  @relation("ToStateHistory")
-  instances           workflow_instance[] @relation("StateToInstance")
+  id                   String              @id @default(dbgenerated("'wsta_' || gen_random_uuid()"))
+  flow_id              String
+  name                 String
+  description          String?
+  sequence             Int                 @default(0) // Display order, fallback to created_at if same
+  is_initial           Boolean             @default(false)
+  is_final             Boolean             @default(false)
+  is_active            Boolean             @default(true)
+  skip                 Boolean             @default(false) // If true, automatically skip this state
+  skip_target_state_id String? // Target state to skip to (required if skip=true and multiple actions exist)
+  entry_conditions     Json? // Conditions that must be met to enter this state
+  exit_conditions      Json? // Conditions that must be met to exit this state
+  assigned_for         String // 'ROLE', 'USER', or 'EXPRESSION'
+  assigned_role_id     String? // Reference to role.id when assigned_for is 'ROLE'
+  assigned_user_id     String? // Reference to user.id when assigned_for is 'USER'
+  assigned_expression  String? // Expression to evaluate when assigned_for is 'EXPRESSION'
+  created_by           String?
+  modified_by          String?
+  created_at           DateTime            @default(now())
+  modified_at          DateTime            @default(now())
+  org_id               String?
+  flow                 workflow_flow       @relation(fields: [flow_id], references: [id])
+  source_actions       workflow_action[]   @relation("source_state")
+  target_actions       workflow_action[]   @relation("target_state")
+  assigned_role        role?               @relation("RoleToWorkflowState", fields: [assigned_role_id], references: [id])
+  assigned_user        user?               @relation("AssignedUserToWorkflowState", fields: [assigned_user_id], references: [id])
+  skip_target_state    workflow_state?     @relation("SkipTargetState", fields: [skip_target_state_id], references: [id])
+  skipped_by_states    workflow_state[]    @relation("SkipTargetState")
+  from_history         workflow_history[]  @relation("FromStateHistory")
+  to_history           workflow_history[]  @relation("ToStateHistory")
+  instances            workflow_instance[] @relation("StateToInstance")
 
   @@map("workflow_state")
 }
@@ -301,22 +301,24 @@ model prompt_template {
 }
 
 model source_system {
-  id                        String   @id @default(dbgenerated("'srcsys_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id                    String   @db.VarChar(50) // Required, one connection per org per system
-  system_type               String   @db.VarChar(255)
-  name                      String   @db.VarChar(255)
-  region                    String?  @db.VarChar(255)
-  connector_version         String?  @db.VarChar(255)
-  connection_config         Json     @db.JsonB // Encrypted OAuth credentials only (encrypted via custom Prisma middleware)
-  is_active                 Boolean? @default(true)
-  default_purchase_account_id   String?  @db.VarChar(255)
-  default_purchase_account_name String?  @db.VarChar(255)
-  created_at                DateTime @default(now())
-  modified_at               DateTime @default(now()) @updatedAt
-  created_by                String?  @db.VarChar(255)
-  modified_by               String?  @db.VarChar(255)
+  id                            String    @id @default(dbgenerated("'srcsys_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                        String    @db.VarChar(50) // Required, one connection per org per system
+  system_type                   String    @db.VarChar(255)
+  name                          String    @db.VarChar(255)
+  region                        String?   @db.VarChar(255)
+  connector_version             String?   @db.VarChar(255)
+  connection_config             Json      @db.JsonB // Encrypted OAuth credentials only (encrypted via custom Prisma middleware)
+  extraction_config             Json?     @db.JsonB // Encrypted Airbyte API credentials + connection id (same encryption as connection_config)
+  is_active                     Boolean?  @default(true)
+  default_purchase_account_id   String?   @db.VarChar(255)
+  default_purchase_account_name String?   @db.VarChar(255)
+  last_sync_at                  DateTime?
+  last_sync_status              Json?     @db.JsonB
+  created_at                    DateTime  @default(now())
+  modified_at                   DateTime  @default(now()) @updatedAt
+  created_by                    String?   @db.VarChar(255)
+  modified_by                   String?   @db.VarChar(255)
 
   @@unique([org_id, system_type]) // One connection per org per ERP type
   @@map("source_system")
 }
-

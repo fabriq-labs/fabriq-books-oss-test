@@ -3,6 +3,11 @@ import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
 import { setupCurrencyMaster } from '../setup-currency-master';
 import prisma from '../../src/lib/prisma';
+import { buildAirbyteExtractionConfigFromEnv } from '../setup-airbyte-extraction-config';
+import {
+  hashStableDemoApiKey,
+  stableIndianDemoApiKeyPlaintext,
+} from '../demo-stable-api-keys';
 const csv = require('csv-parser');
 
 interface CsvRow {
@@ -231,6 +236,10 @@ async function setupIndianDemoData() {
               },
             };
 
+            const extractionConfig = buildAirbyteExtractionConfigFromEnv(
+              process.env.AIRBYTE_CONNECTION_ID_ZOHO
+            );
+
             // Prisma middleware automatically encrypts connection_config before saving
             // Check if record exists
             const existing = await prisma.source_system.findFirst({
@@ -246,10 +255,18 @@ async function setupIndianDemoData() {
                 where: { id: existing.id },
                 data: {
                   connection_config: connectionConfig as any,
+                  ...(extractionConfig ? { extraction_config: extractionConfig as any } : {}),
                   modified_at: new Date(),
                 },
               });
               console.log(`  ✓ Updated Zoho Books connection for org ${orgId} (id: ${existing.id})`);
+              if (extractionConfig) {
+                console.log('    ✓ Airbyte extraction_config applied (Indian demo / Zoho)');
+              } else {
+                console.log(
+                  '    ⚠️  Skipping extraction_config: set AIRBYTE_CLIENT_ID, AIRBYTE_CLIENT_SECRET, AIRBYTE_CONNECTION_ID_ZOHO'
+                );
+              }
             } else {
               // Insert new record (middleware encrypts automatically)
               const newRecord = await prisma.source_system.create({
@@ -258,10 +275,18 @@ async function setupIndianDemoData() {
                   system_type: 'zoho_books',
                   name: 'Zoho Books Production',
                   connection_config: connectionConfig as any,
+                  ...(extractionConfig ? { extraction_config: extractionConfig as any } : {}),
                   is_active: true,
                 },
               });
               console.log(`  ✓ Created Zoho Books connection for org ${orgId} (id: ${newRecord.id})`);
+              if (extractionConfig) {
+                console.log('    ✓ Airbyte extraction_config applied (Indian demo / Zoho)');
+              } else {
+                console.log(
+                  '    ⚠️  Skipping extraction_config: set AIRBYTE_CLIENT_ID, AIRBYTE_CLIENT_SECRET, AIRBYTE_CONNECTION_ID_ZOHO'
+                );
+              }
             }
           } catch (error) {
             console.error('  ❌ Error setting up Zoho Books connection:', error);
@@ -555,31 +580,35 @@ async function setupIndianDemoData() {
     console.log('🔗 Loading role-user assignments...');
     const roleUserData = await loadCsvData(path.join(__dirname, 'role_user.csv'));
 
-    for (const roleUser of roleUserData) {
-      await prisma.role_user.upsert({
-        where: { id: roleUser.id },
+    for (const user of userData) {
+      const apiKeyHash = await hashStableDemoApiKey(stableIndianDemoApiKeyPlaintext(user.id));
+      await prisma.user.upsert({
+        where: { id: user.id },
         update: {
-          role_id: roleUser.role_id,
-          user_id: roleUser.user_id,
-          created_at: new Date(roleUser.created_at),
-          modified_at: new Date(roleUser.modified_at),
-          created_by: roleUser.created_by,
-          modified_by: roleUser.modified_by,
-          org_id: roleUser.org_id,
+          email: user.email,
+          name: user.name,
+          password: user.password,
+          external_id: user.external_id,
+          auth_provider: user.auth_provider,
+          manager_id: user.manager_id || null,
+          org_id: user.org_id,
+          api_key: apiKeyHash,
         },
         create: {
-          id: roleUser.id,
-          role_id: roleUser.role_id,
-          user_id: roleUser.user_id,
-          created_at: new Date(roleUser.created_at),
-          modified_at: new Date(roleUser.modified_at),
-          created_by: roleUser.created_by,
-          modified_by: roleUser.modified_by,
-          org_id: roleUser.org_id,
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          password: user.password,
+          external_id: user.external_id,
+          auth_provider: user.auth_provider,
+          manager_id: user.manager_id || null,
+          org_id: user.org_id,
+          api_key: apiKeyHash,
         },
       });
     }
-    console.log(`  ✓ Loaded ${roleUserData.length} role-user assignments`);
+    console.log(`  ✓ Loaded ${userData.length} users (stable X-API-Key per user: fabriq-indian-demo-<user_id> — see prisma/demo-stable-api-keys.ts)`);
+
 
     // ===== 8.5. LOAD BUSINESS_UNIT AND DEPARTMENT FROM CSV =====
     console.log('🏢 Loading business units and departments...');
