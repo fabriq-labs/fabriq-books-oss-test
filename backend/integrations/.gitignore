@@ -31,9 +31,6 @@
 **/dbt/.DS_Store
 **/dbt/Thumbs.db
 
-# DBT profiles (if not using environment variables)
-**/dbt/profiles.yml
-
 # DBT artifacts
 **/dbt/*.manifest.json
 **/dbt/*.catalog.json

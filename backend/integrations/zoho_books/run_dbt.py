@@ -36,6 +36,7 @@ import sys
 import subprocess
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import psycopg2
@@ -51,43 +52,81 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def _apply_env_file(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    logger.info(f"Loading environment variables from {path}")
+    try:
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+        logger.info(f"✅ Environment variables loaded from {path.name}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to load {path}: {e}")
+        return False
+
+
 def load_env_file():
-    """Load environment variables from env or .env file if it exists.
-    
-    Railway environment variables take precedence (already set).
-    Local development: loads from env/.env file in integration root directory (parent of dbt folder).
+    """Load from integration .env, then shared backend .env (Docker: /app/backend/.env).
+
+    Already-set environment variables (e.g. from Docker env_file) take precedence.
     """
-    # Script is in integration root, look for .env in same directory
     script_dir = Path(__file__).parent
-    env_files = [script_dir / '.env', script_dir / 'env']
-    
-    for env_file in env_files:
-        if env_file.exists():
-            logger.info(f"Loading environment variables from {env_file.name}")
-            try:
-                with open(env_file, 'r') as f:
-                    for line in f:
-                        line = line.strip()
-                        # Skip empty lines and comments
-                        if not line or line.startswith('#'):
-                            continue
-                        # Parse KEY=VALUE format
-                        if '=' in line:
-                            key, value = line.split('=', 1)
-                            key = key.strip()
-                            value = value.strip()
-                            # Only set if not already in environment (Railway vars take precedence)
-                            if key and key not in os.environ:
-                                os.environ[key] = value
-                                logger.debug(f"Loaded {key} from {env_file.name}")
-                logger.info(f"✅ Environment variables loaded from {env_file.name}")
-                return True
-            except Exception as e:
-                logger.warning(f"Failed to load {env_file.name}: {e}")
-                return False
-    
-    logger.info("No env file found, using environment variables (Railway or system)")
-    return False
+    candidates = [
+        script_dir / '.env',
+        script_dir / 'env',
+    ]
+    extra = os.getenv('BACKEND_ENV_FILE')
+    if extra:
+        candidates.append(Path(extra))
+    candidates.append(Path('/app/backend/.env'))
+
+    loaded_any = False
+    for env_file in candidates:
+        if _apply_env_file(env_file):
+            loaded_any = True
+
+    if not loaded_any:
+        logger.info("No env file found, using environment variables (Railway or system)")
+    return loaded_any
+
+
+def ensure_db_env_from_database_url() -> None:
+    """If DB_* are missing, parse DATABASE_URL (same idea as sync_service main)."""
+    if os.getenv('DB_HOST'):
+        return
+    url = os.getenv('DATABASE_URL')
+    if not url:
+        return
+    try:
+        p = urlparse(url)
+        if p.hostname:
+            os.environ['DB_HOST'] = p.hostname
+        if p.port:
+            os.environ['DB_PORT'] = str(p.port)
+        else:
+            os.environ.setdefault('DB_PORT', '5432')
+        if p.username:
+            os.environ['DB_USER'] = p.username
+        if p.password:
+            os.environ['DB_PASSWORD'] = p.password
+        path = (p.path or '').lstrip('/')
+        if path:
+            dbname = path.split('?')[0]
+            if dbname:
+                os.environ['DB_NAME'] = dbname
+        logger.info('Derived DB_* from DATABASE_URL')
+    except Exception as e:
+        logger.warning('Could not parse DATABASE_URL for DB_*: %s', e)
 
 def validate_environment():
     """Validate required environment variables are present"""
@@ -212,6 +251,7 @@ def main():
     # Load environment variables from env file (if exists)
     # Railway environment variables take precedence if already set
     load_env_file()
+    ensure_db_env_from_database_url()
 
     # Validate environment variables
     if not validate_environment():
@@ -265,6 +305,27 @@ def main():
             success = False
             break  # Stop on first failure
         completed_stages.append(stage_name)
+
+    # Restore Prisma constraints after dbt (idempotent)
+    if success:
+        restore_script = script_dir.parent / "shared" / "restore_constraints.py"
+        if restore_script.exists():
+            logger.info("Restoring database constraints...")
+            try:
+                subprocess.run(
+                    [sys.executable, str(restore_script)],
+                    cwd=str(script_dir),
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                logger.info("Database constraints restored successfully")
+            except subprocess.CalledProcessError as e:
+                logger.warning("Constraint restoration failed, but dbt stages succeeded")
+                if e.stderr:
+                    logger.warning("Error: {}".format(e.stderr))
+        else:
+            logger.warning(f"restore_constraints.py not found at {restore_script}")
 
     # Run tests only if all stages completed successfully
     if success:

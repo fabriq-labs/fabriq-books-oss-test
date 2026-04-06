@@ -163,7 +163,7 @@ ZOHO_API_DOMAIN=www.zohoapis.com  # Default: US data center
 Add the Zoho credentials to your **repo root `.env` file** (not in the integrations directory):
 
 ```bash
-# In monorepo `backend/.env`
+# In fabriq-base/.env (repo root)
 ZOHO_CLIENT_ID=your_client_id
 ZOHO_CLIENT_SECRET=your_client_secret
 ZOHO_REFRESH_TOKEN=your_refresh_token
@@ -182,7 +182,7 @@ Set these as environment variables in your Railway project settings. Railway env
 Add the new fields to `purchase_order` table:
 
 ```bash
-cd backend
+cd fabriq-base
 npx prisma migrate dev --name add_zoho_sync_fields_to_purchase_order
 ```
 
