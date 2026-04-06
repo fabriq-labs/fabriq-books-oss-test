@@ -5,7 +5,7 @@ import { erpConnectionsAPI } from "@/api/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle, XCircle, Edit } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Edit, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ConnectionForm from "@/components/connections/ConnectionForm";
 
@@ -22,7 +22,12 @@ interface SourceSystem {
   connector_version?: string;
   default_purchase_account_id?: string;
   default_purchase_account_name?: string;
+  last_sync_at?: string | null;
+  last_sync_status?: { status?: string; message?: string; synced_at?: string; detail?: unknown } | null;
 }
+
+const SYNCABLE_SYSTEM_TYPES = new Set(["zoho_books", "quickbooks"]);
+type SyncMode = "full_sync" | "transform_only" | "extract_only";
 
 // System type configurations (matching backend)
 const SYSTEM_TYPE_CONFIGS: Record<string, { name: string; fields: any[] }> = {
@@ -139,6 +144,8 @@ const ConnectionDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [decryptedConfig, setDecryptedConfig] = useState<any>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMode, setSyncMode] = useState<SyncMode>("full_sync");
 
   useEffect(() => {
     if (id) {
@@ -154,9 +161,9 @@ const ConnectionDetailPage: React.FC = () => {
       const response: any = await erpConnectionsAPI.getById(id);
       // RestService returns { success: true, data: {...} }
       const connectionData = response?.data || response;
-      
+
       setConnection(connectionData);
-      
+
       // Note: connection_config is encrypted in the database
       // For editing, we'll need to decrypt it. For now, we'll pass it as-is
       // The form will handle empty values and user can re-enter credentials
@@ -209,6 +216,35 @@ const ConnectionDetailPage: React.FC = () => {
     fetchConnection(); // Reset to original data
   };
 
+  const handleSync = async () => {
+    if (!id || !connection || !SYNCABLE_SYSTEM_TYPES.has(connection.system_type)) return;
+    setSyncing(true);
+    try {
+      const res: any = await erpConnectionsAPI.triggerSync(id, syncMode);
+      const queuedStatus = res?.data ?? {
+        status: "in_progress",
+        message: "Sync in progress",
+        sync_mode: syncMode,
+      };
+      setConnection((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          last_sync_status: queuedStatus,
+          last_sync_at: new Date().toISOString(),
+        };
+      });
+      toast({
+        title: "Sync started",
+        description: "Sync is running in background. Status will update after completion.",
+      });
+    } catch {
+      // fetchAPI shows error toast for HTTP failures
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
@@ -235,6 +271,9 @@ const ConnectionDetailPage: React.FC = () => {
       </div>
     );
   }
+
+  const isSyncInProgress =
+    (connection.last_sync_status as { status?: string } | null | undefined)?.status === "in_progress";
 
   const systemTypeConfig = SYSTEM_TYPE_CONFIGS[connection.system_type];
 
@@ -279,6 +318,19 @@ const ConnectionDetailPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {SYNCABLE_SYSTEM_TYPES.has(connection.system_type) && (
+                    <select
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                      value={syncMode}
+                      onChange={(e) => setSyncMode(e.target.value as SyncMode)}
+                      disabled={syncing}
+                      title="Sync mode"
+                    >
+                      <option value="full_sync">Full sync — extract + transform</option>
+                      <option value="transform_only">Transform only</option>
+                      <option value="extract_only">Extract only</option>
+                    </select>
+                  )}
                   <Badge variant={connection.is_active ? "default" : "secondary"}>
                     {connection.is_active ? (
                       <>
@@ -292,6 +344,16 @@ const ConnectionDetailPage: React.FC = () => {
                       </>
                     )}
                   </Badge>
+                  {SYNCABLE_SYSTEM_TYPES.has(connection.system_type) && (
+                    <Button
+                      variant="secondary"
+                      disabled={syncing || isSyncInProgress || !connection.is_active}
+                      onClick={() => void handleSync()}
+                    >
+                      <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                      {syncing ? "Syncing…" : "Sync"}
+                    </Button>
+                  )}
                   <Button onClick={() => setIsEditing(true)}>
                     <Edit className="mr-2 h-4 w-4" />
                     Edit
@@ -323,6 +385,23 @@ const ConnectionDetailPage: React.FC = () => {
                   <div className="col-span-2">
                     <span className="font-semibold">Default Purchase Account:</span>{' '}
                     {connection.default_purchase_account_name}
+                  </div>
+                )}
+                {connection.last_sync_at && (
+                  <div>
+                    <span className="font-semibold">Last sync:</span>{' '}
+                    {new Date(connection.last_sync_at).toLocaleString()}
+                  </div>
+                )}
+                {connection.last_sync_status && (
+                  <div className="col-span-2">
+                    <span className="font-semibold">Last sync status:</span>{' '}
+                    <span className="text-gray-700">
+                      {(connection.last_sync_status as { status?: string }).status ?? '—'}
+                      {(connection.last_sync_status as { message?: string }).message
+                        ? ` — ${(connection.last_sync_status as { message?: string }).message}`
+                        : ''}
+                    </span>
                   </div>
                 )}
               </div>

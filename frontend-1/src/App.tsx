@@ -47,6 +47,7 @@ import ConnectionsPage from "./pages/settings/ConnectionsPage";
 import CreateConnectionPage from "./pages/settings/CreateConnectionPage";
 import ConnectionDetailPage from "./pages/settings/ConnectionDetailPage";
 import TenantOnboardingPage from "./pages/settings/TenantOnboardingPage";
+import DemoDatabaseResetPage from "./pages/settings/DemoDatabaseResetPage";
 import { SuperAdminGuard } from "./components/layout/SuperAdminGuard";
 import { PromptTemplateForm } from "./components/forms/Masters/PromptTemplateForm";
 import { AgentTemplateForm } from "./components/forms/Masters/AgentTemplateForm";
@@ -325,6 +326,12 @@ const AppRoutes: React.FC = () => {
                 <Route path="settings/tenant-onboarding" element={
                   <SuperAdminGuard>
                     <TenantOnboardingPage />
+                  </SuperAdminGuard>
+                } />
+
+                <Route path="settings/demo-database-reset" element={
+                  <SuperAdminGuard>
+                    <DemoDatabaseResetPage />
                   </SuperAdminGuard>
                 } />
 

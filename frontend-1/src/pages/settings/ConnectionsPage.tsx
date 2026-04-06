@@ -16,6 +16,9 @@ interface SourceSystem {
   modified_at: string;
   org_id: string;
   connection_config?: any; // Encrypted, not displayed
+  last_sync_at?: string | null;
+  last_sync_status?: { status?: string; message?: string } | null;
+  sync_status?: string;
 }
 
 const ConnectionsPage: React.FC = () => {
@@ -45,13 +48,18 @@ const ConnectionsPage: React.FC = () => {
       const response: any = await erpConnectionsAPI.getAll();
       // RestService returns { success: true, data: [...], total: number }
       const connectionsData = response?.data || [];
-      
+
       // Filter out connection_config from display (sensitive data)
       const sanitizedData = connectionsData.map((conn: any) => {
         const { connection_config, ...rest } = conn;
-        return rest;
+        const ls = rest.last_sync_status;
+        const sync_status =
+          typeof ls === "object" && ls !== null && "status" in ls
+            ? String((ls as { status?: string }).status ?? "—")
+            : "—";
+        return { ...rest, sync_status };
       });
-      
+
       setConnections(sanitizedData);
       setTotal(response?.total || sanitizedData.length);
     } catch (error) {
@@ -122,6 +130,16 @@ const ConnectionsPage: React.FC = () => {
       modified_at: {
         displayName: 'Modified',
         datatype: 'datetime',
+        isColumnShow: true,
+      },
+      last_sync_at: {
+        displayName: 'Last sync',
+        datatype: 'datetime',
+        isColumnShow: true,
+      },
+      sync_status: {
+        displayName: 'Sync status',
+        datatype: 'string',
         isColumnShow: true,
       },
     },

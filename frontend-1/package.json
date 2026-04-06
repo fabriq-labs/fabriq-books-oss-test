@@ -8,13 +8,16 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "node config/scripts/select-brand.js && vite",
+    "dev": "node config/scripts/select-brand.js --interactive && vite",
+    "start": "node config/scripts/select-brand.js --interactive && vite",
+    "dev:fabriq": "node config/scripts/select-brand.js fabriq && vite",
+    "dev:zeiv": "node config/scripts/select-brand.js zeiv && vite",
     "build": "node config/scripts/select-brand.js && vite build",
+    "build:fabriq": "node config/scripts/select-brand.js fabriq && vite build",
+    "build:zeiv": "node config/scripts/select-brand.js zeiv && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "test:e2e": "playwright test",
-    "test:e2e:debug": "playwright test --debug"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@ai-sdk/react": "^1.2.12",

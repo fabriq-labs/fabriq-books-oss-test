@@ -219,7 +219,7 @@ export const viewAPI = {
     childType: any,
     data: any
   ) => {
-    
+
     return fetchAPI(`/api/${type}/${id}/view/${view}/${childType}`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -1142,8 +1142,8 @@ export const erpConnectionsAPI = {
   testConnection: (systemType: string, credentials: any, connectionId?: string) => {
     return fetchAPI('/api/source_system/test-connection', {
       method: 'POST',
-      body: JSON.stringify({ 
-        system_type: systemType, 
+      body: JSON.stringify({
+        system_type: systemType,
         oauth: credentials,
         connection_id: connectionId,
       }),
@@ -1167,6 +1167,24 @@ export const erpConnectionsAPI = {
       .then((res) => {
         return res;
       })
+      .catch((err) => {
+        throw err;
+      });
+  },
+
+  /**
+   * Triggers integration sync with selectable sync_mode.
+   * Supported values:
+   * - full_sync
+   * - transform_only
+   * - extract_only
+   */
+  triggerSync: (id: string, syncMode: 'full_sync' | 'transform_only' | 'extract_only' = 'full_sync') => {
+    return fetchAPI(`/api/source_system/${id}/sync`, {
+      method: 'POST',
+      body: JSON.stringify({ sync_mode: syncMode }),
+    })
+      .then((res) => res)
       .catch((err) => {
         throw err;
       });
@@ -1280,7 +1298,47 @@ export interface OnboardTenantResponse {
   userIds: string[];
 }
 
+export type DemoDataOption =
+  | 'indian-demo'
+  | 'us-ca-demo'
+  | 'perfin-demo'
+  | 'both'
+  | 'nri';
+
+/** Mirrors `setup-db.js` flags. `runTests` defaults false server-side (skip tests unless true). */
+export interface DemoDatabaseResetPayload {
+  demoData: DemoDataOption;
+  demoDataOnly?: boolean;
+  runTests?: boolean;
+}
+
+export interface DemoDatabaseResetResponse {
+  success: boolean;
+  message: string;
+}
+
 export const adminAPI = {
+  demoDatabaseReset: async (
+    payload: DemoDatabaseResetPayload
+  ): Promise<DemoDatabaseResetResponse> => {
+    const API_URL = import.meta.env.VITE_API_BASE_URL || '';
+    const token = Cookies.get('__session');
+    const response = await fetch(`${API_URL}/api/admin/demo-database-reset`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const msg = data?.error || data?.message || 'Failed to start demo database reset';
+      throw new Error(msg);
+    }
+    return data as DemoDatabaseResetResponse;
+  },
+
   onboardTenant: async (payload: OnboardTenantPayload): Promise<OnboardTenantResponse> => {
     const API_URL = import.meta.env.VITE_API_BASE_URL || '';
     const token = Cookies.get('__session');
