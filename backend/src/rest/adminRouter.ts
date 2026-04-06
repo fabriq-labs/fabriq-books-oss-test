@@ -1,3 +1,6 @@
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../auth/middleware';
 import prisma from '../lib/prisma';
@@ -6,13 +9,13 @@ import logger from '../utils/logger';
 
 const adminRouter = Router();
 
-/** Check if the given user id has the Super Admin role. */
+/** Check if the given user id has the Super Admin role (any of their roles). */
 export async function isSuperAdmin(userId: string): Promise<boolean> {
-  const roleUser = await prisma.role_user.findFirst({
+  const roleUsers = await prisma.role_user.findMany({
     where: { user_id: userId },
     include: { role: true },
   });
-  return roleUser?.role?.name?.toLowerCase().includes('super admin') ?? false;
+  return roleUsers.some((ru) => ru.role?.name?.toLowerCase().includes('super admin'));
 }
 
 interface TenantPayload {
@@ -30,6 +33,58 @@ interface AdminUserPayload {
 interface OnboardTenantBody {
   tenant: TenantPayload;
   adminUsers: AdminUserPayload[];
+}
+
+
+/** Matches `setup-db.js` parseArgs() --demo-data= values (five demo profiles; no `skip`). */
+const DEMO_DATA_OPTIONS = [
+  'indian-demo',
+  'us-ca-demo',
+  'perfin-demo',
+  'both',
+  'nri',
+] as const;
+
+type DemoDataOption = (typeof DEMO_DATA_OPTIONS)[number];
+
+let demoResetInProgress = false;
+
+/** Pipe setup-db stdout/stderr to the server process stdout (terminal / container logs). */
+function pipeSetupStreamToConsole(
+  stream: NodeJS.ReadableStream | null,
+  label: 'stdout' | 'stderr'
+): void {
+  if (!stream) return;
+  stream.setEncoding('utf8');
+  let pending = '';
+  stream.on('data', (chunk: string) => {
+    pending += chunk;
+    const lines = pending.split(/\r?\n/);
+    pending = lines.pop() ?? '';
+    for (const line of lines) {
+      if (line.length) {
+        console.log(`[demo-database-reset/setup-db ${label}] ${line}`);
+      }
+    }
+  });
+  stream.on('end', () => {
+    if (pending.length) {
+      console.log(`[demo-database-reset/setup-db ${label}] ${pending}`);
+    }
+  });
+}
+
+/** ALLOW_DEMO_RESET_API=true forces enable; false forces disable; unset defaults to enabled only when NODE_ENV !== production */
+function isDemoDatabaseResetApiEnabled(): boolean {
+  const v = process.env.ALLOW_DEMO_RESET_API;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
+function getBackendRootDir(): string {
+  // Compiled: dist/rest/adminRouter.js -> backend root is two levels up
+  return path.join(__dirname, '..', '..');
 }
 
 adminRouter.post(
@@ -165,6 +220,112 @@ adminRouter.post(
       }
       return res.status(500).json({
         error: err?.message || 'Failed to onboard tenant',
+      });
+    }
+  }
+);
+
+interface DemoDatabaseResetBody {
+  demoData: string;
+  /** If true, append `--demo-data-only` (skip full schema reset; only load demo data). Default false. */
+  demoDataOnly?: boolean;
+  /** If true, run tests (omit `--skip-tests`). Default false (append `--skip-tests`, same as UI default). */
+  runTests?: boolean;
+}
+
+adminRouter.post(
+  '/demo-database-reset',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      if (!isDemoDatabaseResetApiEnabled()) {
+        return res.status(403).json({
+          error:
+            'Demo database reset API is disabled. Set ALLOW_DEMO_RESET_API=true to enable (required in production).',
+        });
+      }
+
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+
+      if (demoResetInProgress) {
+        return res.status(409).json({
+          error: 'A demo database reset is already running. Wait for it to finish.',
+        });
+      }
+
+      const body = req.body as DemoDatabaseResetBody;
+      const raw = typeof body?.demoData === 'string' ? body.demoData.trim().toLowerCase() : '';
+      if (!raw || !DEMO_DATA_OPTIONS.includes(raw as DemoDataOption)) {
+        return res.status(400).json({
+          error: `demoData must be one of: ${DEMO_DATA_OPTIONS.join(', ')}`,
+        });
+      }
+      const demoData = raw as DemoDataOption;
+
+      const demoDataOnly = body?.demoDataOnly === true;
+      const runTests = body?.runTests === true;
+
+      const backendRoot = getBackendRootDir();
+      const setupScript = path.join(backendRoot, 'setup-db.js');
+      if (!fs.existsSync(setupScript)) {
+        logger.error('setup-db.js not found', { setupScript, backendRoot });
+        return res.status(500).json({ error: 'setup-db.js not found on server' });
+      }
+
+      const setupArgs = [setupScript, `--demo-data=${demoData}`];
+      if (demoDataOnly) {
+        setupArgs.push('--demo-data-only');
+      }
+      if (!runTests) {
+        setupArgs.push('--skip-tests');
+      }
+
+      demoResetInProgress = true;
+
+      const child = spawn(process.execPath, setupArgs, {
+        cwd: backendRoot,
+        env: process.env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      child.on('error', (err) => {
+        demoResetInProgress = false;
+        logger.error('demo-database-reset spawn failed', { err: err?.message, demoData, demoDataOnly, runTests });
+      });
+
+      if (!child.stdout || !child.stderr) {
+        demoResetInProgress = false;
+        return res.status(500).json({ error: 'Failed to spawn process (no stdio pipes)' });
+      }
+
+      pipeSetupStreamToConsole(child.stdout, 'stdout');
+      pipeSetupStreamToConsole(child.stderr, 'stderr');
+
+      child.on('close', (code, signal) => {
+        demoResetInProgress = false;
+        logger.info('demo-database-reset finished', { demoData, demoDataOnly, runTests, code, signal });
+      });
+
+      logger.info('demo-database-reset started', { demoData, demoDataOnly, runTests });
+
+      return res.status(202).json({
+        success: true,
+        message:
+          'Database reset started in the background. This may take several minutes. Watch the backend server logs for progress.',
+      });
+    } catch (err: any) {
+      logger.error('demo-database-reset error', { error: err?.message, stack: err?.stack });
+      demoResetInProgress = false;
+      return res.status(500).json({
+        error: err?.message || 'Failed to start demo database reset',
       });
     }
   }

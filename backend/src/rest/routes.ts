@@ -13,6 +13,7 @@ import { getModelId } from '../lib/ai/modelProvider';
 import multer from 'multer';
 import { AttachmentController } from './AttachmentController';
 import { AxiosError } from 'axios';
+import { executeSourceSystemSync } from '../services/external-apis';
 
 export const setupRestRoutes = (router: Router) => {
   const restService = RestService.getInstance();
@@ -58,7 +59,7 @@ export const setupRestRoutes = (router: Router) => {
           },
           durationMs,
           status: 'success',
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       res.json({ data: analysis });
@@ -77,7 +78,7 @@ export const setupRestRoutes = (router: Router) => {
           durationMs,
           status: 'error',
           errorMessage: error.message,
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       res.status(500).json({
@@ -262,6 +263,27 @@ export const setupRestRoutes = (router: Router) => {
           message: error.message || 'Failed to fetch expense accounts',
         });
       }
+    }
+  );
+
+  // Must be registered BEFORE generic POST /:model/:id/:relation or "sync" is treated as a child relation name.
+  router.post(
+    '/source_system/:id/sync',
+    authMiddleware,
+    async (req: any, res: Response) => {
+      const auth = req.context?.auth;
+      if (!auth?.user?.org_id) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const { id } = req.params;
+      const result = await executeSourceSystemSync({
+        connectionId: id,
+        orgId: auth.user.org_id,
+        userId: auth.user.id,
+        syncModeRaw: req.body?.sync_mode,
+      });
+      return res.status(result.httpStatus).json(result.body);
     }
   );
 

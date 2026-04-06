@@ -1,8 +1,9 @@
 /**
- * Prisma Middleware for Encrypting/Decrypting source_system.connection_config
- * 
- * This middleware transparently encrypts connection_config before write operations
- * and decrypts it after read operations, ensuring Python DBT can decrypt using the
+ * Prisma Middleware for Encrypting/Decrypting source_system sensitive JSON fields
+ * (connection_config, extraction_config).
+ *
+ * This middleware transparently encrypts these fields before write operations
+ * and decrypts them after read operations, ensuring Python can decrypt using the
  * same AES-256-CBC algorithm and format.
  * 
  * Usage:
@@ -15,8 +16,10 @@ import { Prisma } from '@prisma/client';
 import { encryptConfig, decryptConfig } from './encryption';
 import logger from '../../../utils/logger';
 
+const SOURCE_SYSTEM_ENCRYPTED_JSON_FIELDS = ['connection_config', 'extraction_config'] as const;
+
 /**
- * Prisma middleware to encrypt/decrypt connection_config for source_system model
+ * Prisma middleware to encrypt/decrypt sensitive JSON fields for source_system model
  * 
  * Encryption: Before create/update operations
  * Decryption: After find operations
@@ -36,26 +39,28 @@ export function sourceSystemEncryptionMiddleware(): Prisma.Middleware {
       const encryptField = (data: any, path: string = '') => {
         if (!data || typeof data !== 'object') return;
 
-        // Handle direct connection_config
-        if (data.connection_config) {
-          if (typeof data.connection_config === 'object' && data.connection_config !== null) {
+        for (const fieldName of SOURCE_SYSTEM_ENCRYPTED_JSON_FIELDS) {
+          const val = data[fieldName];
+          if (!val) continue;
+
+          if (typeof val === 'object' && val !== null) {
             try {
-              const encrypted = encryptConfig(data.connection_config);
-              // Store as string - Prisma JSONB will store this as a JSON string value
-              data.connection_config = encrypted as any; // Prisma JSONB typing
-              logger.info(`✅ Encrypted connection_config at ${path}`, {
+              const encrypted = encryptConfig(val);
+              data[fieldName] = encrypted as any;
+              logger.info(`✅ Encrypted ${fieldName} at ${path}`, {
                 encryptedLength: encrypted.length,
                 encryptedPreview: encrypted.substring(0, 50) + '...',
               });
             } catch (error: any) {
-              logger.error(`❌ Failed to encrypt connection_config at ${path}:`, error);
+              logger.error(`❌ Failed to encrypt ${fieldName} at ${path}:`, error);
               throw error;
             }
-          } else if (typeof data.connection_config === 'string' && data.connection_config.includes(':')) {
-            // Already encrypted, skip
-            logger.debug(`connection_config at ${path} already encrypted, skipping`);
+          } else if (typeof val === 'string' && val.includes(':')) {
+            logger.debug(`${fieldName} at ${path} already encrypted, skipping`);
           } else {
-            logger.warn(`connection_config at ${path} is not an object or encrypted string, type: ${typeof data.connection_config}`);
+            logger.warn(
+              `${fieldName} at ${path} is not an object or encrypted string, type: ${typeof val}`
+            );
           }
         }
 
@@ -86,7 +91,7 @@ export function sourceSystemEncryptionMiddleware(): Prisma.Middleware {
       if (params.args.data) {
         encryptField(params.args.data, 'data');
       }
-      
+
       // For upsert, also check update and create separately
       if (params.action === 'upsert') {
         if (params.args.update && typeof params.args.update === 'object') {
@@ -105,35 +110,36 @@ export function sourceSystemEncryptionMiddleware(): Prisma.Middleware {
       const decryptField = (item: any) => {
         if (!item || typeof item !== 'object') return;
 
-        if (item.connection_config !== undefined && item.connection_config !== null) {
-          // Handle string (encrypted value from JSONB)
-          if (typeof item.connection_config === 'string') {
-            // Check if it's encrypted (format: "iv:ciphertext")
-            if (item.connection_config.includes(':')) {
+        for (const fieldName of SOURCE_SYSTEM_ENCRYPTED_JSON_FIELDS) {
+          const val = item[fieldName];
+          if (val === undefined || val === null) continue;
+
+          if (typeof val === 'string') {
+            if (val.includes(':')) {
               try {
-                const decrypted = decryptConfig(item.connection_config);
-                item.connection_config = decrypted;
-                logger.debug('✅ Decrypted connection_config');
+                const decrypted = decryptConfig(val);
+                item[fieldName] = decrypted;
+                logger.debug(`✅ Decrypted ${fieldName}`);
               } catch (error: any) {
-                logger.error('❌ Failed to decrypt connection_config:', {
+                logger.error(`❌ Failed to decrypt ${fieldName}:`, {
                   error: error.message,
-                  encryptedPreview: item.connection_config.substring(0, 50) + '...',
+                  encryptedPreview: val.substring(0, 50) + '...',
                 });
-                // Don't throw - might be invalid data, but log for debugging
-                throw new Error(`Failed to decrypt connection_config: ${error.message}`);
+                throw new Error(`Failed to decrypt ${fieldName}: ${error.message}`);
               }
             } else {
-              // String but not encrypted format - might be malformed data
-              logger.warn('connection_config is a string but not in encrypted format (no colon separator)');
+              logger.warn(
+                `${fieldName} is a string but not in encrypted format (no colon separator)`
+              );
             }
-          } else if (typeof item.connection_config === 'object') {
-            // Already decrypted or stored as object (shouldn't happen, but handle gracefully)
-            logger.debug('connection_config is already an object (not encrypted)');
+          } else if (typeof val === 'object') {
+            logger.debug(`${fieldName} is already an object (not encrypted)`);
           } else {
-            logger.warn(`connection_config has unexpected type: ${typeof item.connection_config}`);
+            logger.warn(`${fieldName} has unexpected type: ${typeof val}`);
           }
         }
       };
+
 
       if (Array.isArray(result)) {
         result.forEach(decryptField);
