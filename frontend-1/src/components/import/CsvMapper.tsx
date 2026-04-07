@@ -554,7 +554,8 @@ export const CSVMapper = ({
                   pageSize={pageSize}
                   total={tableDataSource.length}
                   onChange={updatePagination}
-                  showSizeChanger
+                  showSizeChanger={{ showSearch: false }}
+                  className="[&_.ant-pagination-options-size-changer]:min-w-[120px] [&_.ant-pagination-options-size-changer]:h-10 [&_.ant-pagination-options-size-changer]:rounded-md [&_.ant-pagination-options-size-changer]:border [&_.ant-pagination-options-size-changer]:border-[#7D23B2]/40 [&_.ant-pagination-options-size-changer]:bg-white [&_.ant-pagination-options-size-changer]:text-[#7D23B2] [&_.ant-pagination-options-size-changer:hover]:bg-purple-50 [&_.ant-pagination-options-size-changer_.ant-select]:h-full [&_.ant-pagination-options-size-changer_.ant-select]:w-full [&_.ant-select-selector]:h-full [&_.ant-select-selector]:border-0 [&_.ant-select-selector]:bg-transparent [&_.ant-select-selector]:text-[#7D23B2] [&_.ant-select-selector]:px-3 [&_.ant-select-selection-item]:leading-[38px] [&_.ant-select-arrow]:text-[#7D23B2]"
                   pageSizeOptions={["10", "20", "50", "100"]}
                 />
               )}
