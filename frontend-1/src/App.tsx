@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider } from 'antd';
 import { ChatProvider } from "./contexts/ChatContext";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -14,7 +14,7 @@ import { Invoice } from "./pages/Invoice"; import Reports from "./pages/Reports"
 import NotFound from "./pages/NotFound";
 import SignInPage from "./pages/sign-in";
 import PurchaseRequisitionDetailsPage from "./pages/PurchaseRequisitionDetail";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import PurchaseRequisitionDashboardPage from "./pages/PurchaseRequisition/PurchaseRequisitionDashboard";
 import Master from "./pages/Master";
 import PurchaseOrderDetailsPage from "./pages/PurchaseOrderDetails";
@@ -72,6 +72,7 @@ import { CreditNoteForm } from "./components/forms/sales/CreditNoteForm";
 import { useUserData } from "./hooks/useUserData";
 import { appId } from "./config/brand";
 import ProtectedRouteWithLoading from "./components/layout/ProtectedRouteWithLoading";
+import { Loading } from "./components/ui/loading";
 import Dashboard from "./pages/Dashboard";
 import RequesterDashboard from "./pages/RequestDashboard";
 import ProcurementApproverDashboard from "./pages/ProcurementDashboardApproval";
@@ -105,6 +106,20 @@ const antTheme = {
 
 
 
+const PublicAuthRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { loading, isMeApiLoading, isAuthenticated } = useAuth();
+
+  if (loading || isMeApiLoading) {
+    return <Loading message="Loading user data..." />;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 // Main App component
 const AppRoutes: React.FC = () => {
 
@@ -116,7 +131,9 @@ const AppRoutes: React.FC = () => {
         <ReportControllerProvider>
           <div className="font-lato">
             <Routes>
-              <Route path="/sign-in" element={<SignInPage />} />
+              <Route path="/sign-in" element={<PublicAuthRoute><SignInPage /></PublicAuthRoute>} />
+              <Route path="/signup" element={<PublicAuthRoute><SignInPage /></PublicAuthRoute>} />
+              <Route path="/auth" element={<PublicAuthRoute><SignInPage /></PublicAuthRoute>} />
 
               {/* Protected routes with AppLayout */}
               <Route path="/" element={
