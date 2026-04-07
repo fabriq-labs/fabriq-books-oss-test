@@ -66,6 +66,7 @@ WHERE id = '<SESSION_ID>';
 | 6 | [Step Stalled — Data Not Found](#6-step-stalled--data-not-found) | `executing` | Some | Yes | ~5 min | LLM couldn't find required data, didn't call `completeStep` |
 | 7 | [Action Step Creates No Actions](#7-action-step-creates-no-actions) | `completed` | Yes | Yes | ~0s | Builder ran but `accumulated_context` was empty |
 | 8 | [Bulk Approve Skips Execution](#8-bulk-approve-skips-execution) | `awaiting_approval` | Yes | Yes | Immediate | `updateMany` bypassed executor registry |
+| 9 | [Tool Parameter Validation Error](#9-tool-parameter-validation-error) | `failed` | Yes | Yes | ~5 min | LLM tool call arguments failed schema validation |
 
 ---
 
@@ -404,6 +405,74 @@ The LLM sees tool results as `tool` role messages in `allMessages`. If the LLM a
 ### "LLM not calling createPlan (system prompt missing)"
 
 Check that `allMessages[0].role === 'system'` includes both the session context block and the `SESSION_DIRECTIVE` text. In `handleStreamingRequest`, the `messages` parameter passed to `streamText` should be `allMessages` — **not** a separate `system:` parameter alongside a different `messages` array. If `tools_called` is empty in `llm_trace`, verify `sessionId` was passed through to `ToolManager.getUnifiedTools`.
+
+---
+
+### 9. Tool Parameter Validation Error
+
+**Observed**: 2026-04-07, session `ses_82ef0156-6e95-490f-b5ad-eabc6095cf19`
+
+**Symptoms**
+- `status = 'failed'`
+- `plan IS NOT NULL`, multiple steps defined
+- Messages exist (3–5 rows), last turn shows assistant LLM calling a tool
+- LLM traces show 2–3 calls: earlier ones `status = 'success'`, final one `status = 'error'`
+- `error_message` contains Zod validation errors like `"Expected object, received null"` or similar schema mismatch
+- `pending_actions_count > 0` but `completed_actions_count = 0` (actions created but not completed)
+- `last_active_at - started_at` ≈ 5 minutes (watchdog eventually kills it)
+- LLM was actively executing (not a timeout/hang)
+
+**Root Cause**
+
+The LLM successfully called multiple tools and advanced partway through the plan. However, on a later tool call (commonly `completeStep`), the LLM generated arguments that failed schema validation (e.g., passing `null` when an object is required, missing required fields, wrong type for a field). The validation error was raised by Zod in `ToolManager`, and the session failed because the tool call was not retried.
+
+**Diagnostic confirmation**
+
+```sql
+-- Check the error message in the final trace
+SELECT id, status, error_message, tools_called, created_at
+FROM llm_trace
+WHERE session_id = '<SESSION_ID>'
+ORDER BY created_at DESC LIMIT 1;
+-- Expected: status = 'error', error_message contains "Type validation failed" or "invalid_type"
+
+-- Confirm the session has pending actions but didn't advance to completion
+SELECT pending_actions_count, completed_actions_count, current_step_index
+FROM agent_session
+WHERE id = '<SESSION_ID>';
+-- Expected: pending_actions_count > 0, completed_actions_count = 0
+
+-- Check which tool call failed
+SELECT tools_called, left(error_message, 150) AS error_preview
+FROM llm_trace
+WHERE session_id = '<SESSION_ID>'
+  AND status = 'error'
+ORDER BY created_at DESC;
+```
+
+**Sub-variant: `accumulated_context_update` is null**
+
+A common case: the LLM calls `completeStep` with `accumulated_context_update: null` (because it has no context to pass), but the tool schema defines `accumulated_context_update` as a required object type. Zod rejects the null and the tool fails.
+
+**Fix (immediate)**
+
+1. **Make schemas nullable where appropriate**: In `ToolManager` / tool definitions, audit schemas to allow `null` or `undefined` where sensible (e.g., `accumulated_context_update` can be an empty object `{}` or null with a default).
+
+2. **Add fallback behavior**: When a tool fails validation, do not immediately fail the session. Instead, log a clear error, optionally call `requestClarification` to ask the LLM to retry, or default the field to a sensible value (e.g., `accumulated_context_update: {}` if null).
+
+3. **Improve error messaging**: Include the actual argument values in the error log (not just the schema error) so it's clear what the LLM tried to pass.
+
+**Fix (longer-term — prevent)**
+
+Strengthen the prompt:
+- Add explicit examples of valid tool calls to the `SESSION_DIRECTIVE`
+- Document nullable fields and their defaults in the template `system_prompt`
+- Include a rule: *"If a tool requires an object but you have nothing to pass, use an empty object `{}`"*
+
+**Files to change**
+- `backend/src/agent/tools/completeStep.ts` — make `accumulated_context_update` nullable with default `{}`
+- `backend/src/agent/ToolManager.ts` — improve validation error logging (log actual args + schema error)
+- `backend/src/agent/prompt/constants.ts` — add explicit tool call format examples to `SESSION_DIRECTIVE`
 
 ---
 

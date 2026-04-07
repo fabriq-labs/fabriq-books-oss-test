@@ -60,8 +60,39 @@ ANALYSIS step:
 3. For each account that has unreconciled postings, call suggestReconciliationMatches(accountId) once per account.
    CRITICAL: After calling suggestReconciliationMatches, you MUST call completeStep IN THE SAME RESPONSE.
    Do NOT end your response without calling completeStep -- the match results will be lost if you do.
-   Pass the FULL suggestReconciliationMatches output (all postings with their suggestions array) in
-   accumulated_context_update under the key "match_results". Do not summarise or truncate it.
+
+   Pass the FULL suggestReconciliationMatches output in accumulated_context_update under the key "match_results".
+   The system expects an ARRAY of posting objects with this EXACT structure (do NOT add extra fields, do NOT rename fields):
+
+   accumulated_context_update: {
+     "match_results": [
+       {
+         "posting_id": "post_demo_24",
+         "posting_description": "DEMO: ACH CREDIT - INV-007 payment",
+         "posting_amount": 45000,
+         "posting_date": "2026-02-15T22:00:33.364Z",
+         "suggestions": [
+           {
+             "type": "invoice",
+             "id": "inv_demo_007",
+             "reference": "INV-007",
+             "amount": 45000,
+             "date": "2026-02-15T22:00:33.364Z",
+             "customer": null,
+             "confidence": "high"
+           }
+         ]
+       }
+     ]
+   }
+
+   Rules for match_results:
+   - MUST be an array of posting objects
+   - Each posting MUST have: posting_id, posting_description, posting_amount, posting_date, suggestions (array)
+   - suggestions array contains matching invoices/receipts with: type, id, reference, amount, date, customer, confidence
+   - confidence MUST be one of: "high", "medium", or "low"
+   - Include ALL postings in the array, even those with empty suggestions []
+   - Do NOT summarise, truncate, or flatten the structure
 
 ACTION step:
 4. The system will automatically create pending actions from match_results -- you do NOT need to call queueAction or queueActionBatch. Just call completeStep to advance the step.
@@ -69,7 +100,7 @@ ACTION step:
 
 RULES:
 - Never reconcile anything yourself -- only queue actions for human review.
-- If there are no plausible matches, the system will queue all postings as low-confidence for manual review.
+- If there are no plausible matches, include the postings in match_results with empty suggestions [] arrays.
 $$,
 'Which account or date range? e.g. "HDFC account", "March 2024"',
 'supervised', true, 2,

@@ -215,7 +215,7 @@ async function setupIndianDemoData() {
       const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
       const organizationId = process.env.ZOHO_ORGANIZATION_ID;
       const apiDomain = process.env.ZOHO_API_DOMAIN || 'www.zohoapis.com';
-      const accountsDomain = process.env.ZOHO_ACCOUNTS_DOMAIN || 'https://accounts.zoho.com';
+      const accountsDomain = process.env.ZOHO_ACCOUNTS_DOMAIN || 'https://accounts.zoho.in';
 
       if (clientId && clientSecret && refreshToken) {
         // Check if ERP_CONFIG_ENCRYPTION_KEY is set
@@ -609,6 +609,31 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Loaded ${userData.length} users (stable X-API-Key per user: fabriq-indian-demo-<user_id> — see prisma/demo-stable-api-keys.ts)`);
 
+    for (const roleUser of roleUserData) {
+      await prisma.role_user.upsert({
+        where: { id: roleUser.id },
+        update: {
+          role_id: roleUser.role_id,
+          user_id: roleUser.user_id,
+          created_at: new Date(roleUser.created_at),
+          modified_at: new Date(roleUser.modified_at),
+          created_by: roleUser.created_by,
+          modified_by: roleUser.modified_by,
+          org_id: roleUser.org_id,
+        },
+        create: {
+          id: roleUser.id,
+          role_id: roleUser.role_id,
+          user_id: roleUser.user_id,
+          created_at: new Date(roleUser.created_at),
+          modified_at: new Date(roleUser.modified_at),
+          created_by: roleUser.created_by,
+          modified_by: roleUser.modified_by,
+          org_id: roleUser.org_id,
+        },
+      });
+    }
+    console.log(`  ✓ Loaded ${roleUserData.length} role-user assignments`);
 
     // ===== 8.5. LOAD BUSINESS_UNIT AND DEPARTMENT FROM CSV =====
     console.log('🏢 Loading business units and departments...');
