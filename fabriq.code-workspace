@@ -9,6 +9,10 @@
 			"path": "backend"
 		},
 		{
+			"name": "integrations",
+			"path": "backend/integrations"
+		},
+		{
 			"name": "frontend",
 			"path": "frontend-1"
 		}

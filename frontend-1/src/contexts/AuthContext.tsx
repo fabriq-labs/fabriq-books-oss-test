@@ -101,8 +101,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Redirect to login if not authenticated and not on auth page
-    if (!loading && !user && location.pathname !== '/auth' && location.pathname !== '/sign-in') {
+    // Redirect to login if not authenticated and not on an auth route
+    const publicAuthRoutes = ['/auth', '/sign-in', '/signup'];
+    if (!loading && !user && !publicAuthRoutes.includes(location.pathname)) {
       navigate('/sign-in');
     }
   }, [user, loading, location.pathname, navigate]);

@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePapaParse } from "react-papaparse";
 import {
+  Checkbox,
+  Pagination,
   Table,
   notification,
 } from "antd";
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { DeleteOutlined } from "@ant-design/icons";
 import { filterUniqueRecords } from "./utils/upload";
 
 import { useNavigate } from "react-router-dom";
@@ -14,6 +16,19 @@ import { FileText, Upload, X } from "lucide-react";
 import { viewAPI } from "@/api/api";
 import { importExtensionRegistry, ImportExtensionState } from "@/features/import-extensions";
 // import { BulkEdit } from "@/components/bulk_edit/bulk_edit";
+
+/** Stable row id for table selection / delete; stripped from upload (only on derived table rows). */
+const IMPORT_ROW_ID = "__importRowId";
+
+function rowHasNotAvailableCell(row: Record<string, unknown>) {
+  return Object.entries(row).some(
+    ([key, cellValue]) =>
+      key !== IMPORT_ROW_ID &&
+      cellValue &&
+      typeof cellValue === "object" &&
+      (cellValue as { isNotAvailable?: boolean }).isNotAvailable === true
+  );
+}
 
 export const CSVMapper = ({
   csvContent,
@@ -56,10 +71,9 @@ export const CSVMapper = ({
   const [api, contextHolder] = notification.useNotification();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [total, setTotal] = useState(0);
-
   const [lookUpData, setLookUpData] = useState<any>([]);
   const [lookUpLoader, setLookUpLoader] = useState(false);
+  const [showOnlyErrors, setShowOnlyErrors] = useState(false);
 
   // Extension state for categorizations (or any extension-specific state)
   const [extensionState, setExtensionState] = useState<ImportExtensionState>({
@@ -184,16 +198,20 @@ export const CSVMapper = ({
     ],
   };
 
-  const handleDelete = (index: number) => {
-    const absoluteIndex = (currentPage - 1) * pageSize + index;
+  const handleDelete = (originalRowIndex: number) => {
     setCsvData((prevData: any) => {
-      const newData = prevData.filter((_: any, i: any) => i !== absoluteIndex);
+      const newData = prevData.filter((_: any, i: any) => i !== originalRowIndex);
       const newPage = Math.max(1, Math.ceil(newData.length / pageSize));
       if (currentPage > newPage) {
         setCurrentPage(newPage);
       }
       return newData;
     });
+    setSelectedRowKeys((prev: any[]) =>
+      prev
+        .filter((k) => k !== originalRowIndex)
+        .map((k) => (typeof k === "number" && k > originalRowIndex ? k - 1 : k))
+    );
   };
 
   const handleSendFileToServer = () => {
@@ -410,6 +428,31 @@ export const CSVMapper = ({
     });
   };
 
+  const tableDataSource = useMemo(() => {
+    const withId = csvData.map((row: any, originalIndex: number) => ({
+      ...row,
+      [IMPORT_ROW_ID]: originalIndex,
+    }));
+    if (!showOnlyErrors) return withId;
+    const errorsOnly = withId.filter((row) => rowHasNotAvailableCell(row));
+    // After all error rows are removed while filter is on, still show valid rows (not an empty table).
+    if (errorsOnly.length === 0 && withId.length > 0) return withId;
+    return errorsOnly;
+  }, [csvData, showOnlyErrors]);
+
+  useEffect(() => {
+    const stillHasErrors = csvData.some((row: any) =>
+      Object.values(row).some(
+        (cellValue: any) =>
+          cellValue && typeof cellValue === "object" && cellValue.isNotAvailable === true
+      )
+    );
+    if (!stillHasErrors && showOnlyErrors) {
+      setShowOnlyErrors(false);
+      setCurrentPage(1);
+    }
+  }, [csvData, showOnlyErrors]);
+
   const isUploadButtonEnabled = () => {
     const requiredFields = Object.entries(filedSets)
       .filter(
@@ -439,9 +482,9 @@ export const CSVMapper = ({
           render: (record: any) =>
             record.isNotAvailable ? (
               <div className="flex gap-y-1 flex-wrap">
-                <span className="bg-red-500 text-white px-2 py-1 rounded text-xs">
-                  {record.oldValue}
-                  <span className="ml-1 font-medium">(Not Available)</span>
+                <span className="bg-red-500 text-white px-2 py-1 rounded text-xs inline-flex items-center gap-1 flex-wrap">
+                  <span>{record.oldValue}</span>
+                  <span className="font-medium opacity-95">(Not available)</span>
                 </span>
               </div>
             ) : (
@@ -456,9 +499,9 @@ export const CSVMapper = ({
               title: "Action",
               key: "action",
               align: "center",
-              render: (_: any, __: any, index: number) => (
+              render: (_: any, record: any) => (
                 <DeleteOutlined
-                  onClick={() => handleDelete(index)}
+                  onClick={() => handleDelete(record[IMPORT_ROW_ID])}
                   style={{ color: "#7D23B2", cursor: "pointer" }}
                 />
               ),
@@ -475,12 +518,12 @@ export const CSVMapper = ({
     <div className="container mx-auto py-6">
       <div className="">
         {/* <Card> */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
           <h2 className="text-2xl font-bold flex items-center">
             <FileText className="mr-2" size={24} />
             Data for Import
           </h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-start justify-end gap-3">
             {/* Extension-provided toolbar actions (e.g., Categorize button for posting) */}
             {extension?.renderToolbarActions?.({
               modelType,
@@ -490,38 +533,64 @@ export const CSVMapper = ({
               filedSets,
               onCategorizationsReceived: handleCategorizationsReceived,
             })}
-            <Button className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600" onClick={handleCancel}>
-              <X size={16} />
-              <span>Discard</span>
-            </Button>
-            {isUploadButtonEnabled() && <Button onClick={handleSendFileToServer}
-              // loading={isSubmitLoader}
-              disabled={isSubmitLoader} className="flex items-center gap-2">
-              <Upload size={16} />
-              <span>Upload CSV</span>
-            </Button>}
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-          }}
-          className="item-header mb-2 gap-3"
-        >
-
-          {selectedRowKeys.length > 1 && (
-            <div className="d-flex gap-3">
-              <DeleteOutlined
-                onClick={() => bulkDelete(setCsvData)}
-                style={{ color: "#7D23B2", cursor: "pointer" }}
-              />
-              <EditOutlined
-                onClick={handleEditShowModal}
-                style={{ color: "#7D23B2", cursor: "pointer" }}
-              />
+            {hasNotAvailableRows() && (
+              <Checkbox
+                className="flex h-10 items-center rounded-md border border-[#7D23B2]/40 bg-white px-4 text-[#7D23B2] hover:bg-purple-50 [&_.ant-checkbox]:top-0 [&_.ant-checkbox+span]:pl-2 [&_.ant-checkbox-inner]:rounded-sm mt-1"
+                checked={showOnlyErrors}
+                onChange={(e) => {
+                  setShowOnlyErrors(e.target.checked);
+                  setCurrentPage(1);
+                }}
+              >
+                <span className="inline-flex items-center whitespace-nowrap font-medium">
+                  Only Errors
+                </span>
+              </Checkbox>
+            )}
+            <div className="flex flex-wrap gap-2 items-center pt-0.5">
+              {csvData.length > 0 && (
+                <Pagination
+                  current={currentPage}
+                  pageSize={pageSize}
+                  total={tableDataSource.length}
+                  onChange={updatePagination}
+                  showSizeChanger={{ showSearch: false }}
+                  className="[&_.ant-pagination-options-size-changer]:min-w-[120px] [&_.ant-pagination-options-size-changer]:h-10 [&_.ant-pagination-options-size-changer]:rounded-md [&_.ant-pagination-options-size-changer]:border [&_.ant-pagination-options-size-changer]:border-[#7D23B2]/40 [&_.ant-pagination-options-size-changer]:bg-white [&_.ant-pagination-options-size-changer]:text-[#7D23B2] [&_.ant-pagination-options-size-changer:hover]:bg-purple-50 [&_.ant-pagination-options-size-changer_.ant-select]:h-full [&_.ant-pagination-options-size-changer_.ant-select]:w-full [&_.ant-select-selector]:h-full [&_.ant-select-selector]:border-0 [&_.ant-select-selector]:bg-transparent [&_.ant-select-selector]:text-[#7D23B2] [&_.ant-select-selector]:px-3 [&_.ant-select-selection-item]:leading-[38px] [&_.ant-select-arrow]:text-[#7D23B2]"
+                  pageSizeOptions={["10", "20", "50", "100"]}
+                />
+              )}
+              {selectedRowKeys.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex h-10 items-center gap-2 whitespace-nowrap px-4 text-[#7D23B2] border-[#7D23B2]/40 hover:bg-purple-50"
+                  onClick={() => bulkDelete(setCsvData)}
+                >
+                  <DeleteOutlined />
+                  Delete selected ({selectedRowKeys.length})
+                </Button>
+              )}
+              <Button
+                type="button"
+                className="flex h-10 items-center gap-2 px-4 bg-gray-500 hover:bg-gray-600"
+                onClick={handleCancel}
+              >
+                <X size={16} />
+                <span>Discard</span>
+              </Button>
+              {isUploadButtonEnabled() && (
+                <Button
+                  type="button"
+                  onClick={handleSendFileToServer}
+                  disabled={isSubmitLoader}
+                  className="flex h-10 items-center gap-2 px-4"
+                >
+                  <Upload size={16} />
+                  <span>Upload CSV</span>
+                </Button>
+              )}
             </div>
-          )}
+          </div>
         </div>
         {csvData.length > 0 && (
           <div className="grid grid-cols-1 gap-4 my-2 mx-3">
@@ -529,17 +598,17 @@ export const CSVMapper = ({
               <Table
                 columns={columns}
                 // style={{ width: "100%" }}
-                dataSource={csvData}
+                dataSource={tableDataSource}
                 loading={lookUpLoader}
                 pagination={{
                   current: currentPage,
                   pageSize: pageSize,
-                  total: total,
+                  total: tableDataSource.length,
                   onChange: updatePagination,
                   showSizeChanger: true,
                   pageSizeOptions: ["10", "20", "50", "100"],
                 }}
-                rowKey={(record, index) => index ?? 0}
+                rowKey={IMPORT_ROW_ID}
                 rowSelection={rowSelection}
                 components={{
                   header: {
