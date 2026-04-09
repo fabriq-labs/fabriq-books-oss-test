@@ -101,7 +101,7 @@ const PRReviewDocument: React.FC<PRReviewDocumentProps> = ({
                     Legal Entity
                   </div>
                   <div className="text-sm font-medium">
-                    {details?.organization?.legal_name}
+                    {details?.legal_entity?.legal_name}
                   </div>
                 </div>
                 <div>
@@ -362,12 +362,12 @@ const PRReviewDocument: React.FC<PRReviewDocumentProps> = ({
                   h.from_state === "Draft" && h.to_state === "Manager Review",
               )
                 ? moment(
-                    workflowContext?.history.find(
-                      (h) =>
-                        h.from_state === "Draft" &&
-                        h.to_state === "Manager Review",
-                    ).performed_at,
-                  ).format("DD-MM-YYYY")
+                  workflowContext?.history.find(
+                    (h) =>
+                      h.from_state === "Draft" &&
+                      h.to_state === "Manager Review",
+                  ).performed_at,
+                ).format("DD-MM-YYYY")
                 : ""}
             </div>
             <div className="text-xs font-bold text-gray-600 uppercase tracking-wide">
@@ -384,12 +384,12 @@ const PRReviewDocument: React.FC<PRReviewDocumentProps> = ({
                   h.to_state === "Buyer Review",
               )
                 ? moment(
-                    workflowContext?.history.find(
-                      (h) =>
-                        h.from_state === "Manager Review" &&
-                        h.to_state === "Buyer Review",
-                    ).performed_at,
-                  ).format("DD-MM-YYYY")
+                  workflowContext?.history.find(
+                    (h) =>
+                      h.from_state === "Manager Review" &&
+                      h.to_state === "Buyer Review",
+                  ).performed_at,
+                ).format("DD-MM-YYYY")
                 : ""}
             </div>
             <div className="text-xs font-bold text-gray-600 uppercase tracking-wide">
@@ -406,12 +406,12 @@ const PRReviewDocument: React.FC<PRReviewDocumentProps> = ({
                   h.from_state === "Buyer Review" && h.to_state === "Delivery",
               )
                 ? moment(
-                    workflowContext?.history.find(
-                      (h) =>
-                        h.from_state === "Buyer Review" &&
-                        h.to_state === "Delivery",
-                    ).performed_at,
-                  ).format("DD-MM-YYYY")
+                  workflowContext?.history.find(
+                    (h) =>
+                      h.from_state === "Buyer Review" &&
+                      h.to_state === "Delivery",
+                  ).performed_at,
+                ).format("DD-MM-YYYY")
                 : ""}
             </div>
             <div className="text-xs font-bold text-gray-600 uppercase tracking-wide">

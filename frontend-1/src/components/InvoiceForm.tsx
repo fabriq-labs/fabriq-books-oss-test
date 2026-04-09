@@ -160,12 +160,12 @@ export const InvoiceForm: React.FC = () => {
       const items = mappedItems;
       invoiceDateRef.current = res.data.invoice_date || null;
       // Populate legalEntityData, customerData, locationData from API for review display
-      const legalEntityData = res.data.organization
+      const legalEntityData = res.data.legal_entity
         ? {
-          item: res.data.organization,
+          item: res.data.legal_entity,
           legal_name:
-            res.data.organization.legal_name ||
-            res.data.organization.organization_name,
+            res.data.legal_entity.legal_name ||
+            res.data.legal_entity.legal_name,
         }
         : null;
       const customerData = res.data.customers
@@ -1073,8 +1073,8 @@ export const InvoiceForm: React.FC = () => {
     const persistHQ = async () => {
       try {
         const res: any = await viewAPI.search(
-          "organization",
-          "organization_view",
+          "entity",
+          "entity_view",
           1,
           1,
           "",
@@ -1143,9 +1143,9 @@ export const InvoiceForm: React.FC = () => {
     const resolve = async () => {
       try {
         const res: any = await viewAPI.getById(
-          "organization",
+          "entity",
           selectedLegalEntityId,
-          "organization_view",
+          "entity_view",
         );
         const org = res?.data;
 
@@ -1343,11 +1343,11 @@ export const InvoiceForm: React.FC = () => {
                           <span className="text-destructive">*</span>
                         </Label>
                         <SearchDropDown
-                          instanceType="organization"
+                          instanceType="entity"
                           instanceSourceKey="legal_entity_id"
                           instanceKey="id"
                           instanceLabel="legal_name"
-                          instanceValue={formData.legalEntityData?.item || initialValues?.organization}
+                          instanceValue={formData.legalEntityData?.item || initialValues?.legal_entity}
                           onSelectItem={handleLegalEntitySelectChange}
                           onClear={handleLegalEntitySelectClear}
                           {...(initialValues &&
@@ -1358,7 +1358,7 @@ export const InvoiceForm: React.FC = () => {
                           })}
                           limit="10"
                           searchParams="legal_name"
-                          type="organization"
+                          type="invoice"
                         />
                       </div>
                       <div className="space-y-2">

@@ -130,7 +130,7 @@ export default function BalanceSheet() {
   const [showOnlyNonZero, setShowOnlyNonZero] = useState(true);
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
   const [currency, setCurrency] = useState("");
-  const [legalEntityOptions, setLegalEntityOptions] = useState<{ id: string; organization_name: string }[]>([]);
+  const [legalEntityOptions, setLegalEntityOptions] = useState<{ id: string; legal_name: string }[]>([]);
   const [selectedLegalEntityIds, setSelectedLegalEntityIds] = useState<string[]>([]);
 
   // Use report controller context
@@ -148,7 +148,7 @@ export default function BalanceSheet() {
     let cancelled = false;
     (async () => {
       try {
-        const res: any = await viewAPI.search("organization", "organization_view", 1, 200, undefined, {}, {});
+        const res: any = await viewAPI.search("entity", "entity_view", 1, 200, undefined, {}, {});
         const list = Array.isArray(res?.data) ? res.data : [];
         if (!cancelled) setLegalEntityOptions(list);
       } catch {
@@ -165,7 +165,7 @@ export default function BalanceSheet() {
     const normalizeClassification = (classification: string | null | undefined) => {
       // Handle null or undefined classification
       if (!classification) return 'Unclassified';
-      
+
       const normalized = classification.toLowerCase().trim();
       // Handle common variations and typos
       if (normalized.includes('asset')) return 'Assets';
@@ -660,7 +660,7 @@ export default function BalanceSheet() {
                             );
                           }}
                         />
-                        <span className="truncate">{org.organization_name ?? org.id}</span>
+                        <span className="truncate">{org.legal_name ?? org.id}</span>
                       </label>
                     ))
                   )}
@@ -813,37 +813,37 @@ export default function BalanceSheet() {
               );
             }
             return (
-            <div className="space-y-3">
-              {groups.map((group) => (
-                <Card key={group.classification} className="shadow-sm border-slate-200 hover:shadow-md transition-shadow duration-200">
-                  <CardHeader className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 py-2 px-3">
-                    <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-1">
-                      {getClassificationIcon(group.classification)}
-                      {group.classification}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-slate-100 border-b border-slate-300">
-                            <TableHead className="font-semibold text-slate-700 py-2 px-3 text-xs">Account</TableHead>
-                            <TableHead className="text-right font-semibold text-blue-700 py-2 px-3 text-xs">Opening</TableHead>
-                            <TableHead className="text-right font-semibold text-slate-700 py-2 px-3 text-xs">Debits</TableHead>
-                            <TableHead className="text-right font-semibold text-slate-700 py-2 px-3 text-xs">Credits</TableHead>
-                            <TableHead className="text-right font-semibold text-green-700 py-2 px-3 text-xs">Current</TableHead>
-                            <TableHead className="text-right font-semibold text-slate-800 py-2 px-3 text-xs">Total</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {renderTableContent(group)}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+              <div className="space-y-3">
+                {groups.map((group) => (
+                  <Card key={group.classification} className="shadow-sm border-slate-200 hover:shadow-md transition-shadow duration-200">
+                    <CardHeader className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200 py-2 px-3">
+                      <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-1">
+                        {getClassificationIcon(group.classification)}
+                        {group.classification}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-slate-100 border-b border-slate-300">
+                              <TableHead className="font-semibold text-slate-700 py-2 px-3 text-xs">Account</TableHead>
+                              <TableHead className="text-right font-semibold text-blue-700 py-2 px-3 text-xs">Opening</TableHead>
+                              <TableHead className="text-right font-semibold text-slate-700 py-2 px-3 text-xs">Debits</TableHead>
+                              <TableHead className="text-right font-semibold text-slate-700 py-2 px-3 text-xs">Credits</TableHead>
+                              <TableHead className="text-right font-semibold text-green-700 py-2 px-3 text-xs">Current</TableHead>
+                              <TableHead className="text-right font-semibold text-slate-800 py-2 px-3 text-xs">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {renderTableContent(group)}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             );
           })()}
         </div>
