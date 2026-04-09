@@ -262,9 +262,9 @@ const AppRoutes: React.FC = () => {
                 <Route path="uom/view/:viewId" element={<UOMForm />} />
 
                 {/* Masters - Organization */}
-                <Route path="masters/organization" element={<Master type="organization" view="organization_view" displayName="Organization" />} />
-                <Route path="organization/view/:viewId" element={<OrganizationForm />} />
-                <Route path="organization/:id/view/:viewId" element={<OrganizationForm />} />
+                <Route path="masters/organization" element={<Master type="entity" view="entity_view" displayName="Entity" />} />
+                <Route path="entity/view/:viewId" element={<OrganizationForm />} />
+                <Route path="entity/:id/view/:viewId" element={<OrganizationForm />} />
 
                 <Route path="masters/locations" element={<Master type="location" view="location_view" displayName="Locations" />} />
                 <Route path="location/:id/view/:viewId" element={<LocationForm />} />

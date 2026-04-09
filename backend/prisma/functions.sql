@@ -353,7 +353,7 @@ $$;
 -- This block ensures every table that should have a prefixed UUID default actually gets one.
 --
 
-ALTER TABLE public."organization" ALTER COLUMN id SET DEFAULT concat('org_', gen_random_uuid());
+ALTER TABLE public."entity" ALTER COLUMN id SET DEFAULT concat('ent_', gen_random_uuid());
 ALTER TABLE public."budget_period" ALTER COLUMN id SET DEFAULT concat('bupe_', gen_random_uuid());
 ALTER TABLE public."item_category" ALTER COLUMN id SET DEFAULT concat('item_', gen_random_uuid());
 ALTER TABLE public."uom" ALTER COLUMN id SET DEFAULT concat('uom_', gen_random_uuid());

@@ -234,7 +234,7 @@
       "dataType": "boolean",
       "permission": "update"
     },
-    "organization": {
+    "legal_entity": {
       "type": "table",
       "select": {
         "id": "read",

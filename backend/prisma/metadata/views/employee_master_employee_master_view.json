@@ -166,7 +166,7 @@
       "displayName": "Manager",
       "isColumnShow": false
     },
-    "organization": {
+    "legal_entity": {
       "select": {
         "id": "read",
         "legal_name": "update",
@@ -263,7 +263,7 @@
           "type": "employee_master",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
+          "instanceType": "entity",
           "searchParams": "organization_name",
           "instanceLabel": "organization_name",
           "instanceSourceKey": "legal_entity_id"
@@ -272,7 +272,7 @@
       },
       "listProps": {
         "type": "text",
-        "recordPath": "organization.legal_name"
+        "recordPath": "entity.legal_name"
       },
       "displayName": "Legal Entity",
       "isColumnShow": true

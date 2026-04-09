@@ -42,14 +42,14 @@
       "displayName": "Description",
       "isColumnShow": true
     },
-    "organization": {
+    "legal_entity": {
       "select": {
         "id": "read",
         "legal_name": "update",
         "organization_name": "update"
       },
       "dataType": "table",
-      "displayName": "Organization",
+      "displayName": "Legal Entity",
       "isColumnShow": false
     },
     "payment_terms": {
@@ -69,19 +69,19 @@
       "tableProps": {
         "columnType": "select",
         "selectProps": {
-          "type": "organization",
+          "type": "payment terms",
           "limit": "10",
-          "instanceType": "organization",
+          "instanceType": "entity",
           "searchParams": "legal_name",
           "instanceLabel": "legal_name",
           "instanceSourceKey": "legal_entity_id",
-          "relationName": "organization"
+          "relationName": "entity"
         },
         "defaultValue": ""
       },
       "listProps": {
         "type": "text",
-        "recordPath": "organization.legal_name"
+        "recordPath": "legal_entity.legal_name"
       },
       "displayName": "Legal Entity",
       "isColumnShow": true

@@ -353,7 +353,7 @@
       "dataType": "int",
       "permission": "update"
     },
-    "organization": {
+    "legal_entity": {
       "type": "table",
       "select": {
         "id": "read",
@@ -368,7 +368,7 @@
       },
       "listProps": {
         "type": "text",
-        "recordPath": "organization.legal_name"
+        "recordPath": "legal_entity.legal_name"
       },
       "displayName": "Legal Entity",
       "isColumnShow": true
@@ -552,10 +552,10 @@
           "type": "organization",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
-          "relationName": "organization",
-          "searchParams": "organization_name",
-          "instanceLabel": "organization_name",
+          "instanceType": "entity",
+          "relationName": "entity",
+          "searchParams": "legal_name",
+          "instanceLabel": "legal_name",
           "instanceSourceKey": "legal_entity_id"
         },
         "defaultValue": ""

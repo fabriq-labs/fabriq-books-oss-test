@@ -91,7 +91,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
 
     const fetchingDetails = (id: any) => {
         setIsLoading(true);
-            viewAPI.getById("account", id, viewId)
+        viewAPI.getById("account", id, viewId)
             .then((res: any) => {
                 setInitialValues(res.data);
                 form.reset({
@@ -509,11 +509,11 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                                             <FormItem>
                                                 <FormLabel>Legal Entity</FormLabel>
                                                 <SearchDropDown
-                                                    instanceType="organization"
+                                                    instanceType="entity"
                                                     instanceSourceKey="legal_entity_id"
                                                     instanceKey="id"
                                                     instanceLabel="legal_name"
-                                                    instanceValue={initialValues?.organization}
+                                                    instanceValue={initialValues?.legal_entity}
                                                     onSelectItem={onhandleSelectChange}
                                                     onClear={handleSelectClear}
                                                     limit="10"

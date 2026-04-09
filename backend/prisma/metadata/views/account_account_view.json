@@ -60,7 +60,7 @@
       "displayName": "Hq Account",
       "isColumnShow": false
     },
-    "organization": {
+    "legal_entity": {
       "type": "table",
       "select": {
         "id": "read",
@@ -68,7 +68,7 @@
         "organization_name": "update"
       },
       "dataType": "table",
-      "displayName": "Organization",
+      "displayName": "Legal Entity",
       "isColumnShow": false
     },
     "hq_account_id": {
@@ -123,7 +123,7 @@
           "type": "business_unit",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
+          "instanceType": "entity",
           "searchParams": "legal_name",
           "instanceLabel": "legal_name",
           "instanceSourceKey": "legal_entity_id"
@@ -132,7 +132,7 @@
       },
       "listProps": {
         "type": "text",
-        "recordPath": "organization.legal_name"
+        "recordPath": "legal_entity.legal_name"
       },
       "displayName": "Legal Entity",
       "isColumnShow": true

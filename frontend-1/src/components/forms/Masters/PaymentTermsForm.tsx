@@ -249,18 +249,18 @@ export const PaymentTermsForm: React.FC<ItemMasterFormProps> = (
                                             <FormItem>
                                                 <FormLabel>Legal Entity  <span className="text-red-500">*</span></FormLabel>
                                                 <SearchDropDown
-                                                    instanceType="organization"
+                                                    instanceType="entity"
                                                     instanceSourceKey="legal_entity_id"
                                                     instanceKey="id"
                                                     instanceLabel="legal_name"
                                                     instanceValue={
-                                                        initialValues?.organization
+                                                        initialValues?.legal_entity
                                                     }
                                                     onSelectItem={handleSelectChange}
                                                     onClear={handleSelectClear}
                                                     limit="10"
                                                     searchParams="legal_name"
-                                                    type="cost_center"
+                                                    type="payment_terms"
                                                 />
 
                                                 <FormMessage />

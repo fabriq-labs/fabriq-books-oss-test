@@ -1,8 +1,8 @@
 {
   "id": "view_d0f8c34b-cc35-4635-bf03-099f8c86559d",
-  "name": "organization_view",
-  "model_name": "organization",
-  "description": "Organization",
+  "name": "entity_view",
+  "model_name": "entity",
+  "description": "Entity",
   "data_graph": {
     "id": {
       "datatype": "string",

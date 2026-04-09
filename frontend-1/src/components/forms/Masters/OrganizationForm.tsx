@@ -75,7 +75,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
 
   const fetchingDetails = (id: any) => {
     setIsLoading(true);
-    viewAPI.getById("organization", id, viewId)
+    viewAPI.getById("entity", id, viewId)
       .then((res: any) => {
         setInitialValues(res.data);
         form.reset({
@@ -109,7 +109,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
 
       if (!id) {
         await viewAPI.create(
-          "organization",
+          "entity",
           viewId,
           submissionData
         );
@@ -120,7 +120,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
         navigate('/masters/organization');
       } else {
         await viewAPI.update(
-          "organization",
+          "entity",
           id,
           viewId,
           submissionData
@@ -185,7 +185,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
           Back to list
         </Button>
       </div>
-      
+
       {showTabs ? (
         <Tabs defaultValue="details" className="w-full">
           <TabsList>

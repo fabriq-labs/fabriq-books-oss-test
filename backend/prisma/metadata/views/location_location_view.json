@@ -127,14 +127,14 @@
       "displayName": "Full Address",
       "isColumnShow": false
     },
-    "organization": {
+    "legal_entity": {
       "select": {
         "id": "read",
         "legal_name": "update",
         "organization_name": "update"
       },
       "dataType": "table",
-      "displayName": "Organization",
+      "displayName": "Legal Entity",
       "isColumnShow": false
     },
     "legal_entity_id": {
@@ -147,7 +147,7 @@
           "type": "business_unit",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
+          "instanceType": "entity",
           "searchParams": "legal_name",
           "instanceLabel": "legal_name",
           "instanceSourceKey": "legal_entity_id"
@@ -156,7 +156,7 @@
       },
       "listProps": {
         "type": "text",
-        "recordPath": "organization.legal_name"
+        "recordPath": "legal_entity.legal_name"
       },
       "displayName": "Legal Entity",
       "isColumnShow": true

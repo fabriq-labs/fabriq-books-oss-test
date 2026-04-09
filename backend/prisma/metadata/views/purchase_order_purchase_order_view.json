@@ -182,7 +182,7 @@
       "displayName": "on_behalf_of",
       "isColumnShow": false
     },
-    "organization": {
+    "legal_entity": {
       "select": {
         "id": "read",
         "city": "update",
