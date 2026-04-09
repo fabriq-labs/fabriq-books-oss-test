@@ -63,7 +63,7 @@ export function getCreateRecordSchema(toolContext?: { modelName?: string }) {
   let dataSchema: z.ZodTypeAny;
   if (toolContext?.modelName) {
     // Use the schema directly from the model registry
-    dataSchema = generateModelDataSchema(toolContext.modelName, { allFieldsOptional: false });    
+    dataSchema = generateModelDataSchema(toolContext.modelName, { allFieldsOptional: false });
   } else {
     // Fallback when modelName is not in context (will be validated at runtime)
     dataSchema = z.record(z.any()).describe('Data object with fields to create. Field types and requirements vary by model. System fields (id, created_at, modified_at, etc.) are automatically handled.');
@@ -99,7 +99,7 @@ export function getUpdateRecordSchema(toolContext?: { modelName?: string }) {
   // If modelName is provided in context, make it optional (default to context modelName)
   const modelNameSchema = toolContext?.modelName
     ? z.string().optional().default(toolContext.modelName).describe(`Name of the model (defaults to ${toolContext.modelName})`)
-    : z.string().describe('Name of the model');  
+    : z.string().describe('Name of the model');
 
   // Generate the data schema directly from model registry when modelName is in context
   let dataSchema: z.ZodTypeAny;
@@ -346,8 +346,8 @@ export const GENERIC_FUNCTIONS: FunctionDefinition[] = [
     parameters: searchRecordsSchema,
   },
   {
-    name: "searchOrganizations",
-    description: "Search for legal entities in the organization model. Use for finding organizations by name, legal name, etc. for purchase requisitions.",
+    name: "searchEntities",
+    description: "Search for legal entities in the entity model. Use for finding entities by name, legal name, etc. for purchase requisitions.",
     parameters: searchRecordsSchema,
   },
   {

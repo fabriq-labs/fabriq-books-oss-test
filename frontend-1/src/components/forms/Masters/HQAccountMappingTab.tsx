@@ -64,15 +64,15 @@ export const HQAccountMappingTab: React.FC<HQAccountMappingTabProps> = ({
 
         // Find HQ organization
         const orgResponse: any = await viewAPI.search(
-          "organization",
-          "organization_view",
+          "entity",
+          "entity_view",
           1,
           100,
           undefined,
           { is_it_headquartres: { eq: "Yes" }, org_id: { eq: orgId } }
         );
         const hqOrg = orgResponse?.data?.[0];
-        
+
         if (hqOrg) {
           // Fetch HQ accounts
           const hqResponse: any = await viewAPI.search(

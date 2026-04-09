@@ -103,9 +103,9 @@ const masterNavItems: MasterNavItem[] = [
   },
   {
     icon: Building2,
-    label: 'Organization',
+    label: 'Entity',
     subNav: [
-      { label: 'Organization', path: '/masters/organization' },
+      { label: 'Entity', path: '/masters/entity' },
       { label: 'Locations', path: '/masters/locations' },
       { label: 'Business Units', path: '/masters/business-units' },
       { label: 'Departments', path: '/masters/departments' },

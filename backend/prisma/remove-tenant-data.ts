@@ -28,7 +28,7 @@ const ORG_TABLES = [
   'general_ledger', 'budget_line', 'budget_period', 'employee_master', 'supplier_items',
   'item_master', 'cost_center', 'department', 'business_unit', 'location', 'customers',
   'supplier', 'payment_terms', 'tax_master', 'shipping_terms', 'shipping_method',
-  'account', 'organization', 'base_model', 'workflow_instance', 'role_user', 'permission',
+  'account', 'entity', 'base_model', 'workflow_instance', 'role_user', 'permission',
   'role_view', 'view', 'role', 'prompt_template', 'source_system', 'user',
   'workflow_action', 'workflow_state', 'workflow_flow', 'currency_master', 'exchange_rate',
   'instance_email_ingest', 'attachment', 'list_data', 'user_master',

@@ -65,7 +65,7 @@ export type ConfidenceLevel = 'high' | 'medium' | 'low';
  */
 export async function getHQEntityId(orgId: string): Promise<string | null> {
   // First try to find the HQ entity
-  const hqEntity = await prisma.organization.findFirst({
+  const hqEntity = await prisma.entity.findFirst({
     where: {
       org_id: orgId,
       is_it_headquartres: 'yes',
@@ -78,7 +78,7 @@ export async function getHQEntityId(orgId: string): Promise<string | null> {
   }
 
   // Fallback: get the first entity for this org
-  const firstEntity = await prisma.organization.findFirst({
+  const firstEntity = await prisma.entity.findFirst({
     where: { org_id: orgId },
     select: { id: true },
     orderBy: { created_at: 'asc' },

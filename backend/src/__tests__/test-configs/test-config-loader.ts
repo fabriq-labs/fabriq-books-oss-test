@@ -13,7 +13,7 @@ export interface TestConfig {
     quickbooksProductName: string;
     productA: string;
     serviceB: string;
-    productC: string;    
+    productC: string;
   };
   locationId: string;
   currency: string;
@@ -76,7 +76,7 @@ export function createTestContext(config: TestConfig) {
  */
 export async function validateTestData(config: TestConfig, prisma: any) {
   const validations = [
-    { name: 'Organization', id: config.orgId, table: 'organization' },
+    { name: 'Entity', id: config.orgId, table: 'entity' },
     { name: 'User', id: config.userId, table: 'user' },
     { name: 'Customer', id: config.customerId, table: 'customers' },
     { name: 'Supplier', id: config.supplierId, table: 'supplier' },
@@ -93,8 +93,8 @@ export async function validateTestData(config: TestConfig, prisma: any) {
       let exists = false;
 
       switch (validation.table) {
-        case 'organization':
-          exists = !!(await prisma.organization.findUnique({ where: { id: validation.id } }));
+        case 'entity':
+          exists = !!(await prisma.entity.findUnique({ where: { id: validation.id } }));
           break;
         case 'user':
           exists = !!(await prisma.user.findUnique({ where: { id: validation.id } }));

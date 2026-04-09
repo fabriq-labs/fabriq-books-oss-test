@@ -30,7 +30,7 @@ async function setupTestData() {
 
     // ===== 2. CREATE BUSINESS ORGANIZATION =====
     console.log('🏢 Creating business organization...');
-    const org = await prisma.organization.upsert({
+    const org = await prisma.entity.upsert({
       where: { id: 'org_test_company' },
       update: {
         organization_name: 'Test Company Inc',
@@ -306,11 +306,11 @@ async function setupTestData() {
 
     // ===== 7. CREATE TEST USERS =====
     console.log('👤 Creating test users...');
-    
+
     // Hash password for all users
     const password = 'Metalimits@123';
     const hashedPassword = await hash(password, 10);
-    
+
     // Test User 0 - Manager (for purchase requisition workflow tests)
     const managerUser = await prisma.user.upsert({
       where: { id: 'user_manager_123' },
@@ -420,7 +420,7 @@ async function setupTestData() {
     });
 
     console.log(`  ✓ Created test user: ${testUser1.email} (id: ${testUser1.id}) with Employee and Buyer roles, manager: ${managerUser.name}`);
-    
+
     // Test User 2 - Sales Rep
     const testUser2 = await prisma.user.upsert({
       where: { email: 'sales@testcompany.com' },
@@ -459,11 +459,11 @@ async function setupTestData() {
 
     // ===== 8. VERIFY SALES ORDER VIEWS AND PERMISSIONS =====
     console.log('🔍 Verifying sales order views and permissions...');
-    
+
     const salesOrderViews = await prisma.view.findMany({
       where: { model_name: 'sales_order' }
     });
-    
+
     const salesOrderItemViews = await prisma.view.findMany({
       where: { model_name: 'sales_order_item' }
     });

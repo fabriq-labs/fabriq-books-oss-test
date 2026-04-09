@@ -95,7 +95,7 @@ async function setupNRIDemoData() {
         createData.basecurrency_id = baseCurrencyId;
       }
 
-      await prisma.organization.upsert({
+      await prisma.entity.upsert({
         where: { id: org.id },
         update: updateData,
         create: createData,
@@ -105,7 +105,7 @@ async function setupNRIDemoData() {
 
     // ===== 3. SETUP CHART OF ACCOUNTS FOR EACH ORGANIZATION =====
     console.log('💰 Setting up chart of accounts for organizations...');
-    
+
     // Map legal entity IDs to their respective chart of accounts and currency
     const chartOfAccountsMap: Record<string, string> = {
       'org_rajesh_canada': path.join(__dirname, 'chart-of-accounts-canada.json'),
@@ -115,7 +115,7 @@ async function setupNRIDemoData() {
       'org_rajesh_canada': 'CAD',
       'org_rajesh_india': 'INR',
     };
-    
+
     for (const org of organizationData) {
       const coaPath = chartOfAccountsMap[org.id];
       const currency = currencyMap[org.id] ?? 'USD';

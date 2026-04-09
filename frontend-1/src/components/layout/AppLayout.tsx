@@ -15,7 +15,7 @@ const routeTitles: Record<string, string> = {
     '/purchase-order': 'Purchase Orders',
     '/invoice': 'Invoice',
     '/reports': 'Reports',
-    '/master/business/organization': 'Organization',
+    '/master/business/entity': 'Entity',
     '/master/procurement/items': 'Item Master',
     '/master/procurement/category': 'Item Category',
     '/master/procurement/supplier': 'Supplier',
@@ -59,7 +59,7 @@ const getTitleFromRoute = (pathname: string, isBuyer: boolean): string => {
     if (pathSegments.length >= 3 && pathSegments[2] === 'view') {
         const entity = pathSegments[1];
         const entityTitles: Record<string, string> = {
-            'organization': 'Organization',
+            'entity': 'Entity',
             'item_master': 'Item Master',
             'item_category': 'Item Category',
             'supplier': 'Supplier',

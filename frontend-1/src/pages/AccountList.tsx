@@ -60,8 +60,8 @@ const AccountList: React.FC = () => {
             listConfig={{
                 importConfig: {
                     updateCSVData: updateCSVData,
-                    relation: "organization",
-                    relationView: "organization_view",
+                    relation: "entity",
+                    relationView: "entity_view",
                     relationField: "organization_name",
                     relationFieldId: "legal_entity_id",
                 },

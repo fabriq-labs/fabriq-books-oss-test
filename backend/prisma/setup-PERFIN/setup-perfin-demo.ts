@@ -91,7 +91,7 @@ async function setupPerfinDemoData() {
         createData.basecurrency_id = baseCurrencyId;
       }
 
-      await prisma.organization.upsert({
+      await prisma.entity.upsert({
         where: { id: org.id },
         update: updateData,
         create: createData,
