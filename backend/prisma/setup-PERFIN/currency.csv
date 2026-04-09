@@ -1,0 +1,2 @@
+id,code,name,symbol,decimal_places,is_active,org_id
+cur_seed_techflow_us_usd,USD,US Dollar,$,2,true,org_techflow_us

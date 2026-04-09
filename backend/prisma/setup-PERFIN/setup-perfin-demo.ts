@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
+import { setupCurrency } from '../setup-currency';
 import prisma from '../../src/lib/prisma';
 const csv = require('csv-parser');
 
@@ -48,6 +49,12 @@ async function setupPerfinDemoData() {
     }
     console.log(`  ✓ Loaded ${orgData.length} organizations`);
 
+    // ===== 1.5. SETUP CURRENCY FROM CSV (before entity — basecurrency_id FK → currency.id) =====
+    console.log('💱 Loading currency from CSV...');
+    await setupCurrency(path.join(__dirname, 'currency.csv'));
+    const currencyData = await loadCsvData(path.join(__dirname, 'currency.csv'));
+    console.log(`  ✓ Loaded ${currencyData.length} currencies`);
+
     // ===== 2. LOAD AND INSERT ORGANIZATION DATA =====
     console.log('🏢 Loading business organization data...');
     const organizationData = await loadCsvData(path.join(__dirname, 'organization.csv'));
@@ -84,7 +91,7 @@ async function setupPerfinDemoData() {
         org_id: org.org_id,
       };
 
-      // Only set basecurrency_id when present (must reference existing currency_master.id)
+      // Only set basecurrency_id when present (must reference existing currency.id)
       const baseCurrencyId = org.basecurrency_id?.trim();
       if (baseCurrencyId) {
         updateData.basecurrency_id = baseCurrencyId;
@@ -292,9 +299,9 @@ async function setupPerfinDemoData() {
         tax_rate_intra_id: item.tax_rate_intra_id || null,
       };
 
-      if (item.currency_master_id && typeof item.currency_master_id === 'string' && item.currency_master_id.trim() !== '' && item.currency_master_id.trim() !== 'undefined') {
-        updateData.currency_master_id = item.currency_master_id;
-        createData.currency_master_id = item.currency_master_id;
+      if (item.currency_id && typeof item.currency_id === 'string' && item.currency_id.trim() !== '' && item.currency_id.trim() !== 'undefined') {
+        updateData.currency_id = item.currency_id;
+        createData.currency_id = item.currency_id;
       }
 
       await prisma.item_master.upsert({
@@ -372,6 +379,7 @@ async function setupPerfinDemoData() {
     console.log('📊 Summary:');
     console.log(`   🏢 Organizations: ${orgData.length}`);
     console.log(`   🏢 Business Orgs: ${organizationData.length}`);
+    console.log(`   💱 Currencies: ${currencyData.length}`);
     console.log(`   💰 Chart of Accounts: Set up for ${organizationData.length} organizations`);
     console.log(`   👥 Customers: ${customerData.length}`);
     console.log(`   🏭 Suppliers: ${supplierData.length}`);

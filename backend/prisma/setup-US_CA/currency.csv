@@ -1,11 +1,12 @@
-code,name,symbol,decimal_places,is_active,org_id
-USD,US Dollar,$,2,true,org_us_ca_demo
-CAD,Canadian Dollar,$,2,true,org_us_ca_demo
-EUR,Euro,EUR,2,true,org_us_ca_demo
-GBP,British Pound,GBP,2,true,org_us_ca_demo
-AED,UAE Dirham,د.إ,2,true,org_us_ca_demo
-SGD,Singapore Dollar,S$,2,true,org_us_ca_demo
-JPY,Japanese Yen,¥,0,true,org_us_ca_demo
-CHF,Swiss Franc,CHF,2,true,org_us_ca_demo
-AUD,Australian Dollar,A$,2,true,org_us_ca_demo
-CAD,Canadian Dollar,C$,2,true,org_us_ca_demo
+id,code,name,symbol,decimal_places,is_active,org_id
+cur_seed_techflow_us_usd,USD,US Dollar,$,2,true,org_techflow_us
+cur_seed_techflow_us_cad,CAD,Canadian Dollar,C$,2,true,org_techflow_us
+cur_seed_techflow_us_eur,EUR,Euro,€,2,true,org_techflow_us
+cur_seed_techflow_us_gbp,GBP,British Pound,£,2,true,org_techflow_us
+cur_seed_techflow_us_aed,AED,UAE Dirham,د.إ,2,true,org_techflow_us
+cur_seed_techflow_us_sgd,SGD,Singapore Dollar,S$,2,true,org_techflow_us
+cur_seed_techflow_us_jpy,JPY,Japanese Yen,¥,0,true,org_techflow_us
+cur_seed_techflow_us_chf,CHF,Swiss Franc,CHF,2,true,org_techflow_us
+cur_seed_techflow_us_aud,AUD,Australian Dollar,A$,2,true,org_techflow_us
+cur_seed_techflow_us_inr,INR,Indian Rupee,₹,2,true,org_techflow_us
+cur_seed_techflow_us_cny,CNY,Chinese Yuan,¥,2,true,org_techflow_us
