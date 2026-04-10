@@ -144,7 +144,7 @@
       "tableProps": {
         "columnType": "select",
         "selectProps": {
-          "type": "business_unit",
+          "type": "location",
           "limit": "10",
           "instanceKey": "id",
           "instanceType": "entity",

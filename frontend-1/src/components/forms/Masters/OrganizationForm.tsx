@@ -117,7 +117,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
           title: "Success",
           description: "Organization created successfully",
         });
-        navigate('/masters/organization');
+        navigate('/masters/entity');
       } else {
         await viewAPI.update(
           "entity",
@@ -130,7 +130,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
           description: "Organization updated successfully",
         });
       }
-      navigate('/masters/organization');
+      navigate('/masters/entity');
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -179,7 +179,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
         <Button
           variant="ghost"
           className="flex items-center gap-2 text-muted-foreground"
-          onClick={() => navigate('/masters/organization')}
+          onClick={() => navigate('/masters/entity')}
         >
           <ArrowLeft size={16} />
           Back to list

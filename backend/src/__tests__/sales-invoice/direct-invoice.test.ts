@@ -191,7 +191,7 @@ describe('Direct Sales Invoice Creation Tests', () => {
   });
 
   describe('Customer and Location Details Mapping', () => {
-    it('should copy customer and location details to direct invoice', async () => {
+    it.only('should copy customer and location details to direct invoice', async () => {
       console.log('\n=== TEST 4: Customer and Location Details ===');
       const invoiceData = createDirectInvoiceData(
         customerId,
@@ -201,16 +201,19 @@ describe('Direct Sales Invoice Creation Tests', () => {
       );
 
       const invoiceResult = await modelService.create('invoice', context, invoiceData, {});
+      console.log('Invoice Result:', JSON.stringify(invoiceResult, null, 2));
       const invoiceId = invoiceResult.data.id;
       console.log('✓ Invoice Created:', invoiceId);
 
       // Add line item
       const lineItems = [createInvoiceLineItemData(itemId1, config.orgId, context.user.id)];
+      console.log('Line Items:', JSON.stringify(lineItems, null, 2));
       await modelService.addChildrenToParent('invoice', invoiceId, 'invoice_line_item', context, lineItems, {});
+      console.log('Line Items Added:', JSON.stringify(lineItems, null, 2));
 
       // Verify invoice has customer_id and location_id
       const invoice = await assertInvoiceCreated(invoiceId);
-
+      console.log('Invoice:', JSON.stringify(invoice, null, 2));
       expect(invoice?.customer_id).toBe(customerId);
       expect(invoice?.location_id).toBe(locationId);
       expect(invoice?.invoice_type).toBe('SALES');

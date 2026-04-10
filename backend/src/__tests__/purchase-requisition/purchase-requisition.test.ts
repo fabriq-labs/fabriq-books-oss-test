@@ -17,8 +17,8 @@ describe('Purchase Requisition Workflow Tests', () => {
 
   console.log('\n🚀 Starting Purchase Requisition Workflow Tests');
   const modelService = ModelService.getInstance();
-  // Disable side effects (email and ERP sync) to prevent delays in tests
-  const workflowEngine = new WorkflowEngine(prisma, { executeSideEffects: false });
+  // Database workflow effects (e.g. generate_po_from_pr) must run for PO/invoice tests; notification effects are no-op in SideEffectExecutor
+  const workflowEngine = new WorkflowEngine(prisma, { executeSideEffects: true });
 
   let config: TestConfig;
   let context: any;
@@ -434,9 +434,7 @@ describe('Purchase Requisition Workflow Tests', () => {
       }))?.id;
       const supplier2 = supplier2Id ? await prisma.supplier.findUnique({ where: { id: supplier2Id } }) : null;
 
-      // Verify items have different suppliers - use productA and productC which have different suppliers
-      // productA (item_ultra_laptop) has supp_global_chip
-      // productC (item_4k_monitor) has supp_pacific_display
+      // Verify items have different suppliers (US-CA: laptop vs monitor; Indian: Dell vs Lenovo)
       const item1Master = await prisma.item_master.findUnique({ where: { id: config.items.productA } });
       const item2Master = await prisma.item_master.findUnique({ where: { id: config.items.productC } });
 

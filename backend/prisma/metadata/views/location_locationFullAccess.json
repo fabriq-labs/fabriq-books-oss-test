@@ -1,8 +1,8 @@
 {
-  "id": "view_7488059b-ed21-48ab-b0ca-1a70ee64ec44",
-  "name": "locationFullAccess",
+  "id": "view_19ba5930-2767-49e3-b75c-fdf0de2a07da",
+  "name": "location_view",
   "model_name": "location",
-  "description": "Full access to location model",
+  "description": "Location",
   "data_graph": {
     "id": {
       "datatype": "string",
@@ -127,14 +127,14 @@
       "displayName": "Full Address",
       "isColumnShow": false
     },
-    "organization": {
+    "legal_entity": {
       "select": {
         "id": "read",
         "legal_name": "update",
         "organization_name": "update"
       },
       "dataType": "table",
-      "displayName": "Organization",
+      "displayName": "Legal Entity",
       "isColumnShow": false
     },
     "legal_entity_id": {
@@ -144,21 +144,25 @@
       "tableProps": {
         "columnType": "select",
         "selectProps": {
-          "type": "business_unit",
+          "type": "location",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
-          "searchParams": "organization_name",
-          "instanceLabel": "organization_name",
+          "instanceType": "entity",
+          "searchParams": "legal_name",
+          "instanceLabel": "legal_name",
           "instanceSourceKey": "legal_entity_id"
         },
         "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "legal_entity.legal_name"
       },
       "displayName": "Legal Entity",
       "isColumnShow": true
     }
   },
-  "org_id": "1",
+  "org_id": "52",
   "created_by": null,
   "modified_by": null
 }

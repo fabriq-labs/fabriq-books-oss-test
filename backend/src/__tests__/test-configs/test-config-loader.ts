@@ -70,6 +70,19 @@ export function createTestContext(config: TestConfig) {
   };
 }
 
+/** Invoice / PO workflows assign Draft/Submit to Buyer; primary test user is often not a buyer. */
+export function createInvoiceWorkflowActorContext(config: TestConfig) {
+  return {
+    user: {
+      id: config.buyerUserId,
+      org_id: config.orgId,
+      email: `${config.buyerUserId}@example.com`,
+      name: config.buyerUserId.replace('user_', '').replace('_', ' ').toUpperCase(),
+    },
+    org: { id: config.orgId },
+  };
+}
+
 /**
  * Validate that the loaded config has all required data in the database
  * This should be called in beforeAll() to ensure test data exists
@@ -78,6 +91,7 @@ export async function validateTestData(config: TestConfig, prisma: any) {
   const validations = [
     { name: 'Entity', id: config.orgId, table: 'entity' },
     { name: 'User', id: config.userId, table: 'user' },
+    { name: 'Buyer user (workflow actor)', id: config.buyerUserId, table: 'user' },
     { name: 'Customer', id: config.customerId, table: 'customers' },
     { name: 'Supplier', id: config.supplierId, table: 'supplier' },
     { name: 'Location', id: config.locationId, table: 'location' },
@@ -132,4 +146,76 @@ export async function validateTestData(config: TestConfig, prisma: any) {
   }
 
   console.log('✅ All test data validated successfully');
+}
+
+/** Parsed workflow_action.side_effects.effects[] entry (database JSON). */
+type WorkflowDbEffect = {
+  type?: string;
+  config?: { method?: string };
+};
+
+/**
+ * Ensure Invoice Approval workflow runs ledger side effects (SALES submit / reject).
+ * Idempotent: safe for DBs created before these effects were added to setup-workflows.
+ */
+export async function ensureInvoiceWorkflowLedgerSideEffects(prisma: {
+  workflow_flow: { findFirst: (args: unknown) => Promise<{ id: string } | null> };
+  workflow_state: { findFirst: (args: unknown) => Promise<{ id: string } | null> };
+  workflow_action: {
+    findFirst: (args: unknown) => Promise<{ id: string; side_effects: unknown } | null>;
+    update: (args: unknown) => Promise<unknown>;
+  };
+}): Promise<void> {
+  const flow = await prisma.workflow_flow.findFirst({
+    where: { model_name: 'invoice', name: 'Invoice Approval' },
+  });
+  if (!flow) return;
+
+  const draftState = await prisma.workflow_state.findFirst({
+    where: { flow_id: flow.id, name: 'Draft' },
+  });
+  const submittedState = await prisma.workflow_state.findFirst({
+    where: { flow_id: flow.id, name: 'Submitted' },
+  });
+  if (!draftState || !submittedState) return;
+
+  const submitAction = await prisma.workflow_action.findFirst({
+    where: { source_state_id: draftState.id, name: 'Submit' },
+  });
+  if (submitAction?.side_effects && typeof submitAction.side_effects === 'object') {
+    const se = submitAction.side_effects as { effects?: unknown[] };
+    const effects: WorkflowDbEffect[] = Array.isArray(se.effects) ? [...se.effects] as WorkflowDbEffect[] : [];
+    if (!effects.some((e) => e?.config?.method === 'create_sales_invoice_posting')) {
+      const afterCalc = effects.findIndex((e) => e?.config?.method === 'calculate_invoice_total');
+      const insertAt = afterCalc >= 0 ? afterCalc + 1 : effects.length;
+      effects.splice(insertAt, 0, {
+        type: 'database',
+        config: { method: 'create_sales_invoice_posting' },
+      });
+      await prisma.workflow_action.update({
+        where: { id: submitAction.id },
+        data: { side_effects: { effects } },
+      });
+    }
+  }
+
+  const rejectAction = await prisma.workflow_action.findFirst({
+    where: { source_state_id: submittedState.id, name: 'Reject' },
+  });
+  if (rejectAction?.side_effects && typeof rejectAction.side_effects === 'object') {
+    const se = rejectAction.side_effects as { effects?: unknown[] };
+    const effects: WorkflowDbEffect[] = Array.isArray(se.effects) ? [...se.effects] as WorkflowDbEffect[] : [];
+    if (!effects.some((e) => e?.config?.method === 'reverse_sales_invoice_postings')) {
+      const afterHandle = effects.findIndex((e) => e?.config?.method === 'handle_invoice_reject');
+      const insertAt = afterHandle >= 0 ? afterHandle + 1 : effects.length;
+      effects.splice(insertAt, 0, {
+        type: 'database',
+        config: { method: 'reverse_sales_invoice_postings' },
+      });
+      await prisma.workflow_action.update({
+        where: { id: rejectAction.id },
+        data: { side_effects: { effects } },
+      });
+    }
+  }
 }
