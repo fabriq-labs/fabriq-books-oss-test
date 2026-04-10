@@ -469,7 +469,6 @@ async function setupIndianDemoData() {
         stockable: item.stockable,
         item_status: item.item_status,
         supplier_id: item.supplier_id,
-        item_category_id: item.item_category_id || null,
         uom_id: item.uom_id || null,
         tax_master_id: item.tax_master_id || null,
         tax_rate_intra_id: item.tax_rate_intra_id || null,

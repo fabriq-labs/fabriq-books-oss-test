@@ -34,7 +34,6 @@ const itemMasterSchema = z.object({
         { message: 'Amount must be a valid positive number' }
     ),
     credit_account_id: z.string().optional(),
-    category_id: z.string().optional(),
     holding_id: z.string().optional(),
     income_type: z.string().optional(),
     income_source: z.string().optional(),
@@ -112,7 +111,6 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
             amount: '',
             account_id: '',
             credit_account_id: '',
-            category_id: '',
             holding_id: '',
             income_type: '',
             income_source: '',
@@ -164,7 +162,6 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                         account_id: toolResultData?.account_id || undefined,
                         amount: toolResultData?.amount,
                         credit_account_id: toolResultData?.credit_account_id || undefined,
-                        category_id: toolResultData?.category_id || undefined,
                         holding_id: toolResultData?.holding_id || undefined,
                         income_type: toolResultData?.income_type || undefined,
                         income_source: toolResultData?.income_source || undefined,
@@ -190,7 +187,6 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                     account_id: res.data?.account_id || undefined,
                     amount: res.data?.amount,
                     credit_account_id: res.data?.credit_account_id || undefined,
-                    category_id: res.data?.category_id || undefined,
                     holding_id: res.data?.holding_id || undefined,
                     income_type: res.data?.income_type || undefined,
                     income_source: res.data?.income_source || undefined,
@@ -228,7 +224,6 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
             const submissionData = {
                 ...data,
                 amount: parseFloat(data.amount),
-                category_id: data.category_id || null,
                 credit_account_id: data.credit_account_id || null,
                 holding_id: data.holding_id || null,
                 income_type: data.income_type || null,
@@ -871,126 +866,126 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                                 reconciliationResult.best_match.type === 'payment_receipt' &&
                                 reconciliationResult.best_match.id === initialValues.payment_receipt.id
                             ) && (
-                            <div className="mt-6 border rounded-lg overflow-hidden">
-                                <div className="bg-muted/50 px-4 py-3 border-b">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <FileCheck className="w-4 h-4 text-primary" />
-                                            <span className="font-medium text-sm">Reconciliation Match</span>
-                                            <Badge variant={
-                                                reconciliationResult.best_match.confidence === 'high' ? 'default' :
-                                                reconciliationResult.best_match.confidence === 'medium' ? 'secondary' : 'outline'
-                                            }>
-                                                {reconciliationResult.best_match.confidence}
-                                            </Badge>
-                                        </div>
-                                        {reconciliationResult.status === 'MATCHED' ? (
-                                            <Badge className="text-xs bg-green-600 hover:bg-green-600">
-                                                Confirmed
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="outline" className="text-xs">
-                                                SUGGESTED
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Best Match */}
-                                <div className="px-4 py-3 bg-primary/5">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="space-y-1 flex-1">
+                                <div className="mt-6 border rounded-lg overflow-hidden">
+                                    <div className="bg-muted/50 px-4 py-3 border-b">
+                                        <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <CheckCircle2 className="w-4 h-4 text-primary" />
-                                                <span className="font-medium text-sm">
-                                                    {reconciliationResult.best_match.type === 'payment_receipt' ? 'Payment Receipt' : 'Invoice'}: {reconciliationResult.best_match.reference}
-                                                </span>
+                                                <FileCheck className="w-4 h-4 text-primary" />
+                                                <span className="font-medium text-sm">Reconciliation Match</span>
+                                                <Badge variant={
+                                                    reconciliationResult.best_match.confidence === 'high' ? 'default' :
+                                                        reconciliationResult.best_match.confidence === 'medium' ? 'secondary' : 'outline'
+                                                }>
+                                                    {reconciliationResult.best_match.confidence}
+                                                </Badge>
                                             </div>
-                                            <div className="text-sm text-muted-foreground ml-6 space-y-0.5">
-                                                <div>Amount: {reconciliationResult.best_match.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</div>
-                                                {reconciliationResult.best_match.date && (
-                                                    <div>Date: {new Date(reconciliationResult.best_match.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-                                                )}
-                                                {reconciliationResult.best_match.customer && (
-                                                    <div>Customer: {reconciliationResult.best_match.customer}</div>
-                                                )}
-                                            </div>
+                                            {reconciliationResult.status === 'MATCHED' ? (
+                                                <Badge className="text-xs bg-green-600 hover:bg-green-600">
+                                                    Confirmed
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-xs">
+                                                    SUGGESTED
+                                                </Badge>
+                                            )}
                                         </div>
-                                        {reconciliationResult.status === 'SUGGESTED' && (
-                                            <Button
+                                    </div>
+
+                                    {/* Best Match */}
+                                    <div className="px-4 py-3 bg-primary/5">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="space-y-1 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                                                    <span className="font-medium text-sm">
+                                                        {reconciliationResult.best_match.type === 'payment_receipt' ? 'Payment Receipt' : 'Invoice'}: {reconciliationResult.best_match.reference}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm text-muted-foreground ml-6 space-y-0.5">
+                                                    <div>Amount: {reconciliationResult.best_match.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</div>
+                                                    {reconciliationResult.best_match.date && (
+                                                        <div>Date: {new Date(reconciliationResult.best_match.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                                                    )}
+                                                    {reconciliationResult.best_match.customer && (
+                                                        <div>Customer: {reconciliationResult.best_match.customer}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {reconciliationResult.status === 'SUGGESTED' && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    className="shrink-0"
+                                                    onClick={handleConfirmMatch}
+                                                    disabled={isConfirmingMatch}
+                                                >
+                                                    {isConfirmingMatch ? (
+                                                        <>
+                                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                            Confirming...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                                                            Confirm match
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Alternatives Toggle */}
+                                    {reconciliationResult.alternatives.length > 0 && (
+                                        <>
+                                            <button
                                                 type="button"
-                                                size="sm"
-                                                className="shrink-0"
-                                                onClick={handleConfirmMatch}
-                                                disabled={isConfirmingMatch}
+                                                className="w-full px-4 py-2 text-xs text-muted-foreground hover:bg-muted/30 flex items-center justify-center gap-1 border-t transition-colors"
+                                                onClick={() => setShowAlternatives(!showAlternatives)}
                                             >
-                                                {isConfirmingMatch ? (
+                                                {showAlternatives ? (
                                                     <>
-                                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                        Confirming...
+                                                        <ChevronUp className="w-3 h-3" />
+                                                        Hide {reconciliationResult.alternatives.length} other suggestion{reconciliationResult.alternatives.length > 1 ? 's' : ''}
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                                                        Confirm match
+                                                        <ChevronDown className="w-3 h-3" />
+                                                        Show {reconciliationResult.alternatives.length} other suggestion{reconciliationResult.alternatives.length > 1 ? 's' : ''}
                                                     </>
                                                 )}
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
+                                            </button>
 
-                                {/* Alternatives Toggle */}
-                                {reconciliationResult.alternatives.length > 0 && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            className="w-full px-4 py-2 text-xs text-muted-foreground hover:bg-muted/30 flex items-center justify-center gap-1 border-t transition-colors"
-                                            onClick={() => setShowAlternatives(!showAlternatives)}
-                                        >
-                                            {showAlternatives ? (
-                                                <>
-                                                    <ChevronUp className="w-3 h-3" />
-                                                    Hide {reconciliationResult.alternatives.length} other suggestion{reconciliationResult.alternatives.length > 1 ? 's' : ''}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <ChevronDown className="w-3 h-3" />
-                                                    Show {reconciliationResult.alternatives.length} other suggestion{reconciliationResult.alternatives.length > 1 ? 's' : ''}
-                                                </>
-                                            )}
-                                        </button>
-
-                                        {/* Alternatives List */}
-                                        {showAlternatives && (
-                                            <div className="border-t divide-y">
-                                                {reconciliationResult.alternatives.map((alt, idx) => (
-                                                    <div key={idx} className="px-4 py-2.5 hover:bg-muted/20 transition-colors">
-                                                        <div className="flex items-start justify-between">
-                                                            <div className="space-y-0.5">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-sm text-muted-foreground">
-                                                                        {alt.type === 'payment_receipt' ? 'Receipt' : 'Invoice'}: {alt.reference}
-                                                                    </span>
-                                                                    <Badge variant="outline" className="text-xs">
-                                                                        {alt.confidence}
-                                                                    </Badge>
-                                                                </div>
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    {alt.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                                                                    {alt.customer && ` - ${alt.customer}`}
-                                                                    {alt.date && ` - ${new Date(alt.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                                            {/* Alternatives List */}
+                                            {showAlternatives && (
+                                                <div className="border-t divide-y">
+                                                    {reconciliationResult.alternatives.map((alt, idx) => (
+                                                        <div key={idx} className="px-4 py-2.5 hover:bg-muted/20 transition-colors">
+                                                            <div className="flex items-start justify-between">
+                                                                <div className="space-y-0.5">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-sm text-muted-foreground">
+                                                                            {alt.type === 'payment_receipt' ? 'Receipt' : 'Invoice'}: {alt.reference}
+                                                                        </span>
+                                                                        <Badge variant="outline" className="text-xs">
+                                                                            {alt.confidence}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="text-xs text-muted-foreground">
+                                                                        {alt.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                                                                        {alt.customer && ` - ${alt.customer}`}
+                                                                        {alt.date && ` - ${new Date(alt.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        )}
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
 
                         {/* Unmatched status indicator */}
                         {reconciliationResult && reconciliationResult.status === 'UNMATCHED' && (

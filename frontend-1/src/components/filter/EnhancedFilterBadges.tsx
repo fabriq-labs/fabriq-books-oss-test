@@ -466,7 +466,6 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
                     className="px-4 py-2 flex items-center gap-1 !rounded-full bg-[#E5DEFF] text-[#403E43] font-semibold"
                 >
                     {isLoading && field === "legal_entity_id" || isLoading && field === "business_unit_id" ||
-                        isLoading && field === "category_id" ||
                         isLoading && field === "coa_id" || isLoading && field === "budget_line_id" || isLoading && field === "budget_period_id" || isLoading && field === "location_id"
                         || isLoading && field === "cost_center_id" || isLoading && field === "department_id" || isLoading && field === "supplier_id" || isLoading && field === "payment_term_id"
                         || isLoading && field === "shipping_term_id" || isLoading && field === "shipping_method_id" || isLoading && field === "preferred_currency_id" || isLoading && field === "item_id" || isLoading && field === "coa_code" ? (

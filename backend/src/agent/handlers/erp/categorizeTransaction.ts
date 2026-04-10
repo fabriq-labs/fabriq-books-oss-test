@@ -46,7 +46,6 @@ interface CategorizeTransactionParams {
     account_type?: string[];
     credit_account_id?: string;
     credit_account_type?: string[];
-    category_id?: string;
   };
   options?: {
     include_alternatives?: boolean;
@@ -192,7 +191,6 @@ export const categorizeTransactionHandler: ERPMethodHandler = {
           creditAccountId: params.posting_data.credit_account_id ?? null,
           creditAccountName: null,
           creditAccountType: params.posting_data.credit_account_type ?? [],
-          categoryId: params.posting_data.category_id ?? null,
           aiCatScore: null,
         };
       }
@@ -345,7 +343,7 @@ export const categorizeTransactionHandler: ERPMethodHandler = {
         },
         durationMs,
         status: 'success',
-      }).catch(() => {});
+      }).catch(() => { });
 
       logger.info('Transaction categorization completed', {
         postingId: posting.id,
@@ -408,7 +406,7 @@ export const categorizeTransactionHandler: ERPMethodHandler = {
           durationMs,
           status: 'error',
           errorMessage: error.message,
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       return {
