@@ -1150,14 +1150,14 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                                         instanceType="currency"
                                                         instanceSourceKey="preferred_currency_id"
                                                         instanceKey="id"
-                                                        instanceLabel="base_currency"
+                                                        instanceLabel="code"
                                                         instanceValue={
                                                             initialValues?.currency
                                                         }
                                                         onSelectItem={handleSelectChange}
-                                                        onClear={() => handleSelectClear('base_currency')}
+                                                        onClear={() => handleSelectClear('code')}
                                                         limit="10"
-                                                        searchParams="base_currency"
+                                                        searchParams="code"
                                                         type="supplier"
                                                     />
                                                     <FormMessage />

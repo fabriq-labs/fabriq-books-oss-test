@@ -214,17 +214,14 @@
       "displayName": "Tax Rate Intra",
       "isColumnShow": false
     },
-    "currency_master": {
+    "currency": {
       "select": {
         "id": "read",
-        "base_currency": "update",
-        "from_currency": "update",
-        "currency_value": "update",
-        "effective_from": "update"
+        "code": "update"
       },
       "dataType": "table",
       "required": false,
-      "displayName": "Currency Master",
+      "displayName": "Currency",
       "isColumnShow": false
     },
     "item_category_id": {
@@ -292,7 +289,7 @@
       "displayName": "Tax Rate Intra",
       "isColumnShow": false
     },
-    "currency_master_id": {
+    "currency_id": {
       "datatype": "string",
       "required": false,
       "permission": "update",
@@ -302,18 +299,18 @@
           "type": "item_master",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "currency_master",
-          "searchParams": "base_currency",
-          "instanceLabel": "base_currency",
-          "instanceSourceKey": "currency_master_id"
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
+          "instanceSourceKey": "currency_id"
         },
         "defaultValue": ""
       },
       "listProps": {
         "type": "text",
-        "recordPath": "currency_master.base_currency"
+        "recordPath": "currency.code"
       },
-      "displayName": "Currency Master",
+      "displayName": "Currency",
       "isColumnShow": false
     },
     "supplier_items": {

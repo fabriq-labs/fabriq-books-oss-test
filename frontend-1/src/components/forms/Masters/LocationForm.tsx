@@ -145,7 +145,7 @@ export const LocationForm: React.FC<LocationFormProps> = () => {
         <div className="mx-auto w-[70%]">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Location Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Location</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit Location' : 'Create New Location'}
                     </p>

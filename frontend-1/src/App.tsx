@@ -38,7 +38,7 @@ import { BudgetLineForm } from "./components/forms/Masters/BudgetLineForm";
 import { UOMForm } from "./components/forms/Masters/UOMForm";
 import { PaymentTermsForm } from "./components/forms/Masters/PaymentTermsForm";
 import { ShippingTermsForm } from "./components/forms/Masters/ShippingTermsForm";
-import { ShippingMethodForm } from "./components/forms/Masters/ShippingMethodForm"; ś
+import { ShippingMethodForm } from "./components/forms/Masters/ShippingMethodForm";
 import WorkflowManagementPage from "./pages/settings/WorkflowManagementPage";
 import WorkflowDetailPage from "./pages/settings/WorkflowDetailPage";
 import ConnectionsPage from "./pages/settings/ConnectionsPage";
@@ -90,6 +90,7 @@ import { InboxPage } from "./pages/workbench/InboxPage";
 import { GoalSetter } from "./components/workbench/GoalSetter";
 
 import { ExchangeRateForm } from "./components/forms/Masters/ExchangeRateForm";
+import { CurrencyForm } from "./components/forms/Masters/CurrencyForm";
 // Create a client
 const queryClient = new QueryClient();
 
@@ -228,6 +229,9 @@ const AppRoutes: React.FC = () => {
 
 
                 <Route path="accounting/currency" element={<Master type="currency" view="currency_view" displayName="Currency" isImport={false} />} />
+                <Route path="currency/:id/view/:viewId" element={<CurrencyForm />} />
+                <Route path="currency/view/:viewId" element={<CurrencyForm />} />
+
                 <Route path="accounting/exchange-rates" element={<Master type="exchange_rate" view="exchange_rate_view" displayName="Exchange Rate" />} />
                 <Route path="exchange_rate/:id/view/:viewId" element={<ExchangeRateForm />} />
                 <Route path="exchange_rate/view/:viewId" element={<ExchangeRateForm />} />

@@ -197,7 +197,7 @@ export const ViewForm: React.FC<ViewFormProps> = () => {
         <div className="mx-auto w-[90%] max-w-6xl">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">View Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">View</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit View' : 'Create New View'}
                     </p>

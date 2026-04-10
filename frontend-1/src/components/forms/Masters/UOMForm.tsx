@@ -140,7 +140,7 @@ export const UOMForm: React.FC<ItemMasterFormProps> = (
         <div className="mx-auto w-[70%]">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">UOM Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">UOM</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit UOM' : 'Create New UOM'}
                     </p>

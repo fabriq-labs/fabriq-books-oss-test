@@ -124,13 +124,13 @@
       "displayName": "Primary Phone",
       "isColumnShow": true
     },
-    "currency_master": {
+    "currency": {
       "select": {
         "id": "read",
-        "base_currency": "update"
+        "code": "update"
       },
       "dataType": "table",
-      "displayName": "currency_master",
+      "displayName": "Currency",
       "isColumnShow": false
     },
     "payment_term_id": {
@@ -173,21 +173,21 @@
       "tableProps": {
         "columnType": "select",
         "selectProps": {
-          "type": "supplier",
+          "type": "customers",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "currency_master",
-          "searchParams": "base_currency",
-          "instanceLabel": "base_currency",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
           "instanceSourceKey": "preferred_currency_id"
         },
         "defaultValue": ""
       },
       "listProps": {
         "type": "text",
-        "recordPath": "currency_master.base_currency"
+        "recordPath": "currency.code"
       },
-      "displayName": "Currency Master",
+      "displayName": "Currency",
       "isColumnShow": true
     }
   },

@@ -132,14 +132,14 @@
           "type": "payment_receipt",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "currency_master",
-          "searchParams": "base_currency",
-          "instanceLabel": "base_currency",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
           "instanceSourceKey": "currency_id"
         },
         "defaultValue": ""
       },
-      "displayName": "Currency Master",
+      "displayName": "Currency",
       "isColumnShow": false
     },
     "customer_id": {
@@ -191,17 +191,15 @@
       "permission": "update",
       "displayName": "Receipt Number"
     },
-    "currency_master": {
+    "currency": {
       "type": "table",
       "select": {
         "id": "read",
-        "base_currency": "update",
-        "from_currency": "update",
-        "effective_from": "update"
+        "code": "update"
       },
       "dataType": "table",
       "required": false,
-      "displayName": "Currency Master",
+      "displayName": "Currency",
       "isColumnShow": false
     },
     "payment_reference": {

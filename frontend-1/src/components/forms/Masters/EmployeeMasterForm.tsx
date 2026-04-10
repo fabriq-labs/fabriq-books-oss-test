@@ -177,7 +177,7 @@ export const EmployeeMasterForm: React.FC<ItemMasterFormProps> = (
         <div className="mx-auto w-[70%]">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Employee Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Employee</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit Employee' : 'Create New Employee'}
                     </p>

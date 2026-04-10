@@ -218,7 +218,7 @@ export const ProjectMasterForm: React.FC<ItemMasterFormProps> = (
         <div className="mx-auto w-[70%]">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Project Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Project</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit Project' : 'Create New Project'}
                     </p>

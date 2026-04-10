@@ -268,15 +268,21 @@ enum account_classification {
 // ── Forex: Currency reference & exchange rates ──────────────────────────
 
 model currency {
-  id             String   @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
-  code           String   @unique // ISO 4217: "USD", "INR", "PHP", "EUR"
-  name           String // "US Dollar", "Indian Rupee"
-  symbol         String? // "$", "₹", "₱"
-  decimal_places Int      @default(2)
-  is_active      Boolean  @default(true)
-  created_at     DateTime @default(now())
-  modified_at    DateTime @updatedAt
-  org_id         String
+  id              String            @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
+  code            String            @unique // ISO 4217: "USD", "INR", "PHP", "EUR"
+  name            String // "US Dollar", "Indian Rupee"
+  symbol          String? // "$", "₹", "₱"
+  decimal_places  Int               @default(2)
+  is_active       Boolean           @default(true)
+  created_at      DateTime          @default(now())
+  modified_at     DateTime          @updatedAt
+  org_id          String
+  payment_receipt payment_receipt[]
+  entities        entity[]
+  suppliers       supplier[]
+  customers       customers[]
+  itemMasters     item_master[]
+  orgs            org[]
 
   @@map("currency")
 }

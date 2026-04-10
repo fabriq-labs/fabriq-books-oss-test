@@ -62,11 +62,11 @@
         "payment_term_id": "update",
         "customer_address": "update",
         "preferred_currency_id": "update",
-        "currency_master": {
+        "currency": {
           "type": "table",
           "select": {
             "id": "read",
-            "base_currency": "read"
+            "code": "read"
           }
         }
       },
@@ -78,14 +78,11 @@
           "payment_terms": "update"
         }
       },
-      "currency_master": {
+      "currency": {
         "type": "table",
         "select": {
           "id": "read",
-          "base_currency": "update",
-          "from_currency": "update",
-          "currency_value": "update",
-          "effective_from": "update"
+          "code": "update"
         }
       }
     },
@@ -418,11 +415,11 @@
         "exchange_rate": "update",
         "payment_method": "update",
         "receipt_number": "update",
-        "currency_master": {
+        "currency": {
           "type": "table",
           "select": {
             "id": "read",
-            "base_currency": "read"
+            "code": "read"
           }
         },
         "payment_reference": "update"
