@@ -22,7 +22,7 @@ const CONFIRM = process.argv.includes('--confirm');
 const ORG_TABLES = [
   'pending_action', 'agent_session', 'llm_trace', 'ai_activity_log', 'expense_report',
   'workflow_history', 'comment',
-  'posting', 'trade', 'holding', 'instrument', 'category', 'category_group',
+  'posting', 'trade', 'holding', 'instrument',
   'delivery_challan', 'credit_note', 'quote', 'sales_order', 'payment_receipt', 'invoice',
   'purchase_order_item', 'purchase_order', 'item', 'purchase_requisition', 'project_master',
   'general_ledger', 'budget_line', 'budget_period', 'employee_master', 'supplier_items',

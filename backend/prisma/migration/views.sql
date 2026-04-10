@@ -408,12 +408,7 @@ AS SELECT p.id,
     p.org_id,
     p.name,
     p.assigned_to,
-    p.category_id,
     a.sub_type,
-    c.name AS category_name,
-    cg.name AS group_name,
-    cg.id AS group_id
    FROM posting p
      LEFT JOIN account a ON p.account_id = a.id::text
-     LEFT JOIN category c ON p.category_id = c.id::text
-     LEFT JOIN category_group cg ON c.group_id = cg.id::text;
+     

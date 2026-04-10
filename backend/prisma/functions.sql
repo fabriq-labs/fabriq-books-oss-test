@@ -382,7 +382,7 @@ ALTER TABLE public."purchase_requisition" ALTER COLUMN id SET DEFAULT concat('pr
 ALTER TABLE public."item" ALTER COLUMN id SET DEFAULT concat('item_', gen_random_uuid());
 ALTER TABLE public."purchase_order" ALTER COLUMN id SET DEFAULT concat('po_', gen_random_uuid());
 ALTER TABLE public."purchase_order_item" ALTER COLUMN id SET DEFAULT concat('po_item_', gen_random_uuid());
-ALTER TABLE public."currency_master" ALTER COLUMN id SET DEFAULT concat('cur_', gen_random_uuid());
+ALTER TABLE public."currency" ALTER COLUMN id SET DEFAULT concat('cur_', gen_random_uuid());
 ALTER TABLE public."invoice" ALTER COLUMN id SET DEFAULT concat('invoice_', gen_random_uuid());
 ALTER TABLE public."invoice_line_item" ALTER COLUMN id SET DEFAULT concat('in_item__', gen_random_uuid());
 ALTER TABLE public."payment_receipt" ALTER COLUMN id SET DEFAULT concat('payr_', gen_random_uuid());
@@ -399,8 +399,6 @@ ALTER TABLE public."quote_item" ALTER COLUMN id SET DEFAULT concat('quote_item_'
 
 -- data.prisma models
 ALTER TABLE public."account" ALTER COLUMN id SET DEFAULT concat('acco_', gen_random_uuid());
-ALTER TABLE public."category" ALTER COLUMN id SET DEFAULT concat('cate_', gen_random_uuid());
-ALTER TABLE public."category_group" ALTER COLUMN id SET DEFAULT concat('catg_', gen_random_uuid());
 ALTER TABLE public."posting" ALTER COLUMN id SET DEFAULT concat('post_', gen_random_uuid());
 ALTER TABLE public."instrument" ALTER COLUMN id SET DEFAULT concat('inst_', gen_random_uuid());
 ALTER TABLE public."trade" ALTER COLUMN id SET DEFAULT concat('trad_', gen_random_uuid());

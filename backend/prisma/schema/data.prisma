@@ -58,37 +58,6 @@ model account {
   @@map("account")
 }
 
-model category {
-  id             String          @id @default(dbgenerated("'cate_' || gen_random_uuid()")) @db.VarChar(50)
-  created_by     String?
-  modified_by    String?
-  created_at     DateTime        @default(now())
-  modified_at    DateTime        @updatedAt
-  org_id         String?
-  assigned_to    String?
-  name           String
-  color          String
-  group_id       String?
-  category_group category_group? @relation(fields: [group_id], references: [id])
-  posting        posting[]
-
-  @@map("category")
-}
-
-model category_group {
-  id             String     @id @default(dbgenerated("'catg_' || gen_random_uuid()")) @db.VarChar(50)
-  created_by     String?
-  modified_by    String?
-  created_at     DateTime   @default(now())
-  modified_at    DateTime   @updatedAt
-  org_id         String?
-  assigned_to    String?
-  name           String
-  category_group category[]
-
-  @@map("category_group")
-}
-
 model posting {
   id                     String    @id @default(dbgenerated("'post_' || gen_random_uuid()")) @db.VarChar(50)
   created_by             String?
@@ -104,7 +73,6 @@ model posting {
   value_date             DateTime?
   posting_date           DateTime?
   amount                 Decimal?  @db.Decimal(19, 4)
-  category_id            String?
   category_name          String?
   posting_type           String?
   notes                  String?
@@ -137,7 +105,6 @@ model posting {
 
   account         account?         @relation("debit_account", fields: [account_id], references: [id])
   credit_account  account?         @relation("credit_account", fields: [credit_account_id], references: [id])
-  category        category?        @relation(fields: [category_id], references: [id])
   payment_receipt payment_receipt? @relation("PostingToPaymentReceipt", fields: [payment_receipt_id], references: [id])
 
   @@map("posting")

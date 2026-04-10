@@ -37,9 +37,7 @@ async function cleanupDevData() {
       }),
 
       // Delete item categories
-      prisma.item_category.deleteMany({
-        where: { org_id: 'org_wayne_enterprises' }
-      }),
+
 
       // Delete customers
       prisma.customers.deleteMany({
@@ -52,7 +50,7 @@ async function cleanupDevData() {
       }),
 
       // Delete currency
-      prisma.currency_master.deleteMany({
+      prisma.currency.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
 

@@ -45,7 +45,6 @@ export interface PostingForCategorization {
   creditAccountId: string | null;
   creditAccountName: string | null;
   creditAccountType: string[];
-  categoryId: string | null;
   aiCatScore: number | null;
 }
 
@@ -216,7 +215,6 @@ export async function fetchPostingById(
     creditAccountId: posting.credit_account_id,
     creditAccountName: posting.credit_account?.name ?? null,
     creditAccountType: posting.credit_account?.type ?? [],
-    categoryId: posting.category_id,
     aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
   };
 }
@@ -262,7 +260,6 @@ export async function fetchPostingsByIds(
     creditAccountId: posting.credit_account_id,
     creditAccountName: posting.credit_account?.name ?? null,
     creditAccountType: posting.credit_account?.type ?? [],
-    categoryId: posting.category_id,
     aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
   }));
 }

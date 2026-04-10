@@ -328,7 +328,7 @@ model supplier {
   shipping_method           shipping_method?      @relation(fields: [shipping_method_id], references: [id])
   shipping_terms            shipping_terms?       @relation(fields: [shipping_term_id], references: [id])
   payment_terms             payment_terms?        @relation(fields: [payment_term_id], references: [id])
-  currency                 currency?             @relation(fields: [preferred_currency_id], references: [id])
+  currency                  currency?             @relation(fields: [preferred_currency_id], references: [id])
   supplier_items            supplier_items[]
   item                      item[]
   purchase_order_item       purchase_order_item[]
@@ -364,7 +364,7 @@ model customers {
   payment_term_id       String?
   preferred_currency_id String?
   payment_terms         payment_terms?     @relation(fields: [payment_term_id], references: [id])
-  currency             currency?          @relation(fields: [preferred_currency_id], references: [id])
+  currency              currency?          @relation(fields: [preferred_currency_id], references: [id])
   invoice               invoice[]
   location              location[]
   payment_receipt       payment_receipt[]
@@ -479,7 +479,7 @@ model item_master {
   uom                   uom?                    @relation(fields: [uom_id], references: [id])
   tax_master            tax_master?             @relation("ItemMaster_TaxMaster", fields: [tax_master_id], references: [id])
   tax_rate_intra        tax_master?             @relation("ItemMaster_TaxRateIntra", fields: [tax_rate_intra_id], references: [id])
-  currency             currency?               @relation(fields: [currency_id], references: [id])
+  currency              currency?               @relation(fields: [currency_id], references: [id])
   sales_account         account?                @relation("ItemMaster_SalesAccount", fields: [sales_account_id], references: [id])
   purchase_account      account?                @relation("ItemMaster_PurchaseAccount", fields: [purchase_account_id], references: [id])
   pr_items              item[]
@@ -929,7 +929,7 @@ model payment_receipt {
   // Relationships
   customers         customers?    @relation(fields: [customer_id], references: [id])
   invoice           invoice?      @relation(fields: [invoice_id], references: [id])
-  currency         currency?     @relation(fields: [currency_id], references: [id])
+  currency          currency?     @relation(fields: [currency_id], references: [id])
 
   account account? @relation(fields: [account_id], references: [id])
 

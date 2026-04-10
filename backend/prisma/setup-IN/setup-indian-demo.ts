@@ -177,24 +177,8 @@ async function setupIndianDemoData() {
     console.log(`  ✓ Shipping methods: ${shippingMethodData.length}, Shipping terms: ${shippingTermsData.length}, Tax: ${taxMasterData.length}, Item categories: ${itemCategoryData.length}, UOM: ${uomData.length}, Cost centers: ${costCenterData.length}`);
 
     // ===== 2.58. LOAD CATEGORY_GROUP, CATEGORY (data.prisma) =====
-    console.log('📂 Loading category groups and categories...');
-    const categoryGroupData = await loadCsvData(path.join(__dirname, 'category_group.csv'));
-    for (const row of categoryGroupData) {
-      await prisma.category_group.upsert({
-        where: { id: row.id },
-        update: { name: row.name, org_id: row.org_id || null },
-        create: { id: row.id, name: row.name, org_id: row.org_id || null },
-      });
-    }
-    const categoryData = await loadCsvData(path.join(__dirname, 'category.csv'));
-    for (const row of categoryData) {
-      await prisma.category.upsert({
-        where: { id: row.id },
-        update: { name: row.name, color: row.color, group_id: row.group_id || null, org_id: row.org_id || null },
-        create: { id: row.id, name: row.name, color: row.color, group_id: row.group_id || null, org_id: row.org_id || null },
-      });
-    }
-    console.log(`  ✓ Category groups: ${categoryGroupData.length}, Categories: ${categoryData.length}, Currencies: ${currencyData.length}`);
+
+
 
     // ===== 2.6. SETUP ZOHO BOOKS ERP CONNECTION =====
     console.log('🔌 Setting up Zoho Books ERP connection...');
@@ -966,7 +950,7 @@ async function setupIndianDemoData() {
     console.log(`   📦 Items: ${itemData.length}`);
     console.log(`   🔗 Supplier items: ${supplierItemsData.length}`);
     console.log(`   📋 Masters: Shipping (${shippingMethodData.length}), Shipping terms (${shippingTermsData.length}), Tax (${taxMasterData.length}), Item categories (${itemCategoryData.length}), UOM (${uomData.length}), Cost centers (${costCenterData.length}), Business units (${businessUnitData.length}), Departments (${departmentData.length})`);
-    console.log(`   📂 Category groups: ${categoryGroupData.length}, Categories: ${categoryData.length}, Currencies: ${currencyData.length}`);
+
     console.log(`   📊 Budget periods: ${budgetPeriodData.length}, Budget lines: ${budgetLineData.length}, General ledger: ${generalLedgerData.length}, Projects: ${projectMasterData.length}, Employee master: ${employeeMasterData.length}`);
     console.log(`   👤 Users: ${userData.length}`);
     console.log(`   🔗 Role Assignments: ${roleUserData.length}`);

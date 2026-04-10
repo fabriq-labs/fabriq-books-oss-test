@@ -62,7 +62,6 @@ const createMockPosting = (overrides: Partial<PostingForCategorization> = {}): P
   creditAccountId: null,
   creditAccountName: null,
   creditAccountType: [],
-  categoryId: null,
   aiCatScore: null,
   ...overrides,
 });
@@ -643,7 +642,7 @@ describe.skip('Integration Tests (requires LLM)', () => {
   afterAll(async () => {
     // Clean up test data
     if (testPostingId) {
-      await prisma.posting.delete({ where: { id: testPostingId } }).catch(() => {});
+      await prisma.posting.delete({ where: { id: testPostingId } }).catch(() => { });
     }
     // Clean up AI activity logs from tests
     await prisma.ai_activity_log
@@ -653,7 +652,7 @@ describe.skip('Integration Tests (requires LLM)', () => {
           user_id: TEST_USER_ID,
         },
       })
-      .catch(() => {});
+      .catch(() => { });
   });
 
   it('should categorize a transaction with LLM', async () => {

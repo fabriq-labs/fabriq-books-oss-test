@@ -22,7 +22,7 @@ const SCHEMA_CONTEXT = {
       'item_master', 'supplier', 'customers', 'invoice', 'invoice_line_item',
       'purchase_requisition', 'item', 'purchase_order', 'purchase_order_item',
       'sales_order', 'sales_order_item', 'delivery_challan', 'credit_note',
-      'quote', 'account', 'posting', 'category', 'payment_receipt',
+      'quote', 'account', 'posting', 'payment_receipt',
       'workflow_instance', 'workflow_history'  // These have org_id!
     ],
     metadataTables: [
