@@ -421,15 +421,15 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
                                                 <FormItem>
                                                     <FormLabel>Preferred Currency</FormLabel>
                                                     <SearchDropDown
-                                                        instanceType="currency_master"
+                                                        instanceType="currency"
                                                         instanceSourceKey="preferred_currency_id"
                                                         instanceKey="id"
-                                                        instanceLabel="base_currency"
-                                                        instanceValue={initialValues?.currency_master}
+                                                        instanceLabel="code"
+                                                        instanceValue={initialValues?.currency}
                                                         onSelectItem={handleSelectChange}
                                                         onClear={() => handleSelectClear('preferred_currency_id')}
                                                         limit="10"
-                                                        searchParams="base_currency"
+                                                        searchParams="code"
                                                         type="customers"
                                                     />
                                                     <FormMessage />

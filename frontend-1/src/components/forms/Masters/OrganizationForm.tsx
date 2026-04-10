@@ -333,18 +333,18 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
                             <FormItem>
                               <FormLabel>Base Currency</FormLabel>
                               <SearchDropDown
-                                instanceType="currency_master"
+                                instanceType="currency"
                                 instanceSourceKey="basecurrency_id"
                                 instanceKey="id"
-                                instanceLabel="base_currency"
+                                instanceLabel="code"
                                 instanceValue={
-                                  initialValues?.currency_master
+                                  initialValues?.currency
                                 }
                                 onSelectItem={handleSelectChange}
                                 onClear={handleSelectClear}
                                 limit="10"
-                                searchParams="base_currency"
-                                type="organization"
+                                searchParams="code"
+                                type="entity"
                               />
                               <FormMessage />
                             </FormItem>
@@ -581,17 +581,17 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
                         <FormItem>
                           <FormLabel>Base Currency</FormLabel>
                           <SearchDropDown
-                            instanceType="currency_master"
+                            instanceType="currency"
                             instanceSourceKey="basecurrency_id"
                             instanceKey="id"
-                            instanceLabel="base_currency"
+                            instanceLabel="code"
                             instanceValue={
-                              initialValues?.currency_master
+                              initialValues?.currency
                             }
                             onSelectItem={handleSelectChange}
                             onClear={handleSelectClear}
                             limit="10"
-                            searchParams="base_currency"
+                            searchParams="code"
                             type="organization"
                           />
                           <FormMessage />

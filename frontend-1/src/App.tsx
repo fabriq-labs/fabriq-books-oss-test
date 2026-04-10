@@ -38,9 +38,7 @@ import { BudgetLineForm } from "./components/forms/Masters/BudgetLineForm";
 import { UOMForm } from "./components/forms/Masters/UOMForm";
 import { PaymentTermsForm } from "./components/forms/Masters/PaymentTermsForm";
 import { ShippingTermsForm } from "./components/forms/Masters/ShippingTermsForm";
-import { ShippingMethodForm } from "./components/forms/Masters/ShippingMethodForm";
-import { CurrencyMasterForm } from "./components/forms/Masters/CurrencyMasterForm";
-import { CurrencyForm } from "./components/forms/Masters/CurrencyForm";
+import { ShippingMethodForm } from "./components/forms/Masters/ShippingMethodForm"; ś
 import WorkflowManagementPage from "./pages/settings/WorkflowManagementPage";
 import WorkflowDetailPage from "./pages/settings/WorkflowDetailPage";
 import ConnectionsPage from "./pages/settings/ConnectionsPage";
@@ -228,10 +226,8 @@ const AppRoutes: React.FC = () => {
                 <Route path="tax_master/:id/view/:viewId" element={<TaxMasterForm />} />
                 <Route path="tax_master/view/:viewId" element={<TaxMasterForm />} />
 
-                <Route path="accounting/currency-master" element={<Master type="currency_master" view="currency_master_view" displayName="Currency Master" />} />
-                <Route path="currency_master/:id/view/:viewId" element={<CurrencyMasterForm />} />
-                <Route path="currency_master/view/:viewId" element={<CurrencyMasterForm />} />
-                <Route path="accounting/currency" element={<Master type="currency" view="currency_view" displayName="Currency" isCreate={false} />} />
+
+                <Route path="accounting/currency" element={<Master type="currency" view="currency_view" displayName="Currency" isImport={false} />} />
                 <Route path="accounting/exchange-rates" element={<Master type="exchange_rate" view="exchange_rate_view" displayName="Exchange Rate" />} />
                 <Route path="exchange_rate/:id/view/:viewId" element={<ExchangeRateForm />} />
                 <Route path="exchange_rate/view/:viewId" element={<ExchangeRateForm />} />

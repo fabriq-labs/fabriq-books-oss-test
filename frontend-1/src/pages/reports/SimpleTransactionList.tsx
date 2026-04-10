@@ -58,7 +58,7 @@ interface LegalEntity {
     organization_name?: string;
     legal_name?: string;
     basecurrency_id?: string | null;
-    currency_master?: { base_currency?: string } | null;
+    currency?: { code?: string } | null;
 }
 
 // Chart colors
@@ -371,7 +371,7 @@ export default function SimpleTransactionList() {
     };
 
     const displayCurrency = useMemo(() => {
-        const code = selectedLegalEntity?.currency_master?.base_currency;
+        const code = selectedLegalEntity?.currency?.code;
         if (code) return code;
         return transactions[0]?.currency || "INR";
     }, [selectedLegalEntity, transactions]);

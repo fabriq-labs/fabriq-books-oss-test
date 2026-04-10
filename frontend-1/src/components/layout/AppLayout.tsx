@@ -35,7 +35,7 @@ const routeTitles: Record<string, string> = {
     '/master/others/payment-terms': 'Payment Terms',
     '/master/others/shipping-terms': 'Shipping Terms',
     '/master/others/shipping-method': 'Shipping Method',
-    '/master/others/currency': 'Currency Master',
+    '/master/others/currency': 'Currency',
     '/master/others/tax-master': 'Tax Master',
     '/settings/tenant-onboarding': 'Tenant Onboarding',
 };
@@ -80,7 +80,6 @@ const getTitleFromRoute = (pathname: string, isBuyer: boolean): string => {
             'payment_terms': 'Payment Terms',
             'shipping_terms': 'Shipping Terms',
             'shipping_method': 'Shipping Method',
-            'currency_master': 'Currency Master',
             'exchange_rates': 'Exchange Rates',
             'currency': 'Currency',
         };
