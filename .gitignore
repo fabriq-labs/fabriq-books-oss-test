@@ -47,9 +47,7 @@ __pycache__/
 venv/
 
 # User-specific IDE/AI folders
-.claude/
-.cursor/*
-!.cursor/skills/
+
 
 trash/
 
