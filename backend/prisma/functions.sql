@@ -66,7 +66,7 @@ END $$;
 -- Name: generate_challan_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_challan_number() RETURNS text
+CREATE OR REPLACE FUNCTION public.generate_challan_number() RETURNS text
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -79,7 +79,7 @@ $$;
 -- Name: generate_credit_note_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_credit_note_number() RETURNS text
+CREATE OR REPLACE FUNCTION public.generate_credit_note_number() RETURNS text
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -92,7 +92,7 @@ $$;
 -- Name: generate_gl_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_gl_number() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_gl_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -109,7 +109,7 @@ $$;
 -- Name: generate_invoice_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_invoice_number() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_invoice_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -125,7 +125,7 @@ $$;
 -- Name: generate_item_code(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_item_code() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_item_code() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -141,7 +141,7 @@ $$;
 -- Name: generate_item_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_item_number() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_item_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $_$
 DECLARE
@@ -174,7 +174,7 @@ $_$;
 -- Name: generate_payment_receipt_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_payment_receipt_number() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_payment_receipt_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -190,7 +190,7 @@ $$;
 -- Name: generate_po_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_po_number() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_po_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -206,7 +206,7 @@ $$;
 -- Name: generate_pr_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_pr_number() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_pr_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -222,7 +222,7 @@ $$;
 -- Name: generate_prefixed_uuid(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_prefixed_uuid(prefix text) RETURNS text
+CREATE OR REPLACE FUNCTION public.generate_prefixed_uuid(prefix text) RETURNS text
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -235,7 +235,7 @@ $$;
 -- Name: generate_purchase_order_item_no(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_purchase_order_item_no() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_purchase_order_item_no() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 DECLARE
@@ -261,7 +261,7 @@ $$;
 -- Name: generate_quote_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_quote_number() RETURNS text
+CREATE OR REPLACE FUNCTION public.generate_quote_number() RETURNS text
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -274,7 +274,7 @@ $$;
 -- Name: generate_so_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_so_number() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_so_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
     BEGIN
@@ -290,7 +290,7 @@ CREATE FUNCTION public.generate_so_number() RETURNS trigger
 -- Name: generate_user_id(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_user_id() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_user_id() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -304,7 +304,7 @@ $$;
 -- Name: generate_usr_uuid(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_usr_uuid() RETURNS uuid
+CREATE OR REPLACE FUNCTION public.generate_usr_uuid() RETURNS uuid
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -317,7 +317,7 @@ $$;
 -- Name: renumber_items_after_delete(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.renumber_items_after_delete() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.renumber_items_after_delete() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 DECLARE
@@ -437,6 +437,7 @@ ALTER TABLE public."source_system" ALTER COLUMN id SET DEFAULT concat('srcsys_',
 -- Name: invoice trg_generate_invoice_number; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trg_generate_invoice_number ON public.invoice;
 CREATE TRIGGER trg_generate_invoice_number BEFORE INSERT ON public.invoice FOR EACH ROW EXECUTE FUNCTION public.generate_invoice_number();
 
 
@@ -444,6 +445,7 @@ CREATE TRIGGER trg_generate_invoice_number BEFORE INSERT ON public.invoice FOR E
 -- Name: purchase_order trg_generate_po_number; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trg_generate_po_number ON public.purchase_order;
 CREATE TRIGGER trg_generate_po_number BEFORE INSERT ON public.purchase_order FOR EACH ROW EXECUTE FUNCTION public.generate_po_number();
 
 
@@ -451,6 +453,7 @@ CREATE TRIGGER trg_generate_po_number BEFORE INSERT ON public.purchase_order FOR
 -- Name: purchase_requisition trg_generate_pr_number; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trg_generate_pr_number ON public.purchase_requisition;
 CREATE TRIGGER trg_generate_pr_number BEFORE INSERT ON public.purchase_requisition FOR EACH ROW EXECUTE FUNCTION public.generate_pr_number();
 
 
@@ -458,6 +461,7 @@ CREATE TRIGGER trg_generate_pr_number BEFORE INSERT ON public.purchase_requisiti
 -- Name: general_ledger trigger_generate_gl_number; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trigger_generate_gl_number ON public.general_ledger;
 CREATE TRIGGER trigger_generate_gl_number BEFORE INSERT ON public.general_ledger FOR EACH ROW EXECUTE FUNCTION public.generate_gl_number();
 
 
@@ -465,6 +469,7 @@ CREATE TRIGGER trigger_generate_gl_number BEFORE INSERT ON public.general_ledger
 -- Name: item_master trigger_generate_item_code; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trigger_generate_item_code ON public.item_master;
 CREATE TRIGGER trigger_generate_item_code BEFORE INSERT ON public.item_master FOR EACH ROW EXECUTE FUNCTION public.generate_item_code();
 
 
@@ -472,6 +477,7 @@ CREATE TRIGGER trigger_generate_item_code BEFORE INSERT ON public.item_master FO
 -- Name: item trigger_generate_item_number; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trigger_generate_item_number ON public.item;
 CREATE TRIGGER trigger_generate_item_number BEFORE INSERT ON public.item FOR EACH ROW EXECUTE FUNCTION public.generate_item_number();
 
 
@@ -479,6 +485,7 @@ CREATE TRIGGER trigger_generate_item_number BEFORE INSERT ON public.item FOR EAC
 -- Name: payment_receipt trigger_generate_payment_receipt_number; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trigger_generate_payment_receipt_number ON public.payment_receipt;
 CREATE TRIGGER trigger_generate_payment_receipt_number BEFORE INSERT ON public.payment_receipt FOR EACH ROW EXECUTE FUNCTION public.generate_payment_receipt_number();
 
 
@@ -486,6 +493,7 @@ CREATE TRIGGER trigger_generate_payment_receipt_number BEFORE INSERT ON public.p
 -- Name: sales_order trigger_generate_so_number; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trigger_generate_so_number ON public.sales_order;
 CREATE TRIGGER trigger_generate_so_number BEFORE INSERT ON public.sales_order FOR EACH ROW EXECUTE FUNCTION public.generate_so_number();
 
 
@@ -493,4 +501,5 @@ CREATE TRIGGER trigger_generate_so_number BEFORE INSERT ON public.sales_order FO
 -- Name: item trigger_renumber_items_after_delete; Type: TRIGGER; Schema: public; Owner: -
 --
 
+DROP TRIGGER IF EXISTS trigger_renumber_items_after_delete ON public.item;
 CREATE TRIGGER trigger_renumber_items_after_delete AFTER DELETE ON public.item FOR EACH ROW EXECUTE FUNCTION public.renumber_items_after_delete();
