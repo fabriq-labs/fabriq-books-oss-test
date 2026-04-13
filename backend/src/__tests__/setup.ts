@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client';
 import { execSync } from 'child_process';
-import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const prisma = new PrismaClient({
@@ -11,7 +10,7 @@ const prisma = new PrismaClient({
 
 // Seed data for integration tests
 const seedData = {
-  organization: {
+  entity: {
     id: 'org_test_seed',
     organization_name: 'Test Organization',
     legal_name: 'Test Organization Ltd',
@@ -31,11 +30,11 @@ const seedData = {
   },
   currency: {
     id: 'cur_test_seed',
-    base_currency: 'USD',
-    from_currency: 'USD',
-    currency_value: 1.0,
-    effective_from: new Date(),
-    status: 'Active',
+    code: 'USD',
+    name: 'US Dollar',
+    symbol: '$',
+    decimal_places: 2,
+    is_active: true,
     org_id: 'org_test_seed',
   },
   customer: {
@@ -95,23 +94,34 @@ beforeAll(async () => {
 
     // Create organization first
     await prisma.entity.upsert({
-      where: { id: seedData.organization.id },
-      update: seedData.organization,
-      create: seedData.organization,
+      where: { id: seedData.entity.id },
+      update: seedData.entity,
+      create: seedData.entity,
     });
 
     // Create currency
-    await prisma.currency_master.upsert({
-      where: { id: seedData.currency.id },
-      update: seedData.currency,
-      create: seedData.currency,
+    const existingCurrency = await prisma.currency.findUnique({
+      where: { code: seedData.currency.code },
+      select: { id: true },
     });
 
+    const currency =
+      existingCurrency ??
+      (await prisma.currency.create({
+        data: seedData.currency,
+        select: { id: true },
+      }));
+
     // Create customer
+    const customerData = {
+      ...seedData.customer,
+      preferred_currency_id: currency.id,
+    };
+
     await prisma.customers.upsert({
       where: { id: seedData.customer.id },
-      update: seedData.customer,
-      create: seedData.customer,
+      update: customerData,
+      create: customerData,
     });
 
     // Create account

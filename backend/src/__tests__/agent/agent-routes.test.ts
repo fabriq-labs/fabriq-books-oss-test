@@ -22,7 +22,7 @@ describe('Agent Routes - End-to-End Tests', () => {
 
         // Check database setup
         try {
-            const org = await prisma.organization.findUnique({ where: { id: 'org_test_company' } });
+            const org = await prisma.entity.findUnique({ where: { id: 'org_test_company' } });
             if (org) {
                 dbSetupAvailable = true;
                 console.log('✓ Database setup verified');
