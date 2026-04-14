@@ -688,84 +688,88 @@ export default function IncomeStatement() {
               showAccountFilter={true}
               showRefreshButton={true}
               className="!flex-row !items-center !gap-2 shrink-0"
-            />
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 border-slate-300 justify-between min-w-[120px] shrink-0">
-                  <span className="text-slate-600 truncate text-xs">
-                    {selectedLegalEntityIds.length === 0
-                      ? "Legal Entity"
-                      : `${selectedLegalEntityIds.length} selected`}
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[280px] p-2" align="start">
-                <div className="max-h-[240px] overflow-y-auto space-y-1">
-                  {legalEntityOptions.length === 0 ? (
-                    <p className="text-xs text-slate-500 py-2">No organizations loaded</p>
-                  ) : (
-                    legalEntityOptions.map((org) => (
-                      <label
-                        key={org.id}
-                        className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-slate-100 cursor-pointer text-sm"
-                      >
-                        <Checkbox
-                          checked={selectedLegalEntityIds.includes(org.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedLegalEntityIds((prev) =>
-                              checked ? [...prev, org.id] : prev.filter((id) => id !== org.id)
-                            );
-                          }}
-                        />
-                        <span className="truncate">{org.legal_name ?? org.id}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-                {selectedLegalEntityIds.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 w-full text-xs"
-                    onClick={() => setSelectedLegalEntityIds([])}
+              beforeRefresh={
+                <>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 border-slate-300 justify-between min-w-[120px] shrink-0">
+                        <span className="text-slate-600 truncate text-xs">
+                          {selectedLegalEntityIds.length === 0
+                            ? "Legal Entity"
+                            : `${selectedLegalEntityIds.length} selected`}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[280px] p-2" align="start">
+                      <div className="max-h-[240px] overflow-y-auto space-y-1">
+                        {legalEntityOptions.length === 0 ? (
+                          <p className="text-xs text-slate-500 py-2">No organizations loaded</p>
+                        ) : (
+                          legalEntityOptions.map((org) => (
+                            <label
+                              key={org.id}
+                              className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-slate-100 cursor-pointer text-sm"
+                            >
+                              <Checkbox
+                                checked={selectedLegalEntityIds.includes(org.id)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedLegalEntityIds((prev) =>
+                                    checked ? [...prev, org.id] : prev.filter((id) => id !== org.id)
+                                  );
+                                }}
+                              />
+                              <span className="truncate">{org.legal_name ?? org.id}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      {selectedLegalEntityIds.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 w-full text-xs"
+                          onClick={() => setSelectedLegalEntityIds([])}
+                        >
+                          Clear selection
+                        </Button>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                  <Select
+                    value={currency ? currency : "__default__"}
+                    onValueChange={(v) => {
+                      setCurrency(v === "__default__" ? "" : v);
+                    }}
+                    disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
                   >
-                    Clear selection
-                  </Button>
-                )}
-              </PopoverContent>
-            </Popover>
-            <Select
-              value={currency ? currency : "__default__"}
-              onValueChange={(v) => {
-                setCurrency(v === "__default__" ? "" : v);
-              }}
-              disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
-            >
-              <SelectTrigger className="w-[min(100vw-8rem,220px)] min-w-[150px] max-w-[220px] h-9 border-slate-300 text-sm shrink-0">
-                <DollarSign className="h-4 w-4 mr-1 text-slate-500 shrink-0" />
-                <SelectValue placeholder={currenciesLoading ? "Loading…" : "Org Default"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__default__">
-                  {legalEntitiesLoading ? "Org Default (…)" : orgDefaultLabel}
-                </SelectItem>
-                {sortedActiveCurrencies.map((row) => {
-                  const code = row.code.toUpperCase();
-                  const label = row.name ? `${code} — ${row.name}` : code;
-                  return (
-                    <SelectItem key={row.id || code} value={code}>
-                      {label}
-                    </SelectItem>
-                  );
-                })}
-                {currency && !currencyCodeInList && (
-                  <SelectItem value={currency.trim().toUpperCase()}>
-                    {currency.trim().toUpperCase()} (not in master list)
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+                    <SelectTrigger className="w-[min(100vw-8rem,220px)] min-w-[150px] max-w-[220px] h-9 border-slate-300 text-sm shrink-0">
+                      <DollarSign className="h-4 w-4 mr-1 text-slate-500 shrink-0" />
+                      <SelectValue placeholder={currenciesLoading ? "Loading…" : "Org Default"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">
+                        {legalEntitiesLoading ? "Org Default (…)" : orgDefaultLabel}
+                      </SelectItem>
+                      {sortedActiveCurrencies.map((row) => {
+                        const code = row.code.toUpperCase();
+                        const label = row.name ? `${code} — ${row.name}` : code;
+                        return (
+                          <SelectItem key={row.id || code} value={code}>
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
+                      {currency && !currencyCodeInList && (
+                        <SelectItem value={currency.trim().toUpperCase()}>
+                          {currency.trim().toUpperCase()} (not in master list)
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </>
+              }
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

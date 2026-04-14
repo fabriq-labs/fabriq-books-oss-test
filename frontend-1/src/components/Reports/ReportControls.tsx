@@ -35,6 +35,8 @@ interface ReportControlsProps {
     accountAdditionalFilters?: Record<string, any>;
     /** Client-side filter for account options after fetch (e.g. bank/credit_card only). */
     accountFilterOptions?: (items: any[]) => any[];
+    /** Rendered after date/custom controls and before the refresh button (e.g. legal entity + currency on Balance Sheet). */
+    beforeRefresh?: React.ReactNode;
 }
 
 export const ReportControls: React.FC<ReportControlsProps> = ({
@@ -48,6 +50,7 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     className = "",
     accountAdditionalFilters,
     accountFilterOptions,
+    beforeRefresh,
 }) => {
     const {
         dateRange,
@@ -234,6 +237,8 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                     </Select>
                 </div>
             )}
+
+            {beforeRefresh}
 
             {/* Refresh Button */}
             {showRefreshButton && (
