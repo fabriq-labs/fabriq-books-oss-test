@@ -45,7 +45,7 @@ import ConnectionsPage from "./pages/settings/ConnectionsPage";
 import CreateConnectionPage from "./pages/settings/CreateConnectionPage";
 import ConnectionDetailPage from "./pages/settings/ConnectionDetailPage";
 import TenantOnboardingPage from "./pages/settings/TenantOnboardingPage";
-import DemoDatabaseResetPage from "./pages/settings/DemoDatabaseResetPage";
+import DeveloperOptionsPage from "./pages/settings/DeveloperOptionsPage";
 import { SuperAdminGuard } from "./components/layout/SuperAdminGuard";
 import { PromptTemplateForm } from "./components/forms/Masters/PromptTemplateForm";
 import { AgentTemplateForm } from "./components/forms/Masters/AgentTemplateForm";
@@ -346,11 +346,12 @@ const AppRoutes: React.FC = () => {
                   </SuperAdminGuard>
                 } />
 
-                <Route path="settings/demo-database-reset" element={
+                <Route path="settings/dev-options" element={
                   <SuperAdminGuard>
-                    <DemoDatabaseResetPage />
+                    <DeveloperOptionsPage />
                   </SuperAdminGuard>
                 } />
+                <Route path="settings/demo-database-reset" element={<Navigate to="/settings/dev-options" replace />} />
 
                 {/* Investments Routes */}
                 <Route path="investments/instruments" element={<Master type="instrument" view="instrument_view" displayName="Instruments" />} />

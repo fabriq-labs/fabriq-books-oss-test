@@ -224,6 +224,10 @@ REQUEST_BODY_LIMIT=25mb
 # Demo database reset (POST /api/admin/demo-database-reset; Super Admin; Settings UI)
 # In production set to true only if you intentionally expose this destructive API.
 ALLOW_DEMO_RESET_API=true
+
+# Developer options — metadata sync (POST /api/admin/dev-options/sync-metadata; Super Admin; Settings UI)
+# In production set to true only if you intentionally expose this API (syncs views, prompt templates, agent template SQL).
+ALLOW_DEV_OPTIONS_API=true
 ```
 
 ## Adding a New Model
@@ -278,6 +282,7 @@ npx prisma generate
 | `POST /api/parse-document/{model}` | PDF extraction |
 | `POST /api/workflow/instances/{id}/actions/{actionId}` | Execute workflow action |
 | `POST /api/admin/demo-database-reset` | Super Admin: start `setup-db.js` in background. Body: `demoData` (`indian-demo` \| `us-ca-demo` \| `perfin-demo` \| `both` \| `nri`), optional `demoDataOnly` (adds `--demo-data-only`), optional `runTests` (default false; true omits `--skip-tests` and runs `npm test -- src/__tests__`). Disabled when `ALLOW_DEMO_RESET_API` is false and `NODE_ENV=production`. Child stdout/stderr is printed to the backend process console (`[demo-database-reset/setup-db …]`). |
+| `POST /api/admin/dev-options/sync-metadata` | Super Admin: runs `syncMetadataFromJson()` (same pipeline as `npm run sync-metadata`): views + prompt templates from `prisma/metadata`, then `prisma db execute` on `prisma/seed-agent-templates.sql`. Returns JSON with counts and `agentTemplatesSeeded`. Disabled when `ALLOW_DEV_OPTIONS_API` is false and `NODE_ENV=production`. Cannot run concurrently with `demo-database-reset`. |
 
 ## Search Query Filters
 

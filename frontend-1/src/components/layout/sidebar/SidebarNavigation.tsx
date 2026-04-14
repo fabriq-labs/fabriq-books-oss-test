@@ -136,7 +136,7 @@ const settingsNavItems: MasterNavItem[] = [
       { label: 'AI Templates', path: '/settings/ai-templates' },
       { label: 'LLM Traces', path: '/settings/llm-traces' },
       { label: 'Tenant Onboarding', path: '/settings/tenant-onboarding' },
-      { label: 'Demo database reset', path: '/settings/demo-database-reset' }
+      { label: 'Developer options', path: '/settings/dev-options' }
     ]
   }
 ];

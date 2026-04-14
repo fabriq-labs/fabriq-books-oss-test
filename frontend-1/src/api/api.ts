@@ -1316,7 +1316,42 @@ export interface DemoDatabaseResetResponse {
   message: string;
 }
 
+export interface SyncMetadataCounts {
+  created: number;
+  updated: number;
+  errors: number;
+}
+
+export interface DevOptionsSyncMetadataResponse {
+  success: boolean;
+  message: string;
+  stats: {
+    views: SyncMetadataCounts;
+    promptTemplates: SyncMetadataCounts;
+    agentTemplatesSeeded: boolean;
+  };
+  agentTemplatesSeeded: boolean;
+}
+
 export const adminAPI = {
+  devOptionsSyncMetadata: async (): Promise<DevOptionsSyncMetadataResponse> => {
+    const API_URL = import.meta.env.VITE_API_BASE_URL || '';
+    const token = Cookies.get('__session');
+    const response = await fetch(`${API_URL}/api/admin/dev-options/sync-metadata`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const msg = data?.error || data?.message || 'Failed to sync metadata';
+      throw new Error(msg);
+    }
+    return data as DevOptionsSyncMetadataResponse;
+  },
+
   demoDatabaseReset: async (
     payload: DemoDatabaseResetPayload
   ): Promise<DemoDatabaseResetResponse> => {

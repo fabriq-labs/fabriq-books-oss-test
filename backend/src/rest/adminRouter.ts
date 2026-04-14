@@ -6,6 +6,7 @@ import { authMiddleware } from '../auth/middleware';
 import prisma from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import logger from '../utils/logger';
+import { main as syncMetadataFromJson } from '../metadata/syncMetadataFromJson';
 
 const adminRouter = Router();
 
@@ -48,6 +49,7 @@ const DEMO_DATA_OPTIONS = [
 type DemoDataOption = (typeof DEMO_DATA_OPTIONS)[number];
 
 let demoResetInProgress = false;
+let devOptionsSyncInProgress = false;
 
 /** Pipe setup-db stdout/stderr to the server process stdout (terminal / container logs). */
 function pipeSetupStreamToConsole(
@@ -77,6 +79,14 @@ function pipeSetupStreamToConsole(
 /** ALLOW_DEMO_RESET_API=true forces enable; false forces disable; unset defaults to enabled only when NODE_ENV !== production */
 function isDemoDatabaseResetApiEnabled(): boolean {
   const v = process.env.ALLOW_DEMO_RESET_API;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
+/** ALLOW_DEV_OPTIONS_API=true forces enable; false forces disable; unset defaults to enabled only when NODE_ENV !== production */
+function isDevOptionsApiEnabled(): boolean {
+  const v = process.env.ALLOW_DEV_OPTIONS_API;
   if (v === 'true') return true;
   if (v === 'false') return false;
   return process.env.NODE_ENV !== 'production';
@@ -261,6 +271,12 @@ adminRouter.post(
         });
       }
 
+      if (devOptionsSyncInProgress) {
+        return res.status(409).json({
+          error: 'Developer options sync is in progress. Wait for it to finish.',
+        });
+      }
+
       const body = req.body as DemoDatabaseResetBody;
       const raw = typeof body?.demoData === 'string' ? body.demoData.trim().toLowerCase() : '';
       if (!raw || !DEMO_DATA_OPTIONS.includes(raw as DemoDataOption)) {
@@ -326,6 +342,73 @@ adminRouter.post(
       demoResetInProgress = false;
       return res.status(500).json({
         error: err?.message || 'Failed to start demo database reset',
+      });
+    }
+  }
+);
+
+adminRouter.post(
+  '/dev-options/sync-metadata',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      if (!isDevOptionsApiEnabled()) {
+        return res.status(403).json({
+          error:
+            'Developer options API is disabled. Set ALLOW_DEV_OPTIONS_API=true to enable (required in production).',
+        });
+      }
+
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+
+      if (devOptionsSyncInProgress) {
+        return res.status(409).json({
+          error: 'A metadata sync is already running. Wait for it to finish.',
+        });
+      }
+
+      if (demoResetInProgress) {
+        return res.status(409).json({
+          error: 'A demo database reset is in progress. Wait for it to finish.',
+        });
+      }
+
+      devOptionsSyncInProgress = true;
+
+      try {
+        const stats = await syncMetadataFromJson();
+        logger.info('dev-options sync-metadata finished', { stats });
+        return res.status(200).json({
+          success: true,
+          message:
+            'Views, prompt templates, and agent templates were synced from the repo into this database.',
+          stats,
+          agentTemplatesSeeded: stats.agentTemplatesSeeded,
+        });
+      } catch (err: any) {
+        logger.error('dev-options sync-metadata failed', {
+          error: err?.message,
+          stack: err?.stack,
+        });
+        return res.status(500).json({
+          error: err?.message || 'Metadata sync failed',
+        });
+      } finally {
+        devOptionsSyncInProgress = false;
+      }
+    } catch (err: any) {
+      logger.error('dev-options sync-metadata error', { error: err?.message, stack: err?.stack });
+      devOptionsSyncInProgress = false;
+      return res.status(500).json({
+        error: err?.message || 'Failed to run metadata sync',
       });
     }
   }

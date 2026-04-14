@@ -36,7 +36,8 @@ const DEMO_OPTIONS: { value: DemoDataOption; label: string; description: string 
   },
 ];
 
-export default function DemoDatabaseResetPage() {
+/** Full database reset via setup-db.js (Super Admin). */
+export function DemoDatabaseResetSection() {
   const { toast } = useToast();
   const [demoData, setDemoData] = useState<DemoDataOption>("indian-demo");
   const [runTests, setRunTests] = useState(false);
@@ -67,17 +68,7 @@ export default function DemoDatabaseResetPage() {
   };
 
   return (
-    <div className="container max-w-2xl py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Demo database reset</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Runs <code className="text-xs bg-muted px-1 rounded">setup-db.js</code> on the server with the same
-          flags as the CLI: <code className="text-xs">--demo-data=…</code>, optional{" "}
-          <code className="text-xs">--demo-data-only</code>, and optional{" "}
-          <code className="text-xs">--skip-tests</code>. Output goes to the backend process logs only.
-        </p>
-      </div>
-
+    <div className="space-y-6">
       <div className="flex gap-3 rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-sm">
         <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
         <div className="space-y-1">
