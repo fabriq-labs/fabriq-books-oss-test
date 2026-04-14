@@ -81,10 +81,11 @@ model posting {
   reversal_of_posting_id String? // Reference to original posting.id when this is a reversal
   status                 String? // Status of posting (ACTIVE, REVERSED, etc.)
   reversed_at            DateTime? // Timestamp when posting was reversed
-
+  legal_entity_id        String?
+  legal_entity           entity?   @relation(fields: [legal_entity_id], references: [id])
   // Trade relationship - one-to-one
-  trade_id String? @unique
-  trade    trade?  @relation("PostingToTrade", fields: [trade_id], references: [id])
+  trade_id               String?   @unique
+  trade                  trade?    @relation("PostingToTrade", fields: [trade_id], references: [id])
 
   // Asset reference for investment income
   holding_id String?

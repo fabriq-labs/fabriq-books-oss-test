@@ -81,6 +81,7 @@
       "type": "table",
       "select": {
         "id": "read",
+        "code": "update",
         "name": "update"
       },
       "orderNo": 3,
@@ -111,6 +112,10 @@
     },
     "account_id": {
       "datatype": "string",
+      "listProps": {
+        "type": "text",
+        "recordPath": "account.name"
+      },
       "permission": "update",
       "tableProps": {
         "width": "250",
@@ -120,15 +125,11 @@
           "limit": "10",
           "instanceKey": "id",
           "instanceType": "account",
-          "searchParams": "name",
-          "instanceLabel": "name",
+          "searchParams": "code",
+          "instanceLabel": "code",
           "instanceSourceKey": "account_id"
         },
         "defaultValue": ""
-      },
-      "listProps": {
-        "type": "text",
-        "recordPath": "account.name"
       },
       "displayName": "Debit Account",
       "isColumnShow": true
@@ -176,6 +177,17 @@
         "defaultValue": ""
       },
       "displayName": "Income Type",
+      "isColumnShow": false
+    },
+    "legal_entity": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "legal_name": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Legal Entity",
       "isColumnShow": false
     },
     "posting_date": {
@@ -234,6 +246,7 @@
       "type": "table",
       "select": {
         "id": "read",
+        "code": "update",
         "name": "update"
       },
       "orderNo": 4,
@@ -242,9 +255,66 @@
       "displayName": "Credit Account",
       "isColumnShow": false
     },
+    "legal_entity_id": {
+      "datatype": "string",
+      "listProps": {
+        "type": "text",
+        "recordPath": "legal_entity.legal_name"
+      },
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "account",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "entity",
+          "searchParams": "legal_name",
+          "instanceLabel": "legal_name",
+          "instanceSourceKey": "legal_entity_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Legal Entity",
+      "isColumnShow": true
+    },
+    "payment_receipt": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "amount": "read",
+        "invoice": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "customers": {
+              "type": "table",
+              "select": {
+                "id": "read",
+                "customer_name": "read"
+              }
+            },
+            "invoice_date": "read",
+            "invoice_total": "read",
+            "invoice_number": "read"
+          }
+        },
+        "invoice_id": "read",
+        "receipt_date": "read",
+        "receipt_number": "read"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Linked Receipt",
+      "isColumnShow": false
+    },
     "credit_account_id": {
       "datatype": "string",
       "required": false,
+      "listProps": {
+        "type": "text",
+        "recordPath": "credit_account.name"
+      },
       "permission": "update",
       "tableProps": {
         "width": "250",
@@ -254,25 +324,14 @@
           "limit": "10",
           "instanceKey": "id",
           "instanceType": "account",
-          "searchParams": "name",
-          "instanceLabel": "name",
+          "searchParams": "code",
+          "instanceLabel": "code",
           "instanceSourceKey": "credit_account_id"
         },
         "defaultValue": ""
       },
-      "listProps": {
-        "type": "text",
-        "recordPath": "credit_account.name"
-      },
       "displayName": "Credit Account",
       "isColumnShow": true
-    },
-    "reconciliation_status": {
-      "datatype": "string",
-      "required": false,
-      "permission": "read",
-      "displayName": "Reconciliation Status",
-      "isColumnShow": false
     },
     "matched_reference": {
       "datatype": "string",
@@ -288,35 +347,12 @@
       "displayName": "Payment Receipt",
       "isColumnShow": false
     },
-    "payment_receipt": {
-      "type": "table",
-      "dataType": "table",
+    "reconciliation_status": {
+      "datatype": "string",
       "required": false,
-      "displayName": "Linked Receipt",
-      "isColumnShow": false,
-      "select": {
-        "id": "read",
-        "receipt_number": "read",
-        "amount": "read",
-        "receipt_date": "read",
-        "invoice_id": "read",
-        "invoice": {
-          "type": "table",
-          "select": {
-            "id": "read",
-            "invoice_number": "read",
-            "invoice_total": "read",
-            "invoice_date": "read",
-            "customers": {
-              "type": "table",
-              "select": {
-                "id": "read",
-                "customer_name": "read"
-              }
-            }
-          }
-        }
-      }
+      "permission": "read",
+      "displayName": "Reconciliation Status",
+      "isColumnShow": false
     }
   },
   "org_id": "52",

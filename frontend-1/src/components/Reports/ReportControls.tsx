@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,8 +13,9 @@ import { RefreshCw } from "lucide-react";
 import dayjs from "dayjs";
 import { useReportController } from "@/contexts/ReportControllerContext";
 
-/** Custom date month picker: -1 = full calendar year (Jan 1 – Dec 31); 0–11 = single month */
+/** Internal: full calendar year (Jan 1 – Dec 31). Select uses `"all"` so Radix does not hide the row when scrolled to month 0–11. */
 const ALL_MONTHS_INDEX = -1;
+const ALL_MONTHS_SELECT_VALUE = "all";
 
 interface ReportControlsProps {
     // Account filter props
@@ -34,6 +35,8 @@ interface ReportControlsProps {
     accountAdditionalFilters?: Record<string, any>;
     /** Client-side filter for account options after fetch (e.g. bank/credit_card only). */
     accountFilterOptions?: (items: any[]) => any[];
+    /** Rendered after date/custom controls and before the refresh button (e.g. legal entity + currency on Balance Sheet). */
+    beforeRefresh?: React.ReactNode;
 }
 
 export const ReportControls: React.FC<ReportControlsProps> = ({
@@ -47,6 +50,7 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     className = "",
     accountAdditionalFilters,
     accountFilterOptions,
+    beforeRefresh,
 }) => {
     const {
         dateRange,
@@ -61,11 +65,17 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     } = useReportController();
 
     // For "Custom" month selection (temp until user hits Refresh / Fetch)
-    const [tempCustomMonthIndex, setTempCustomMonthIndex] = useState<number>(() => {
-        // Default to currently selected start month (or current month)
-        const m = dateRange?.[0]?.month?.();
-        return typeof m === "number" ? m : dayjs().month();
-    });
+    const currentMonth = dayjs().month();
+    const [tempCustomMonthIndex, setTempCustomMonthIndex] = useState<number>(currentMonth);
+
+    useEffect(() => {
+        // On report load, always default UI + range to current month.
+        setSelectedOption("currentMonth");
+        setIsCustomDate(false);
+        const startDate = dayjs().startOf("month");
+        const endDate = dayjs().endOf("month");
+        setDateRange([startDate, endDate]);
+    }, [setSelectedOption, setIsCustomDate, setDateRange]);
 
     // Handle select change for predefined ranges
     const handleSelectChange = (value: string) => {
@@ -99,6 +109,10 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
             case "previousMonth":
                 startDate = dayjs().subtract(1, "month").startOf("month");
                 endDate = dayjs().subtract(1, "month").endOf("month");
+                break;
+            case "allMonths":
+                startDate = dayjs().startOf("year");
+                endDate = dayjs().endOf("year");
                 break;
 
             default:
@@ -172,9 +186,9 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                     <SelectValue placeholder="Select Time Frame" />
                 </SelectTrigger>
                 <SelectContent>
+                    <SelectItem value="allMonths">All Months</SelectItem>
                     <SelectItem value="currentMonth">Current Month</SelectItem>
                     <SelectItem value="previousMonth">Previous Month</SelectItem>
-
                     <SelectItem value="custom">Custom Date</SelectItem>
                 </SelectContent>
             </Select>
@@ -193,14 +207,22 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                     />
 
                     <Select
-                        value={String(tempCustomMonthIndex)}
-                        onValueChange={(v) => setTempCustomMonthIndex(parseInt(v))}
+                        value={
+                            tempCustomMonthIndex === ALL_MONTHS_INDEX
+                                ? ALL_MONTHS_SELECT_VALUE
+                                : String(tempCustomMonthIndex)
+                        }
+                        onValueChange={(v) => {
+                            setTempCustomMonthIndex(
+                                v === ALL_MONTHS_SELECT_VALUE ? ALL_MONTHS_INDEX : parseInt(v, 10)
+                            );
+                        }}
                     >
                         <SelectTrigger className="h-10 w-full sm:w-44">
                             <SelectValue placeholder="Select Month" />
                         </SelectTrigger>
-                        <SelectContent className="max-h-40 overflow-y-auto">
-                            <SelectItem value={String(ALL_MONTHS_INDEX)} className="py-1 text-sm font-medium">
+                        <SelectContent position="item-aligned" className="max-h-[min(20rem,70vh)]">
+                            <SelectItem value={ALL_MONTHS_SELECT_VALUE} className="py-1 text-sm font-medium">
                                 All Months
                             </SelectItem>
                             {[
@@ -215,6 +237,8 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                     </Select>
                 </div>
             )}
+
+            {beforeRefresh}
 
             {/* Refresh Button */}
             {showRefreshButton && (

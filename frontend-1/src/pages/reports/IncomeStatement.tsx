@@ -55,12 +55,12 @@ const getDisplayAmount = (amount: number, classification?: string) => {
 const displayPlAmount = (amount: number, classification?: string) =>
   getDisplayAmount(amount, classification);
 
-const CURRENCY_OPTIONS = [
-  { value: "", label: "Org Default" },
-  { value: "INR", label: "INR - Indian Rupee" },
-  { value: "USD", label: "USD - US Dollar" },
-  { value: "PHP", label: "PHP - Philippine Peso" },
-];
+type CurrencyListRow = {
+  id: string;
+  code: string;
+  name: string;
+  is_active?: boolean;
+};
 
 type LegalEntityOption = {
   id: string;
@@ -68,41 +68,14 @@ type LegalEntityOption = {
   legal_name?: string;
   name?: string | null;
   is_it_headquartres?: string | null;
-  currency_master?: { base_currency?: string | null } | null;
+  /** From `entity.basecurrency_id` → `currency` (see `entity_view` data graph). */
+  currency?: { code?: string | null } | null;
 };
 
-/**
- * Legal entity display currency by name substring (case-insensitive).
- * More specific patterns must appear first (e.g. "KNACK GLOBAL" before "KNACK").
- */
-const LEGAL_ENTITY_NAME_CURRENCY_RULES: readonly { pattern: string; currency: string }[] = [
-  { pattern: "KNACK GLOBAL", currency: "USD" },
-  { pattern: "KNACK", currency: "INR" },
-  { pattern: "HBOS", currency: "PHP" },
-  { pattern: "FPS", currency: "USD" },
-];
-
-function legalEntityDisplayName(org: Pick<LegalEntityOption, "legal_name" | "name">): string {
-  return String(org.legal_name ?? org.name ?? "").toUpperCase();
-}
-
-/** ISO code from hardcoded map, or null if no rule matches. */
-function hardcodedCurrencyForLegalEntity(org: LegalEntityOption | undefined): string | null {
+/** ISO 4217 code from the entity’s linked `currency` row (`basecurrency_id`). */
+function resolveEntityBaseCurrencyCode(org: LegalEntityOption | undefined): string | null {
   if (!org) return null;
-  const haystack = legalEntityDisplayName(org);
-  if (!haystack.trim()) return null;
-  for (const { pattern, currency } of LEGAL_ENTITY_NAME_CURRENCY_RULES) {
-    if (haystack.includes(pattern.toUpperCase())) return currency;
-  }
-  return null;
-}
-
-/** Hardcoded name map first, then linked currency_master. */
-function resolveEntityDisplayCurrency(org: LegalEntityOption | undefined): string | null {
-  if (!org) return null;
-  const hard = hardcodedCurrencyForLegalEntity(org);
-  if (hard) return hard;
-  const raw = org.currency_master?.base_currency?.trim();
+  const raw = org.currency?.code?.trim();
   return raw ? raw.toUpperCase() : null;
 }
 
@@ -112,9 +85,10 @@ function isHeadquartersEntity(org: Pick<LegalEntityOption, "is_it_headquartres">
   return v === "yes" || v === "true" || v === "1";
 }
 
+/** Reporting currency for the org: HQ entity’s base currency, else first entity, else INR. */
 function resolveHeadquartersBaseCurrency(list: LegalEntityOption[]): string {
   const hq = list.find(isHeadquartersEntity) ?? list[0];
-  return resolveEntityDisplayCurrency(hq) ?? "INR";
+  return resolveEntityBaseCurrencyCode(hq) ?? "INR";
 }
 
 const useIncomeStatement = ({
@@ -144,9 +118,7 @@ const useIncomeStatement = ({
         if (account) {
           filters.account_id = account?.id;
         }
-        if (currency) {
-          filters.currency = currency;
-        }
+        filters.currency = currency || "INR";
         if (legalEntityIds.length > 0) {
           filters.legal_entity_ids = legalEntityIds;
         }
@@ -193,31 +165,30 @@ export default function IncomeStatement() {
   const [showOnlyNonZero, setShowOnlyNonZero] = useState(true);
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
   const [currency, setCurrency] = useState("");
+  const [currencies, setCurrencies] = useState<CurrencyListRow[]>([]);
+  const [currenciesLoading, setCurrenciesLoading] = useState(false);
   const [legalEntityOptions, setLegalEntityOptions] = useState<LegalEntityOption[]>([]);
+  const [legalEntitiesLoading, setLegalEntitiesLoading] = useState(true);
   const [selectedLegalEntityIds, setSelectedLegalEntityIds] = useState<string[]>([]);
 
   const { dateRange } = useReportController();
   const { user } = useAuth();
 
-  /**
-   * Currency dropdown overrides.
-   * With "Org Default", always use HQ entity currency (hardcoded map / currency_master), else INR.
-   */
-  const displayCurrencyCode = useMemo(() => {
-    if (currency) return currency;
+  /** ISO code sent to income_statement report and used for formatting. */
+  const reportCurrencyCode = useMemo(() => {
+    if (currency.trim()) return currency.trim().toUpperCase();
     return resolveHeadquartersBaseCurrency(legalEntityOptions);
   }, [currency, legalEntityOptions]);
 
-  const formatAmountNoSymbol = (n: number) => {
-    const locale = displayCurrencyCode === "INR" ? "en-IN" : "en-US";
-    return n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const displayCurrencyCode = reportCurrencyCode;
 
   const { data, loading, error, fetchIncomeStatement } = useIncomeStatement({
     dateRange,
-    currency,
+    currency: reportCurrencyCode,
     legalEntityIds: selectedLegalEntityIds,
   });
+
+  const reportLoading = loading || legalEntitiesLoading;
 
   const ADD_BACK_TYPES = ["D&A", "Interest & Tax", "EBITDA Adjustments"];
 
@@ -322,6 +293,7 @@ export default function IncomeStatement() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLegalEntitiesLoading(true);
       try {
         const filters = user?.org_id ? { org_id: { eq: user.org_id } } : {};
         const res: any = await viewAPI.search(
@@ -337,6 +309,8 @@ export default function IncomeStatement() {
         if (!cancelled) setLegalEntityOptions(list);
       } catch {
         if (!cancelled) setLegalEntityOptions([]);
+      } finally {
+        if (!cancelled) setLegalEntitiesLoading(false);
       }
     })();
     return () => {
@@ -344,15 +318,78 @@ export default function IncomeStatement() {
     };
   }, [user?.org_id]);
 
+  const loadCurrencies = useCallback(async () => {
+    if (!user?.org_id) {
+      setCurrencies([]);
+      return;
+    }
+    setCurrenciesLoading(true);
+    try {
+      const res: any = await viewAPI.search(
+        "currency",
+        "currency_view",
+        1,
+        500,
+        undefined,
+        { org_id: { eq: user.org_id } },
+        {}
+      );
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setCurrencies(
+        list.map((row: any) => ({
+          id: String(row.id ?? ""),
+          code: String(row.code ?? "").trim(),
+          name: String(row.name ?? "").trim(),
+          is_active: row.is_active !== false && row.is_active !== "false",
+        }))
+      );
+    } catch {
+      setCurrencies([]);
+    } finally {
+      setCurrenciesLoading(false);
+    }
+  }, [user?.org_id]);
+
   useEffect(() => {
+    void loadCurrencies();
+  }, [loadCurrencies]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadCurrencies();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadCurrencies]);
+
+  const sortedActiveCurrencies = useMemo(() => {
+    return [...currencies]
+      .filter((c) => c.code && c.is_active !== false)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [currencies]);
+
+  const currencyCodeInList = useMemo(() => {
+    if (!currency.trim()) return true;
+    const u = currency.trim().toUpperCase();
+    return sortedActiveCurrencies.some((c) => c.code.toUpperCase() === u);
+  }, [sortedActiveCurrencies, currency]);
+
+  const orgDefaultLabel = useMemo(() => {
+    const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
+    return `Org Default (${code})`;
+  }, [legalEntityOptions]);
+
+  useEffect(() => {
+    if (legalEntitiesLoading) return;
     void fetchIncomeStatement(account);
-  }, [fetchIncomeStatement, account]);
+  }, [legalEntitiesLoading, fetchIncomeStatement, account]);
 
   useEffect(() => {
     if (!fetchOnButtonClick) return;
+    if (legalEntitiesLoading) return;
     void fetchIncomeStatement(account);
     setFetchOnButtonClick(false);
-  }, [fetchOnButtonClick, fetchIncomeStatement, account]);
+  }, [fetchOnButtonClick, legalEntitiesLoading, fetchIncomeStatement, account]);
 
   const handleAccountChange = (value: any) => {
     setAccount(value);
@@ -522,7 +559,7 @@ export default function IncomeStatement() {
   );
 
   const renderTableContent = (group: { classification: string; items: IncomeStatementRow[] }) => {
-    if (loading) {
+    if (reportLoading) {
       return (
         <TableRow>
           <TableCell colSpan={2} className="text-center">
@@ -592,8 +629,9 @@ export default function IncomeStatement() {
             </TableCell>
             <TableCell className="text-right py-2 px-3 font-mono text-xs">
               <span className="text-slate-900 font-bold">
-                {formatAmountNoSymbol(
-                  displayPlAmount(Number(row.total_amount || 0), group.classification)
+                {formatCurrency(
+                  displayPlAmount(Number(row.total_amount || 0), group.classification),
+                  displayCurrencyCode
                 )}
               </span>
             </TableCell>
@@ -646,76 +684,98 @@ export default function IncomeStatement() {
               onAccountChange={handleAccountChange}
               onAccountClear={handleAccountClear}
               onRefresh={handleRefresh}
-              loading={loading}
+              loading={reportLoading}
               showAccountFilter={true}
               showRefreshButton={true}
               className="!flex-row !items-center !gap-2 shrink-0"
-            />
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 border-slate-300 justify-between min-w-[120px] shrink-0">
-                  <span className="text-slate-600 truncate text-xs">
-                    {selectedLegalEntityIds.length === 0
-                      ? "Legal Entity"
-                      : `${selectedLegalEntityIds.length} selected`}
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[280px] p-2" align="start">
-                <div className="max-h-[240px] overflow-y-auto space-y-1">
-                  {legalEntityOptions.length === 0 ? (
-                    <p className="text-xs text-slate-500 py-2">No organizations loaded</p>
-                  ) : (
-                    legalEntityOptions.map((org) => (
-                      <label
-                        key={org.id}
-                        className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-slate-100 cursor-pointer text-sm"
-                      >
-                        <Checkbox
-                          checked={selectedLegalEntityIds.includes(org.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedLegalEntityIds((prev) =>
-                              checked ? [...prev, org.id] : prev.filter((id) => id !== org.id)
-                            );
-                          }}
-                        />
-                        <span className="truncate">{org.legal_name ?? org.id}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-                {selectedLegalEntityIds.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 w-full text-xs"
-                    onClick={() => setSelectedLegalEntityIds([])}
+              beforeRefresh={
+                <>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 border-slate-300 justify-between min-w-[120px] shrink-0">
+                        <span className="text-slate-600 truncate text-xs">
+                          {selectedLegalEntityIds.length === 0
+                            ? "Legal Entity"
+                            : `${selectedLegalEntityIds.length} selected`}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[280px] p-2" align="start">
+                      <div className="max-h-[240px] overflow-y-auto space-y-1">
+                        {legalEntityOptions.length === 0 ? (
+                          <p className="text-xs text-slate-500 py-2">No organizations loaded</p>
+                        ) : (
+                          legalEntityOptions.map((org) => (
+                            <label
+                              key={org.id}
+                              className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-slate-100 cursor-pointer text-sm"
+                            >
+                              <Checkbox
+                                checked={selectedLegalEntityIds.includes(org.id)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedLegalEntityIds((prev) =>
+                                    checked ? [...prev, org.id] : prev.filter((id) => id !== org.id)
+                                  );
+                                }}
+                              />
+                              <span className="truncate">{org.legal_name ?? org.id}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      {selectedLegalEntityIds.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 w-full text-xs"
+                          onClick={() => setSelectedLegalEntityIds([])}
+                        >
+                          Clear selection
+                        </Button>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                  <Select
+                    value={currency ? currency : "__default__"}
+                    onValueChange={(v) => {
+                      setCurrency(v === "__default__" ? "" : v);
+                    }}
+                    disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
                   >
-                    Clear selection
-                  </Button>
-                )}
-              </PopoverContent>
-            </Popover>
-            <Select value={currency} onValueChange={(v) => { setCurrency(v === "__default__" ? "" : v); }}>
-              <SelectTrigger className="w-[150px] h-9 border-slate-300 text-sm shrink-0">
-                <DollarSign className="h-4 w-4 mr-1 text-slate-500" />
-                <SelectValue placeholder="Org Default" />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCY_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value || "__default__"} value={opt.value || "__default__"}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    <SelectTrigger className="w-[min(100vw-8rem,220px)] min-w-[150px] max-w-[220px] h-9 border-slate-300 text-sm shrink-0">
+                      <DollarSign className="h-4 w-4 mr-1 text-slate-500 shrink-0" />
+                      <SelectValue placeholder={currenciesLoading ? "Loading…" : "Org Default"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">
+                        {legalEntitiesLoading ? "Org Default (…)" : orgDefaultLabel}
+                      </SelectItem>
+                      {sortedActiveCurrencies.map((row) => {
+                        const code = row.code.toUpperCase();
+                        const label = row.name ? `${code} — ${row.name}` : code;
+                        return (
+                          <SelectItem key={row.id || code} value={code}>
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
+                      {currency && !currencyCodeInList && (
+                        <SelectItem value={currency.trim().toUpperCase()}>
+                          {currency.trim().toUpperCase()} (not in master list)
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </>
+              }
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={loading || exportPdfLoading || data.length === 0}
+                  disabled={reportLoading || exportPdfLoading || data.length === 0}
                   className="border-slate-300 hover:bg-slate-50 shrink-0"
                 >
                   {exportPdfLoading ? (
@@ -778,7 +838,7 @@ export default function IncomeStatement() {
 
       <div className="p-3 space-y-3">
         <div className="space-y-3">
-          {loading && data.length === 0 ? (
+          {reportLoading && data.length === 0 ? (
             <Card className="shadow-sm border-slate-200">
               <CardContent className="p-6">
                 <LoadingContent />
@@ -847,7 +907,7 @@ export default function IncomeStatement() {
               </Card>
             ));
           })()}
-          {!loading && !error && hasVisibleStatementRows && (
+          {!reportLoading && !error && hasVisibleStatementRows && (
             <Card className="w-full shadow-sm border-slate-200 hover:shadow-md transition-shadow duration-200">
               <CardHeader className="bg-slate-100 py-3 px-4">
                 <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-800">
@@ -857,7 +917,7 @@ export default function IncomeStatement() {
               </CardHeader>
             </Card>
           )}
-          {!loading && !error && hasVisibleStatementRows && (
+          {!reportLoading && !error && hasVisibleStatementRows && (
             <Card className="shadow-sm border-slate-200 hover:shadow-md transition-shadow duration-200">
               <CardHeader className="bg-slate-50 border-b border-slate-200 py-2 px-3">
                 <CardTitle className="text-base font-semibold text-slate-800">Add-backs and Adjustments</CardTitle>
@@ -890,7 +950,7 @@ export default function IncomeStatement() {
               </CardContent>
             </Card>
           )}
-          {!loading && !error && hasVisibleStatementRows && (
+          {!reportLoading && !error && hasVisibleStatementRows && (
             <Card className="w-full shadow-sm border-slate-200 hover:shadow-md transition-shadow duration-200">
               <CardHeader className="bg-slate-100 py-3 px-4">
                 <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-800">

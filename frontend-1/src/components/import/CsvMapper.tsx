@@ -119,7 +119,21 @@ export const CSVMapper = ({
               ? { key: field, displayName: filedSets[field]?.displayName || field }
               : field
           );
-          setList([...lists, ...additionalFieldsList]);
+          const mergedList = [...lists, ...additionalFieldsList];
+          const displayNameCount = mergedList.reduce((acc: Record<string, number>, item: any) => {
+            const label = item?.displayName || item?.key;
+            acc[label] = (acc[label] || 0) + 1;
+            return acc;
+          }, {});
+          const disambiguatedList = mergedList.map((item: any) => {
+            const label = item?.displayName || item?.key;
+            if ((displayNameCount[label] || 0) <= 1) return item;
+            return {
+              ...item,
+              displayName: `${label} (${item?.key})`,
+            };
+          });
+          setList(disambiguatedList);
           const allKeys = [...lists.map((item: any) => item.key), ...additionalFieldsList.map((item: any) => item.key)];
           mapSimilarData(allKeys);
           handleTableData(parsedData);
@@ -334,21 +348,27 @@ export const CSVMapper = ({
             lookupData: instanceDetails,
           },
         ]);
-        const lookUpArray = instanceDetails.map(
-          (val: any) =>
-            val?.name ||
-            val?.[filedSets[normalizedValue]?.tableProps?.selectProps?.instanceLabel]
+        const normalizeLookupValue = (val: any) =>
+          val === null || val === undefined ? "" : String(val).trim().toLowerCase();
+        const instanceLabel =
+          filedSets[normalizedValue]?.tableProps?.selectProps?.instanceLabel;
+        const lookUpSet = new Set(
+          instanceDetails.map((val: any) =>
+            normalizeLookupValue(
+              val?.[instanceLabel] ?? val?.name
+            )
+          )
         );
         const updateCSVData = csvData.map((item: any) => {
+          const cellValue = item[Object.keys(csvData[0])[index]];
+          const normalizedCellValue = normalizeLookupValue(cellValue);
           return {
             ...item,
-            [Object.keys(csvData[0])[index]]: lookUpArray.includes(
-              item[Object.keys(csvData[0])[index]]
-            )
-              ? item[Object.keys(csvData[0])[index]]
+            [Object.keys(csvData[0])[index]]: lookUpSet.has(normalizedCellValue)
+              ? cellValue
               : {
                 isNotAvailable: true,
-                oldValue: item[Object.keys(csvData[0])[index]],
+                oldValue: cellValue,
               },
           };
         });
@@ -591,6 +611,14 @@ export const CSVMapper = ({
               )}
             </div>
           </div>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+          }}
+          className="item-header mb-2 gap-3"
+        >
         </div>
         {csvData.length > 0 && (
           <div className="grid grid-cols-1 gap-4 my-2 mx-3">

@@ -73,7 +73,7 @@
         "type": "text",
         "recordPath": "account.name"
       },
-      "displayName": "Charts of Date",
+      "displayName": "Charts of Account",
       "isColumnShow": true
     },
     "budget_period": {
