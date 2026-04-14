@@ -1,0 +1,11 @@
+tax_name,tax_code,tax_rate,effective_from,geo,expires_on,status
+GST 18%,GST18,18,2025-04-01,IN,,Active
+GST 12%,GST12,12,2025-04-01,IN,,Active
+GST 5%,GST5,5,2025-04-01,IN,,Active
+GST 0%,GST0,0,2025-04-01,IN,,Active
+IGST 18%,IGST18,18,2025-04-01,IN,,Active
+IGST 12%,IGST12,12,2025-04-01,IN,,Active
+VAT 15%,VAT15,15,2025-01-01,UAE,,Active
+Sales Tax 7%,STX7,7,2025-01-01,US,2026-12-31,InActive
+Service Tax 10%,SVT10,10,2025-01-01,PH,,Active
+Zero Rated Export,ZR0,0,2025-01-01,GLOBAL,,Active

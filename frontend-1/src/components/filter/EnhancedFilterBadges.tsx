@@ -158,7 +158,7 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
             };
 
             try {
-                await fetchEntity(legalEntityIds, "organization", "legal_name");
+                await fetchEntity(legalEntityIds, "entity", "legal_name");
                 await fetchEntity(businessUnitIds, "business_unit", "business_unit");
                 await fetchEntity(coaCodeIds, "coa", "coa_code"); // COA codes use 'coa_code' as label
                 await fetchEntity(coaIds, "coa", "coa_code"); // COA accounts use 'coa_code' as label
@@ -171,7 +171,7 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
                 await fetchEntity(paymentTermIds, "payment_terms", "payment_terms"); // payment terms use 'payment_term' as label
                 await fetchEntity(shippingTermIds, "shipping_terms", "shipping_terms"); // shipping terms use 'shipping_term' as label
                 await fetchEntity(shippingMethodIds, "shipping_method", "shipping_method"); // shipping methods use 'shipping_method' as label
-                await fetchEntity(currencyMasterIds, "currency_master", "base_currency"); // currency masters use 'base_currency' as label
+                await fetchEntity(currencyMasterIds, "currency", "symbol"); // currency masters use 'base_currency' as label
                 await fetchEntity(itemIds, "item_master", "item_name"); // items use 'item_name' as label
             } finally {
                 if (isMounted) {

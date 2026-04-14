@@ -16,14 +16,20 @@ export const filterUniqueRecords = async (dataset: any, key: string) => {
 };
 export const buildDataWithLookupFields = async (dataset: any, lookupData: any, filedSets: any) => {
   return new Promise((resolve) => {
+    const normalizeLookupValue = (value: any) =>
+      value === null || value === undefined
+        ? ""
+        : String(value).trim().toLowerCase();
     const lookupMap = lookupData.reduce((acc: { [key: string]: any }, data: { key: string; csvKey: string; lookupData: any[] }) => {
       const targetField = data.key;
       const sourceField = data.csvKey;
       acc[sourceField] = data.lookupData.reduce((innerAcc: { [key: string]: any }, item: any) => {
-        const instanceLabel = filedSets[targetField]?.tableProps?.selectProps?.instanceLabel;
-        const lookupValue = item?.name || item?.[instanceLabel];
+        const selectProps = filedSets[targetField]?.tableProps?.selectProps || {};
+        const instanceLabel = selectProps?.instanceLabel || selectProps?.searchParams;
+        const instanceKey = selectProps?.instanceKey || "id";
+        const lookupValue = normalizeLookupValue(item?.[instanceLabel]);
         if (lookupValue) {
-          innerAcc[lookupValue] = item.id;
+          innerAcc[lookupValue] = item?.[instanceKey] ?? null;
         }
         return innerAcc;
       }, {});
@@ -35,7 +41,7 @@ export const buildDataWithLookupFields = async (dataset: any, lookupData: any, f
         const sourceField = mapping.csvKey;
         const currentValue = row[sourceField];
         const lookupValue = currentValue?.isNotAvailable ? currentValue.oldValue : currentValue;
-        updatedRow[sourceField] = lookupMap[sourceField]?.[lookupValue] || null;
+        updatedRow[sourceField] = lookupMap[sourceField]?.[normalizeLookupValue(lookupValue)] || null;
       });
       return updatedRow;
     });

@@ -32,6 +32,7 @@ model entity {
   purchase_requisition purchase_requisition[]
   purchase_order       purchase_order[]
   invoice              invoice[]
+  posting              posting[]
 }
 
 model budget_period {

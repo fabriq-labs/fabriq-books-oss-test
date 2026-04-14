@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -58,11 +58,17 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     } = useReportController();
 
     // For "Custom" month selection (temp until user hits Refresh / Fetch)
-    const [tempCustomMonthIndex, setTempCustomMonthIndex] = useState<number>(() => {
-        // Default to currently selected start month (or current month)
-        const m = dateRange?.[0]?.month?.();
-        return typeof m === "number" ? m : dayjs().month();
-    });
+    const currentMonth = dayjs().month();
+    const [tempCustomMonthIndex, setTempCustomMonthIndex] = useState<number>(currentMonth);
+
+    useEffect(() => {
+        // On report load, always default UI + range to current month.
+        setSelectedOption("currentMonth");
+        setIsCustomDate(false);
+        const startDate = dayjs().startOf("month");
+        const endDate = dayjs().endOf("month");
+        setDateRange([startDate, endDate]);
+    }, [setSelectedOption, setIsCustomDate, setDateRange]);
 
     // Handle select change for predefined ranges
     const handleSelectChange = (value: string) => {
@@ -73,7 +79,7 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
             // Initialize temporary year values with current date range
             setTempStartYear(dateRange[0].year().toString());
             setTempEndYear(dateRange[0].year().toString());
-            setTempCustomMonthIndex(dateRange[0].month());
+            setTempCustomMonthIndex(dayjs().month());
             return; // Don't update dateRange for custom option
         }
 

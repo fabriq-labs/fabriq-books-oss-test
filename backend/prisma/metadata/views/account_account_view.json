@@ -11,8 +11,10 @@
     },
     "code": {
       "dataType": "string",
+      "required": true,
       "permission": "update",
-      "displayName": "Code"
+      "displayName": "Code",
+      "isColumnShow": true
     },
     "name": {
       "dataType": "string",
@@ -86,7 +88,7 @@
       "type": "table",
       "select": {
         "id": "read",
-        "name": "update",
+        "code": "update",
         "child_accounts": "read",
         "parent_account": "read",
         "parent_account_id": "update"
@@ -106,6 +108,7 @@
       "type": "table",
       "select": {
         "id": "read",
+        "code": "update",
         "name": "update"
       },
       "dataType": "table",
@@ -116,11 +119,15 @@
     "legal_entity_id": {
       "dataType": "string",
       "required": false,
+      "listProps": {
+        "type": "text",
+        "recordPath": "legal_entity.legal_name"
+      },
       "permission": "update",
       "tableProps": {
         "columnType": "select",
         "selectProps": {
-          "type": "business_unit",
+          "type": "account",
           "limit": "10",
           "instanceKey": "id",
           "instanceType": "entity",
@@ -130,16 +137,16 @@
         },
         "defaultValue": ""
       },
-      "listProps": {
-        "type": "text",
-        "recordPath": "legal_entity.legal_name"
-      },
       "displayName": "Legal Entity",
       "isColumnShow": true
     },
     "parent_account_id": {
       "dataType": "string",
       "required": false,
+      "listProps": {
+        "type": "text",
+        "recordPath": "parent_account.name"
+      },
       "permission": "update",
       "tableProps": {
         "width": "250",
@@ -149,15 +156,11 @@
           "limit": "10",
           "instanceKey": "id",
           "instanceType": "account",
-          "searchParams": "name",
-          "instanceLabel": "name",
+          "searchParams": "code",
+          "instanceLabel": "code",
           "instanceSourceKey": "parent_account_id"
         },
         "defaultValue": ""
-      },
-      "listProps": {
-        "type": "text",
-        "recordPath": "parent_account.name"
       },
       "displayName": "Parent Account",
       "isColumnShow": true
