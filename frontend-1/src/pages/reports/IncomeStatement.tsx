@@ -182,11 +182,6 @@ export default function IncomeStatement() {
 
   const displayCurrencyCode = reportCurrencyCode;
 
-  const formatAmountNoSymbol = (n: number) => {
-    const locale = displayCurrencyCode === "INR" ? "en-IN" : "en-US";
-    return n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
   const { data, loading, error, fetchIncomeStatement } = useIncomeStatement({
     dateRange,
     currency: reportCurrencyCode,
@@ -634,8 +629,9 @@ export default function IncomeStatement() {
             </TableCell>
             <TableCell className="text-right py-2 px-3 font-mono text-xs">
               <span className="text-slate-900 font-bold">
-                {formatAmountNoSymbol(
-                  displayPlAmount(Number(row.total_amount || 0), group.classification)
+                {formatCurrency(
+                  displayPlAmount(Number(row.total_amount || 0), group.classification),
+                  displayCurrencyCode
                 )}
               </span>
             </TableCell>
