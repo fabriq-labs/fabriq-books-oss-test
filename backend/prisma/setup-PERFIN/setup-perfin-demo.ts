@@ -217,6 +217,11 @@ async function setupPerfinDemoData() {
     // ===== 5. LOAD AND INSERT LOCATION DATA =====
     console.log('🏢 Loading location data...');
     const locationData = await loadCsvData(path.join(__dirname, 'locations.csv'));
+    const seededLegalEntityIds = new Set(
+      organizationData.map((row) => String(row.id).trim()).filter(Boolean),
+    );
+    const defaultLegalEntityId =
+      organizationData.length === 1 ? String(organizationData[0].id).trim() : '';
 
     for (const location of locationData) {
       const updateData: any = {
@@ -244,9 +249,19 @@ async function setupPerfinDemoData() {
         updateData.customer_id = location.customer_id;
         createData.customer_id = location.customer_id;
       }
-      if (location.legal_entity_id && String(location.legal_entity_id).trim() !== '') {
-        updateData.legal_entity_id = location.legal_entity_id;
-        createData.legal_entity_id = location.legal_entity_id;
+      const csvLegalEntityId = location.legal_entity_id ? String(location.legal_entity_id).trim() : '';
+      let legalEntityId = csvLegalEntityId;
+      if (legalEntityId && !seededLegalEntityIds.has(legalEntityId) && defaultLegalEntityId) {
+        console.warn(
+          `  ⚠️  Location ${location.id}: legal_entity_id "${legalEntityId}" is not a seeded entity id; using "${defaultLegalEntityId}"`,
+        );
+        legalEntityId = defaultLegalEntityId;
+      } else if (!legalEntityId && defaultLegalEntityId) {
+        legalEntityId = defaultLegalEntityId;
+      }
+      if (legalEntityId) {
+        updateData.legal_entity_id = legalEntityId;
+        createData.legal_entity_id = legalEntityId;
       }
 
       await prisma.location.upsert({
