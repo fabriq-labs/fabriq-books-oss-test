@@ -13,6 +13,9 @@ import { RefreshCw } from "lucide-react";
 import dayjs from "dayjs";
 import { useReportController } from "@/contexts/ReportControllerContext";
 
+/** Custom date month picker: -1 = full calendar year (Jan 1 – Dec 31); 0–11 = single month */
+const ALL_MONTHS_INDEX = -1;
+
 interface ReportControlsProps {
     // Account filter props
     selectedAccount?: any;
@@ -73,7 +76,16 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
             // Initialize temporary year values with current date range
             setTempStartYear(dateRange[0].year().toString());
             setTempEndYear(dateRange[0].year().toString());
-            setTempCustomMonthIndex(dateRange[0].month());
+            const start = dateRange[0].startOf("day");
+            const end = dateRange[1].endOf("day");
+            const y = start.year();
+            const spansFullCalendarYear =
+                start.month() === 0 &&
+                start.date() === 1 &&
+                end.month() === 11 &&
+                end.date() === end.daysInMonth() &&
+                end.year() === y;
+            setTempCustomMonthIndex(spansFullCalendarYear ? ALL_MONTHS_INDEX : dateRange[0].month());
             return; // Don't update dateRange for custom option
         }
 
@@ -99,11 +111,17 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     const handleRefresh = () => {
         // Apply custom year inputs if they exist and custom date is selected
         if (isCustomDate && tempStartYear) {
-            const year = parseInt(tempStartYear);
+            const year = parseInt(tempStartYear, 10);
             if (!isNaN(year) && year >= 2000 && year <= 2100) {
-                const newStartDate = dayjs().year(year).month(tempCustomMonthIndex).date(1).startOf("day");
-                const newEndDate = newStartDate.endOf("month").endOf("day");
-                setDateRange([newStartDate, newEndDate]);
+                if (tempCustomMonthIndex === ALL_MONTHS_INDEX) {
+                    const newStartDate = dayjs().year(year).month(0).date(1).startOf("day");
+                    const newEndDate = dayjs().year(year).month(11).endOf("month").endOf("day");
+                    setDateRange([newStartDate, newEndDate]);
+                } else {
+                    const newStartDate = dayjs().year(year).month(tempCustomMonthIndex).date(1).startOf("day");
+                    const newEndDate = newStartDate.endOf("month").endOf("day");
+                    setDateRange([newStartDate, newEndDate]);
+                }
             }
         }
         if (onRefresh) {
@@ -182,6 +200,9 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                             <SelectValue placeholder="Select Month" />
                         </SelectTrigger>
                         <SelectContent className="max-h-40 overflow-y-auto">
+                            <SelectItem value={String(ALL_MONTHS_INDEX)} className="py-1 text-sm font-medium">
+                                All Months
+                            </SelectItem>
                             {[
                                 "Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",

@@ -55,6 +55,11 @@ IMPORTANT - Column mapping for Indian bank statements:
 - Keep debit and credit amounts as SEPARATE fields. Do not merge them.
 - Set the unused amount field to 0 (not null or empty)
 
+Continuation rows and dates (common on bank/PDF statements, e.g. RBC):
+- Tables often leave value_date and/or posting_date blank on continuation rows; the statement implies you reuse the last date shown above in the same transaction section.
+- For each row, if value_date or posting_date is empty in the document, set it from the nearest preceding row that had a non-empty value in that column (top to bottom). Any number of consecutive blank-date rows share the same carried dates until a row shows a new explicit date.
+- Carry value_date and posting_date independently from each column's last non-empty cell. If only one date column exists, use it for both fields unless two distinct dates are clearly labeled.
+
 === ACCOUNT CONTEXT ===
 Also extract basic account context from the statement header:
 - Account number
