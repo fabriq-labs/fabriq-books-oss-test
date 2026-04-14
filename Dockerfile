@@ -24,7 +24,7 @@ COPY frontend-1/ ./
 
 ENV VITE_API_BASE_URL=""
 ENV VITE_ENABLE_AI="true"
-RUN npm run build
+RUN npm run build:fabriq
 
 # Stage 2: Build Backend
 FROM node:20-alpine AS backend-builder
