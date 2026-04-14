@@ -47,7 +47,14 @@ def run_functions_sql():
         logger.error("psycopg2 is required but not installed")
         return False
 
-    functions_sql_path = Path(__file__).parent.parent.parent / "prisma" / "functions.sql"
+    # .resolve() is required: when invoked as a subprocess with a relative path,
+    # parent traversal without it collapses to cwd instead of the real directory.
+    # Docker fallback: the sync-service stage flattens integrations/shared/ →
+    # fabriq-int/shared/, so the __file__-relative path misses; the final image
+    # already has the backend tree at /app/backend/.
+    functions_sql_path = Path(__file__).resolve().parent.parent.parent / "prisma" / "functions.sql"
+    if not functions_sql_path.exists():
+        functions_sql_path = Path("/app/backend/prisma/functions.sql")
     if not functions_sql_path.exists():
         logger.warning(f"functions.sql not found at {functions_sql_path}")
         return False
