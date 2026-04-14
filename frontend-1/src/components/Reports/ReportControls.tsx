@@ -13,8 +13,9 @@ import { RefreshCw } from "lucide-react";
 import dayjs from "dayjs";
 import { useReportController } from "@/contexts/ReportControllerContext";
 
-/** Custom date month picker: -1 = full calendar year (Jan 1 – Dec 31); 0–11 = single month */
+/** Internal: full calendar year (Jan 1 – Dec 31). Select uses `"all"` so Radix does not hide the row when scrolled to month 0–11. */
 const ALL_MONTHS_INDEX = -1;
+const ALL_MONTHS_SELECT_VALUE = "all";
 
 interface ReportControlsProps {
     // Account filter props
@@ -106,6 +107,10 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                 startDate = dayjs().subtract(1, "month").startOf("month");
                 endDate = dayjs().subtract(1, "month").endOf("month");
                 break;
+            case "allMonths":
+                startDate = dayjs().startOf("year");
+                endDate = dayjs().endOf("year");
+                break;
 
             default:
                 return;
@@ -178,9 +183,9 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                     <SelectValue placeholder="Select Time Frame" />
                 </SelectTrigger>
                 <SelectContent>
+                    <SelectItem value="allMonths">All Months</SelectItem>
                     <SelectItem value="currentMonth">Current Month</SelectItem>
                     <SelectItem value="previousMonth">Previous Month</SelectItem>
-
                     <SelectItem value="custom">Custom Date</SelectItem>
                 </SelectContent>
             </Select>
@@ -199,14 +204,22 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                     />
 
                     <Select
-                        value={String(tempCustomMonthIndex)}
-                        onValueChange={(v) => setTempCustomMonthIndex(parseInt(v))}
+                        value={
+                            tempCustomMonthIndex === ALL_MONTHS_INDEX
+                                ? ALL_MONTHS_SELECT_VALUE
+                                : String(tempCustomMonthIndex)
+                        }
+                        onValueChange={(v) => {
+                            setTempCustomMonthIndex(
+                                v === ALL_MONTHS_SELECT_VALUE ? ALL_MONTHS_INDEX : parseInt(v, 10)
+                            );
+                        }}
                     >
                         <SelectTrigger className="h-10 w-full sm:w-44">
                             <SelectValue placeholder="Select Month" />
                         </SelectTrigger>
-                        <SelectContent className="max-h-40 overflow-y-auto">
-                            <SelectItem value={String(ALL_MONTHS_INDEX)} className="py-1 text-sm font-medium">
+                        <SelectContent position="item-aligned" className="max-h-[min(20rem,70vh)]">
+                            <SelectItem value={ALL_MONTHS_SELECT_VALUE} className="py-1 text-sm font-medium">
                                 All Months
                             </SelectItem>
                             {[
