@@ -51,11 +51,57 @@
 .reports-header {
     position: sticky;
     top: 0;
-    z-index: 50;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    z-index: 60;
     background: white;
     border-bottom: 1px solid #e2e8f0;
     padding: 8px 16px;
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.reports-header::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -1rem;
+    height: 1rem;
+    background: white;
+    pointer-events: none;
+}
+
+@media (min-width: 768px) {
+    .reports-header {
+        margin-left: -1.5rem;
+        margin-right: -1.5rem;
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+    }
+
+    .reports-header::before {
+        top: -1.5rem;
+        height: 1.5rem;
+    }
+}
+
+/* Remove purple click/focus ring on report header controls */
+.reports-header button:focus,
+.reports-header button:focus-visible,
+.reports-header [role="button"]:focus,
+.reports-header [role="button"]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.reports-header input:focus,
+.reports-header input:focus-visible,
+.reports-header select:focus,
+.reports-header select:focus-visible,
+.reports-header [data-slot="select-trigger"]:focus,
+.reports-header [data-slot="select-trigger"]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 /* Compact Controls */
@@ -137,6 +183,3 @@
     font-size: 12px;
     color: #1e293b;
 }
-
-
-

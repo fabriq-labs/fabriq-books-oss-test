@@ -62,11 +62,11 @@
         "payment_term_id": "update",
         "customer_address": "update",
         "preferred_currency_id": "update",
-        "currency_master": {
+        "currency": {
           "type": "table",
           "select": {
             "id": "read",
-            "base_currency": "read"
+            "code": "read"
           }
         }
       },
@@ -78,14 +78,11 @@
           "payment_terms": "update"
         }
       },
-      "currency_master": {
+      "currency": {
         "type": "table",
         "select": {
           "id": "read",
-          "base_currency": "update",
-          "from_currency": "update",
-          "currency_value": "update",
-          "effective_from": "update"
+          "code": "update"
         }
       }
     },
@@ -353,7 +350,7 @@
       "dataType": "int",
       "permission": "update"
     },
-    "organization": {
+    "legal_entity": {
       "type": "table",
       "select": {
         "id": "read",
@@ -368,7 +365,7 @@
       },
       "listProps": {
         "type": "text",
-        "recordPath": "organization.legal_name"
+        "recordPath": "legal_entity.legal_name"
       },
       "displayName": "Legal Entity",
       "isColumnShow": true
@@ -418,11 +415,11 @@
         "exchange_rate": "update",
         "payment_method": "update",
         "receipt_number": "update",
-        "currency_master": {
+        "currency": {
           "type": "table",
           "select": {
             "id": "read",
-            "base_currency": "read"
+            "code": "read"
           }
         },
         "payment_reference": "update"
@@ -552,10 +549,10 @@
           "type": "organization",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
-          "relationName": "organization",
-          "searchParams": "organization_name",
-          "instanceLabel": "organization_name",
+          "instanceType": "entity",
+          "relationName": "entity",
+          "searchParams": "legal_name",
+          "instanceLabel": "legal_name",
           "instanceSourceKey": "legal_entity_id"
         },
         "defaultValue": ""

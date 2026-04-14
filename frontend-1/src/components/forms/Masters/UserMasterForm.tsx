@@ -299,7 +299,7 @@ export const UserMasterForm: React.FC<UserMasterFormProps> = () => {
             <div className="mx-auto w-[70%]">
                 <div className="mb-4 flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">User Master</h1>
+                        <h1 className="text-2xl font-bold text-gray-900">User</h1>
                         <p className="text-sm text-gray-600 mt-1">
                             {initialValues ? 'Edit User' : 'Create New User'}
                         </p>

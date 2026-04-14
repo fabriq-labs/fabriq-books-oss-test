@@ -75,7 +75,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
 
   const fetchingDetails = (id: any) => {
     setIsLoading(true);
-    viewAPI.getById("organization", id, viewId)
+    viewAPI.getById("entity", id, viewId)
       .then((res: any) => {
         setInitialValues(res.data);
         form.reset({
@@ -109,7 +109,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
 
       if (!id) {
         await viewAPI.create(
-          "organization",
+          "entity",
           viewId,
           submissionData
         );
@@ -117,10 +117,10 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
           title: "Success",
           description: "Organization created successfully",
         });
-        navigate('/masters/organization');
+        navigate('/masters/entity');
       } else {
         await viewAPI.update(
-          "organization",
+          "entity",
           id,
           viewId,
           submissionData
@@ -130,7 +130,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
           description: "Organization updated successfully",
         });
       }
-      navigate('/masters/organization');
+      navigate('/masters/entity');
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -160,7 +160,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
 
 
   const handleCancel = () => {
-    navigate('/masters/organization');
+    navigate('/masters/entity');
   };
 
   const isSubEntity = initialValues?.is_it_headquartres !== 'Yes';
@@ -171,7 +171,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
     <div className="mx-auto w-[70%]">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Organization Master</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Organization</h1>
           <p className="text-sm text-gray-600 mt-1">
             {initialValues ? 'Edit Organization' : 'Create New Organization'}
           </p>
@@ -179,13 +179,13 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
         <Button
           variant="ghost"
           className="flex items-center gap-2 text-muted-foreground"
-          onClick={() => navigate('/masters/organization')}
+          onClick={() => navigate('/masters/entity')}
         >
           <ArrowLeft size={16} />
           Back to list
         </Button>
       </div>
-      
+
       {showTabs ? (
         <Tabs defaultValue="details" className="w-full">
           <TabsList>
@@ -333,18 +333,18 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
                             <FormItem>
                               <FormLabel>Base Currency</FormLabel>
                               <SearchDropDown
-                                instanceType="currency_master"
+                                instanceType="currency"
                                 instanceSourceKey="basecurrency_id"
                                 instanceKey="id"
-                                instanceLabel="base_currency"
+                                instanceLabel="code"
                                 instanceValue={
-                                  initialValues?.currency_master
+                                  initialValues?.currency
                                 }
                                 onSelectItem={handleSelectChange}
                                 onClear={handleSelectClear}
                                 limit="10"
-                                searchParams="base_currency"
-                                type="organization"
+                                searchParams="code"
+                                type="entity"
                               />
                               <FormMessage />
                             </FormItem>
@@ -581,17 +581,17 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
                         <FormItem>
                           <FormLabel>Base Currency</FormLabel>
                           <SearchDropDown
-                            instanceType="currency_master"
+                            instanceType="currency"
                             instanceSourceKey="basecurrency_id"
                             instanceKey="id"
-                            instanceLabel="base_currency"
+                            instanceLabel="code"
                             instanceValue={
-                              initialValues?.currency_master
+                              initialValues?.currency
                             }
                             onSelectItem={handleSelectChange}
                             onClear={handleSelectClear}
                             limit="10"
-                            searchParams="base_currency"
+                            searchParams="code"
                             type="organization"
                           />
                           <FormMessage />

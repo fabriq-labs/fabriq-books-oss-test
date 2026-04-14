@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
+import { setupCurrency } from '../setup-currency';
 import prisma from '../../src/lib/prisma';
 const csv = require('csv-parser');
 
@@ -52,6 +53,12 @@ async function setupNRIDemoData() {
     }
     console.log(`  ✓ Loaded ${orgData.length} tenant(s)`);
 
+    // ===== 1.5. SETUP CURRENCY FROM CSV (before entity — basecurrency_id FK → currency.id) =====
+    console.log('💱 Loading currency from CSV...');
+    await setupCurrency(path.join(__dirname, 'currency.csv'));
+    const currencyData = await loadCsvData(path.join(__dirname, 'currency.csv'));
+    console.log(`  ✓ Loaded ${currencyData.length} currencies`);
+
     // ===== 2. LOAD AND INSERT ORGANIZATION DATA (LEGAL ENTITIES) =====
     console.log('🏢 Loading organization (legal entity) data...');
     const organizationData = await loadCsvData(path.join(__dirname, 'organization.csv'));
@@ -88,14 +95,14 @@ async function setupNRIDemoData() {
         org_id: org.org_id,
       };
 
-      // Only set basecurrency_id when present (must reference existing currency_master.id)
+      // Only set basecurrency_id when present (must reference existing currency.id)
       const baseCurrencyId = org.basecurrency_id?.trim();
       if (baseCurrencyId) {
         updateData.basecurrency_id = baseCurrencyId;
         createData.basecurrency_id = baseCurrencyId;
       }
 
-      await prisma.organization.upsert({
+      await prisma.entity.upsert({
         where: { id: org.id },
         update: updateData,
         create: createData,
@@ -105,7 +112,7 @@ async function setupNRIDemoData() {
 
     // ===== 3. SETUP CHART OF ACCOUNTS FOR EACH ORGANIZATION =====
     console.log('💰 Setting up chart of accounts for organizations...');
-    
+
     // Map legal entity IDs to their respective chart of accounts and currency
     const chartOfAccountsMap: Record<string, string> = {
       'org_rajesh_canada': path.join(__dirname, 'chart-of-accounts-canada.json'),
@@ -115,7 +122,7 @@ async function setupNRIDemoData() {
       'org_rajesh_canada': 'CAD',
       'org_rajesh_india': 'INR',
     };
-    
+
     for (const org of organizationData) {
       const coaPath = chartOfAccountsMap[org.id];
       const currency = currencyMap[org.id] ?? 'USD';
@@ -194,6 +201,7 @@ async function setupNRIDemoData() {
     console.log('');
     console.log('📊 Summary:');
     console.log(`   🏢 Tenant: ${orgData.length} (Rajesh Kumar)`);
+    console.log(`   💱 Currencies: ${currencyData.length}`);
     console.log(`   🏠 Organizations (Legal Entities): ${organizationData.length}`);
     console.log(`      - Rajesh (Canada) - Toronto, Ontario (CAD accounts: RRSP, TFSA, GICs, etc.)`);
     console.log(`      - Rajesh (India) - Chennai, Tamil Nadu (INR accounts: PPF, EPF, NPS, FDs, etc.)`);

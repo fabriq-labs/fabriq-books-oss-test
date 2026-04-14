@@ -146,7 +146,7 @@ export const ShippingTermsForm: React.FC<ItemMasterFormProps> = (
         <div className="mx-auto w-[70%]">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Shipping Terms Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Shipping Terms</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit Shipping Terms' : 'Create New Shipping Terms'}
                     </p>

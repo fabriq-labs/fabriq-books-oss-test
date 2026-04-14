@@ -6,7 +6,7 @@ export const getModelDisplayName = (modelName: string): string => {
         'purchase_requisition': 'Purchase Requisition',
         'purchase_order': 'Purchase Order',
         'invoice': 'Invoice',
-        'organization': 'Organization',
+        'entity': 'Entity',
         'item_master': 'Item Master',
         'item_category': 'Item Category',
         'supplier': 'Supplier',

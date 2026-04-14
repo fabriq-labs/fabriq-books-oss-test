@@ -106,12 +106,12 @@ const FinancialInformation: React.FC<FinancialInformationProps> = ({ form, readO
           className='mb-0'
         >
           <SearchDropDown
-            instanceType="organization"
+            instanceType="entity"
             instanceSourceKey="legal_entity_id"
             instanceKey="id"
             instanceLabel="legal_name"
             instanceValue={
-              details?.organization
+              details?.legal_entity
             }
             onSelectItem={handleSelectChange}
             onClear={handleSelectClear}

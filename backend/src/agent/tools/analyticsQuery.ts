@@ -24,10 +24,10 @@ const BUSINESS_TABLES = new Set([
   'item_master', 'supplier', 'customers', 'invoice', 'invoice_line_item',
   'purchase_requisition', 'item', 'purchase_order', 'purchase_order_item',
   'sales_order', 'sales_order_item', 'delivery_challan', 'credit_note',
-  'quote', 'account', 'posting', 'category', 'payment_receipt',
+  'quote', 'account', 'posting', 'payment_receipt',
   'workflow_instance', 'workflow_history',  // These have org_id!
   'employee_master', 'department', 'cost_center', 'location', 'project_master',
-  'budget_period', 'budget_line', 'coa', 'organization'
+  'budget_period', 'budget_line', 'coa', 'entity'
 ]);
 
 /**
@@ -56,7 +56,7 @@ function validateQuery(
       valid: false,
       warnings: [],
       error: `Query contains unsubstituted placeholders: ${placeholderMatch.join(', ')}. ` +
-             `Do not write {{...}} in SQL — org_id filtering is applied automatically by this tool.`
+        `Do not write {{...}} in SQL — org_id filtering is applied automatically by this tool.`
     };
   }
 
@@ -91,7 +91,7 @@ function validateQuery(
   for (const table of businessTablesInQuery) {
     // Simple check - look for org_id in the query
     // This is a heuristic, not perfect, but provides guidance
-    const hasOrgIdFilter = 
+    const hasOrgIdFilter =
       lowerQuery.includes(`${table}.org_id`) ||
       lowerQuery.includes(`org_id = '${orgId.toLowerCase()}'`) ||
       lowerQuery.includes(`org_id='${orgId.toLowerCase()}'`);
@@ -124,7 +124,7 @@ function isCurrencyField(fieldName: string, value: any): boolean {
  */
 function createColumnMetadata(field: string, value: any) {
   const dataType = typeof value;
-  
+
   return {
     field,
     label: field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
@@ -247,8 +247,8 @@ export function analyticsQueryTool(auth: AuthContext) {
         // Build column metadata from first row
         const columns = rowCount > 0
           ? Object.keys(data[0])
-              .filter(f => !SYSTEM_FIELDS.includes(f))
-              .map(f => createColumnMetadata(f, data[0][f]))
+            .filter(f => !SYSTEM_FIELDS.includes(f))
+            .map(f => createColumnMetadata(f, data[0][f]))
           : [];
 
         // Convert BigInt to Number for JSON serialization

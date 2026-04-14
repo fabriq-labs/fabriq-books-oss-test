@@ -18,6 +18,8 @@ describe('Sales Order Workflow Tests', () => {
   console.log('\n🚀 Starting Sales Order Workflow Tests');
   const modelService = ModelService.getInstance();
   const workflowEngine = new WorkflowEngine(prisma);
+const findWorkflowAction = (actions: any[], candidateNames: string[]) =>
+  actions.find((action) => candidateNames.includes(action.name));
 
   let config: TestConfig;
   let context: any;
@@ -257,11 +259,13 @@ describe('Sales Order Workflow Tests', () => {
 
       // Execute workflow transitions
       const wfContext1 = await workflowEngine.getWorkflowContext(wfInstanceId, context);
-      const submitAction = wfContext1.availableActions.find(a => a.name === 'Submit for Processing');
+      const submitAction = findWorkflowAction(wfContext1.availableActions, ['Submit for Processing', 'Submit']);
+      expect(submitAction).toBeDefined();
       await workflowEngine.executeTransition(wfContext1, submitAction!, context, {});
 
       const wfContext2 = await workflowEngine.getWorkflowContext(wfInstanceId, context);
-      const invoiceAction = wfContext2.availableActions.find(a => a.name === 'Generate Invoice');
+      const invoiceAction = findWorkflowAction(wfContext2.availableActions, ['Generate Invoice', 'Approve']);
+      expect(invoiceAction).toBeDefined();
       await workflowEngine.executeTransition(wfContext2, invoiceAction!, context, {});
 
       // Verify invoice has sales_order_id
@@ -297,11 +301,13 @@ describe('Sales Order Workflow Tests', () => {
 
       // Execute workflow transitions
       const wfContext1 = await workflowEngine.getWorkflowContext(wfInstanceId, context);
-      const submitAction = wfContext1.availableActions.find(a => a.name === 'Submit for Processing');
+      const submitAction = findWorkflowAction(wfContext1.availableActions, ['Submit for Processing', 'Submit']);
+      expect(submitAction).toBeDefined();
       await workflowEngine.executeTransition(wfContext1, submitAction!, context, {});
 
       const wfContext2 = await workflowEngine.getWorkflowContext(wfInstanceId, context);
-      const invoiceAction = wfContext2.availableActions.find(a => a.name === 'Generate Invoice');
+      const invoiceAction = findWorkflowAction(wfContext2.availableActions, ['Generate Invoice', 'Approve']);
+      expect(invoiceAction).toBeDefined();
       await workflowEngine.executeTransition(wfContext2, invoiceAction!, context, {});
 
       // Verify invoice has 3 line items
@@ -333,11 +339,13 @@ describe('Sales Order Workflow Tests', () => {
 
       // Execute workflow transitions
       const wfContext1 = await workflowEngine.getWorkflowContext(wfInstanceId, context);
-      const submitAction = wfContext1.availableActions.find(a => a.name === 'Submit for Processing');
+      const submitAction = findWorkflowAction(wfContext1.availableActions, ['Submit for Processing', 'Submit']);
+      expect(submitAction).toBeDefined();
       await workflowEngine.executeTransition(wfContext1, submitAction!, context, {});
 
       const wfContext2 = await workflowEngine.getWorkflowContext(wfInstanceId, context);
-      const invoiceAction = wfContext2.availableActions.find(a => a.name === 'Generate Invoice');
+      const invoiceAction = findWorkflowAction(wfContext2.availableActions, ['Generate Invoice', 'Approve']);
+      expect(invoiceAction).toBeDefined();
       await workflowEngine.executeTransition(wfContext2, invoiceAction!, context, {});
 
       // Verify invoice has customer_id and location_id

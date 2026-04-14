@@ -83,6 +83,8 @@ interface MasterProps {
   /** Optional extra action buttons per row (e.g. Reconcile icon); rendered between Edit and Delete */
   injectRowActions?: (record: any) => React.ReactNode | null;
   isCreate?: boolean;
+  /** When `false`, hides the Import button. Omitted or `true` shows it (default: show). */
+  isImport?: boolean;
 }
 
 type DateRangeType = {
@@ -105,6 +107,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   renderRowExtra,
   injectRowActions,
   isCreate,
+  isImport,
 }, masterRef) => {
   // Extract import-related config from listConfig.importConfig
   const {
@@ -646,10 +649,12 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
                   <span>Add {displayName}</span>
                 </Button>
               )}
-              <Button onClick={handleImport} className="flex items-center gap-2">
-                <Import size={16} />
-                <span>Import</span>
-              </Button>
+              {isImport !== false && (
+                <Button onClick={handleImport} className="flex items-center gap-2">
+                  <Import size={16} />
+                  <span>Import</span>
+                </Button>
+              )}
             </div>
           </div>
         ) : (
@@ -680,10 +685,12 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
                   <span>Add {displayName}</span>
                 </Button>
               )}
-              <Button onClick={handleImport} className="flex items-center gap-2">
-                <Import size={16} />
-                <span>Import</span>
-              </Button>
+              {isImport !== false && (
+                <Button onClick={handleImport} className="flex items-center gap-2">
+                  <Import size={16} />
+                  <span>Import</span>
+                </Button>
+              )}
             </div>
           </div>
         )}

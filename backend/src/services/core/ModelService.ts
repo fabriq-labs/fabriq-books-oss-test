@@ -224,7 +224,7 @@ export class ModelService {
   /**
    * Get a record by auth_id (external_id)
    */
-  async getByAuthId(modelName: string, context: AuthContext, authId: string, options?: any): Promise<DataAccessResult> {    
+  async getByAuthId(modelName: string, context: AuthContext, authId: string, options?: any): Promise<DataAccessResult> {
     try {
       const dalResult = await this.dal.findUniqueByAuthId(modelName, context, authId, { select: options?.select });
 
@@ -254,7 +254,7 @@ export class ModelService {
     query: any,
     options?: { viewName?: string; select?: any }
   ): Promise<DataAccessResult> {
-    
+
     try {
       const { select, dataGraph } = await this.getSelectFromView(
         modelName,

@@ -687,17 +687,17 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                                             <FormLabel>Preferred Currency</FormLabel>
 
                                                             <SearchDropDown
-                                                                instanceType="currency_master"
+                                                                instanceType="currency"
                                                                 instanceSourceKey="preferred_currency_id"
                                                                 instanceKey="id"
-                                                                instanceLabel="base_currency"
+                                                                instanceLabel="code"
                                                                 instanceValue={
-                                                                    initialValues?.currency_master
+                                                                    initialValues?.currency
                                                                 }
                                                                 onSelectItem={handleSelectChange}
-                                                                onClear={() => handleSelectClear('base_currency')}
+                                                                onClear={() => handleSelectClear('code')}
                                                                 limit="10"
-                                                                searchParams="base_currency"
+                                                                searchParams="code"
                                                                 type="supplier"
                                                             />
                                                             <FormMessage />
@@ -1147,17 +1147,17 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                                     <FormLabel>Preferred Currency</FormLabel>
 
                                                     <SearchDropDown
-                                                        instanceType="currency_master"
+                                                        instanceType="currency"
                                                         instanceSourceKey="preferred_currency_id"
                                                         instanceKey="id"
-                                                        instanceLabel="base_currency"
+                                                        instanceLabel="code"
                                                         instanceValue={
-                                                            initialValues?.currency_master
+                                                            initialValues?.currency
                                                         }
                                                         onSelectItem={handleSelectChange}
-                                                        onClear={() => handleSelectClear('base_currency')}
+                                                        onClear={() => handleSelectClear('code')}
                                                         limit="10"
-                                                        searchParams="base_currency"
+                                                        searchParams="code"
                                                         type="supplier"
                                                     />
                                                     <FormMessage />

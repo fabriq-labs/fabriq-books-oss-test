@@ -9,8 +9,8 @@
   "supplierId2": "supp_lenovo_india",
   "items": {
     "productA": "item_dell_laptop",
-    "serviceB": "item_dell_desktop",
-    "productC": "item_dell_monitor",
+    "serviceB": "item_it_consulting",
+    "productC": "item_lenovo_laptop",
     "zohoProductName": "Cream Cheese",
     "quickbooksProductName": "Pump"
   },

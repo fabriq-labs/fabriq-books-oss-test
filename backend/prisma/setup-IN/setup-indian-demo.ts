@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
-import { setupCurrencyMaster } from '../setup-currency-master';
+import { setupCurrency } from '../setup-currency';
 import prisma from '../../src/lib/prisma';
 import { buildAirbyteExtractionConfigFromEnv } from '../setup-airbyte-extraction-config';
 import {
@@ -58,10 +58,11 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Loaded ${orgData.length} organizations`);
 
-    // ===== 1.5. SETUP CURRENCY MASTER FROM CSV (before organization — basecurrency_id FK) =====
-    console.log('💱 Loading currency master from CSV...');
-    await setupCurrencyMaster(path.join(__dirname, 'currency_master.csv'));
-    console.log('  ✓ Currency master setup complete');
+    // ===== 1.5. SETUP CURRENCY FROM CSV (before entity — basecurrency_id FK → currency.id) =====
+    console.log('💱 Loading currency from CSV...');
+    await setupCurrency(path.join(__dirname, 'currency.csv'));
+    const currencyData = await loadCsvData(path.join(__dirname, 'currency.csv'));
+    console.log(`  ✓ Loaded ${currencyData.length} currencies`);
 
     // ===== 2. LOAD AND INSERT ORGANIZATION DATA =====
     console.log('🏢 Loading business organization data...');
@@ -99,14 +100,14 @@ async function setupIndianDemoData() {
         org_id: org.org_id,
       };
 
-      // Only set basecurrency_id when present (must reference existing currency_master.id)
+      // Only set basecurrency_id when present (must reference existing currency.id)
       const baseCurrencyId = org.basecurrency_id?.trim();
       if (baseCurrencyId) {
         updateData.basecurrency_id = baseCurrencyId;
         createData.basecurrency_id = baseCurrencyId;
       }
 
-      await prisma.organization.upsert({
+      await prisma.entity.upsert({
         where: { id: org.id },
         update: updateData,
         create: createData,
@@ -175,34 +176,9 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Shipping methods: ${shippingMethodData.length}, Shipping terms: ${shippingTermsData.length}, Tax: ${taxMasterData.length}, Item categories: ${itemCategoryData.length}, UOM: ${uomData.length}, Cost centers: ${costCenterData.length}`);
 
-    // ===== 2.58. LOAD CATEGORY_GROUP, CATEGORY (data.prisma), CURRENCY (data.prisma) =====
-    console.log('📂 Loading category groups, categories, and currencies...');
-    const categoryGroupData = await loadCsvData(path.join(__dirname, 'category_group.csv'));
-    for (const row of categoryGroupData) {
-      await prisma.category_group.upsert({
-        where: { id: row.id },
-        update: { name: row.name, org_id: row.org_id || null },
-        create: { id: row.id, name: row.name, org_id: row.org_id || null },
-      });
-    }
-    const categoryData = await loadCsvData(path.join(__dirname, 'category.csv'));
-    for (const row of categoryData) {
-      await prisma.category.upsert({
-        where: { id: row.id },
-        update: { name: row.name, color: row.color, group_id: row.group_id || null, org_id: row.org_id || null },
-        create: { id: row.id, name: row.name, color: row.color, group_id: row.group_id || null, org_id: row.org_id || null },
-      });
-    }
-    const currencyData = await loadCsvData(path.join(__dirname, 'currency.csv'));
-    for (const row of currencyData) {
-      const currencyOrgId = row.org_id?.trim() || 'org_indian_demo';
-      await prisma.currency.upsert({
-        where: { code: row.code },
-        update: { name: row.name, symbol: row.symbol || null, decimal_places: parseInt(row.decimal_places || '2', 10), is_active: row.is_active === 'true', org_id: currencyOrgId },
-        create: { code: row.code, name: row.name, symbol: row.symbol || null, decimal_places: parseInt(row.decimal_places || '2', 10), is_active: row.is_active !== 'false', org_id: currencyOrgId },
-      });
-    }
-    console.log(`  ✓ Category groups: ${categoryGroupData.length}, Categories: ${categoryData.length}, Currencies: ${currencyData.length}`);
+    // ===== 2.58. LOAD CATEGORY_GROUP, CATEGORY (data.prisma) =====
+
+
 
     // ===== 2.6. SETUP ZOHO BOOKS ERP CONNECTION =====
     console.log('🔌 Setting up Zoho Books ERP connection...');
@@ -493,12 +469,11 @@ async function setupIndianDemoData() {
         stockable: item.stockable,
         item_status: item.item_status,
         supplier_id: item.supplier_id,
-        item_category_id: item.item_category_id || null,
         uom_id: item.uom_id || null,
         tax_master_id: item.tax_master_id || null,
         tax_rate_intra_id: item.tax_rate_intra_id || null,
         org_id: item.org_id,
-        currency_master_id: item.currency_master_id || null,
+        currency_id: item.currency_id || null,
       };
 
       const createData: any = {
@@ -520,10 +495,10 @@ async function setupIndianDemoData() {
         org_id: item.org_id,
       };
 
-      // Only add currency_master_id if it exists and is not empty or 'undefined'
-      if (item.currency_master_id && typeof item.currency_master_id === 'string' && item.currency_master_id.trim() !== '' && item.currency_master_id.trim() !== 'undefined') {
-        updateData.currency_master_id = item.currency_master_id;
-        createData.currency_master_id = item.currency_master_id;
+      // Only add currency_id if it exists and is not empty or 'undefined'
+      if (item.currency_id && typeof item.currency_id === 'string' && item.currency_id.trim() !== '' && item.currency_id.trim() !== 'undefined') {
+        updateData.currency_id = item.currency_id;
+        createData.currency_id = item.currency_id;
       }
 
       await prisma.item_master.upsert({
@@ -974,7 +949,7 @@ async function setupIndianDemoData() {
     console.log(`   📦 Items: ${itemData.length}`);
     console.log(`   🔗 Supplier items: ${supplierItemsData.length}`);
     console.log(`   📋 Masters: Shipping (${shippingMethodData.length}), Shipping terms (${shippingTermsData.length}), Tax (${taxMasterData.length}), Item categories (${itemCategoryData.length}), UOM (${uomData.length}), Cost centers (${costCenterData.length}), Business units (${businessUnitData.length}), Departments (${departmentData.length})`);
-    console.log(`   📂 Category groups: ${categoryGroupData.length}, Categories: ${categoryData.length}, Currencies: ${currencyData.length}`);
+
     console.log(`   📊 Budget periods: ${budgetPeriodData.length}, Budget lines: ${budgetLineData.length}, General ledger: ${generalLedgerData.length}, Projects: ${projectMasterData.length}, Employee master: ${employeeMasterData.length}`);
     console.log(`   👤 Users: ${userData.length}`);
     console.log(`   🔗 Role Assignments: ${roleUserData.length}`);

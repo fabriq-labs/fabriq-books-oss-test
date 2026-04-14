@@ -58,7 +58,7 @@ interface LegalEntity {
     organization_name?: string;
     legal_name?: string;
     basecurrency_id?: string | null;
-    currency_master?: { base_currency?: string } | null;
+    currency?: { code?: string } | null;
 }
 
 // Chart colors
@@ -178,16 +178,16 @@ export default function SimpleTransactionList() {
             try {
                 const [allRes, hqRes] = await Promise.all([
                     viewAPI.search(
-                        "organization",
-                        "organization_view",
+                        "entity",
+                        "entity_view",
                         1,
                         500,
                         undefined,
                         { org_id: { eq: user.org_id } }
                     ),
                     viewAPI.search(
-                        "organization",
-                        "organization_view",
+                        "entity",
+                        "entity_view",
                         1,
                         10,
                         undefined,
@@ -371,7 +371,7 @@ export default function SimpleTransactionList() {
     };
 
     const displayCurrency = useMemo(() => {
-        const code = selectedLegalEntity?.currency_master?.base_currency;
+        const code = selectedLegalEntity?.currency?.code;
         if (code) return code;
         return transactions[0]?.currency || "INR";
     }, [selectedLegalEntity, transactions]);
@@ -431,7 +431,7 @@ export default function SimpleTransactionList() {
                                                     className={cn(
                                                         "px-3 py-2 text-left text-sm rounded-md hover:bg-accent",
                                                         entity.id === selectedLegalEntity?.id &&
-                                                            "bg-accent font-medium"
+                                                        "bg-accent font-medium"
                                                     )}
                                                 >
                                                     {entity.organization_name ||
@@ -499,8 +499,8 @@ export default function SimpleTransactionList() {
                                                 >
                                                     <TableCell>
                                                         {transaction.value_date
-                                                            ? formatDate(typeof transaction.value_date === 'string' 
-                                                                ? transaction.value_date 
+                                                            ? formatDate(typeof transaction.value_date === 'string'
+                                                                ? transaction.value_date
                                                                 : new Date(transaction.value_date).toISOString())
                                                             : 'N/A'}
                                                     </TableCell>
@@ -515,11 +515,10 @@ export default function SimpleTransactionList() {
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <span
-                                                            className={`font-medium ${
-                                                                transaction.isMoneyIn
-                                                                    ? 'text-green-700'
-                                                                    : 'text-red-700'
-                                                            }`}
+                                                            className={`font-medium ${transaction.isMoneyIn
+                                                                ? 'text-green-700'
+                                                                : 'text-red-700'
+                                                                }`}
                                                         >
                                                             {transaction.isMoneyIn ? '+' : '-'}
                                                             {formatCurrency(Math.abs(transaction.amount), displayCurrency)}
@@ -683,7 +682,7 @@ export default function SimpleTransactionList() {
                                                                     cx="50%"
                                                                     cy="50%"
                                                                     labelLine={false}
-                                                                    label={({ name, percent }) => 
+                                                                    label={({ name, percent }) =>
                                                                         percent > 0.05 ? `${name.substring(0, 15)}${name.length > 15 ? '...' : ''}: ${(percent * 100).toFixed(0)}%` : ''
                                                                     }
                                                                     outerRadius={100}
@@ -717,7 +716,7 @@ export default function SimpleTransactionList() {
                                                                     cx="50%"
                                                                     cy="50%"
                                                                     labelLine={false}
-                                                                    label={({ name, percent }) => 
+                                                                    label={({ name, percent }) =>
                                                                         percent > 0.05 ? `${name.substring(0, 15)}${name.length > 15 ? '...' : ''}: ${(percent * 100).toFixed(0)}%` : ''
                                                                     }
                                                                     outerRadius={100}

@@ -35,7 +35,7 @@ model account {
   child_accounts        account[]               @relation("ParentChildRelation")
   hq_account            account?                @relation("HQAccountRelation", fields: [hq_account_id], references: [id])
   hq_mapped_accounts    account[]               @relation("HQAccountRelation")
-  organization          organization?           @relation(fields: [legal_entity_id], references: [id])
+  legal_entity          entity?                 @relation(fields: [legal_entity_id], references: [id])
   debit_postings        posting[]               @relation("debit_account")
   credit_postings       posting[]               @relation("credit_account")
   trades                trade[]
@@ -58,37 +58,6 @@ model account {
   @@map("account")
 }
 
-model category {
-  id             String          @id @default(dbgenerated("'cate_' || gen_random_uuid()")) @db.VarChar(50)
-  created_by     String?
-  modified_by    String?
-  created_at     DateTime        @default(now())
-  modified_at    DateTime        @updatedAt
-  org_id         String?
-  assigned_to    String?
-  name           String
-  color          String
-  group_id       String?
-  category_group category_group? @relation(fields: [group_id], references: [id])
-  posting        posting[]
-
-  @@map("category")
-}
-
-model category_group {
-  id             String     @id @default(dbgenerated("'catg_' || gen_random_uuid()")) @db.VarChar(50)
-  created_by     String?
-  modified_by    String?
-  created_at     DateTime   @default(now())
-  modified_at    DateTime   @updatedAt
-  org_id         String?
-  assigned_to    String?
-  name           String
-  category_group category[]
-
-  @@map("category_group")
-}
-
 model posting {
   id                     String    @id @default(dbgenerated("'post_' || gen_random_uuid()")) @db.VarChar(50)
   created_by             String?
@@ -104,7 +73,6 @@ model posting {
   value_date             DateTime?
   posting_date           DateTime?
   amount                 Decimal?  @db.Decimal(19, 4)
-  category_id            String?
   category_name          String?
   posting_type           String?
   notes                  String?
@@ -137,7 +105,6 @@ model posting {
 
   account         account?         @relation("debit_account", fields: [account_id], references: [id])
   credit_account  account?         @relation("credit_account", fields: [credit_account_id], references: [id])
-  category        category?        @relation(fields: [category_id], references: [id])
   payment_receipt payment_receipt? @relation("PostingToPaymentReceipt", fields: [payment_receipt_id], references: [id])
 
   @@map("posting")
@@ -268,15 +235,21 @@ enum account_classification {
 // ── Forex: Currency reference & exchange rates ──────────────────────────
 
 model currency {
-  id             String   @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
-  code           String   @unique // ISO 4217: "USD", "INR", "PHP", "EUR"
-  name           String // "US Dollar", "Indian Rupee"
-  symbol         String? // "$", "₹", "₱"
-  decimal_places Int      @default(2)
-  is_active      Boolean  @default(true)
-  created_at     DateTime @default(now())
-  modified_at    DateTime @updatedAt
-  org_id         String
+  id              String            @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
+  code            String            @unique // ISO 4217: "USD", "INR", "PHP", "EUR"
+  name            String // "US Dollar", "Indian Rupee"
+  symbol          String? // "$", "₹", "₱"
+  decimal_places  Int               @default(2)
+  is_active       Boolean           @default(true)
+  created_at      DateTime          @default(now())
+  modified_at     DateTime          @updatedAt
+  org_id          String
+  payment_receipt payment_receipt[]
+  entities        entity[]
+  suppliers       supplier[]
+  customers       customers[]
+  itemMasters     item_master[]
+  orgs            org[]
 
   @@map("currency")
 }
@@ -454,14 +427,14 @@ model llm_trace_step {
 // ── Agentic Sessions & Pending Actions ──────────────────────────
 
 model agent_template {
-  id          String  @id @default(dbgenerated("'atpl_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id      String? // null = system-level template (available to all orgs)
-  name        String
-  description String
-  icon        String  // lucide icon name e.g. "arrow-right-left"
-  goal_model  String?
-  system_prompt String @db.Text
-  user_hint   String  // placeholder text shown to user in GoalSetter
+  id            String   @id @default(dbgenerated("'atpl_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id        String? // null = system-level template (available to all orgs)
+  name          String
+  description   String
+  icon          String // lucide icon name e.g. "arrow-right-left"
+  goal_model    String?
+  system_prompt String   @db.Text
+  user_hint     String // placeholder text shown to user in GoalSetter
   default_mode  String   @default("supervised")
   is_active     Boolean  @default(true)
   sort_order    Int      @default(0)
@@ -476,18 +449,18 @@ model agent_template {
 }
 
 model agent_session {
-  id              String   @id @default(dbgenerated("'ses_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id          String
-  user_id         String
+  id      String @id @default(dbgenerated("'ses_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id  String
+  user_id String
 
   goal        String
   name        String? // auto-generated short title e.g. "HDFC March Reconciliation"
   goal_model  String?
   template_id String? @db.VarChar(50)
 
-  plan            Json?
+  plan Json?
 
-  status          String   @default("planning")
+  status String @default("planning")
   // 'planning' | 'awaiting_approval' | 'executing'
   // | 'paused' | 'completed' | 'failed' | 'abandoned'
 
@@ -499,13 +472,13 @@ model agent_session {
   pending_actions_count   Int @default(0)
   completed_actions_count Int @default(0)
 
-  mode            String   @default("supervised")
+  mode String @default("supervised")
   // 'supervised' | 'semi_auto' | 'autonomous'
 
-  started_at      DateTime @default(now())
-  last_active_at  DateTime @updatedAt
-  completed_at    DateTime?
-  expires_at      DateTime?
+  started_at     DateTime  @default(now())
+  last_active_at DateTime  @updatedAt
+  completed_at   DateTime?
+  expires_at     DateTime?
 
   template        agent_template?  @relation(fields: [template_id], references: [id])
   messages        agent_message[]
@@ -519,64 +492,64 @@ model agent_session {
 model agent_message {
   id           String   @id @default(dbgenerated("'msg_' || gen_random_uuid()")) @db.VarChar(50)
   session_id   String
-  role         String   // 'user' | 'assistant' | 'tool'
+  role         String // 'user' | 'assistant' | 'tool'
   content      String   @db.Text
   tool_calls   Json?
   tool_results Json?
   step_index   Int?
   created_at   DateTime @default(now())
 
-  session      agent_session @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  session agent_session @relation(fields: [session_id], references: [id], onDelete: Cascade)
 
   @@index([session_id, created_at])
   @@map("agent_message")
 }
 
 model pending_action {
-  id              String   @id @default(dbgenerated("'pa_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id          String
-  session_id      String?
-  created_by      String   // 'agent' or user_id
-  assigned_to     String?
-  assigned_role   String?
+  id            String  @id @default(dbgenerated("'pa_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id        String
+  session_id    String?
+  created_by    String // 'agent' or user_id
+  assigned_to   String?
+  assigned_role String?
 
-  action_type     String
+  action_type String
   // V1: 'reconcile_posting'
   // Future: 'invoice_match' | 'send_email' | 'escalate_collection'
 
-  batch_id        String?
-  batch_total     Int?
+  batch_id    String?
+  batch_total Int?
 
-  title           String
-  description     String?  @db.Text
+  title       String
+  description String? @db.Text
 
-  payload         Json
+  payload Json
 
-  confidence      String   // 'high' | 'medium' | 'low'
+  confidence       String // 'high' | 'medium' | 'low'
   confidence_score Float?
 
-  status          String   @default("pending")
+  status String @default("pending")
   // 'pending' | 'approved' | 'approved_with_edits'
   // | 'rejected' | 'deferred' | 'executed' | 'expired'
 
   resolved_by     String?
   resolved_at     DateTime?
-  resolution_note String?  @db.Text
+  resolution_note String?   @db.Text
 
-  on_approve      String
+  on_approve String
   // 'execute_immediately' | 'queue_for_batch' | 'notify_only'
 
   executed_at      DateTime?
   execution_result Json?
-  execution_error  String?  @db.Text
+  execution_error  String?   @db.Text
 
-  defer_until     DateTime?
-  expires_at      DateTime?
+  defer_until DateTime?
+  expires_at  DateTime?
 
-  created_at      DateTime @default(now())
-  modified_at     DateTime @updatedAt
+  created_at  DateTime @default(now())
+  modified_at DateTime @updatedAt
 
-  session         agent_session? @relation(fields: [session_id], references: [id])
+  session agent_session? @relation(fields: [session_id], references: [id])
 
   @@index([org_id, status])
   @@index([session_id, status])

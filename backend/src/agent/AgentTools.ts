@@ -309,18 +309,18 @@ export function searchCOATool(auth: AuthContext) {
   });
 }
 
-export function searchOrganizationsTool(auth: AuthContext) {
+export function searchEntitiesTool(auth: AuthContext) {
   return tool({
     parameters: searchRecordsSchema,
-    description: getDescription('searchOrganizations'),
+    description: getDescription('searchEntities'),
     execute: async (
       params: { modelName: string; search?: any; page?: number; pageSize?: number },
       _options
     ) => {
       // Force modelName to be organization
-      const searchParams = { ...params, modelName: 'organization' };
-      const result = await modelService.search('organization', auth, searchParams);
-      const enrichedResult = enrichSearchResult(result, 'organization');
+      const searchParams = { ...params, modelName: 'entity' };
+      const result = await modelService.search('entity', auth, searchParams);
+      const enrichedResult = enrichSearchResult(result, 'entity');
       const safeResult = JSON.parse(JSON.stringify(enrichedResult));
       return safeResult;
     }

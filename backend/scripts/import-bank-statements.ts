@@ -97,8 +97,6 @@ interface TransactionRecord {
   amount?: number;
   balance?: number;
   reference?: string;
-  category_id?: string;
-  category_name?: string;
   account_id?: string;
   credit_account_id?: string;
   predicted_account_id?: string; // AI-predicted account ID from categorizations
@@ -301,14 +299,14 @@ async function testEndpoint(apiUrl: string, verbose: boolean): Promise<void> {
     normalizedUrl = normalizedUrl.replace(/\/api$/, '');
   }
   const testUrl = `${normalizedUrl}/api/auth/login`;
-  
+
   if (verbose) {
     logVerbose(`Testing endpoint accessibility: ${testUrl}`, { verbose } as ScriptConfig);
   }
-  
+
   try {
     // Try a HEAD request first to see if the endpoint exists
-    await axios.head(testUrl, { 
+    await axios.head(testUrl, {
       timeout: 5000,
       validateStatus: () => true // Accept any status for HEAD
     });
@@ -322,19 +320,19 @@ async function testEndpoint(apiUrl: string, verbose: boolean): Promise<void> {
 
 async function authenticate(config: ScriptConfig): Promise<string> {
   log('Authenticating...', false);
-  
+
   // Normalize API URL (remove trailing slash if present)
   let apiUrl = config.apiUrl.replace(/\/$/, '');
-  
+
   // If API URL already includes /api, don't add it again
   // This handles cases where user provides http://example.com/api
   if (apiUrl.endsWith('/api')) {
     apiUrl = apiUrl.replace(/\/api$/, '');
     logVerbose(`Detected /api in URL, normalizing to: ${apiUrl}`, config);
   }
-  
+
   const loginUrl = `${apiUrl}/api/auth/login`;
-  
+
   logVerbose(`API URL: ${apiUrl}`, config);
   logVerbose(`Login URL: ${loginUrl}`, config);
   logVerbose(`Email: ${config.email}`, config);
@@ -358,14 +356,14 @@ async function authenticate(config: ScriptConfig): Promise<string> {
     if (response.status === 401) {
       throw new Error('Authentication failed: Invalid credentials');
     }
-    
+
     if (response.status === 405) {
       logVerbose(`Response status: ${response.status}`, config);
       logVerbose(`Response headers: ${JSON.stringify(response.headers)}`, config);
       logVerbose(`Response data: ${JSON.stringify(response.data)}`, config);
       throw new Error(`Authentication failed: Method Not Allowed (405). The endpoint ${loginUrl} may not accept POST requests. Please verify the API URL and endpoint path.`);
     }
-    
+
     if (response.status >= 400) {
       logVerbose(`Response status: ${response.status}`, config);
       logVerbose(`Response data: ${JSON.stringify(response.data)}`, config);
@@ -384,31 +382,31 @@ async function authenticate(config: ScriptConfig): Promise<string> {
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<{ error: string }>;
-      
+
       // Network errors
       if (!axiosError.response) {
         logVerbose(`Network error: ${axiosError.message}`, config);
         logVerbose(`Request URL: ${loginUrl}`, config);
         throw new Error(`Authentication failed: Network error - ${axiosError.message}. Please check if the API server is accessible at ${apiUrl}`);
       }
-      
+
       // HTTP errors
       const status = axiosError.response.status;
       const statusText = axiosError.response.statusText;
       const responseData = axiosError.response.data;
-      
+
       logVerbose(`HTTP Error ${status}: ${statusText}`, config);
       logVerbose(`Response data: ${JSON.stringify(responseData)}`, config);
       logVerbose(`Request URL: ${loginUrl}`, config);
-      
+
       if (status === 401) {
         throw new Error('Authentication failed: Invalid credentials');
       }
-      
+
       if (status === 405) {
         const allowHeader = axiosError.response.headers['allow'] || axiosError.response.headers['Allow'] || '';
         const serverHeader = axiosError.response.headers['server'] || axiosError.response.headers['Server'] || '';
-        
+
         // Check if this is a Railway Edge routing issue
         if (serverHeader.includes('railway-edge') && allowHeader.includes('GET, HEAD')) {
           throw new Error(
@@ -426,10 +424,10 @@ async function authenticate(config: ScriptConfig): Promise<string> {
             `Allowed methods: ${allowHeader}`
           );
         }
-        
+
         throw new Error(`Authentication failed: Method Not Allowed (405). The endpoint ${loginUrl} may not accept POST requests. Please verify:\n  1. The API URL is correct: ${apiUrl}\n  2. The endpoint path is correct: /api/auth/login\n  3. The server is running and accessible`);
       }
-      
+
       throw new Error(`Authentication failed: HTTP ${status} ${statusText} - ${JSON.stringify(responseData) || axiosError.message}`);
     }
     throw error;
@@ -869,14 +867,14 @@ async function uploadTransactions(
   // Transform data to match frontend updateCSVData transformation
   // Remove debit_amount/credit_amount and create single amount field
   const transformedData = mappedTransactions.map((record: any) => {
-    const hasDebitAmount = record.debit_amount != null && 
-      record.debit_amount != undefined && 
-      record.debit_amount != 0 && 
+    const hasDebitAmount = record.debit_amount != null &&
+      record.debit_amount != undefined &&
+      record.debit_amount != 0 &&
       record.debit_amount !== '';
-    
-    const hasCreditAmount = record.credit_amount != null && 
-      record.credit_amount != undefined && 
-      record.credit_amount != 0 && 
+
+    const hasCreditAmount = record.credit_amount != null &&
+      record.credit_amount != undefined &&
+      record.credit_amount != 0 &&
       record.credit_amount !== '';
 
     // Create final record with single amount field (matching frontend transformation)
@@ -889,7 +887,7 @@ async function uploadTransactions(
     // Remove debit_amount and credit_amount fields (not accepted by backend)
     delete finalRecord.debit_amount;
     delete finalRecord.credit_amount;
-    
+
     // Remove other fields that shouldn't be sent or don't exist in posting model
     delete finalRecord.category_id;
     delete finalRecord.category_name;
@@ -918,7 +916,7 @@ async function uploadTransactions(
   // Only map valid posting model fields
   // Valid fields: name, description, value_date, posting_date, amount, account_id, credit_account_id, notes
   const validFields = ['name', 'description', 'value_date', 'posting_date', 'amount', 'account_id', 'credit_account_id', 'notes'];
-  
+
   validFields.forEach(field => {
     if (sampleRecord.hasOwnProperty(field)) {
       mapping[field] = field;

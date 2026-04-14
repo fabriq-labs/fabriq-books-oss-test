@@ -78,7 +78,7 @@ describe('Location Master Creation Tests', () => {
   describe('Location Creation with Customer Reference', () => {
     it('should create a location with customer reference', async () => {
       console.log('\n=== TEST 2: Location Creation with Customer Reference ===');
-      
+
       const locationData = createLocationData(
         config.orgId,
         context.user.id,
@@ -90,10 +90,9 @@ describe('Location Master Creation Tests', () => {
 
       const result = await modelService.create('location', context, locationData, {});
       console.log('Create Result:', JSON.stringify(result, null, 2));
-
       expect(result.success).toBe(true);
       expect(result.data.id).toBeDefined();
-      
+
       // Verify location was actually created in database with customer reference
       const location = await assertLocationCreated(result.data.id);
       expect(location?.location).toBe(locationData.location);

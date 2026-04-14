@@ -102,15 +102,6 @@
       "displayName": "Holding",
       "isColumnShow": false
     },
-    "category": {
-      "type": "table",
-      "select": {
-        "id": "read",
-        "name": "update"
-      },
-      "displayName": "Category",
-      "isColumnShow": false
-    },
     "trade_id": {
       "datatype": "string",
       "required": false,
@@ -156,26 +147,6 @@
         "defaultValue": ""
       },
       "displayName": "Value Date",
-      "isColumnShow": true
-    },
-    "category_id": {
-      "datatype": "string",
-      "permission": "update",
-      "tableProps": {
-        "width": "200",
-        "columnType": "select",
-        "selectProps": {
-          "type": "posting",
-          "limit": "10",
-          "instanceKey": "id",
-          "instanceType": "category",
-          "searchParams": "name",
-          "instanceLabel": "name",
-          "instanceSourceKey": "category_id"
-        },
-        "defaultValue": ""
-      },
-      "displayName": "Category",
       "isColumnShow": true
     },
     "description": {

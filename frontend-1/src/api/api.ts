@@ -826,7 +826,6 @@ export const agentAPI = {
       account_type?: string[];
       credit_account_id?: string;
       credit_account_type?: string[];
-      category_id?: string;
     };
     options?: {
       include_alternatives?: boolean;

@@ -63,7 +63,7 @@
       "displayName": "Account Name",
       "isColumnShow": false
     },
-    "organization": {
+    "legal_entity": {
       "type": "table",
       "select": {
         "id": "read",
@@ -130,7 +130,7 @@
           "type": "project_master",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
+          "instanceType": "entity",
           "searchParams": "legal_name",
           "instanceLabel": "legal_name",
           "instanceSourceKey": "legal_entity_id"
@@ -139,7 +139,7 @@
       },
       "listProps": {
         "type": "text",
-        "recordPath": "organization.legal_name"
+        "recordPath": "legal_entity.legal_name"
       },
       "displayName": "Legal Entity",
       "isColumnShow": true

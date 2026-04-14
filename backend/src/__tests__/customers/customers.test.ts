@@ -69,14 +69,14 @@ describe('Customer Master Creation Tests', () => {
   describe('Customer Creation with Optional Fields', () => {
     it('should create a customer with payment terms and preferred currency', async () => {
       console.log('\n=== TEST 2: Customer Creation with Optional Fields ===');
-      
+
       // Get a payment term from seed data (if available)
       const paymentTerm = await prisma.payment_terms.findFirst({
         where: { org_id: config.orgId }
       });
 
       // Get a currency from seed data (if available)
-      const currency = await prisma.currency_master.findFirst({
+      const currency = await prisma.currency.findFirst({
         where: { org_id: config.orgId }
       });
 
@@ -95,13 +95,13 @@ describe('Customer Master Creation Tests', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.id).toBeDefined();
-      
+
       // Verify optional fields if they were provided
       if (paymentTerm) {
         expect(result.data.payment_term_id).toBe(paymentTerm.id);
         console.log('✓ Payment Term linked:', paymentTerm.id);
       }
-      
+
       if (currency) {
         expect(result.data.preferred_currency_id).toBe(currency.id);
         console.log('✓ Preferred Currency linked:', currency.id);
@@ -110,12 +110,12 @@ describe('Customer Master Creation Tests', () => {
       // Verify customer was actually created in database with relationships
       const customer = await assertCustomerCreated(result.data.id);
       expect(customer?.customer_name).toBe(customerData.customer_name);
-      
+
       if (paymentTerm) {
         expect(customer?.payment_term_id).toBe(paymentTerm.id);
         console.log('✓ Payment Terms relationship verified');
       }
-      
+
       if (currency) {
         expect(customer?.preferred_currency_id).toBe(currency.id);
         console.log('✓ Currency relationship verified');

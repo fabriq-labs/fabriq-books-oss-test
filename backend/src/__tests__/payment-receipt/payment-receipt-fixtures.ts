@@ -213,7 +213,7 @@ export const assertPaymentReceiptCreated = async (paymentReceiptId: string) => {
         include: {
             invoice: true,
             customers: true,
-            currency_master: true,
+            currency: true,
         }
     });
 

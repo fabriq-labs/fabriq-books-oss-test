@@ -29,7 +29,7 @@ const DEFAULT_MAX_STEPS = 5;
 // When a session targets a specific goal_model, only include these related models
 // in the system prompt to reduce noise and improve LLM accuracy
 const RELATED_MODELS: Record<string, string[]> = {
-  posting: ['posting', 'account', 'category', 'category_group', 'payment_receipt', 'invoice'],
+  posting: ['posting', 'account', 'payment_receipt', 'invoice'],
   invoice: ['invoice', 'supplier', 'purchase_order', 'posting', 'account'],
   trade: ['trade', 'instrument', 'holding', 'posting', 'account'],
 };
@@ -312,7 +312,7 @@ export class AgentService {
             // Session name generation: fires once, after the plan is created (first turn, createPlan tool used)
             const planJustCreated = (toolCalls ?? []).some((tc: any) => tc.toolName === 'createPlan');
             if (planJustCreated && !sess.name) {
-              this.generateSessionName(sessionId, sess.goal, orgId, sess.template_id || undefined).catch(() => {});
+              this.generateSessionName(sessionId, sess.goal, orgId, sess.template_id || undefined).catch(() => { });
             }
           } catch { /* non-critical */ }
         },
@@ -737,7 +737,7 @@ export class AgentService {
             });
             const planJustCreated = (toolCalls ?? []).some((tc: any) => tc.toolName === 'createPlan');
             if (planJustCreated && !sess.name) {
-              this.generateSessionName(sessionId, sess.goal, sess.org_id, sess.template_id || undefined).catch(() => {});
+              this.generateSessionName(sessionId, sess.goal, sess.org_id, sess.template_id || undefined).catch(() => { });
             }
           } catch { /* non-critical */ }
         },

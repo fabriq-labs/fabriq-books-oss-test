@@ -1,11 +1,11 @@
 id,base_currency,from_currency,currency_value,name,status,org_id
-cur_seed_indian_demo_usd,USD,USD,1,US Dollar,Active,org_indian_demo
-cur_seed_indian_demo_eur,EUR,EUR,1,Euro,Active,org_indian_demo
-cur_seed_indian_demo_gbp,GBP,GBP,1,British Pound,Active,org_indian_demo
-cur_seed_indian_demo_inr,INR,INR,1,Indian Rupee,Active,org_indian_demo
-cur_seed_indian_demo_jpy,JPY,JPY,1,Japanese Yen,Active,org_indian_demo
-cur_seed_indian_demo_cad,CAD,CAD,1,Canadian Dollar,Active,org_indian_demo
-cur_seed_indian_demo_aud,AUD,AUD,1,Australian Dollar,Active,org_indian_demo
-cur_seed_indian_demo_chf,CHF,CHF,1,Swiss Franc,Active,org_indian_demo
-cur_seed_indian_demo_cny,CNY,CNY,1,Chinese Yuan,Active,org_indian_demo
-cur_seed_indian_demo_sgd,SGD,SGD,1,Singapore Dollar,Active,org_indian_demo
+cur_iso_USD,USD,USD,1,US Dollar,Active,org_indian_demo
+cur_iso_EUR,EUR,EUR,1,Euro,Active,org_indian_demo
+cur_iso_GBP,GBP,GBP,1,British Pound,Active,org_indian_demo
+cur_iso_INR,INR,INR,1,Indian Rupee,Active,org_indian_demo
+cur_iso_JPY,JPY,JPY,1,Japanese Yen,Active,org_indian_demo
+cur_iso_CAD,CAD,CAD,1,Canadian Dollar,Active,org_indian_demo
+cur_iso_AUD,AUD,AUD,1,Australian Dollar,Active,org_indian_demo
+cur_iso_CHF,CHF,CHF,1,Swiss Franc,Active,org_indian_demo
+cur_iso_CNY,CNY,CNY,1,Chinese Yuan,Active,org_indian_demo
+cur_iso_SGD,SGD,SGD,1,Singapore Dollar,Active,org_indian_demo

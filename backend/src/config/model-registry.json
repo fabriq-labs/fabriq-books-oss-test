@@ -277,42 +277,6 @@
         "chart of accounts"
       ]
     },
-    "category": {
-      "name": "category",
-      "description": "Used for categorizing financial transactions and organizing them into groups",
-      "businessContext": "Financial categorization and reporting",
-      "examples": [
-        "Create a new expense category",
-        "Update category details",
-        "Assign categories to transactions",
-        "View transactions by category",
-        "Organize categories into groups"
-      ],
-      "synonyms": [
-        "transaction category",
-        "expense category",
-        "income category",
-        "classification"
-      ]
-    },
-    "category_group": {
-      "name": "category_group",
-      "description": "Used for organizing categories into logical groups for better financial reporting and organization",
-      "businessContext": "Financial categorization and reporting",
-      "examples": [
-        "Create a new category group",
-        "Update group details",
-        "Organize categories into groups",
-        "View categories by group",
-        "Set up hierarchical category structure"
-      ],
-      "synonyms": [
-        "category collection",
-        "category folder",
-        "category hierarchy",
-        "grouping"
-      ]
-    },
     "posting": {
       "name": "posting",
       "description": "Used for recording financial transactions and journal entries with debit and credit accounts",

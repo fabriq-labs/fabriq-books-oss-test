@@ -39,8 +39,6 @@ import { UOMForm } from "./components/forms/Masters/UOMForm";
 import { PaymentTermsForm } from "./components/forms/Masters/PaymentTermsForm";
 import { ShippingTermsForm } from "./components/forms/Masters/ShippingTermsForm";
 import { ShippingMethodForm } from "./components/forms/Masters/ShippingMethodForm";
-import { CurrencyMasterForm } from "./components/forms/Masters/CurrencyMasterForm";
-import { CurrencyForm } from "./components/forms/Masters/CurrencyForm";
 import WorkflowManagementPage from "./pages/settings/WorkflowManagementPage";
 import WorkflowDetailPage from "./pages/settings/WorkflowDetailPage";
 import ConnectionsPage from "./pages/settings/ConnectionsPage";
@@ -92,6 +90,7 @@ import { InboxPage } from "./pages/workbench/InboxPage";
 import { GoalSetter } from "./components/workbench/GoalSetter";
 
 import { ExchangeRateForm } from "./components/forms/Masters/ExchangeRateForm";
+import { CurrencyForm } from "./components/forms/Masters/CurrencyForm";
 // Create a client
 const queryClient = new QueryClient();
 
@@ -228,10 +227,11 @@ const AppRoutes: React.FC = () => {
                 <Route path="tax_master/:id/view/:viewId" element={<TaxMasterForm />} />
                 <Route path="tax_master/view/:viewId" element={<TaxMasterForm />} />
 
-                <Route path="accounting/currency-master" element={<Master type="currency_master" view="currency_master_view" displayName="Currency Master" />} />
-                <Route path="currency_master/:id/view/:viewId" element={<CurrencyMasterForm />} />
-                <Route path="currency_master/view/:viewId" element={<CurrencyMasterForm />} />
-                <Route path="accounting/currency" element={<Master type="currency" view="currency_view" displayName="Currency" isCreate={false} />} />
+
+                <Route path="accounting/currency" element={<Master type="currency" view="currency_view" displayName="Currency" isImport={false} />} />
+                <Route path="currency/:id/view/:viewId" element={<CurrencyForm />} />
+                <Route path="currency/view/:viewId" element={<CurrencyForm />} />
+
                 <Route path="accounting/exchange-rates" element={<Master type="exchange_rate" view="exchange_rate_view" displayName="Exchange Rate" />} />
                 <Route path="exchange_rate/:id/view/:viewId" element={<ExchangeRateForm />} />
                 <Route path="exchange_rate/view/:viewId" element={<ExchangeRateForm />} />
@@ -262,9 +262,9 @@ const AppRoutes: React.FC = () => {
                 <Route path="uom/view/:viewId" element={<UOMForm />} />
 
                 {/* Masters - Organization */}
-                <Route path="masters/organization" element={<Master type="organization" view="organization_view" displayName="Organization" />} />
-                <Route path="organization/view/:viewId" element={<OrganizationForm />} />
-                <Route path="organization/:id/view/:viewId" element={<OrganizationForm />} />
+                <Route path="masters/entity" element={<Master type="entity" view="entity_view" displayName="Entity" />} />
+                <Route path="entity/view/:viewId" element={<OrganizationForm />} />
+                <Route path="entity/:id/view/:viewId" element={<OrganizationForm />} />
 
                 <Route path="masters/locations" element={<Master type="location" view="location_view" displayName="Locations" />} />
                 <Route path="location/:id/view/:viewId" element={<LocationForm />} />

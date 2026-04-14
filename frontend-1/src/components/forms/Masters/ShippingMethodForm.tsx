@@ -146,7 +146,7 @@ export const ShippingMethodForm: React.FC<ItemMasterFormProps> = (
         <div className="mx-auto w-[70%]">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Shipping Method Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Shipping Method</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit Shipping Method' : 'Create New Shipping Method'}
                     </p>

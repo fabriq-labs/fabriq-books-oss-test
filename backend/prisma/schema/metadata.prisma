@@ -1,20 +1,20 @@
 model org {
-  id                  String           @id @default(dbgenerated("'org_' || gen_random_uuid()"))
+  id                  String    @id @default(dbgenerated("'org_' || gen_random_uuid()"))
   name                String
-  slug                String           @unique // Short unique identifier for the organization
+  slug                String    @unique // Short unique identifier for the organization
   external_code       String?
-  created_at          DateTime         @default(now())
-  modified_at         DateTime         @updatedAt @map("updated_at")
+  created_at          DateTime  @default(now())
+  modified_at         DateTime  @updatedAt @map("updated_at")
   settings            String
   logo                String?
-  external_mapping    Json?            @default("{}")
+  external_mapping    Json?     @default("{}")
   customer_timezone   String?
-  active_subscription Boolean          @default(false)
+  active_subscription Boolean   @default(false)
   basecurrency_id     String?
-  base_currency       String?          @default("USD") // ISO 4217 code for the org's reporting currency
+  base_currency       String?   @default("USD") // ISO 4217 code for the org's reporting currency
   erp_system_type     String? // ERP system type for this organization (e.g., 'zoho_books', 'xero', 'quickbooks')
-  currency_master     currency_master? @relation(fields: [basecurrency_id], references: [id])
-  users               user[]           @relation("UserOrg")
+  currency            currency? @relation(fields: [basecurrency_id], references: [id])
+  users               user[]    @relation("UserOrg")
 
   @@map("organizations")
 }

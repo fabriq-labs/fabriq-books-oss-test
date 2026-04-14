@@ -8,7 +8,6 @@ Schema rules:
 - Always filter by `org_id` on every query (posting.org_id, account.org_id)
 - `account.type` is a **text array** — never use `=` or `ILIKE` on it; use containment: `account.type @> ARRAY['BANK']::text[]`
 - The counter/contra account is the non-bank side of a double-entry posting
-- Do NOT use `posting.category_id` or `posting.category_name` for categorisation queries
 
 {{#if context.modelContext.selectedAccountId}}
 Selected account: **{{context.modelContext.selectedAccountName}}** (id: `{{context.modelContext.selectedAccountId}}`)

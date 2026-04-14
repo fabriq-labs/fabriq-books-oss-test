@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,6 +12,9 @@ import { SearchDropDown } from "@/components/search_dropdown/dropdown";
 import { RefreshCw } from "lucide-react";
 import dayjs from "dayjs";
 import { useReportController } from "@/contexts/ReportControllerContext";
+
+/** Custom date month picker: -1 = full calendar year (Jan 1 – Dec 31); 0–11 = single month */
+const ALL_MONTHS_INDEX = -1;
 
 interface ReportControlsProps {
     // Account filter props
@@ -54,35 +57,15 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
         setIsCustomDate,
         tempStartYear,
         setTempStartYear,
-        tempEndYear,
         setTempEndYear,
     } = useReportController();
 
-    // Handle custom date input changes (temporary values)
-    const handleCustomDateInputChange = (field: 'start' | 'end', value: string) => {
-        if (field === 'start') {
-            setTempStartYear(value);
-            // Auto-calculate end year as start year + 1
-            const startYear = parseInt(value);
-            if (!isNaN(startYear) && startYear >= 2000 && startYear <= 2100) {
-                setTempEndYear((startYear + 1).toString());
-            }
-        }
-    };
-
-    // Handle Enter key press to apply custom date changes
-    const handleEnterKeyPress = (field: 'start' | 'end', value: string) => {
-        const year = parseInt(value);
-        if (isNaN(year) || year < 2000 || year > 2100) return;
-
-        // Just store the year value, don't update dateRange yet
-        // The dateRange will be updated when "Fetch Data" is clicked
-        if (field === 'start') {
-            setTempStartYear(value);
-            // Auto-calculate end year as start year + 1
-            setTempEndYear((year + 1).toString());
-        }
-    };
+    // For "Custom" month selection (temp until user hits Refresh / Fetch)
+    const [tempCustomMonthIndex, setTempCustomMonthIndex] = useState<number>(() => {
+        // Default to currently selected start month (or current month)
+        const m = dateRange?.[0]?.month?.();
+        return typeof m === "number" ? m : dayjs().month();
+    });
 
     // Handle select change for predefined ranges
     const handleSelectChange = (value: string) => {
@@ -92,39 +75,32 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
         if (value === "custom") {
             // Initialize temporary year values with current date range
             setTempStartYear(dateRange[0].year().toString());
-            setTempEndYear(dateRange[1].year().toString());
+            setTempEndYear(dateRange[0].year().toString());
+            const start = dateRange[0].startOf("day");
+            const end = dateRange[1].endOf("day");
+            const y = start.year();
+            const spansFullCalendarYear =
+                start.month() === 0 &&
+                start.date() === 1 &&
+                end.month() === 11 &&
+                end.date() === end.daysInMonth() &&
+                end.year() === y;
+            setTempCustomMonthIndex(spansFullCalendarYear ? ALL_MONTHS_INDEX : dateRange[0].month());
             return; // Don't update dateRange for custom option
         }
 
         let startDate: dayjs.Dayjs, endDate: dayjs.Dayjs;
 
         switch (value) {
-            case "currentCalendarYear":
-                startDate = dayjs().startOf('year');
-                endDate = dayjs().endOf('year');
+            case "currentMonth":
+                startDate = dayjs().startOf("month");
+                endDate = dayjs().endOf("month");
                 break;
-            case "previousCalendarYear":
-                startDate = dayjs().subtract(1, 'year').startOf('year');
-                endDate = dayjs().subtract(1, 'year').endOf('year');
+            case "previousMonth":
+                startDate = dayjs().subtract(1, "month").startOf("month");
+                endDate = dayjs().subtract(1, "month").endOf("month");
                 break;
-            case "currentFinancialYear":
-                startDate = dayjs();
-                if (startDate.month() < 3) {
-                    startDate = startDate.subtract(1, 'year');
-                }
-                startDate = startDate.month(3).startOf('month');
-                endDate = startDate.add(1, 'year').subtract(1, 'day').endOf('month');
-                break;
-            case "previousFinancialYear":
-                startDate = dayjs();
-                if (startDate.month() < 3) {
-                    startDate = startDate.subtract(2, 'year');
-                } else {
-                    startDate = startDate.subtract(1, 'year');
-                }
-                startDate = startDate.month(3).startOf('month');
-                endDate = startDate.add(1, 'year').subtract(1, 'day').endOf('month');
-                break;
+
             default:
                 return;
         }
@@ -135,19 +111,18 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     const handleRefresh = () => {
         // Apply custom year inputs if they exist and custom date is selected
         if (isCustomDate && tempStartYear) {
-            let newStartDate = dateRange[0];
-            let newEndDate = dateRange[1];
-
-            const startYear = parseInt(tempStartYear);
-            if (!isNaN(startYear) && startYear >= 2000 && startYear <= 2100) {
-                newStartDate = dayjs().year(startYear).month(3).date(1); // April 1st
-                // Auto-calculate end year as start year + 1
-                const endYear = startYear + 1;
-                newEndDate = dayjs().year(endYear).month(2).endOf('month'); // March 31st
+            const year = parseInt(tempStartYear, 10);
+            if (!isNaN(year) && year >= 2000 && year <= 2100) {
+                if (tempCustomMonthIndex === ALL_MONTHS_INDEX) {
+                    const newStartDate = dayjs().year(year).month(0).date(1).startOf("day");
+                    const newEndDate = dayjs().year(year).month(11).endOf("month").endOf("day");
+                    setDateRange([newStartDate, newEndDate]);
+                } else {
+                    const newStartDate = dayjs().year(year).month(tempCustomMonthIndex).date(1).startOf("day");
+                    const newEndDate = newStartDate.endOf("month").endOf("day");
+                    setDateRange([newStartDate, newEndDate]);
+                }
             }
-
-            // Update the dateRange with the new values
-            setDateRange([newStartDate, newEndDate]);
         }
         if (onRefresh) {
             onRefresh();
@@ -157,7 +132,7 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     // Account dropdown component
     const accountDropdown = useMemo(
         () => (
-            <div className="w-full sm:w-48">
+            <div className="w-full sm:w-44">
                 <SearchDropDown
                     instanceType={"account"}
                     instanceSourceKey={"account_id"}
@@ -187,50 +162,57 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     );
 
     return (
-        <div className={`flex flex-col sm:flex-row sm:justify-end gap-4 ${className}`}>
+        <div className={`flex flex-col sm:flex-row sm:justify-end gap-3 items-stretch sm:items-center ${className}`}>
             {/* Account Filter */}
             {showAccountFilter && accountDropdown}
 
             {/* Date Range Selection */}
             <Select value={selectedOption} onValueChange={handleSelectChange}>
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="h-10 w-full sm:w-44">
                     <SelectValue placeholder="Select Time Frame" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="currentFinancialYear">Current Financial Year</SelectItem>
-                    <SelectItem value="previousFinancialYear">Previous Financial Year</SelectItem>
-                    <SelectItem value="currentCalendarYear">Current Calendar Year</SelectItem>
-                    <SelectItem value="previousCalendarYear">Previous Calendar Year</SelectItem>
+                    <SelectItem value="currentMonth">Current Month</SelectItem>
+                    <SelectItem value="previousMonth">Previous Month</SelectItem>
+
                     <SelectItem value="custom">Custom Date</SelectItem>
                 </SelectContent>
             </Select>
 
             {/* Custom Date Inputs */}
             {isCustomDate && (
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row items-start gap-3">
                     <Input
                         type="number"
-                        placeholder="Start Year"
+                        placeholder="Year"
                         value={tempStartYear}
-                        onChange={(e) => handleCustomDateInputChange('start', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                handleEnterKeyPress('start', tempStartYear);
-                            }
-                        }}
-                        className="w-24"
+                        onChange={(e) => setTempStartYear(e.target.value)}
+                        className="h-10 w-28"
                         min="2000"
                         max="2100"
                     />
-                    <Input
-                        type="number"
-                        placeholder="End Year"
-                        value={tempEndYear}
-                        disabled
-                        className="w-24 bg-gray-100"
-                        min="2000"
-                        max="2100"
-                    />
+
+                    <Select
+                        value={String(tempCustomMonthIndex)}
+                        onValueChange={(v) => setTempCustomMonthIndex(parseInt(v))}
+                    >
+                        <SelectTrigger className="h-10 w-full sm:w-44">
+                            <SelectValue placeholder="Select Month" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-40 overflow-y-auto">
+                            <SelectItem value={String(ALL_MONTHS_INDEX)} className="py-1 text-sm font-medium">
+                                All Months
+                            </SelectItem>
+                            {[
+                                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+                            ].map((label, idx) => (
+                                <SelectItem key={label} value={String(idx)} className="py-1 text-sm">
+                                    {label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             )}
 

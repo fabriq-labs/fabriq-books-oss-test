@@ -38,9 +38,9 @@ interface PaymentReceipt {
     exchange_rate: number | null;
     payment_method: string;
     receipt_number: string;
-    currency_master: {
+    currency: {
         id: string;
-        base_currency: string;
+        code: string;
     };
     payment_reference: string;
 }
@@ -157,7 +157,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
 
     const totalPayments = paymentReceipts.reduce((sum, receipt) => sum + receipt.amount, 0);
     const displayBalance = Number(paymentReceipts[0]?.invoice?.balance_amount ?? remainingBalance ?? 0) || 0;
-    const currencyCode = paymentReceipts[0]?.currency_master?.base_currency || currency;
+    const currencyCode = paymentReceipts[0]?.currency?.code || currency;
 
     return (
         <Card>
@@ -230,7 +230,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
                                         <TableCell className="font-semibold">
                                             {formatCurrency(
                                                 paymentReceipt?.amount,
-                                                paymentReceipt?.currency_master?.base_currency || currency
+                                                paymentReceipt?.currency?.code || currency
                                             )}
                                         </TableCell>
 

@@ -45,7 +45,6 @@ export interface PostingForCategorization {
   creditAccountId: string | null;
   creditAccountName: string | null;
   creditAccountType: string[];
-  categoryId: string | null;
   aiCatScore: number | null;
 }
 
@@ -65,7 +64,7 @@ export type ConfidenceLevel = 'high' | 'medium' | 'low';
  */
 export async function getHQEntityId(orgId: string): Promise<string | null> {
   // First try to find the HQ entity
-  const hqEntity = await prisma.organization.findFirst({
+  const hqEntity = await prisma.entity.findFirst({
     where: {
       org_id: orgId,
       is_it_headquartres: 'yes',
@@ -78,7 +77,7 @@ export async function getHQEntityId(orgId: string): Promise<string | null> {
   }
 
   // Fallback: get the first entity for this org
-  const firstEntity = await prisma.organization.findFirst({
+  const firstEntity = await prisma.entity.findFirst({
     where: { org_id: orgId },
     select: { id: true },
     orderBy: { created_at: 'asc' },
@@ -216,7 +215,6 @@ export async function fetchPostingById(
     creditAccountId: posting.credit_account_id,
     creditAccountName: posting.credit_account?.name ?? null,
     creditAccountType: posting.credit_account?.type ?? [],
-    categoryId: posting.category_id,
     aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
   };
 }
@@ -262,7 +260,6 @@ export async function fetchPostingsByIds(
     creditAccountId: posting.credit_account_id,
     creditAccountName: posting.credit_account?.name ?? null,
     creditAccountType: posting.credit_account?.type ?? [],
-    categoryId: posting.category_id,
     aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
   }));
 }

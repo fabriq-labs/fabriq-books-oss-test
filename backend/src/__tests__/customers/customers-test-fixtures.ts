@@ -25,18 +25,18 @@ export const createCustomerData = (
     created_by: userId,
     modified_by: userId,
   };
-  
+
   if (options?.paymentTermId) {
     data.payment_term_id = options.paymentTermId;
   }
-  
+
   if (options?.preferredCurrencyId) {
     data.preferred_currency_id = options.preferredCurrencyId;
   }
-  
+
   // Explicitly exclude id field (database-generated)
   delete data.id;
-  
+
   return data;
 };
 
@@ -46,7 +46,7 @@ export const assertCustomerCreated = async (customerId: string) => {
     where: { id: customerId },
     include: {
       payment_terms: true,
-      currency_master: true,
+      currency: true,
     },
   });
 

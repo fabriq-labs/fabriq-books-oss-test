@@ -291,11 +291,11 @@ export class WorkflowEngine {
     } else {
       // Auto-determine from actions
       const actions = state.source_actions || [];
-      
+
       if (actions.length === 0) {
         throw new Error(`State ${state.name} (${stateId}) is marked to skip but has no outgoing actions`);
       }
-      
+
       if (actions.length === 1) {
         // Single action, use its target
         nextStateId = actions[0].target_state_id;
@@ -395,7 +395,7 @@ export class WorkflowEngine {
     // Check if target state should be skipped and resolve the skip chain
     const skippedStates: string[] = [];
     let finalStateId = action.target_state_id;
-    
+
     if ((targetState as any).skip) {
       const skipResult = await this.resolveSkipChain(action.target_state_id, skippedStates);
       if (!skipResult) {

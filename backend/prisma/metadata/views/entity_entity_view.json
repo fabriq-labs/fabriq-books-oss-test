@@ -1,8 +1,8 @@
 {
   "id": "view_d0f8c34b-cc35-4635-bf03-099f8c86559d",
-  "name": "organization_view",
-  "model_name": "organization",
-  "description": "Organization",
+  "name": "entity_view",
+  "model_name": "entity",
+  "description": "Entity",
   "data_graph": {
     "id": {
       "datatype": "string",
@@ -102,31 +102,30 @@
       "tableProps": {
         "columnType": "select",
         "selectProps": {
-          "type": "currency_master",
+          "type": "currency",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
-          "searchParams": "organization_name",
-          "instanceLabel": "organization_name",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
           "instanceSourceKey": "basecurrency_id"
         },
         "defaultValue": ""
       },
       "listProps": {
         "type": "text",
-        "recordPath": "currency_master.base_currency"
+        "recordPath": "currency.code"
       },
       "displayName": "Legal Entity",
       "isColumnShow": false
     },
-    "currency_master": {
+    "currency": {
       "select": {
         "id": "read",
-        "base_currency": "update",
-        "from_currency": "update"
+        "code": "update"
       },
       "dataType": "table",
-      "displayName": "Currency Master"
+      "displayName": "Currency"
     },
     "organization_name": {
       "required": true,

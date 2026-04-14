@@ -12,7 +12,7 @@ const prisma = new PrismaClient({
 
 async function cleanupDevData() {
   console.log('🧹 Cleaning up Wayne Enterprises development data...');
-  
+
   try {
     // Clean up in correct order to respect foreign keys
     await prisma.$transaction([
@@ -20,68 +20,66 @@ async function cleanupDevData() {
       prisma.payment_receipt.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete invoices
       prisma.invoice.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete invoice line items
       prisma.invoice_line_item.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete item masters
       prisma.item_master.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete item categories
-      prisma.item_category.deleteMany({
-        where: { org_id: 'org_wayne_enterprises' }
-      }),
-      
+
+
       // Delete customers
       prisma.customers.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete accounts
       prisma.account.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete currency
-      prisma.currency_master.deleteMany({
+      prisma.currency.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete role assignments
       prisma.role_user.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete users
       prisma.user.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete roles
       prisma.role.deleteMany({
         where: { org_id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete metadata organization
       prisma.org.deleteMany({
         where: { id: 'org_wayne_enterprises' }
       }),
-      
+
       // Delete organization last
-      prisma.organization.deleteMany({
+      prisma.entity.deleteMany({
         where: { id: 'org_wayne_enterprises' }
       }),
     ]);
-    
+
     console.log('✅ Wayne Enterprises development data cleaned up successfully!');
     console.log('');
     console.log('🗑️ Removed:');
@@ -94,7 +92,7 @@ async function cleanupDevData() {
     console.log('   👔 Roles (Administrator, Manager, User)');
     console.log('   👤 Users (Bruce Wayne, Lucius Fox, Alfred Pennyworth)');
     console.log('   📄 Any invoices and payments');
-    
+
   } catch (error) {
     console.error('❌ Failed to cleanup development data:', error);
     throw error;

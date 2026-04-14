@@ -1,4 +1,4 @@
-model organization {
+model entity {
   id                   String                 @id @default(dbgenerated("concat('org_', gen_random_uuid())")) @db.VarChar(50)
   organization_name    String
   legal_name           String
@@ -19,7 +19,7 @@ model organization {
   org_id               String
   assigned_to          String?
   name                 String?
-  currency_master      currency_master?       @relation(fields: [basecurrency_id], references: [id])
+  currency             currency?              @relation(fields: [basecurrency_id], references: [id])
   business_unit        business_unit[]
   location             location[]
   employee_master      employee_master[]
@@ -174,7 +174,7 @@ model payment_terms {
   assigned_to     String?
   name            String?
   supplier        supplier[]
-  organization    organization?    @relation(fields: [legal_entity_id], references: [id])
+  legal_entity    entity?          @relation(fields: [legal_entity_id], references: [id])
   purchase_order  purchase_order[]
   customers       customers[]
   sales_order     sales_order[]
@@ -192,7 +192,7 @@ model business_unit {
   modified_at     DateTime          @default(now())
   org_id          String?
   assigned_to     String?
-  organization    organization?     @relation(fields: [legal_entity_id], references: [id])
+  legal_entity    entity?           @relation(fields: [legal_entity_id], references: [id])
   employee_master employee_master[]
   department      department[]
 }
@@ -279,7 +279,7 @@ model location {
   org_id               String?
   assigned_to          String?
   employee_master      employee_master[]
-  organization         organization?          @relation(fields: [legal_entity_id], references: [id])
+  legal_entity         entity?                @relation(fields: [legal_entity_id], references: [id])
   customers            customers?             @relation(fields: [customer_id], references: [id])
   purchase_requisition purchase_requisition[]
   purchase_order       purchase_order[]
@@ -328,7 +328,7 @@ model supplier {
   shipping_method           shipping_method?      @relation(fields: [shipping_method_id], references: [id])
   shipping_terms            shipping_terms?       @relation(fields: [shipping_term_id], references: [id])
   payment_terms             payment_terms?        @relation(fields: [payment_term_id], references: [id])
-  currency_master           currency_master?      @relation(fields: [preferred_currency_id], references: [id])
+  currency                  currency?             @relation(fields: [preferred_currency_id], references: [id])
   supplier_items            supplier_items[]
   item                      item[]
   purchase_order_item       purchase_order_item[]
@@ -364,7 +364,7 @@ model customers {
   payment_term_id       String?
   preferred_currency_id String?
   payment_terms         payment_terms?     @relation(fields: [payment_term_id], references: [id])
-  currency_master       currency_master?   @relation(fields: [preferred_currency_id], references: [id])
+  currency              currency?          @relation(fields: [preferred_currency_id], references: [id])
   invoice               invoice[]
   location              location[]
   payment_receipt       payment_receipt[]
@@ -395,7 +395,7 @@ model cost_center {
   assigned_to          String?
   name                 String?
   employee_master      employee_master[]
-  organization         organization?          @relation(fields: [legal_entity_id], references: [id])
+  legal_entity         entity?                @relation(fields: [legal_entity_id], references: [id])
   purchase_requisition purchase_requisition[]
   item                 item[]
 }
@@ -412,7 +412,7 @@ model department {
   legal_entity_id      String
   business_unit_id     String?
   employee_master      employee_master[]
-  organization         organization?          @relation(fields: [legal_entity_id], references: [id])
+  legal_entity         entity?                @relation(fields: [legal_entity_id], references: [id])
   business_unit        business_unit?         @relation(fields: [business_unit_id], references: [id])
   purchase_requisition purchase_requisition[]
   purchase_order       purchase_order[]
@@ -473,13 +473,13 @@ model item_master {
   item_category_id      String?
   tax_master_id         String?
   tax_rate_intra_id     String?
-  currency_master_id    String?
+  currency_id           String?
   supplier              supplier?               @relation(fields: [supplier_id], references: [id])
   item_category         item_category?          @relation(fields: [item_category_id], references: [id])
   uom                   uom?                    @relation(fields: [uom_id], references: [id])
   tax_master            tax_master?             @relation("ItemMaster_TaxMaster", fields: [tax_master_id], references: [id])
   tax_rate_intra        tax_master?             @relation("ItemMaster_TaxRateIntra", fields: [tax_rate_intra_id], references: [id])
-  currency_master       currency_master?        @relation(fields: [currency_master_id], references: [id])
+  currency              currency?               @relation(fields: [currency_id], references: [id])
   sales_account         account?                @relation("ItemMaster_SalesAccount", fields: [sales_account_id], references: [id])
   purchase_account      account?                @relation("ItemMaster_PurchaseAccount", fields: [purchase_account_id], references: [id])
   pr_items              item[]
@@ -501,7 +501,7 @@ model item_master {
 }
 
 model general_ledger {
-  id              String        @id @default(dbgenerated("concat('gl_',  gen_random_uuid())")) @db.VarChar(50)
+  id              String    @id @default(dbgenerated("concat('gl_',  gen_random_uuid())")) @db.VarChar(50)
   gl_number       String?
   gl_code         Int
   gl_name         String
@@ -512,11 +512,11 @@ model general_ledger {
   created_by      String
   created_at      DateTime?
   modified_by     String?
-  modified_at     DateTime      @default(now())
+  modified_at     DateTime  @default(now())
   org_id          String?
   assigned_to     String?
-  account         account?      @relation(fields: [account_id], references: [id])
-  organization    organization? @relation(fields: [legal_entity_id], references: [id])
+  account         account?  @relation(fields: [account_id], references: [id])
+  legal_entity    entity?   @relation(fields: [legal_entity_id], references: [id])
 }
 
 model employee_master {
@@ -543,7 +543,7 @@ model employee_master {
   business_unit    business_unit? @relation(fields: [business_unit_id], references: [id])
   location         location?      @relation(fields: [location_id], references: [id])
   cost_center      cost_center?   @relation(fields: [cost_center_id], references: [id])
-  organization     organization?  @relation(fields: [legal_entity_id], references: [id])
+  legal_entity     entity?        @relation(fields: [legal_entity_id], references: [id])
   manager_user     user           @relation("ManagerRelation", fields: [manager], references: [id])
   user             user           @relation("EmployeeUserRelation", fields: [user_id], references: [id])
   user_role        role           @relation(fields: [user_role_id], references: [id])
@@ -584,7 +584,7 @@ model project_master {
   account_name         String?
   budget_line          budget_line?           @relation(fields: [budget_line_id], references: [id])
   account              account?               @relation(fields: [account_id], references: [id])
-  organization         organization?          @relation(fields: [legal_entity_id], references: [id])
+  legal_entity         entity?                @relation(fields: [legal_entity_id], references: [id])
   purchase_requisition purchase_requisition[]
   purchase_order       purchase_order[]
   quote                quote[]
@@ -634,7 +634,7 @@ model purchase_requisition {
   budget_line_obj      budget_line?          @relation(fields: [budget_line], references: [id])
   budget_period_obj    budget_period?        @relation(fields: [budget_period], references: [id])
   project_master_obj   project_master?       @relation(fields: [project_name], references: [id])
-  organization         organization?         @relation(fields: [legal_entity_id], references: [id])
+  legal_entity         entity?               @relation(fields: [legal_entity_id], references: [id])
   department_id        String?               @db.VarChar(50)
   purchase_order       purchase_order[]
   purchase_order_item  purchase_order_item[]
@@ -725,7 +725,7 @@ model purchase_order {
   purchase_requisition purchase_requisition? @relation(fields: [purchase_id], references: [id])
   supplier_details     supplier?             @relation(fields: [supplier_id], references: [id])
   location             location?             @relation(fields: [location_id], references: [id])
-  organization         organization?         @relation(fields: [legal_entity_id], references: [id])
+  legal_entity         entity?               @relation(fields: [legal_entity_id], references: [id])
   shipping_method      shipping_method?      @relation(fields: [shipping_method_id], references: [id])
   shipping_terms       shipping_terms?       @relation(fields: [shipping_terms_id], references: [id])
   payment_terms        payment_terms?        @relation(fields: [payment_terms_id], references: [id])
@@ -780,28 +780,6 @@ model purchase_order_item {
   supplier                supplier?            @relation(fields: [supplier_id], references: [id])
   invoice_line_item       invoice_line_item[]
   invoice                 invoice[]
-}
-
-model currency_master {
-  id              String            @id @default(dbgenerated("concat('cur_', gen_random_uuid())")) @db.VarChar(50)
-  base_currency   String
-  from_currency   String
-  effective_from  DateTime
-  currency_value  Float?
-  status          String?
-  created_by      String?
-  created_at      DateTime?
-  modified_by     String?
-  modified_at     DateTime          @default(now())
-  org_id          String
-  assigned_to     String?
-  name            String?
-  supplier        supplier[]
-  organization    organization[]
-  item_master     item_master[]
-  org             org[]
-  customers       customers[]
-  payment_receipt payment_receipt[]
 }
 
 model invoice {
@@ -868,7 +846,7 @@ model invoice {
   customers           customers?           @relation(fields: [customer_id], references: [id])
   sales_order         sales_order?         @relation(fields: [sales_order_id], references: [id])
   account             account?             @relation(fields: [account_id], references: [id])
-  organization        organization?        @relation(fields: [legal_entity_id], references: [id])
+  legal_entity        entity?              @relation(fields: [legal_entity_id], references: [id])
   invoice_line_item   invoice_line_item[]
   payment_receipt     payment_receipt[]
   credit_note         credit_note[]
@@ -946,14 +924,12 @@ model payment_receipt {
   source_record_id  String? // Source system record ID (e.g., Zoho payment_id)
   source_updated_at DateTime?     @default(now()) // Last updated in source system (default: now() for internal records)
   ingest_batch_id   String? // FK to datalake.sync_batch
-
   // Back-relation from posting (posting.payment_receipt_id points here)
-  posting posting? @relation("PostingToPaymentReceipt")
-
+  posting           posting?      @relation("PostingToPaymentReceipt")
   // Relationships
-  customers       customers?       @relation(fields: [customer_id], references: [id])
-  invoice         invoice?         @relation(fields: [invoice_id], references: [id])
-  currency_master currency_master? @relation(fields: [currency_id], references: [id])
+  customers         customers?    @relation(fields: [customer_id], references: [id])
+  invoice           invoice?      @relation(fields: [invoice_id], references: [id])
+  currency          currency?     @relation(fields: [currency_id], references: [id])
 
   account account? @relation(fields: [account_id], references: [id])
 

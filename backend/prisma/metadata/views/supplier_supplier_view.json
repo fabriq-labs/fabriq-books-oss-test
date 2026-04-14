@@ -200,15 +200,15 @@
       "displayName": "Shipping Terms",
       "isColumnShow": false
     },
-    "currency_master": {
+    "currency": {
       "type": "table",
       "select": {
         "id": "read",
-        "base_currency": "update"
+        "code": "update"
       },
       "listProps": {
         "type": "text",
-        "recordPath": "currency_master.base_currency"
+        "recordPath": "currency.code"
       },
       "dataType": "table",
       "required": false,
@@ -356,16 +356,16 @@
           "type": "supplier",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "currency_master",
-          "searchParams": "base_currency",
-          "instanceLabel": "base_currency",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
           "instanceSourceKey": "preferred_currency_id"
         },
         "defaultValue": ""
       },
       "listProps": {
         "type": "text",
-        "recordPath": "currency_master.base_currency"
+        "recordPath": "currency.code"
       },
       "displayName": "Currency Master",
       "isColumnShow": true

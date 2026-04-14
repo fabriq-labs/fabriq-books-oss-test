@@ -22,13 +22,13 @@ const SCHEMA_CONTEXT = {
       'item_master', 'supplier', 'customers', 'invoice', 'invoice_line_item',
       'purchase_requisition', 'item', 'purchase_order', 'purchase_order_item',
       'sales_order', 'sales_order_item', 'delivery_challan', 'credit_note',
-      'quote', 'account', 'posting', 'category', 'payment_receipt',
+      'quote', 'account', 'posting', 'payment_receipt',
       'workflow_instance', 'workflow_history'  // These have org_id!
     ],
     metadataTables: [
       'view', 'permission', 'role', 'role_user', 'role_view',
       'workflow_flow', 'workflow_state', 'workflow_action',
-      'org', 'organization'
+      'org', 'entity'
     ],
     rule: 'Business tables MUST filter by org_id. Metadata tables (definitions) do NOT filter by org_id.'
   },
@@ -233,7 +233,7 @@ This tool provides:
       // Fetch ACTUAL workflow states from database - CRITICAL for correct queries
       let actualWorkflowStates: any[] = [];
       let activeWorkflowSummary: any[] = [];
-      
+
       try {
         // Get all workflow states with their flow (model) info
         const rawStates: any[] = await prisma.$queryRaw`
@@ -250,7 +250,7 @@ This tool provides:
           WHERE wf.is_active = true
           ORDER BY wf.model_name, ws.sequence
         `;
-        
+
         // Convert any BigInt/Decimal to plain JS types for serialization
         actualWorkflowStates = rawStates.map(row => ({
           ...row,
@@ -273,7 +273,7 @@ This tool provides:
             GROUP BY wf.model_name, ws.name, ws.id
             ORDER BY wf.model_name, count DESC
           `;
-          
+
           // Convert Decimal/BigInt to plain numbers for JSON serialization
           activeWorkflowSummary = rawSummary.map(row => ({
             ...row,

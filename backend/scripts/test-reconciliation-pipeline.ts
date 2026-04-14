@@ -75,7 +75,7 @@ async function buildAuthContext(): Promise<AuthContext> {
   if (!user) {
     throw new Error(
       `Test user not found: ${TEST_USER_EMAIL}. ` +
-        'Run: node setup-db.js --demo-data=indian-demo'
+      'Run: node setup-db.js --demo-data=indian-demo'
     );
   }
 
@@ -205,11 +205,11 @@ function printScorecard(scorecard: PipelineScorecard): void {
   console.log('\n' + '-'.repeat(100));
   console.log(
     padR('DESCRIPTION', 50) +
-      padR('AMOUNT', 10) +
-      padR('CATEGORY', 22) +
-      padR('STATUS', 12) +
-      padR('BEST MATCH', 35) +
-      'CONF'
+    padR('AMOUNT', 10) +
+    padR('CATEGORY', 22) +
+    padR('STATUS', 12) +
+    padR('BEST MATCH', 35) +
+    'CONF'
   );
   console.log('-'.repeat(100));
 
@@ -226,11 +226,11 @@ function printScorecard(scorecard: PipelineScorecard): void {
 
     console.log(
       padR(desc, 50) +
-        padR(amt, 10) +
-        padR(cat, 22) +
-        padR(status, 12) +
-        padR(match, 35) +
-        conf
+      padR(amt, 10) +
+      padR(cat, 22) +
+      padR(status, 12) +
+      padR(match, 35) +
+      conf
     );
 
     if (r.alternatives.length > 0) {
@@ -238,11 +238,11 @@ function printScorecard(scorecard: PipelineScorecard): void {
         const altMatch = `${alt.type === 'payment_receipt' ? 'receipt' : 'invoice'}:${alt.reference}`;
         console.log(
           padR('', 50) +
-            padR('', 10) +
-            padR('', 22) +
-            padR('  (alt)', 12) +
-            padR(altMatch, 35) +
-            alt.confidence
+          padR('', 10) +
+          padR('', 22) +
+          padR('  (alt)', 12) +
+          padR(altMatch, 35) +
+          alt.confidence
         );
       }
     }
@@ -421,8 +421,6 @@ async function main(): Promise<void> {
       console.log('  --- Updated Posting (as returned by API) ---');
       console.log(`  reconciliation_status: ${updatedPosting.reconciliation_status}`);
       console.log(`  matched_reference:     ${updatedPosting.matched_reference}`);
-      console.log(`  category_id:           ${updatedPosting.category_id}`);
-      console.log(`  category_name:         ${updatedPosting.category_name}`);
       console.log(`  credit_account_id:     ${updatedPosting.credit_account_id}`);
       console.log(`  account_id:            ${updatedPosting.account_id}`);
       console.log(`  ai_cat_score:          ${updatedPosting.ai_cat_score}`);

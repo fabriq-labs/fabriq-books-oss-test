@@ -12,7 +12,7 @@ import {
     searchBudgetPeriodsTool,
     searchBudgetLinesTool,
     searchCOATool,
-    searchOrganizationsTool,
+    searchEntitiesTool,
     searchEmployeesTool,
     searchUsersTool,
     createChildItemTool,
@@ -93,7 +93,7 @@ export class ToolManager {
                 searchBudgetPeriods: searchBudgetPeriodsTool(auth), // budget_period
                 searchBudgetLines: searchBudgetLinesTool(auth),  // budget_line
                 searchCOA: searchCOATool(auth),          // coa
-                searchOrganizations: searchOrganizationsTool(auth), // organization
+                searchEntities: searchEntitiesTool(auth), // entity
                 searchEmployees: searchEmployeesTool(auth),    // employee_master
                 searchUsers: searchUsersTool(auth)         // user_master
             };

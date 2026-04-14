@@ -39,14 +39,9 @@ async function main() {
     console.log('📥 Importing roles, permissions, and role_view from SQL file...');
     try {
       const sqlFilePath = join(__dirname, 'metadata-tables.sql');
-      const databaseUrl = process.env.DATABASE_URL;
-
-      if (!databaseUrl) {
-        throw new Error('DATABASE_URL environment variable is not set');
-      }
-
-      console.log('  Executing SQL file with psql...');
-      execSync(`psql "${databaseUrl}" -f "${sqlFilePath}"`, {
+      const schemaPath = join(__dirname, 'schema');
+      console.log('  Executing SQL file with prisma db execute...');
+      execSync(`npx prisma db execute --schema "${schemaPath}" --file "${sqlFilePath}"`, {
         stdio: 'inherit'
       });
 

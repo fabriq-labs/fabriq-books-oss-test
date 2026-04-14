@@ -145,7 +145,7 @@ export const LocationForm: React.FC<LocationFormProps> = () => {
         <div className="mx-auto w-[70%]">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Location Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Location</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit Location' : 'Create New Location'}
                     </p>
@@ -204,11 +204,11 @@ export const LocationForm: React.FC<LocationFormProps> = () => {
                                             <FormItem>
                                                 <FormLabel>Legal Entity <span className="text-red-500">*</span></FormLabel>
                                                 <SearchDropDown
-                                                    instanceType="organization"
+                                                    instanceType="entity"
                                                     instanceSourceKey="legal_entity_id"
                                                     instanceKey="id"
                                                     instanceLabel="legal_name"
-                                                    instanceValue={initialValues?.organization}
+                                                    instanceValue={initialValues?.legal_entity}
                                                     onSelectItem={handleSelectChange}
                                                     onClear={handleSelectClear}
                                                     limit="10"

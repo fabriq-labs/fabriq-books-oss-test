@@ -423,7 +423,6 @@ Value Date,Description,Credit Account,Debit Amount,Credit Amount,Category
 - `Credit Account` → `credit_account_id` (lookup field - for debit transactions)
 - `Debit Amount` → `amount` (when > 0, selected account is debited)
 - `Credit Amount` → `amount` (when > 0, selected account is credited)
-- `Category` → `category_id` (optional, lookup field)
 
 **How It Works**:
 1. Selected account ID is stored in `relationId` state via `handleSelectedState` callback
@@ -488,7 +487,7 @@ Value Date,Description,Account,Amount,Credit Account,Category
 - `Account` → `account_id` (required, lookup field - debit account)
 - `Amount` → `amount` (required)
 - `Credit Account` → `credit_account_id` (required, lookup field - credit account)
-- `Category` → `category_id` (optional, lookup field)
+
 
 **How It Works**:
 1. Both `account_id` and `credit_account_id` are mapped directly from CSV columns
@@ -930,7 +929,7 @@ Field mapping is **completely metadata-driven** and works generically for any mo
    - Only fields with `permission === "update"` are available for mapping
    - Fields can be filtered by `isColumnShow === true` (optional)
    - Additional fields can be specified via `additionalFileds` prop (optional)
-   - **Example**: For `posting_view`, available fields include `value_date`, `description`, `account_id`, `amount`, `credit_account_id`, `category_id`
+   - **Example**: For `posting_view`, available fields include `value_date`, `description`, `account_id`, `amount`, `credit_account_id`
    - **Example**: For `account_view`, available fields include `name`, `classification`, `code`, `parent_id`
 
 3. **Mapping Creation**:

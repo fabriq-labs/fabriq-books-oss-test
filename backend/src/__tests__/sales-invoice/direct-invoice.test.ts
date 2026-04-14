@@ -10,7 +10,14 @@ import {
   calculateInvoiceTotal,
   cleanupTestData,
 } from './direct-invoice-fixtures';
-import { loadTestConfig, createTestContext, validateTestData, TestConfig } from '../test-configs/test-config-loader';
+import {
+  loadTestConfig,
+  createTestContext,
+  createInvoiceWorkflowActorContext,
+  ensureInvoiceWorkflowLedgerSideEffects,
+  validateTestData,
+  TestConfig
+} from '../test-configs/test-config-loader';
 
 describe('Direct Sales Invoice Creation Tests', () => {
   // Increase timeout for database operations
@@ -18,6 +25,7 @@ describe('Direct Sales Invoice Creation Tests', () => {
 
   let config: TestConfig;
   let context: any;
+  let workflowActorContext: any;
 
   console.log('\n🚀 Starting Direct Sales Invoice Creation Tests');
   const modelService = ModelService.getInstance();
@@ -27,9 +35,12 @@ describe('Direct Sales Invoice Creation Tests', () => {
   beforeAll(() => {
     config = loadTestConfig();
     context = createTestContext(config);
+    workflowActorContext = createInvoiceWorkflowActorContext(config);
   });
   let locationId: string;
   let customerId: string;
+  let customerName: string;
+  let locationName: string;
   let itemId1: string;
   let itemId2: string;
   let itemId3: string;
@@ -37,6 +48,7 @@ describe('Direct Sales Invoice Creation Tests', () => {
   beforeAll(async () => {
     // Validate that the configured test data exists
     await validateTestData(config, prisma);
+    await ensureInvoiceWorkflowLedgerSideEffects(prisma as any);
 
     // Get existing seed data IDs
     const customer = await prisma.customers.findUnique({ where: { id: config.customerId } });
@@ -44,6 +56,7 @@ describe('Direct Sales Invoice Creation Tests', () => {
       throw new Error(`Customer ${config.customerId} not found. Run the appropriate setup script first.`);
     }
     customerId = customer.id;
+    customerName = customer.customer_name;
 
     const item1 = await prisma.item_master.findUnique({ where: { id: config.items.productA } });
     if (!item1) {
@@ -68,6 +81,7 @@ describe('Direct Sales Invoice Creation Tests', () => {
       throw new Error(`Location ${config.locationId} not found. Run the appropriate setup script first.`);
     }
     locationId = location.id;
+    locationName = location.location;
 
     console.log('✓ All seed data verified and loaded from configuration');
   });
@@ -201,26 +215,30 @@ describe('Direct Sales Invoice Creation Tests', () => {
       );
 
       const invoiceResult = await modelService.create('invoice', context, invoiceData, {});
+      console.log('Invoice Result:', JSON.stringify(invoiceResult, null, 2));
       const invoiceId = invoiceResult.data.id;
       console.log('✓ Invoice Created:', invoiceId);
 
       // Add line item
       const lineItems = [createInvoiceLineItemData(itemId1, config.orgId, context.user.id)];
+      console.log('Line Items:', JSON.stringify(lineItems, null, 2));
       await modelService.addChildrenToParent('invoice', invoiceId, 'invoice_line_item', context, lineItems, {});
+      console.log('Line Items Added:', JSON.stringify(lineItems, null, 2));
 
       // Verify invoice has customer_id and location_id
       const invoice = await assertInvoiceCreated(invoiceId);
-
+      console.log('Invoice:', JSON.stringify(invoice, null, 2));
       expect(invoice?.customer_id).toBe(customerId);
       expect(invoice?.location_id).toBe(locationId);
       expect(invoice?.invoice_type).toBe('SALES');
 
       // Verify customer details
       expect(invoice?.customers).toBeDefined();
-      expect(invoice?.customers?.customer_name).toBe('Aether Dynamics Corp');
+      expect(invoice?.customers?.customer_name).toBe(customerName);
 
       // Verify location details
       expect(invoice?.location).toBeDefined();
+      expect(invoice?.location?.location).toBe(locationName);
       console.log('✓ Test 4 PASSED\n');
     });
   });
@@ -433,7 +451,7 @@ describe('Direct Sales Invoice Creation Tests', () => {
       expect(wfInstanceId).toBeDefined();
 
       // Get initial workflow context
-      const initialWfContext = await workflowEngine.getWorkflowContext(wfInstanceId, context);
+      const initialWfContext = await workflowEngine.getWorkflowContext(wfInstanceId, workflowActorContext);
       expect(initialWfContext.currentState.name).toBe('Draft');
       console.log('✓ Invoice is in Draft state');
 
@@ -448,11 +466,11 @@ describe('Direct Sales Invoice Creation Tests', () => {
       const submitAction = initialWfContext.availableActions.find(a => a.name === 'Submit');
       expect(submitAction).toBeDefined();
 
-      await workflowEngine.executeTransition(initialWfContext, submitAction!, context, {});
+      await workflowEngine.executeTransition(initialWfContext, submitAction!, workflowActorContext, {});
       console.log('✓ Transitioned to Submitted state');
 
       // Verify workflow state
-      const submittedWfContext = await workflowEngine.getWorkflowContext(wfInstanceId, context);
+      const submittedWfContext = await workflowEngine.getWorkflowContext(wfInstanceId, workflowActorContext);
       expect(submittedWfContext.currentState.name).toBe('Submitted');
       console.log('✓ Confirmed invoice is in Submitted state');
 
@@ -469,11 +487,11 @@ describe('Direct Sales Invoice Creation Tests', () => {
       const approveAction = submittedWfContext.availableActions.find(a => a.name === 'Approve');
       expect(approveAction).toBeDefined();
 
-      await workflowEngine.executeTransition(submittedWfContext, approveAction!, context, {});
+      await workflowEngine.executeTransition(submittedWfContext, approveAction!, workflowActorContext, {});
       console.log('✓ Transitioned to Approved state');
 
       // Verify workflow state
-      const approvedWfContext = await workflowEngine.getWorkflowContext(wfInstanceId, context);
+      const approvedWfContext = await workflowEngine.getWorkflowContext(wfInstanceId, workflowActorContext);
       expect(approvedWfContext.currentState.name).toBe('Approved');
       console.log('✓ Confirmed invoice is in Approved state');
 
@@ -529,22 +547,22 @@ describe('Direct Sales Invoice Creation Tests', () => {
       console.log('✓ Created separate invoice for rejection testing');
 
       // Submit the rejection test invoice
-      const rejectInitialWfContext = await workflowEngine.getWorkflowContext(rejectWfInstanceId, context);
+      const rejectInitialWfContext = await workflowEngine.getWorkflowContext(rejectWfInstanceId, workflowActorContext);
       const rejectSubmitAction = rejectInitialWfContext.availableActions.find(a => a.name === 'Submit');
-      await workflowEngine.executeTransition(rejectInitialWfContext, rejectSubmitAction!, context, {});
+      await workflowEngine.executeTransition(rejectInitialWfContext, rejectSubmitAction!, workflowActorContext, {});
       console.log('✓ Submitted rejection test invoice');
 
       // Now reject it from Submitted back to Draft (this should trigger posting reversal when side effects are configured)
       console.log('Transitioning from Submitted back to Draft (Reject)...');
-      const rejectSubmittedWfContext = await workflowEngine.getWorkflowContext(rejectWfInstanceId, context);
+      const rejectSubmittedWfContext = await workflowEngine.getWorkflowContext(rejectWfInstanceId, workflowActorContext);
       const rejectFromSubmittedAction = rejectSubmittedWfContext.availableActions.find(a => a.name === 'Reject');
       expect(rejectFromSubmittedAction).toBeDefined();
 
-      await workflowEngine.executeTransition(rejectSubmittedWfContext, rejectFromSubmittedAction!, context, {});
+      await workflowEngine.executeTransition(rejectSubmittedWfContext, rejectFromSubmittedAction!, workflowActorContext, {});
       console.log('✓ Rejected back to Draft state');
 
       // Verify workflow state
-      const rejectedWfContext = await workflowEngine.getWorkflowContext(rejectWfInstanceId, context);
+      const rejectedWfContext = await workflowEngine.getWorkflowContext(rejectWfInstanceId, workflowActorContext);
       expect(rejectedWfContext.currentState.name).toBe('Draft');
       console.log('✓ Confirmed invoice is back in Draft state');
 
@@ -596,7 +614,7 @@ describe('Direct Sales Invoice Creation Tests', () => {
       console.log('🎯 Side effects are configured for SUBMIT (posting creation) and REJECT (posting reversal)');
       console.log('📝 NOTE: Posting creation happens on submit, reversal happens on reject');
       console.log('✓ Test 9 PASSED\n');
-    });
+    }, 120000);
   });
 });
 

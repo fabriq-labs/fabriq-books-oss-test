@@ -13,9 +13,9 @@ Fabriq implements a **double-entry bookkeeping system** with support for **multi
 
 ## Core Data Model
 
-### 1. Organization (Legal Entity)
+### 1. Entity (Legal Entity)
 
-**Model**: `organization` (zeiv.prisma)
+**Model**: `entity` (zeiv.prisma)
 
 Each organization represents a legal entity within the tenant's group structure.
 
@@ -35,8 +35,8 @@ Each organization represents a legal entity within the tenant's group structure.
 - `business_unit[]`, `department[]`, `cost_center[]` — organizational hierarchy
 
 **Multi-entity rules**:
-- One tenant (`org_id`) can have **multiple organizations**
-- Exactly **one organization** has `is_it_headquartres = "Yes"` — this is the HQ
+- One tenant (`org_id`) can have **multiple entities**
+- Exactly **one entity** has `is_it_headquartres = "Yes"` — this is the HQ
 - Each entity can have a **different base currency**
 - All entities share master data (items, suppliers, customers) via `org_id`
 
@@ -57,7 +57,7 @@ The account model serves dual purposes: it represents bank/financial accounts AN
 | `balance` | Current balance (Decimal 19,4) |
 | `currency` | Account currency |
 | `is_active` | Soft delete / activation flag |
-| `legal_entity_id` | FK to `organization` — which entity owns this account |
+| `legal_entity_id` | FK to `entity` — which entity owns this account |
 | `parent_account_id` | FK to self — builds account hierarchy (tree) |
 | `hq_account_id` | FK to self — maps this entity account to the corresponding HQ account |
 
@@ -136,7 +136,7 @@ The `account_classification` enum defines the five standard accounting categorie
 
 ## Multi-Entity Structure
 
-### Tenant → Organization Hierarchy
+### Tenant → Entity Hierarchy
 
 ```
 Tenant (org_id: "org_xyz")
@@ -165,7 +165,7 @@ The `hq_account_id` field on `account` creates a mapping from entity-level accou
 
 ### Multi-Currency Considerations
 
-- Each `organization` has a `basecurrency_id` (functional currency)
+- Each `entity` has a `basecurrency_id` (functional currency)
 - Each `account` has a `currency` field
 - The `exchange_rate` model stores rates with `from_currency`, `to_currency`, `effective_date`
 - Rate types: `SPOT`, `CLOSING`, `AVERAGE`
@@ -187,7 +187,7 @@ Used for transaction classification and reporting:
 **Model**: `general_ledger` (zeiv.prisma)
 - Links GL codes to accounts and legal entities
 - `gl_code`, `gl_name`, `description`
-- FK to both `account` and `organization`
+- FK to both `account` and `emtity`
 
 ### Currency & Exchange Rates
 
@@ -410,7 +410,7 @@ Pandas handles messy Excel files naturally — multi-sheet workbooks, merged cel
 
 The existing data model fully supports this feature:
 
-- **`organization.is_it_headquartres`** — identifies the HQ entity
+- **`entity.is_it_headquartres`** — identifies the HQ entity
 - **`account.legal_entity_id`** — ties accounts to their entity
 - **`account.hq_account_id`** — maps entity accounts to HQ accounts for roll-up
 - **`account.classification`** — determines P&L vs BS for currency translation rate selection

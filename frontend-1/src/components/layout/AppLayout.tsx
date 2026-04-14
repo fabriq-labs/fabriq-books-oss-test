@@ -15,7 +15,7 @@ const routeTitles: Record<string, string> = {
     '/purchase-order': 'Purchase Orders',
     '/invoice': 'Invoice',
     '/reports': 'Reports',
-    '/master/business/organization': 'Organization',
+    '/master/business/entity': 'Entity',
     '/master/procurement/items': 'Item Master',
     '/master/procurement/category': 'Item Category',
     '/master/procurement/supplier': 'Supplier',
@@ -35,7 +35,7 @@ const routeTitles: Record<string, string> = {
     '/master/others/payment-terms': 'Payment Terms',
     '/master/others/shipping-terms': 'Shipping Terms',
     '/master/others/shipping-method': 'Shipping Method',
-    '/master/others/currency': 'Currency Master',
+    '/master/others/currency': 'Currency',
     '/master/others/tax-master': 'Tax Master',
     '/settings/tenant-onboarding': 'Tenant Onboarding',
 };
@@ -59,7 +59,7 @@ const getTitleFromRoute = (pathname: string, isBuyer: boolean): string => {
     if (pathSegments.length >= 3 && pathSegments[2] === 'view') {
         const entity = pathSegments[1];
         const entityTitles: Record<string, string> = {
-            'organization': 'Organization',
+            'entity': 'Entity',
             'item_master': 'Item Master',
             'item_category': 'Item Category',
             'supplier': 'Supplier',
@@ -80,7 +80,6 @@ const getTitleFromRoute = (pathname: string, isBuyer: boolean): string => {
             'payment_terms': 'Payment Terms',
             'shipping_terms': 'Shipping Terms',
             'shipping_method': 'Shipping Method',
-            'currency_master': 'Currency Master',
             'exchange_rates': 'Exchange Rates',
             'currency': 'Currency',
         };

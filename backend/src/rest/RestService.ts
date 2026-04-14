@@ -180,15 +180,12 @@ export class RestService {
             logo: true,
             customer_timezone: true,
             basecurrency_id: true,
-            currency_master: {
+            currency: {
               select: {
                 id: true,
+                code: true,
                 name: true,
-                base_currency: true,
-                from_currency: true,
-                effective_from: true,
-                currency_value: true,
-                status: true,
+                symbol: true,
               }
             }
           }

@@ -137,8 +137,8 @@ Expected output schema:
 ${JSON.stringify(schema, null, 2)}
 
 Instructions:
-1. Extract only the information that is clearly present in the document
-2. Use null for missing fields
+1. Extract information that is clearly present in the document, or that the extraction instructions above infer from layout (for example dates carried forward to continuation rows in bank statements).
+2. Use null only when a field is absent and not inferable from those instructions; do not use null for values the prompt tells you to derive from prior rows or merged cells.
 3. Ensure all extracted values match the expected data types
 4. Be precise and accurate in your extraction
 5. Return the result as valid JSON matching the schema exactly

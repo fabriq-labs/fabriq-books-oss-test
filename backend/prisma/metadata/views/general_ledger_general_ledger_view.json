@@ -93,14 +93,14 @@
       "displayName": "Description",
       "isColumnShow": true
     },
-    "organization": {
+    "legal_entity": {
       "select": {
         "id": "read",
         "legal_name": "update",
         "organization_name": "update"
       },
       "dataType": "table",
-      "displayName": "Organization",
+      "displayName": "Legal Entity",
       "isColumnShow": false
     },
     "legal_entity_id": {
@@ -112,7 +112,7 @@
           "type": "cost center",
           "limit": "10",
           "instanceKey": "id",
-          "instanceType": "organization",
+          "instanceType": "entity",
           "searchParams": "organization_name",
           "instanceLabel": "organization_name",
           "instanceSourceKey": "legal_entity_id"

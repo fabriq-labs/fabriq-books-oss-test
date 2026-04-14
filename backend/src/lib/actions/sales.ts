@@ -314,7 +314,11 @@ export const create_sales_invoice_posting = async (
     }
 
     if (invoice.invoice_type !== 'SALES') {
-      throw new Error(`Invoice ${instance_id} is not a sales invoice`);
+      logger.debug('Skipping sales invoice posting for non-SALES invoice', {
+        instance_id,
+        invoice_type: invoice.invoice_type,
+      });
+      return { success: true, postings_created: 0, invoice_id: instance_id };
     }
 
     // 2. Get accounts (simplified - in production, this should be configurable)

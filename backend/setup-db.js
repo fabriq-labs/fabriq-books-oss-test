@@ -14,6 +14,37 @@ require("dotenv").config();
 
 const isWindows = os.platform() === "win32";
 
+function runPrismaSqlFile(sqlFilePath, label) {
+  const schemaPath = path.join("prisma", "schema");
+  const command = `npx prisma db execute --schema "${schemaPath}" --file "${sqlFilePath}"`;
+  console.log(`Command: ${command}`);
+  execSync(command, {
+    stdio: "inherit",
+    cwd: __dirname,
+  });
+  if (label) {
+    console.log(`✅ ${label}`);
+  }
+}
+
+function runPrismaSqlText(sqlText, label) {
+  const tempSqlPath = path.join(
+    os.tmpdir(),
+    `fabriq-setup-${Date.now()}-${Math.random().toString(36).slice(2)}.sql`
+  );
+
+  try {
+    fs.writeFileSync(tempSqlPath, sqlText, "utf8");
+    runPrismaSqlFile(tempSqlPath, label);
+  } finally {
+    try {
+      fs.unlinkSync(tempSqlPath);
+    } catch {
+      // Ignore cleanup failures for temp files
+    }
+  }
+}
+
 // Parse command-line arguments
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -188,14 +219,9 @@ async function main() {
       );
 
       if (fs.existsSync(functionsSqlPath)) {
-        console.log(
-          `Command: psql -f "${functionsSqlPath}" (target: ${databaseTargetLog})`
-        );
+        console.log(`Target: ${databaseTargetLog}`);
         try {
-          execSync(`psql "${databaseUrl}" -f "${functionsSqlPath}"`, {
-            stdio: "inherit",
-            cwd: __dirname,
-          });
+          runPrismaSqlFile(functionsSqlPath, "Database functions loaded successfully");
           console.log("✅ Database functions loaded successfully");
         } catch (error) {
           console.error("⚠️  Error loading database functions:", error.message);
@@ -216,14 +242,12 @@ async function main() {
       );
 
       if (fs.existsSync(fabriqSourceSystemSqlPath)) {
-        console.log(
-          `Command: psql -f "${fabriqSourceSystemSqlPath}" (target: ${databaseTargetLog})`
-        );
+        console.log(`Target: ${databaseTargetLog}`);
         try {
-          execSync(`psql "${databaseUrl}" -f "${fabriqSourceSystemSqlPath}"`, {
-            stdio: "inherit",
-            cwd: __dirname,
-          });
+          runPrismaSqlFile(
+            fabriqSourceSystemSqlPath,
+            "Fabriq source system setup complete"
+          );
           console.log("✅ Fabriq source system setup complete");
         } catch (error) {
           console.error("⚠️  Error setting up Fabriq source system:", error.message);
@@ -268,14 +292,12 @@ async function main() {
       );
 
       if (fs.existsSync(seedAgentTemplatesSqlPath)) {
-        console.log(
-          `Command: psql -f "${seedAgentTemplatesSqlPath}" (target: ${databaseTargetLog})`
-        );
+        console.log(`Target: ${databaseTargetLog}`);
         try {
-          execSync(`psql "${databaseUrl}" -f "${seedAgentTemplatesSqlPath}"`, {
-            stdio: "inherit",
-            cwd: __dirname,
-          });
+          runPrismaSqlFile(
+            seedAgentTemplatesSqlPath,
+            "Agent templates seeded successfully"
+          );
           console.log("✅ Agent templates seeded successfully");
         } catch (error) {
           console.error("⚠️  Error seeding agent templates:", error.message);
@@ -336,7 +358,7 @@ async function main() {
         console.log("");
         while (true) {
           const answer = await askQuestion('Enter choice (0-5): ');
-          if (['0','1','2','3','4','5'].includes(answer)) { resetChoice = answer; break; }
+          if (['0', '1', '2', '3', '4', '5'].includes(answer)) { resetChoice = answer; break; }
           console.log('Invalid choice.');
         }
       }
@@ -344,9 +366,9 @@ async function main() {
       // 1. Clear AI categorisation fields on all postings
       console.log("\n🤖 Clearing AI categorisation state on all postings...");
       try {
-        execSync(
-          `psql "${databaseUrl}" -c "UPDATE posting SET ai_cat_score = NULL, ai_categorized_at = NULL WHERE ai_cat_score IS NOT NULL OR ai_categorized_at IS NOT NULL"`,
-          { stdio: 'inherit', cwd: __dirname }
+        runPrismaSqlText(
+          "UPDATE posting SET ai_cat_score = NULL, ai_categorized_at = NULL WHERE ai_cat_score IS NOT NULL OR ai_categorized_at IS NOT NULL;",
+          "AI categorisation fields cleared"
         );
         console.log("  ✓ AI categorisation fields cleared");
       } catch (e) {
@@ -356,9 +378,9 @@ async function main() {
       // 2. Delete all agent session data (cascading)
       console.log("\n🗑️  Deleting agent session data...");
       try {
-        execSync(
-          `psql "${databaseUrl}" -c "DELETE FROM pending_action WHERE session_id IN (SELECT id FROM agent_session); DELETE FROM agent_message WHERE session_id IN (SELECT id FROM agent_session); DELETE FROM llm_trace WHERE session_id IN (SELECT id FROM agent_session); DELETE FROM agent_session"`,
-          { stdio: 'inherit', cwd: __dirname }
+        runPrismaSqlText(
+          "DELETE FROM pending_action WHERE session_id IN (SELECT id FROM agent_session); DELETE FROM agent_message WHERE session_id IN (SELECT id FROM agent_session); DELETE FROM llm_trace WHERE session_id IN (SELECT id FROM agent_session); DELETE FROM agent_session;",
+          "Agent sessions cleared"
         );
         console.log("  ✓ Agent sessions cleared");
       } catch (e) {

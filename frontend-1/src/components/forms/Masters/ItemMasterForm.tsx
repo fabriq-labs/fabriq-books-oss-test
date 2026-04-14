@@ -84,7 +84,7 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                 setSupplierItems(res.data.supplier_items || []);
 
                 // Foreign key fields that should use null instead of empty string
-                const foreignKeyFields = ['item_category_id', 'supplier_id', 'uom_id', 'sales_account_id', 'purchase_account_id', 'tax_master_id', 'tax_rate_intra_id', 'currency_master_id'];
+                const foreignKeyFields = ['item_category_id', 'supplier_id', 'uom_id', 'sales_account_id', 'purchase_account_id', 'tax_master_id', 'tax_rate_intra_id', 'currency_id'];
 
                 // Build form values dynamically from response data
                 const formValues: Record<string, any> = {};
@@ -122,13 +122,24 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                 ...(data as Record<string, any>),
             };
 
-            // Convert unit_price to float if it exists
-            if (submissionData.unit_price) {
-                submissionData.unit_price = parseFloat(submissionData.unit_price);
+            delete submissionData.id;
+
+            // Prisma rejects "" for Float? and optional FKs — use null or omit
+            const rawPrice = submissionData.unit_price;
+            if (rawPrice === '' || rawPrice === null || rawPrice === undefined) {
+                submissionData.unit_price = null;
+            } else {
+                submissionData.unit_price = parseFloat(String(rawPrice));
             }
 
-            // Foreign key fields in item_master
-            const foreignKeyFields = ['item_category_id', 'supplier_id', 'uom_id', 'sales_account_id', 'purchase_account_id', 'tax_master_id', 'tax_rate_intra_id', 'currency_master_id'];
+            // Foreign key fields in item_master (must match zeiv.prisma `item_master`, e.g. currency_id not currency_master_id)
+            const foreignKeyFields = ['item_category_id', 'supplier_id', 'uom_id', 'sales_account_id', 'purchase_account_id', 'tax_master_id', 'tax_rate_intra_id', 'currency_id'];
+
+            foreignKeyFields.forEach((field) => {
+                if (submissionData[field] === '' || submissionData[field] === undefined) {
+                    submissionData[field] = null;
+                }
+            });
 
             if (!id) {
                 // For creates: remove null foreign key fields (don't send them - backend will use defaults)
@@ -137,6 +148,9 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                         delete submissionData[field];
                     }
                 });
+                if (submissionData.unit_price === null) {
+                    delete submissionData.unit_price;
+                }
                 await viewAPI.create(
                     "item_master",
                     viewId,
@@ -315,7 +329,7 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
         <div className="mx-auto w-[70%]">
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Item Master</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Item</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         {initialValues ? 'Edit Item' : 'Create New Item'}
                     </p>
