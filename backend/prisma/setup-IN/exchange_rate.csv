@@ -1,6 +1,6 @@
-id,org_id,from_currency,to_currency,effective_date,rate,rate_type,source
-exrt_demo_001,org_indian_demo,USD,INR,2024-10-01,83.250000,SPOT,manual:indian-demo
-exrt_demo_002,org_indian_demo,USD,INR,2024-10-01,83.180000,CLOSING,rbi_reference_demo
-exrt_demo_003,org_indian_demo,EUR,INR,2024-10-01,91.450000,SPOT,manual:indian-demo
-exrt_demo_004,org_indian_demo,GBP,INR,2024-10-01,105.320000,SPOT,manual:indian-demo
-exrt_demo_005,org_indian_demo,USD,INR,2024-11-15,84.100000,SPOT,manual:indian-demo
+id,org_id,from_currency_id,to_currency_id,effective_date,rate,rate_type,source
+exrt_demo_001,org_indian_demo,cur_iso_USD,cur_iso_INR,2024-10-01,83.250000,SPOT,manual:indian-demo
+exrt_demo_002,org_indian_demo,cur_iso_USD,cur_iso_INR,2024-10-01,83.180000,CLOSING,rbi_reference_demo
+exrt_demo_003,org_indian_demo,cur_iso_EUR,cur_iso_INR,2024-10-01,91.450000,SPOT,manual:indian-demo
+exrt_demo_004,org_indian_demo,cur_iso_GBP,cur_iso_INR,2024-10-01,105.320000,SPOT,manual:indian-demo
+exrt_demo_005,org_indian_demo,cur_iso_USD,cur_iso_INR,2024-11-15,84.100000,SPOT,manual:indian-demo

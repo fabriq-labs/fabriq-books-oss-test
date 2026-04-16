@@ -685,6 +685,21 @@ async function setupIndianDemoData() {
       return cur.id;
     };
 
+    /** exchange_rate.csv: use public.currency.id (e.g. cur_iso_USD); ISO code fallback for legacy rows */
+    const exchangeRateCurrencyId = async (orgId: string, cell: string | undefined) => {
+      const raw = csvStr(cell ?? '');
+      if (!raw) {
+        throw new Error(`Indian demo: exchange_rate row missing currency id/code for org ${orgId}`);
+      }
+      const byIdOrg = await prisma.currency.findFirst({
+        where: { id: raw, org_id: orgId },
+      });
+      if (byIdOrg) return byIdOrg.id;
+      const byId = await prisma.currency.findUnique({ where: { id: raw } });
+      if (byId) return byId.id;
+      return currencyIdByOrgAndCode(orgId, raw);
+    };
+
     console.log('🧾 Loading sales orders and line items from CSV...');
     const salesOrderRows = await loadCsvData(path.join(__dirname, 'sales_order.csv'));
     for (const row of salesOrderRows) {
@@ -900,12 +915,17 @@ async function setupIndianDemoData() {
     const exchangeRateRows = await loadCsvData(path.join(__dirname, 'exchange_rate.csv'));
     for (const row of exchangeRateRows) {
       const eff = row.effective_date ? new Date(row.effective_date) : new Date();
+      const exOrgId = csvStr(row.org_id) || 'org_indian_demo';
+      const fromCell = row.from_currency_id ?? row.from_currency;
+      const toCell = row.to_currency_id ?? row.to_currency;
+      const fromCurrencyId = await exchangeRateCurrencyId(exOrgId, fromCell);
+      const toCurrencyId = await exchangeRateCurrencyId(exOrgId, toCell);
       await prisma.exchange_rate.upsert({
         where: { id: row.id },
         update: {
           org_id: row.org_id,
-          from_currency: row.from_currency,
-          to_currency: row.to_currency,
+          from_currency_id: fromCurrencyId,
+          to_currency_id: toCurrencyId,
           effective_date: eff,
           rate: row.rate,
           rate_type: (csvStr(row.rate_type) || 'SPOT') as any,
@@ -914,8 +934,8 @@ async function setupIndianDemoData() {
         create: {
           id: row.id,
           org_id: row.org_id,
-          from_currency: row.from_currency,
-          to_currency: row.to_currency,
+          from_currency_id: fromCurrencyId,
+          to_currency_id: toCurrencyId,
           effective_date: eff,
           rate: row.rate,
           rate_type: (csvStr(row.rate_type) || 'SPOT') as any,

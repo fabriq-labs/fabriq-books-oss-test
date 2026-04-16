@@ -68,8 +68,9 @@ type LegalEntityOption = {
   legal_name?: string;
   name?: string | null;
   is_it_headquartres?: string | null;
+  basecurrency_id?: string | null;
   /** From `entity.basecurrency_id` → `currency` (see `entity_view` data graph). */
-  currency?: { code?: string | null } | null;
+  currency?: { id?: string | null; code?: string | null } | null;
 };
 
 /** ISO 4217 code from the entity’s linked `currency` row (`basecurrency_id`). */
@@ -91,13 +92,28 @@ function resolveHeadquartersBaseCurrency(list: LegalEntityOption[]): string {
   return resolveEntityBaseCurrencyCode(hq) ?? "INR";
 }
 
+/** `currency.id` for HQ (or first) entity’s base currency — for `filters.currency_id` on default load. */
+function resolveHeadquartersBaseCurrencyId(list: LegalEntityOption[]): string {
+  const hq = list.find(isHeadquartersEntity) ?? list[0];
+  if (!hq) return "";
+  const fromNested = hq.currency?.id?.trim();
+  if (fromNested) return fromNested;
+  const fk = hq.basecurrency_id?.trim();
+  if (fk) return fk;
+  return "";
+}
+
 const useIncomeStatement = ({
   dateRange,
-  currency,
+  currencyId,
+  currencyCode,
   legalEntityIds,
 }: {
   dateRange?: [dayjs.Dayjs, dayjs.Dayjs];
-  currency: string;
+  /** `currency.id` — explicit pick or HQ default; sent as `filters.currency_id` when non-empty. */
+  currencyId: string;
+  /** ISO reporting code — always sent as `filters.currency`. */
+  currencyCode: string;
   legalEntityIds: string[];
 }) => {
   const [loading, setLoading] = useState(false);
@@ -118,7 +134,9 @@ const useIncomeStatement = ({
         if (account) {
           filters.account_id = account?.id;
         }
-        filters.currency = currency || "INR";
+        if (currencyId.trim()) {
+          filters.currency_id = currencyId.trim();
+        }
         if (legalEntityIds.length > 0) {
           filters.legal_entity_ids = legalEntityIds;
         }
@@ -141,7 +159,7 @@ const useIncomeStatement = ({
         }
       }
     },
-    [dateRange, currency, legalEntityIds]
+    [dateRange, currencyId, currencyCode, legalEntityIds]
   );
 
   useEffect(() => {
@@ -164,7 +182,7 @@ export default function IncomeStatement() {
   const [view, setView] = useState("Summary");
   const [showOnlyNonZero, setShowOnlyNonZero] = useState(true);
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
-  const [currency, setCurrency] = useState("");
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState("");
   const [currencies, setCurrencies] = useState<CurrencyListRow[]>([]);
   const [currenciesLoading, setCurrenciesLoading] = useState(false);
   const [legalEntityOptions, setLegalEntityOptions] = useState<LegalEntityOption[]>([]);
@@ -174,17 +192,36 @@ export default function IncomeStatement() {
   const { dateRange } = useReportController();
   const { user } = useAuth();
 
-  /** ISO code sent to income_statement report and used for formatting. */
+  /** ISO code for `formatCurrency` / PDF; from selected `currency.id` row or HQ org default. */
   const reportCurrencyCode = useMemo(() => {
-    if (currency.trim()) return currency.trim().toUpperCase();
+    if (selectedCurrencyId.trim()) {
+      const row = currencies.find((c) => c.id === selectedCurrencyId.trim());
+      const code = row?.code?.trim().toUpperCase();
+      if (code) return code;
+    }
     return resolveHeadquartersBaseCurrency(legalEntityOptions);
-  }, [currency, legalEntityOptions]);
+  }, [selectedCurrencyId, currencies, legalEntityOptions]);
 
   const displayCurrencyCode = reportCurrencyCode;
 
+  /** HQ / first entity base `currency.id` or FK; used when user leaves “Org default” so API gets `currency_id`. */
+  const defaultReportingCurrencyId = useMemo(() => {
+    const fromEntity = resolveHeadquartersBaseCurrencyId(legalEntityOptions);
+    if (fromEntity) return fromEntity;
+    const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
+    const row = currencies.find((c) => c.code.toUpperCase() === code.toUpperCase());
+    return row?.id ?? "";
+  }, [legalEntityOptions, currencies]);
+
+  const effectiveReportCurrencyId = useMemo(
+    () => selectedCurrencyId.trim() || defaultReportingCurrencyId,
+    [selectedCurrencyId, defaultReportingCurrencyId],
+  );
+
   const { data, loading, error, fetchIncomeStatement } = useIncomeStatement({
     dateRange,
-    currency: reportCurrencyCode,
+    currencyId: effectiveReportCurrencyId,
+    currencyCode: reportCurrencyCode,
     legalEntityIds: selectedLegalEntityIds,
   });
 
@@ -368,11 +405,10 @@ export default function IncomeStatement() {
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [currencies]);
 
-  const currencyCodeInList = useMemo(() => {
-    if (!currency.trim()) return true;
-    const u = currency.trim().toUpperCase();
-    return sortedActiveCurrencies.some((c) => c.code.toUpperCase() === u);
-  }, [sortedActiveCurrencies, currency]);
+  const selectedCurrencyInMasterList = useMemo(() => {
+    if (!selectedCurrencyId.trim()) return true;
+    return sortedActiveCurrencies.some((c) => c.id === selectedCurrencyId.trim());
+  }, [sortedActiveCurrencies, selectedCurrencyId]);
 
   const orgDefaultLabel = useMemo(() => {
     const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
@@ -737,9 +773,9 @@ export default function IncomeStatement() {
                     </PopoverContent>
                   </Popover>
                   <Select
-                    value={currency ? currency : "__default__"}
+                    value={selectedCurrencyId ? selectedCurrencyId : "__default__"}
                     onValueChange={(v) => {
-                      setCurrency(v === "__default__" ? "" : v);
+                      setSelectedCurrencyId(v === "__default__" ? "" : v);
                     }}
                     disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
                   >
@@ -755,14 +791,14 @@ export default function IncomeStatement() {
                         const code = row.code.toUpperCase();
                         const label = row.name ? `${code} — ${row.name}` : code;
                         return (
-                          <SelectItem key={row.id || code} value={code}>
+                          <SelectItem key={row.id || code} value={row.id}>
                             {label}
                           </SelectItem>
                         );
                       })}
-                      {currency && !currencyCodeInList && (
-                        <SelectItem value={currency.trim().toUpperCase()}>
-                          {currency.trim().toUpperCase()} (not in master list)
+                      {selectedCurrencyId && !selectedCurrencyInMasterList && (
+                        <SelectItem value={selectedCurrencyId}>
+                          {reportCurrencyCode} (id)
                         </SelectItem>
                       )}
                     </SelectContent>

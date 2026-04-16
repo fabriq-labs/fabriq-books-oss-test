@@ -192,9 +192,9 @@ model holding {
   realized_pnl   Decimal? @db.Decimal(19, 4)
 
   // Metadata (FK to currency.id; Prisma relation name "currency" → column currency_id only)
-  currency_id  String?   @db.VarChar(50)
-  currency     currency? @relation(fields: [currency_id], references: [id])
-  last_updated DateTime  @default(now())
+  currency_id     String?   @db.VarChar(50)
+  currency        currency? @relation(fields: [currency_id], references: [id])
+  last_updated    DateTime  @default(now())
   last_trade_date DateTime? // Last trade that affected this holding
   is_active       Boolean   @default(true)
   notes           String?
@@ -239,44 +239,48 @@ enum account_classification {
 // ── Forex: Currency reference & exchange rates ──────────────────────────
 
 model currency {
-  id              String            @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
-  code            String            @unique // ISO 4217: "USD", "INR", "PHP", "EUR"
-  name            String // "US Dollar", "Indian Rupee"
-  symbol          String? // "$", "₹", "₱"
-  decimal_places  Int               @default(2)
-  is_active       Boolean           @default(true)
-  created_at      DateTime          @default(now())
-  modified_at     DateTime          @updatedAt
-  org_id          String
-  payment_receipt payment_receipt[]
-  entities        entity[]
-  suppliers       supplier[]
-  customers       customers[]
-  itemMasters     item_master[]
-  orgs            org[]
-  accounts        account[]
-  holdings        holding[]
+  id                String            @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
+  code              String            @unique // ISO 4217: "USD", "INR", "PHP", "EUR"
+  name              String // "US Dollar", "Indian Rupee"
+  symbol            String? // "$", "₹", "₱"
+  decimal_places    Int               @default(2)
+  is_active         Boolean           @default(true)
+  created_at        DateTime          @default(now())
+  modified_at       DateTime          @updatedAt
+  org_id            String
+  payment_receipt   payment_receipt[]
+  entities          entity[]
+  suppliers         supplier[]
+  customers         customers[]
+  itemMasters       item_master[]
+  orgs              org[]
+  accounts          account[]
+  holdings          holding[]
+  exchangeFromRates exchange_rate[] @relation("ExchangeRateFromCurrency")
+  exchangeToRates   exchange_rate[] @relation("ExchangeRateToCurrency")
 
   @@map("currency")
 }
 
 model exchange_rate {
-  id             String             @id @default(dbgenerated("'exrt_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id         String
-  from_currency  String // ISO 4217 code, e.g. "PHP"
-  to_currency    String // ISO 4217 code, e.g. "USD" (typically org base currency)
-  effective_date DateTime           @db.Date
-  rate           Decimal            @db.Decimal(19, 6)
-  rate_type      exchange_rate_type @default(SPOT)
-  source         String? // "manual", "api:openexchangerates", etc.
-  created_by     String?
-  created_at     DateTime           @default(now())
-  modified_by    String?
-  modified_at    DateTime           @updatedAt
-  assigned_to    String?
+  id               String             @id @default(dbgenerated("'exrt_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id           String
+  from_currency_id String             @db.VarChar(50) // FK → currency.id (source currency)
+  to_currency_id   String             @db.VarChar(50) // FK → currency.id (e.g. org reporting currency)
+  effective_date   DateTime           @db.Date
+  rate             Decimal            @db.Decimal(19, 6)
+  rate_type        exchange_rate_type @default(SPOT)
+  source           String? // "manual", "api:openexchangerates", etc.
+  created_by       String?
+  created_at       DateTime           @default(now())
+  modified_by      String?
+  modified_at      DateTime           @updatedAt
+  assigned_to      String?
+  from_currency    currency?          @relation("ExchangeRateFromCurrency", fields: [from_currency_id], references: [id])
+  to_currency      currency?          @relation("ExchangeRateToCurrency", fields: [to_currency_id], references: [id])
 
-  @@unique([org_id, from_currency, to_currency, effective_date, rate_type])
-  @@index([org_id, from_currency, to_currency, effective_date])
+  @@unique([org_id, from_currency_id, to_currency_id, effective_date, rate_type])
+  @@index([org_id, from_currency_id, to_currency_id, effective_date])
   @@map("exchange_rate")
 }
 

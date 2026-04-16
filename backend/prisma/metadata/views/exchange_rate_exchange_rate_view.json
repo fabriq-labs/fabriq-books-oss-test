@@ -8,31 +8,77 @@
       "dataType": "string",
       "permission": "read"
     },
-    "from_currency": {
+    "from_currency_id": {
       "dataType": "string",
-      "required": true,
+      "required": false,
+      "listProps": {
+        "type": "text",
+        "recordPath": "from_currency.code"
+      },
       "permission": "update",
       "tableProps": {
-        "width": "150",
-        "columnType": "text"
+        "columnType": "select",
+        "selectProps": {
+          "type": "exchange_rate",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
+          "instanceSourceKey": "from_currency_id"
+        },
+        "defaultValue": ""
       },
       "displayName": "From Currency",
-      "searchProps": {
-        "isSearch": true,
-        "operation": "startswith"
-      },
       "isColumnShow": true
     },
-    "to_currency": {
+    "from_currency": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "update",
+        "symbol": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "From Currency",
+      "isColumnShow": false
+    },
+    "to_currency_id": {
       "dataType": "string",
-      "required": true,
+      "required": false,
+      "listProps": {
+        "type": "text",
+        "recordPath": "to_currency.code"
+      },
       "permission": "update",
       "tableProps": {
-        "width": "150",
-        "columnType": "text"
+        "columnType": "select",
+        "selectProps": {
+          "type": "currency",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
+          "instanceSourceKey": "to_currency_id"
+        },
+        "defaultValue": ""
       },
       "displayName": "To Currency",
       "isColumnShow": true
+    },
+    "to_currency": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "update",
+        "symbol": "update"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "To Currency",
+      "isColumnShow": false
     },
     "effective_date": {
       "dataType": "date",
