@@ -15,7 +15,8 @@ model account {
   type                  String[]
   frequency             String?
   balance               Decimal?                @db.Decimal(19, 4)
-  currency              String?
+  base_currency_id      String?
+  currency              currency?               @relation(fields: [base_currency_id], references: [id])
   is_active             Boolean                 @default(true)
   last_sync_at          DateTime?
   inst_id               String?
@@ -251,6 +252,7 @@ model currency {
   customers       customers[]
   itemMasters     item_master[]
   orgs            org[]
+  accounts        account[]
 
   @@map("currency")
 }
