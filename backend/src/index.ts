@@ -15,6 +15,7 @@ import { errorHandler } from './rest/middleware/errorHandler';
 import agentModule from './agent';
 import { GracefulShutdown } from './utils/gracefulShutdown';
 import { initializeImportExtensions } from './lib/import-extensions';
+import './rest/postingCustomActions'; // registers posting/import-bank-statement custom action
 
 const app: Express = express();
 const port: number = parseInt(process.env.BACKEND_PORT || process.env.PORT || '4000', 10);

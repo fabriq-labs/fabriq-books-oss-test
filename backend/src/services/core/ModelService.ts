@@ -10,6 +10,7 @@ import { is_workflow_model } from '../../workflow-engine/types/workflow.types';
 import { executeCustomAction } from '../../lib/actions';
 import { ExtractorRegistry } from '../../lib/extractors/extractor-registry';
 import { ImportExtensionRegistry } from '../../lib/import-extensions';
+import { ValidationError } from '../../rest/errors/ApiError';
 import { Prisma } from '@prisma/client';
 
 // Types for model schema introspection
@@ -559,9 +560,23 @@ export class ModelService {
     context: AuthContext,
     pdfBuffer: Buffer,
     options?: {
+      mimeType?: string;
+      fileSize?: number;
+      fileName?: string;
+      documentType?: string;
       extractorOptions?: any;
+      [key: string]: any;
     }
   ): Promise<DataAccessResult> {
+    // Validate file type and size when caller provides them
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (options?.mimeType && options.mimeType !== 'application/pdf') {
+      throw new ValidationError('Only PDF files are supported');
+    }
+    if (options?.fileSize && options.fileSize > MAX_FILE_SIZE) {
+      throw new ValidationError('File size must be less than 10MB');
+    }
+
     logger.debug('Parsing document for model', {
       modelName,
       userId: context.user?.id,
@@ -569,11 +584,27 @@ export class ModelService {
     });
 
     try {
-      const extractorOptions = options?.extractorOptions || {};
+      // Build extractor options: start from explicit extractorOptions, add file metadata,
+      // then pull any extension-required option keys from the top-level options dict
+      const extractorOptions: Record<string, any> = {
+        ...(options?.extractorOptions || {}),
+        ...(options?.documentType ? { documentType: options.documentType } : {}),
+        ...(options?.fileName ? { fileName: options.fileName } : {}),
+        ...(options?.fileSize ? { fileSize: options.fileSize } : {}),
+      };
+
+      // Pull extension-required option keys from the caller-supplied options
+      const extension = this.importExtensionRegistry.getByDocumentType(modelName);
+      if (extension) {
+        const requiredOptions = extension.getRequiredOptions();
+        for (const optionKey of requiredOptions) {
+          if (options?.[optionKey] != null) {
+            extractorOptions[optionKey] = options[optionKey];
+          }
+        }
+      }
 
       // 1. Check if an import extension handles this document type
-      const extension = this.importExtensionRegistry.getByDocumentType(modelName);
-
       if (extension && extension.customExtract) {
         logger.debug('Using import extension for document', {
           modelName,
@@ -624,7 +655,10 @@ export class ModelService {
           metaData: {
             modelName,
             ...extensionResult.metadata,
-            extensionId: extension.extensionId
+            extensionId: extension.extensionId,
+            ...(options?.fileName ? { fileName: options.fileName } : {}),
+            ...(options?.fileSize ? { fileSize: options.fileSize } : {}),
+            uploadedAt: new Date().toISOString(),
           },
           error: undefined
         };
@@ -696,12 +730,19 @@ export class ModelService {
           confidence: extractionResult.confidence,
           modelName,
           processingTime: extractionResult.metadata?.processingTime,
-          extractorType: extractor.constructor.name
+          extractorType: extractor.constructor.name,
+          ...(options?.fileName ? { fileName: options.fileName } : {}),
+          ...(options?.fileSize ? { fileSize: options.fileSize } : {}),
+          uploadedAt: new Date().toISOString(),
         },
         error: undefined
       };
 
     } catch (error: any) {
+      // Re-throw validation errors so callers can map them to 400 responses
+      if (error instanceof ValidationError) {
+        throw error;
+      }
       logger.error('Error in ModelService.parseDocument', {
         error: error.message,
         modelName

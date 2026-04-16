@@ -12,16 +12,19 @@ export class BankStatementExtractor extends BaseDocumentExtractor {
   getExtractionPrompt(): string {
     return `Extract bank statement transaction data from the provided document. Focus on extracting posting records.
 
-    Extract the following transaction information for each transaction:
-    - Transaction name/description
-    - Account name/number
+    Schema fields (posting model) — use these strictly:
+    - description: FULL text from the statement's Description / Details / Transaction remarks / Memo column. That column must map to the JSON field \`description\`, not \`name\`.
+    - name: Short display label only (e.g. merchant or payee), or null if the statement only provides one long description line.
+    - account_name: Account name or number as shown for the transaction row if present.
+    - notes: Extra lines or running balance text that are NOT the main Description column.
+
+    Also extract:
     - Value date (when transaction occurred)
     - Posting date (when transaction was recorded)
     - Debit amount (if present, keep as separate field)
     - Credit amount (if present, keep as separate field)
-    - Notes/description
-    - Transaction reference number
-    - Running balance after transaction
+    - Transaction reference number (if shown)
+    - Running balance after transaction (if shown; put in notes if not a separate column)
 
     Important: Keep debit and credit amounts as separate fields. Do not merge them into a single amount field.
     If a transaction shows both debit and credit, include both fields with their respective values.
@@ -37,6 +40,12 @@ export class BankStatementExtractor extends BaseDocumentExtractor {
     - Bank name
     - Statement period (from date, to date)
     - Currency
+    - Starting balance (opening balance)
+    - Closing balance (ending balance)
+
+    IMPORTANT:
+    - Do NOT treat Opening/Starting Balance or Closing/Ending Balance lines as transactions.
+    - Never include balance-only rows in the transactions array (they are not postings).
 
     Return an array of posting records that can be directly inserted into the posting model.`;
   }

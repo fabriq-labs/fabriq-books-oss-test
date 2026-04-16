@@ -21,7 +21,9 @@ async function fetchAPI<T>(
     });
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || "API request failed");
+      throw new Error(
+        error.message || error.error || "API request failed"
+      );
     }
     // Check if the response is JSON
     const contentType = response.headers.get("content-type");
@@ -59,7 +61,9 @@ async function uploadAPI<T>(
     });
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || "API request failed");
+      throw new Error(
+        error.message || error.error || "API request failed"
+      );
     }
     // Check if the response is JSON
     const contentType = response.headers.get("content-type");
@@ -97,7 +101,9 @@ async function fetchBinaryAPI(
     });
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || "API request failed");
+      throw new Error(
+        error.message || error.error || "API request failed"
+      );
     }
     // Log the content type to verify what we're receiving
     const contentType = response.headers.get("content-type");
@@ -560,6 +566,12 @@ export const bulkEditAPI = {
       });
   },
 };
+export interface GenerateApiKeyResponse {
+  api_key: string;
+  email: string;
+  message: string;
+}
+
 export const userAPI = {
   getCurrentUser: () => {
     return fetchAPI(`/api/metadata/user/me`, {
@@ -572,6 +584,13 @@ export const userAPI = {
         throw err;
       });
   },
+
+  /** Creates a new API key (sent as X-API-Key); replaces any existing key. Plaintext returned once. */
+  generateApiKey: () =>
+    fetchAPI<GenerateApiKeyResponse>(`/api/auth/generate-api-key`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
 };
 
 export const invoiceAPI = {

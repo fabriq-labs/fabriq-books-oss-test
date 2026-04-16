@@ -15,7 +15,6 @@ import { AuthContext } from '../auth/types';
 import { SearchQueryBuilder } from '../services/query/SearchQueryBuilder';
 import { run_report } from '../lib/reports';
 import { ModelService } from '../services/core/ModelService';
-import { ImportExtensionRegistry } from '../lib/import-extensions';
 
 export interface AuthRequest extends Request {
   context?: any;
@@ -25,12 +24,10 @@ export class RestService {
   private static instance: RestService;
   private dal: DataAccessLayer;
   private modelService: ModelService;
-  private importExtensionRegistry: ImportExtensionRegistry;
 
   private constructor() {
     this.dal = DataAccessLayer.getInstance(prisma);
     this.modelService = ModelService.getInstance();
-    this.importExtensionRegistry = ImportExtensionRegistry.getInstance();
   }
 
   public static getInstance(): RestService {
@@ -499,20 +496,13 @@ export class RestService {
     try {
       const context = this.getAuthContext(req);
       const modelName = req.params.modelName;
-      const viewName = req.query.view as string;
-      const viewId = req.params.viewId;
-
-      // Use viewId from path params if viewName from query is not available
-      const finalViewName = viewName || viewId;
-
-      const view = await PermissionService.getView(finalViewName, modelName);
-      const dataGraph = view?.data_graph as { select?: any; include?: any } | null;
+      const viewId = req.params.viewId || (req.query.view as string);
 
       logger.info('Uploading CSV data', { modelName, user: context.user?.id });
 
+      // dataGraph is fetched once inside UploadService and returned in result.metaData
       const uploadService = UploadService.getInstance();
-      const result = await uploadService.uploadCSV(modelName, context, req.body, finalViewName);
-      result.metaData = dataGraph;
+      const result = await uploadService.uploadCSV(modelName, context, req.body, viewId);
 
       if (!result.success) {
         throw new Error(result.error);
@@ -669,95 +659,45 @@ export class RestService {
     try {
       const context = this.getAuthContext(req);
       const modelName = req.params.modelName;
-      const documentType = req.query.documentType as string;
-      const viewName = req.query.view as string;
 
-      // Validate model name
       if (!modelName) {
         throw new ValidationError('Model name is required');
       }
-
-      // Check if file is uploaded
       if (!req.file) {
         throw new ValidationError('PDF file is required');
       }
 
-      // Validate file type
-      if (req.file.mimetype !== 'application/pdf') {
-        throw new ValidationError('Only PDF files are supported');
-      }
-
-      // Validate file size (max 10MB)
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      if (req.file.size > maxSize) {
-        throw new ValidationError('File size must be less than 10MB');
-      }
-
-      // Build extractor options dynamically based on extension requirements
-      const extractorOptions: Record<string, any> = {
-        documentType,
-        fileName: req.file.originalname,
-        fileSize: req.file.size
-      };
-
-      // Check if there's an extension for this document type
-      const extension = this.importExtensionRegistry.getByDocumentType(modelName);
-      if (extension) {
-        // Extract required options from form data
-        const requiredOptions = extension.getRequiredOptions();
-        for (const optionKey of requiredOptions) {
-          if (req.body?.[optionKey]) {
-            extractorOptions[optionKey] = req.body[optionKey];
-          }
-        }
-      }
-
-      logger.info('Parsing PDF document', {
-        modelName,
-        documentType,
-        extractorOptions,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
-        user: context.user?.id
-      });
-
-      // Convert buffer to Buffer if needed
       const pdfBuffer = Buffer.isBuffer(req.file.buffer)
         ? req.file.buffer
         : Buffer.from(req.file.buffer);
 
-      // Parse document using ModelService
+      // Validation, extension option extraction, and metaData shaping are
+      // handled inside ModelService.parseDocument
       const result = await this.modelService.parseDocument(
         modelName,
         context,
         pdfBuffer,
-        { extractorOptions }
+        {
+          mimeType: req.file.mimetype,
+          fileSize: req.file.size,
+          fileName: req.file.originalname,
+          documentType: req.query.documentType as string | undefined,
+          ...req.body,
+        }
       );
 
       if (!result.success) {
         throw new Error(result.error);
       }
 
-      logger.info('PDF parsing completed successfully', {
+      logger.info('PDF parsing completed', {
         modelName,
-        documentType,
         confidence: result.metaData?.confidence,
         processingTime: result.metaData?.processingTime,
-        dataFields: Object.keys(result.data || {}),
-        user: context.user?.id
+        user: context.user?.id,
       });
 
-      res.json({
-        success: true,
-        data: result.data,
-        metaData: {
-          ...result.metaData,
-          fileName: req.file.originalname,
-          fileSize: req.file.size,
-          uploadedAt: new Date().toISOString()
-        },
-        error: undefined
-      });
+      res.json(result);
 
     } catch (error: any) {
       logger.error('Error in parseDocument', {

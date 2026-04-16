@@ -103,7 +103,8 @@ export class UploadService {
       return {
         success: true,
         message: `Successfully created ${totalCount} records`,
-        data: { count: totalCount }
+        data: { count: totalCount },
+        metaData: fieldsets ?? null,
       };
 
     } catch (error) {
