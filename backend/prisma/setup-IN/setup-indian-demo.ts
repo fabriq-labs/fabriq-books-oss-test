@@ -674,6 +674,17 @@ async function setupIndianDemoData() {
       return acc.id;
     };
 
+    const currencyIdByOrgAndCode = async (orgId: string, isoCode: string) => {
+      const code = isoCode.toUpperCase();
+      const cur = await prisma.currency.findFirst({
+        where: { org_id: orgId, code },
+      });
+      if (!cur) {
+        throw new Error(`Indian demo: currency code "${code}" not found for org ${orgId}`);
+      }
+      return cur.id;
+    };
+
     console.log('🧾 Loading sales orders and line items from CSV...');
     const salesOrderRows = await loadCsvData(path.join(__dirname, 'sales_order.csv'));
     for (const row of salesOrderRows) {
@@ -951,6 +962,11 @@ async function setupIndianDemoData() {
     const holdingRows = await loadCsvData(path.join(__dirname, 'holding.csv'));
     for (const row of holdingRows) {
       const accId = await accountIdByCoaCode(csvStr(row.account_code));
+      const holdingOrgId = csvStr(row.org_id) || 'org_indian_demo';
+      const currencyId = await currencyIdByOrgAndCode(
+        holdingOrgId,
+        csvStr(row.currency) || 'INR',
+      );
       const lastTradeOff = parseInt(row.last_trade_days_offset, 10);
       const lastTradeDate = Number.isFinite(lastTradeOff) ? dateWithOffset(lastTradeOff) : null;
       await prisma.holding.upsert({
@@ -963,7 +979,7 @@ async function setupIndianDemoData() {
           average_cost: row.average_cost,
           current_price: csvOpt(row.current_price) ? row.current_price : null,
           market_value: csvOpt(row.market_value) ? row.market_value : null,
-          currency: csvStr(row.currency) || 'INR',
+          currency_id: currencyId,
           last_trade_date: lastTradeDate,
           notes: csvOpt(row.notes),
           tags: parseTags(row.tags),
@@ -977,7 +993,7 @@ async function setupIndianDemoData() {
           average_cost: row.average_cost,
           current_price: csvOpt(row.current_price) ? row.current_price : null,
           market_value: csvOpt(row.market_value) ? row.market_value : null,
-          currency: csvStr(row.currency) || 'INR',
+          currency_id: currencyId,
           last_trade_date: lastTradeDate,
           notes: csvOpt(row.notes),
           tags: parseTags(row.tags),

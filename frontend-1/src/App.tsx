@@ -223,7 +223,7 @@ const AppRoutes: React.FC = () => {
                 <Route path="category_group/:id/view/:viewId" element={<CategoryGroupForm />} />
                 <Route path="category_group/view/:viewId" element={<CategoryGroupForm />} />
 
-                <Route path="accounting/tax" element={<Master type="tax_master" view="tax_master_view" displayName="Tax Master" />} />
+                <Route path="accounting/tax" element={<Master type="tax_master" view="tax_master_view" displayName="Tax" />} />
                 <Route path="tax_master/:id/view/:viewId" element={<TaxMasterForm />} />
                 <Route path="tax_master/view/:viewId" element={<TaxMasterForm />} />
 

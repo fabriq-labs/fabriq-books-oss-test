@@ -191,9 +191,10 @@ model holding {
   unrealized_pnl Decimal? @db.Decimal(19, 4)
   realized_pnl   Decimal? @db.Decimal(19, 4)
 
-  // Metadata
-  currency        String    @default("USD")
-  last_updated    DateTime  @default(now())
+  // Metadata (FK to currency.id; Prisma relation name "currency" → column currency_id only)
+  currency_id  String?   @db.VarChar(50)
+  currency     currency? @relation(fields: [currency_id], references: [id])
+  last_updated DateTime  @default(now())
   last_trade_date DateTime? // Last trade that affected this holding
   is_active       Boolean   @default(true)
   notes           String?
@@ -206,6 +207,7 @@ model holding {
 
   // Unique constraint ensures one holding per instrument per account
   @@unique([instrument_id, account_id])
+  @@index([currency_id])
   @@map("holding")
 }
 
@@ -253,6 +255,7 @@ model currency {
   itemMasters     item_master[]
   orgs            org[]
   accounts        account[]
+  holdings        holding[]
 
   @@map("currency")
 }
