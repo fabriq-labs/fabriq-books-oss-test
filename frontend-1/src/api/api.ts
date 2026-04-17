@@ -591,6 +591,31 @@ export const userAPI = {
       method: "POST",
       body: JSON.stringify({}),
     }),
+
+  /** Change password (local auth only). Caller handles errors (no global fetchAPI toast). */
+  changePassword: async (params: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ success: boolean }> => {
+    const url = `${API_URL}/api/auth/change-password`;
+    const token = Cookies.get("__session");
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token || ""}`,
+      },
+      body: JSON.stringify(params),
+    });
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+    };
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "Failed to change password");
+    }
+    return data as { success: boolean };
+  },
 };
 
 export const invoiceAPI = {

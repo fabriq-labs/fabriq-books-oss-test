@@ -43,7 +43,7 @@ authRouter.post('/login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
+      {
         sub: user.external_id,  // Use email as external ID for database lookup
         email: user.email,
         name: user.name,
@@ -103,7 +103,7 @@ authRouter.post('/register', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
+      {
         sub: user.id,
         email: user.email
       },
@@ -126,28 +126,28 @@ authRouter.post('/register', async (req, res) => {
   }
 });
 
-  // Development-only token generation endpoint
-  if (process.env.NODE_ENV !== 'production') {
-    authRouter.post('/generate-token', (req, res) => {
-      try {
-        const { userId } = req.body;
-        if (!userId) {
-          return res.status(400).json({ error: 'User ID is required' });
-        }
-
-        const token = jwt.sign(
-          { id: userId },
-          process.env.JWT_SECRET || 'test-secret-key',
-          { expiresIn: '365d' }
-        );
-
-        res.json({ token });
-      } catch (error) {
-        logger.error('Token generation error:', error);
-        res.status(500).json({ error: 'Failed to generate token' });
+// Development-only token generation endpoint
+if (process.env.NODE_ENV !== 'production') {
+  authRouter.post('/generate-token', (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
       }
-    });
-  }
+
+      const token = jwt.sign(
+        { id: userId },
+        process.env.JWT_SECRET || 'test-secret-key',
+        { expiresIn: '365d' }
+      );
+
+      res.json({ token });
+    } catch (error) {
+      logger.error('Token generation error:', error);
+      res.status(500).json({ error: 'Failed to generate token' });
+    }
+  });
+}
 
 /** Generate, persist (bcrypt hash), and return plaintext once for X-API-Key auth. */
 async function handleGenerateApiKey(req: Request, res: Response) {
@@ -194,7 +194,55 @@ async function handleGenerateApiKey(req: Request, res: Response) {
 
 authRouter.post('/generate-api-key', handleGenerateApiKey);
 
+/** Local-password users only: verify current password, set new hash. */
+async function handleChangePassword(req: Request, res: Response) {
+  try {
+    const auth = (req as any).context?.auth;
+    if (!auth?.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: auth.user.id },
+      select: { id: true, password: true, auth_provider: true },
+    });
+
+    if (!dbUser?.password) {
+      return res.status(400).json({ error: 'Password change is not available for this account' });
+    }
+
+    const provider = (dbUser.auth_provider || 'local').toLowerCase();
+    if (provider !== 'local' && provider !== 'internal') {
+      return res.status(400).json({ error: 'Password change is not available for this account' });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, dbUser.password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: dbUser.id },
+      data: { password: hashed },
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    logger.error('Change password error', { error });
+    return res.status(500).json({ error: 'Failed to change password' });
+  }
+}
+
+authRouter.post('/change-password', handleChangePassword);
 // Apply error handler
 authRouter.use(errorHandler);
-
 export default authRouter; 

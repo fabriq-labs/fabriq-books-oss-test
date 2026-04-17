@@ -465,6 +465,7 @@ export const setupRestRoutes = (router: Router) => {
   // Auth routes (login/register don't need auth middleware)
   // generate-api-key needs auth, so apply authMiddleware to that path
   router.post('/auth/generate-api-key', authMiddleware);
+  router.post('/auth/change-password', authMiddleware);
   router.use('/auth', authRouter);
 
   return router;

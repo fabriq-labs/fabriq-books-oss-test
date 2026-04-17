@@ -81,4 +81,12 @@ export const hasRole = (user: User | null, roleName: string): boolean => {
         roleUser.role.name &&
         roleUser.role.name.toLowerCase().includes(roleName.toLowerCase())
     );
-}; 
+};
+
+/** Platform super-user (metadata governance, /api/admin, etc.). */
+export const isSuperAdmin = (user: User | null): boolean =>
+    hasRole(user, 'Super Admin');
+
+/** Tenant administrator (org users, connections, etc.). */
+export const isTenantAdmin = (user: User | null): boolean =>
+    hasRole(user, 'Admin') || isSuperAdmin(user);

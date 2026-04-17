@@ -16,6 +16,7 @@ import {
   Truck,
   FileText,
   Bot,
+  Shield,
 } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { NavGroup } from './NavGroup';
@@ -120,25 +121,37 @@ const masterNavItems: MasterNavItem[] = [
   }
 ];
 
+/** Tenant-focused: org directory and integrations (Admin or Super Admin). */
 const settingsNavItems: MasterNavItem[] = [
   {
     icon: Settings,
     label: 'Settings',
-    allowedRoles: ['Super Admin'],
+    allowedRoles: ['Admin', 'Super Admin'],
     subNav: [
       { label: 'Users', path: '/settings/users' },
       { label: 'Employees', path: '/settings/employees' },
-      { label: 'Roles', path: '/settings/roles' },
-      { label: 'Workflow Management', path: '/settings/workflows' },
       { label: 'Connections', path: '/settings/connections' },
+    ],
+  },
+];
+
+/** Platform governance and dev tooling (Super Admin only). */
+const superAdminNavItems: MasterNavItem[] = [
+  {
+    icon: Shield,
+    label: 'Super Admin',
+    allowedRoles: ['Super Admin'],
+    subNav: [
+      { label: 'Workflows', path: '/settings/workflows' },
       { label: 'Views', path: '/settings/views' },
       { label: 'Permissions', path: '/settings/permissions' },
+      { label: 'Roles', path: '/settings/roles' },
       { label: 'AI Templates', path: '/settings/ai-templates' },
       { label: 'LLM Traces', path: '/settings/llm-traces' },
       { label: 'Tenant Onboarding', path: '/settings/tenant-onboarding' },
-      { label: 'Developer options', path: '/settings/dev-options' }
-    ]
-  }
+      { label: 'Developer options', path: '/settings/dev-options' },
+    ],
+  },
 ];
 
 export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ collapsed }) => {
@@ -166,6 +179,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ collapsed 
   const filteredTopLevelNavItems = filterNavItems(topLevelNavItems);
   const filteredMasterNavItems = filterNavItems(masterNavItems);
   const filteredSettingsNavItems = filterNavItems(settingsNavItems);
+  const filteredSuperAdminNavItems = filterNavItems(superAdminNavItems);
 
   return (
     <>
@@ -210,7 +224,23 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ collapsed 
         ))}
       </NavGroup>
 
-      {/* Settings */}
+      {/* Super Admin — hidden when user has no Super Admin role */}
+      {filteredSuperAdminNavItems.length > 0 ? (
+        <div className="space-y-1 mt-4">
+          {filteredSuperAdminNavItems.map(({ icon, label, subNav }) => (
+            <NavItem
+              key={label}
+              icon={icon}
+              label={label}
+              collapsed={collapsed}
+              subNav={subNav}
+              active={isActive(undefined, subNav)}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {/* Settings (tenant) */}
       <div className="space-y-1 mt-4">
         {filteredSettingsNavItems?.map(({ icon, label, subNav }) => (
           <NavItem

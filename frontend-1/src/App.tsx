@@ -125,7 +125,12 @@ const AppRoutes: React.FC = () => {
   // const { getUserRole } = useUserData();
   // console.log(getUserRole);
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <AuthProvider>
         <ReportControllerProvider>
           <div className="font-lato">
@@ -304,41 +309,115 @@ const AppRoutes: React.FC = () => {
                 <Route path="employee_master/:id/view/:viewId" element={<EmployeeMasterForm />} />
                 <Route path="employee_master/view/:viewId" element={<EmployeeMasterForm />} />
 
-                <Route path="settings/roles" element={<Master type="role" view="role_view" displayName="Roles" />} />
-                <Route path="role/:id/view/:viewId" element={<UserRolesForm />} />
-                <Route path="role/view/:viewId" element={<UserRolesForm />} />
+                <Route path="settings/roles" element={
+                  <SuperAdminGuard>
+                    <Master type="role" view="role_view" displayName="Roles" />
+                  </SuperAdminGuard>
+                } />
+                <Route path="role/:id/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <UserRolesForm />
+                  </SuperAdminGuard>
+                } />
+                <Route path="role/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <UserRolesForm />
+                  </SuperAdminGuard>
+                } />
 
-                <Route path="settings/workflows" element={<WorkflowManagementPage />} />
-                <Route path="settings/workflows/:flowId" element={<WorkflowDetailPage />} />
+                <Route path="settings/workflows" element={
+                  <SuperAdminGuard>
+                    <WorkflowManagementPage />
+                  </SuperAdminGuard>
+                } />
+                <Route path="settings/workflows/:flowId" element={
+                  <SuperAdminGuard>
+                    <WorkflowDetailPage />
+                  </SuperAdminGuard>
+                } />
                 <Route path="settings/connections" element={<ConnectionsPage />} />
                 <Route path="settings/connections/new" element={<CreateConnectionPage />} />
                 <Route path="settings/connections/new/:systemType" element={<CreateConnectionPage />} />
                 <Route path="settings/connections/:id" element={<ConnectionDetailPage />} />
-                <Route path="settings/views" element={<Master type="view" view="view" displayName="Views" defaultSortOption={{ field: 'model_name', direction: 'asc' }} />} />
-                <Route path="view/:id/view/:viewId" element={<ViewForm />} />
-                <Route path="view/view/:viewId" element={<ViewForm />} />
+                <Route path="settings/views" element={
+                  <SuperAdminGuard>
+                    <Master type="view" view="view" displayName="Views" defaultSortOption={{ field: 'model_name', direction: 'asc' }} />
+                  </SuperAdminGuard>
+                } />
+                <Route path="view/:id/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <ViewForm />
+                  </SuperAdminGuard>
+                } />
+                <Route path="view/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <ViewForm />
+                  </SuperAdminGuard>
+                } />
 
-                <Route path="settings/permissions" element={<Master type="permission" view="permission_view" displayName="Permissions" />} />
-                <Route path="permission/:id/view/:viewId" element={<PermissionForm />} />
-                <Route path="permission/view/:viewId" element={<PermissionForm />} />
+                <Route path="settings/permissions" element={
+                  <SuperAdminGuard>
+                    <Master type="permission" view="permission_view" displayName="Permissions" />
+                  </SuperAdminGuard>
+                } />
+                <Route path="permission/:id/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <PermissionForm />
+                  </SuperAdminGuard>
+                } />
+                <Route path="permission/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <PermissionForm />
+                  </SuperAdminGuard>
+                } />
 
-                <Route path="settings/ai-templates" element={<AITemplatesPage />} />
-                <Route path="settings/prompt-templates" element={<AITemplatesPage />} />
-                <Route path="prompt_template/:id/view/:viewId" element={<PromptTemplateForm />} />
-                <Route path="prompt_template/view/:viewId" element={<PromptTemplateForm />} />
-                <Route path="settings/agent-templates/new" element={<AgentTemplateForm />} />
-                <Route path="settings/agent-templates/:id/edit" element={<AgentTemplateForm />} />
+                <Route path="settings/ai-templates" element={
+                  <SuperAdminGuard>
+                    <AITemplatesPage />
+                  </SuperAdminGuard>
+                } />
+                <Route path="settings/prompt-templates" element={
+                  <SuperAdminGuard>
+                    <AITemplatesPage />
+                  </SuperAdminGuard>
+                } />
+                <Route path="prompt_template/:id/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <PromptTemplateForm />
+                  </SuperAdminGuard>
+                } />
+                <Route path="prompt_template/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <PromptTemplateForm />
+                  </SuperAdminGuard>
+                } />
+                <Route path="settings/agent-templates/new" element={
+                  <SuperAdminGuard>
+                    <AgentTemplateForm />
+                  </SuperAdminGuard>
+                } />
+                <Route path="settings/agent-templates/:id/edit" element={
+                  <SuperAdminGuard>
+                    <AgentTemplateForm />
+                  </SuperAdminGuard>
+                } />
 
                 <Route path="settings/llm-traces" element={
-                  <Master
-                    type="llm_trace"
-                    view="llm_trace_view"
-                    displayName="LLM Traces"
-                    defaultSortOption={{ field: 'created_at', direction: 'desc' }}
-                    listConfig={{ enableCreate: false }}
-                  />
+                  <SuperAdminGuard>
+                    <Master
+                      type="llm_trace"
+                      view="llm_trace_view"
+                      displayName="LLM Traces"
+                      defaultSortOption={{ field: 'created_at', direction: 'desc' }}
+                      listConfig={{ enableCreate: false }}
+                    />
+                  </SuperAdminGuard>
                 } />
-                <Route path="llm_trace/:id/view/:viewId" element={<LLMTraceDetailPage />} />
+                <Route path="llm_trace/:id/view/:viewId" element={
+                  <SuperAdminGuard>
+                    <LLMTraceDetailPage />
+                  </SuperAdminGuard>
+                } />
 
                 <Route path="settings/tenant-onboarding" element={
                   <SuperAdminGuard>
