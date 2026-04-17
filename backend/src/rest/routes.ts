@@ -14,6 +14,7 @@ import multer from 'multer';
 import { AttachmentController } from './AttachmentController';
 import { AxiosError } from 'axios';
 import { executeSourceSystemSync } from '../services/external-apis';
+import { customActionRegistry } from './customActionRegistry';
 
 export const setupRestRoutes = (router: Router) => {
   const restService = RestService.getInstance();
@@ -130,6 +131,20 @@ export const setupRestRoutes = (router: Router) => {
 
   // Common attachment routes (reassign only; list + download are per-model below)
   router.post('/attachments/reassign', authMiddleware, AttachmentController.reassign.bind(AttachmentController));
+
+  // Custom action dispatch — /:model/custom/:action
+  // Must be registered BEFORE the model loops so Express does not treat "custom" as a
+  // :viewId or :id segment and route to the wrong auto-generated handler.
+  router.all('/:model/custom/:action', authMiddleware, upload.any(), async (req, res) => {
+    const handler = customActionRegistry.resolve(req.params.model, req.params.action);
+    if (!handler) {
+      return res.status(404).json({
+        error: `No custom action registered for: ${req.params.model}/${req.params.action}`,
+        registered: customActionRegistry.list(),
+      });
+    }
+    await handler(req, res);
+  });
 
   // Setup routes for each model which has a view in the path (legacy support)
   models.forEach(model => {
@@ -448,7 +463,7 @@ export const setupRestRoutes = (router: Router) => {
 
   // Add auth routes
   // Auth routes (login/register don't need auth middleware)
-  // generate-api-key needs auth, so apply authMiddleware to that specific path
+  // generate-api-key needs auth, so apply authMiddleware to that path
   router.post('/auth/generate-api-key', authMiddleware);
   router.use('/auth', authRouter);
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Menu, Bell, UserRound, Settings, LogOut, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarLogo } from "./sidebar/SidebarLogo";
+import { MyProfileModal } from "./MyProfileModal";
 
 interface TopBarProps {
   title: string;
@@ -23,6 +24,7 @@ interface TopBarProps {
 }
 
 const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
+  const [profileOpen, setProfileOpen] = useState(false);
   const { logout } = useAuth();
   const { toggleChat } = useChat();
   const {
@@ -118,7 +120,13 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
                 </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+              <DropdownMenuItem
+                className="flex items-center gap-2 cursor-pointer"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setProfileOpen(true);
+                }}
+              >
                 <UserRound className="h-4 w-4" />
                 <span>My Profile</span>
               </DropdownMenuItem>
@@ -138,6 +146,8 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
           </DropdownMenu>
         </div>
       </div>
+
+      <MyProfileModal open={profileOpen} onOpenChange={setProfileOpen} />
     </header>
   );
 };

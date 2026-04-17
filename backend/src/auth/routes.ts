@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
@@ -149,9 +149,8 @@ authRouter.post('/register', async (req, res) => {
     });
   }
 
-// Generate API key for the authenticated user, or for a specific user (admin only).
-// If `email` is provided in the body, generates a key for that user instead.
-authRouter.post('/generate-api-key', async (req, res) => {
+/** Generate, persist (bcrypt hash), and return plaintext once for X-API-Key auth. */
+async function handleGenerateApiKey(req: Request, res: Response) {
   try {
     const auth = (req as any).context?.auth;
     if (!auth?.user?.id) {
@@ -162,7 +161,7 @@ authRouter.post('/generate-api-key', async (req, res) => {
     let targetEmail = auth.user.email;
 
     // If an email is provided, generate key for that user (admin action)
-    if (req.body.email) {
+    if (req.body?.email) {
       const targetUser = await prisma.user.findFirst({
         where: { email: req.body.email },
         select: { id: true, email: true }
@@ -174,19 +173,14 @@ authRouter.post('/generate-api-key', async (req, res) => {
       targetEmail = targetUser.email;
     }
 
-    // Generate a random API key
     const apiKey = crypto.randomBytes(32).toString('hex');
-
-    // Hash it with bcrypt (same pattern as password hashing)
     const hashedKey = await bcrypt.hash(apiKey, 10);
 
-    // Store the hash in the target user's api_key column
     await prisma.user.update({
       where: { id: targetUserId },
       data: { api_key: hashedKey }
     });
 
-    // Return the plaintext key once — user must save it
     res.json({
       api_key: apiKey,
       email: targetEmail,
@@ -196,7 +190,9 @@ authRouter.post('/generate-api-key', async (req, res) => {
     logger.error('API key generation error', { error });
     res.status(500).json({ error: 'Failed to generate API key' });
   }
-});
+}
+
+authRouter.post('/generate-api-key', handleGenerateApiKey);
 
 // Apply error handler
 authRouter.use(errorHandler);

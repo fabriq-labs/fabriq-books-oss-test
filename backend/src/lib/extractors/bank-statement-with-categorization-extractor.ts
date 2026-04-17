@@ -41,13 +41,18 @@ export class BankStatementWithCategorizationExtractor extends BaseDocumentExtrac
 
 === EXTRACTION TASK ===
 Extract the following for each transaction:
-- Transaction name/description (from Transaction Remarks/Description column)
+
+Schema fields (posting model) — use these strictly:
+- description: Put the FULL narrative text from the statement's Description / Details / Transaction remarks / Memo column (whatever the bank labels that column). This is the primary line users see for each row — it must go in \`description\`, not in \`name\`.
+- name: Short display label only — e.g. merchant or payee name, or a brief title derived from the first segment of the description (optional; may be null if the statement only provides one long description line).
+- notes: Extra notes, running text, or secondary lines that are NOT the main Description column (often empty).
+- reference: Transaction reference / cheque / confirmation number if shown.
+
+Also extract:
 - Value date (when transaction occurred)
 - Posting date (when transaction was recorded)
 - Debit amount (from Withdrawal/Debit column - money going OUT of the account, 0 if empty)
 - Credit amount (from Deposit/Credit column - money coming IN to the account, 0 if empty)
-- Notes/description
-- Transaction reference number
 
 IMPORTANT - Column mapping for Indian bank statements:
 - "Withdrawal Amount" or "Debit" column → debit_amount (money leaving the account)
@@ -66,7 +71,12 @@ Also extract basic account context from the statement header:
 - Bank name
 - Statement period (from date, to date)
 - Currency
-- Starting/closing balance`;
+- Starting balance (opening balance)
+- Closing balance (ending balance)
+
+IMPORTANT:
+- Do NOT treat Opening/Starting Balance or Closing/Ending Balance lines as transactions.
+- Never include balance-only rows in the transactions array (they are not postings).`;
   }
 
   getExpectedSchema(): Record<string, any> {
