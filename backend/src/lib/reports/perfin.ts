@@ -77,28 +77,46 @@ export const getIncomeStatement = async (
   orgId: string,
   accountId?: string,
   legalEntityIds?: string[],
-  reportCurrency?: string // ISO code override; if omitted, uses org base_currency
+  reportCurrency?: string // `currency.id` or ISO code; if omitted, uses org base currency
 ): Promise<IncomeStatementRow[]> => {
   // NULL means "use org default"; a value means "use this currency"
   const currencyParam = reportCurrency || null;
   const incomeStatement = await prisma.$queryRaw<IncomeStatementRow[]>`
         WITH RECURSIVE
   org_base AS (
-    SELECT COALESCE(${currencyParam}, o.base_currency, 'INR') as base_currency
+    SELECT
+      COALESCE(c_param.id, c_org.id, c_legacy.id, c_inr.id) AS base_currency_id,
+      COALESCE(c_param.code, c_org.code, c_legacy.code, c_inr.code, NULLIF(TRIM(o.base_currency::text), ''), 'INR') AS base_currency
     FROM organizations o
+    LEFT JOIN currency c_param
+      ON (${currencyParam}::text IS NOT NULL)
+      AND (
+        c_param.id::text = ${currencyParam}::text
+        OR UPPER(TRIM(c_param.code)) = UPPER(TRIM(${currencyParam}::text))
+      )
+    LEFT JOIN currency c_org ON c_org.id = o.basecurrency_id
+    LEFT JOIN currency c_legacy
+      ON c_legacy.org_id = o.id
+      AND o.basecurrency_id IS NULL
+      AND o.base_currency IS NOT NULL
+      AND TRIM(o.base_currency::text) <> ''
+      AND UPPER(TRIM(c_legacy.code)) = UPPER(TRIM(o.base_currency::text))
+    LEFT JOIN currency c_inr ON c_inr.org_id = o.id AND c_inr.code = 'INR'
     WHERE o.id = ${orgId}
   ),
-  -- Most recent AVERAGE rate on or before period end, per foreign currency
+  -- Most recent AVERAGE rate on or before period end, per account currency id (from_currency_id)
   period_avg_rates AS (
-    SELECT DISTINCT ON (er.from_currency)
-      er.from_currency,
+    SELECT DISTINCT ON (er.from_currency_id)
+      er.from_currency_id,
       er.rate
-    FROM exchange_rate er, org_base ob
+    FROM exchange_rate er
+    CROSS JOIN org_base ob
     WHERE er.org_id = ${orgId}
-      AND er.to_currency = ob.base_currency
+      AND ob.base_currency_id IS NOT NULL
+      AND er.to_currency_id = ob.base_currency_id
       AND er.rate_type = 'AVERAGE'
       AND er.effective_date <= ${endDate}::date
-    ORDER BY er.from_currency, er.effective_date DESC
+    ORDER BY er.from_currency_id, er.effective_date DESC
   ),
   account_balances AS (
     SELECT
@@ -147,18 +165,18 @@ export const getIncomeStatement = async (
       ab.*,
       CASE
         WHEN ab.account_currency IS NULL
-          OR ab.account_currency = (SELECT base_currency FROM org_base)
+          OR ab.account_currency = (SELECT base_currency_id FROM org_base)
         THEN 1::numeric
         ELSE COALESCE(par.rate, 1)
       END as period_rate,
       ab.balance * CASE
         WHEN ab.account_currency IS NULL
-          OR ab.account_currency = (SELECT base_currency FROM org_base)
+          OR ab.account_currency = (SELECT base_currency_id FROM org_base)
         THEN 1::numeric
         ELSE COALESCE(par.rate, 1)
       END as converted_balance
     FROM account_balances ab
-    LEFT JOIN period_avg_rates par ON ab.account_currency = par.from_currency
+    LEFT JOIN period_avg_rates par ON ab.account_currency = par.from_currency_id
   ),
   hierarchy_descendants AS (
     SELECT
@@ -229,7 +247,7 @@ export const getTrialBalance = async (
   endDate: string,
   orgId: string,
   accountId?: string,
-  reportCurrency?: string, // ISO code override; if omitted, uses org base_currency
+  reportCurrency?: string, // `currency.id` or ISO code; if omitted, uses org base currency
   legalEntityIds?: string[] // when provided, only include accounts whose legal_entity_id is in this list (excludes NULL)
 ): Promise<TrialBalanceRow[]> => {
 
@@ -243,37 +261,56 @@ export const getTrialBalance = async (
 
   const trialBalance = await prisma.$queryRaw<TrialBalanceRow[]>`
       WITH RECURSIVE
-      -- Resolve reporting currency: explicit param > org base_currency > 'INR'
       org_base AS (
-        SELECT COALESCE(${currencyParam}, o.base_currency, 'INR') as base_currency
+        SELECT
+          COALESCE(c_param.id, c_org.id, c_legacy.id, c_inr.id) AS base_currency_id,
+          COALESCE(c_param.code, c_org.code, c_legacy.code, c_inr.code, NULLIF(TRIM(o.base_currency::text), ''), 'INR') AS base_currency
         FROM organizations o
+        LEFT JOIN currency c_param
+          ON (${currencyParam}::text IS NOT NULL)
+          AND (
+            c_param.id::text = ${currencyParam}::text
+            OR UPPER(TRIM(c_param.code)) = UPPER(TRIM(${currencyParam}::text))
+          )
+        LEFT JOIN currency c_org ON c_org.id = o.basecurrency_id
+        LEFT JOIN currency c_legacy
+          ON c_legacy.org_id = o.id
+          AND o.basecurrency_id IS NULL
+          AND o.base_currency IS NOT NULL
+          AND TRIM(o.base_currency::text) <> ''
+          AND UPPER(TRIM(c_legacy.code)) = UPPER(TRIM(o.base_currency::text))
+        LEFT JOIN currency c_inr ON c_inr.org_id = o.id AND c_inr.code = 'INR'
         WHERE o.id = ${orgId}
       ),
 
-      -- Most recent AVERAGE rate on or before period end, per foreign currency
+      -- Most recent AVERAGE rate on or before period end, keyed by from_currency_id
       period_avg_rates AS (
-        SELECT DISTINCT ON (er.from_currency)
-          er.from_currency,
+        SELECT DISTINCT ON (er.from_currency_id)
+          er.from_currency_id,
           er.rate
-        FROM exchange_rate er, org_base ob
+        FROM exchange_rate er
+        CROSS JOIN org_base ob
         WHERE er.org_id = ${orgId}
-          AND er.to_currency = ob.base_currency
+          AND ob.base_currency_id IS NOT NULL
+          AND er.to_currency_id = ob.base_currency_id
           AND er.rate_type = 'AVERAGE'
           AND er.effective_date <= ${endDate}::date
-        ORDER BY er.from_currency, er.effective_date DESC
+        ORDER BY er.from_currency_id, er.effective_date DESC
       ),
 
       -- Most recent CLOSING rate before the period start (for opening balance)
       opening_close_rates AS (
-        SELECT DISTINCT ON (er.from_currency)
-          er.from_currency,
+        SELECT DISTINCT ON (er.from_currency_id)
+          er.from_currency_id,
           er.rate
-        FROM exchange_rate er, org_base ob
+        FROM exchange_rate er
+        CROSS JOIN org_base ob
         WHERE er.org_id = ${orgId}
-          AND er.to_currency = ob.base_currency
+          AND ob.base_currency_id IS NOT NULL
+          AND er.to_currency_id = ob.base_currency_id
           AND er.rate_type = 'CLOSING'
           AND er.effective_date < ${startDate}::date
-        ORDER BY er.from_currency, er.effective_date DESC
+        ORDER BY er.from_currency_id, er.effective_date DESC
       ),
 
       -- Opening balance from prior-year closing postings (both legs; normal-balance sign per classification)
@@ -355,39 +392,39 @@ export const getTrialBalance = async (
           rb.*,
           CASE
             WHEN rb.account_currency IS NULL
-              OR rb.account_currency = (SELECT base_currency FROM org_base)
+              OR rb.account_currency = (SELECT base_currency_id FROM org_base)
             THEN 1::numeric
             ELSE COALESCE(par.rate, 1)
           END as period_rate,
           CASE
             WHEN rb.account_currency IS NULL
-              OR rb.account_currency = (SELECT base_currency FROM org_base)
+              OR rb.account_currency = (SELECT base_currency_id FROM org_base)
             THEN 1::numeric
             ELSE COALESCE(ocr.rate, 1)
           END as opening_rate,
           rb.total_debits_orig * CASE
             WHEN rb.account_currency IS NULL
-              OR rb.account_currency = (SELECT base_currency FROM org_base)
+              OR rb.account_currency = (SELECT base_currency_id FROM org_base)
             THEN 1::numeric ELSE COALESCE(par.rate, 1)
           END as total_debits,
           rb.total_credits_orig * CASE
             WHEN rb.account_currency IS NULL
-              OR rb.account_currency = (SELECT base_currency FROM org_base)
+              OR rb.account_currency = (SELECT base_currency_id FROM org_base)
             THEN 1::numeric ELSE COALESCE(par.rate, 1)
           END as total_credits,
           rb.balance_orig * CASE
             WHEN rb.account_currency IS NULL
-              OR rb.account_currency = (SELECT base_currency FROM org_base)
+              OR rb.account_currency = (SELECT base_currency_id FROM org_base)
             THEN 1::numeric ELSE COALESCE(par.rate, 1)
           END as balance,
           COALESCE(pyc.opening_balance_orig, 0) * CASE
             WHEN rb.account_currency IS NULL
-              OR rb.account_currency = (SELECT base_currency FROM org_base)
+              OR rb.account_currency = (SELECT base_currency_id FROM org_base)
             THEN 1::numeric ELSE COALESCE(ocr.rate, 1)
           END as opening_balance
         FROM rolled_up_balances rb
-        LEFT JOIN period_avg_rates par ON rb.account_currency = par.from_currency
-        LEFT JOIN opening_close_rates ocr ON rb.account_currency = ocr.from_currency
+        LEFT JOIN period_avg_rates par ON rb.account_currency = par.from_currency_id
+        LEFT JOIN opening_close_rates ocr ON rb.account_currency = ocr.from_currency_id
         LEFT JOIN previous_year_closing pyc ON rb.account_id = pyc.account_id
       ),
 
@@ -445,7 +482,7 @@ export const getTrialBalance = async (
         display_ah.type as account_type,
         display_ah.level,
         display_ah.parent_account_id,
-        COALESCE(cb.account_currency, display_ah.currency) as account_currency,
+        acc_curr.code AS account_currency,
         (SELECT base_currency FROM org_base) as report_currency,
         COALESCE(cb.period_rate, 1) as period_rate,
         COALESCE(cb.opening_rate, 1) as opening_rate,
@@ -460,6 +497,7 @@ export const getTrialBalance = async (
         COALESCE(cb.balance_orig, 0) as balance_orig
       FROM account_hierarchy display_ah
       LEFT JOIN converted_balances cb ON cb.account_id = display_ah.id
+      LEFT JOIN currency acc_curr ON acc_curr.id = COALESCE(cb.account_currency, display_ah.currency)
       LEFT JOIN parent_totals pt ON display_ah.id = pt.id
       LEFT JOIN parent_opening_totals pot ON display_ah.id = pot.id
       WHERE display_ah.org_id = ${orgId}
