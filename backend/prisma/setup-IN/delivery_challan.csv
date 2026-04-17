@@ -1,0 +1,4 @@
+id,challan_number,days_offset,challan_type,sales_order_id,customer_id,location_id,delivery_status,delivery_days_offset,driver_name,vehicle_number,reference_number,total_amount,status,org_id
+dc_demo_001,DC-IN-2024-4401,-55,DELIVERY,so_demo_001,cust_tata_consultancy,loc_tcs_delivery,PARTIALLY_DELIVERED,-54,Rajesh Kumar,MH-01-AB-4521,LR-MUM-778821,170000,DISPATCHED,org_indian_demo
+dc_demo_002,DC-IN-2024-4402,-50,DELIVERY,so_demo_002,cust_infosys,loc_infosys_delivery,DELIVERED,-49,Priya Nair,KA-03-CD-9920,LR-BLR-112903,230000,DELIVERED,org_indian_demo
+dc_demo_003,DC-IN-2024-4403,-46,DELIVERY,so_demo_003,cust_reliance_industries,loc_ril_delivery,DELIVERED,-45,Amit Shah,MH-02-EF-2210,LR-MUM-889014,125000,DELIVERED,org_indian_demo

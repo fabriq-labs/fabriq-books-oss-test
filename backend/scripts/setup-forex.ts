@@ -41,7 +41,7 @@ async function seedCurrencies() {
     await prisma.currency.upsert({
       where: { code: c.code },
       update: { name: c.name, symbol: c.symbol, decimal_places: c.decimal_places },
-      create: c,
+      create: { ...c, org_id: ORG_ID },
     });
   }
   console.log(`   ✓ ${CURRENCIES.length} currencies upserted`);
@@ -63,13 +63,13 @@ async function setOrgBaseCurrency() {
 
 function inferCurrency(accountName: string): string {
   const n = accountName.trim();
-  if (n.endsWith('-PHP') || n.includes('-PHP '))  return 'PHP';
-  if (n.includes('(PH)'))                          return 'PHP';
-  if (n.endsWith('-PPM') || n.includes('-PPM '))   return 'USD';
-  if (n.includes('(US)'))                           return 'USD';
+  if (n.endsWith('-PHP') || n.includes('-PHP ')) return 'PHP';
+  if (n.includes('(PH)')) return 'PHP';
+  if (n.endsWith('-PPM') || n.includes('-PPM ')) return 'USD';
+  if (n.includes('(US)')) return 'USD';
   if (n.endsWith('-KI USD') || n.includes('-KI USD ')) return 'USD';
-  if (n.includes('(India)'))                        return 'INR';
-  if (n.endsWith('-INR') || n.includes('-INR '))   return 'INR';
+  if (n.includes('(India)')) return 'INR';
+  if (n.endsWith('-INR') || n.includes('-INR ')) return 'INR';
   if (n.endsWith('-KI INR') || n.includes('-KI INR ')) return 'INR';
   return BASE_CURRENCY;
 }
@@ -194,12 +194,22 @@ async function seedExchangeRates() {
         ['AVERAGE', m.average],
       ] as const) {
         await prisma.$executeRawUnsafe(
-          `INSERT INTO exchange_rate (id, org_id, from_currency, to_currency, effective_date, rate, rate_type, source, created_at, modified_at)
-           VALUES (
+          `INSERT INTO exchange_rate (id, org_id, from_currency_id, to_currency_id, effective_date, rate, rate_type, source, created_at, modified_at)
+           SELECT
              'exrt_' || gen_random_uuid(),
-             $1, $2, $3, $4::date, $5, $6::exchange_rate_type, 'seed', NOW(), NOW()
-           )
-           ON CONFLICT (org_id, from_currency, to_currency, effective_date, rate_type)
+             $1,
+             cf.id,
+             ct.id,
+             $4::date,
+             $5,
+             $6::exchange_rate_type,
+             'seed',
+             NOW(),
+             NOW()
+           FROM currency cf
+           JOIN currency ct ON ct.code = $3
+           WHERE cf.code = $2
+           ON CONFLICT (org_id, from_currency_id, to_currency_id, effective_date, rate_type)
            DO UPDATE SET rate = EXCLUDED.rate, modified_at = NOW()`,
           ORG_ID,
           pair.from,
@@ -283,7 +293,12 @@ async function main() {
   for (const r of currDist) console.log(`  ${r.currency || '(null)'}: ${r.cnt}`);
 
   const rateCnt: any[] = await prisma.$queryRawUnsafe(
-    `SELECT from_currency, rate_type, COUNT(*)::int as cnt FROM exchange_rate WHERE org_id = $1 GROUP BY from_currency, rate_type ORDER BY 1, 2`,
+    `SELECT cf.code AS from_currency, er.rate_type, COUNT(*)::int AS cnt
+     FROM exchange_rate er
+     JOIN currency cf ON cf.id = er.from_currency_id
+     WHERE er.org_id = $1
+     GROUP BY cf.code, er.rate_type
+     ORDER BY 1, 2`,
     ORG_ID,
   );
   console.log('Exchange rates loaded:');

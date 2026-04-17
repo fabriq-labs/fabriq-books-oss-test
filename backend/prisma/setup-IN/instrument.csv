@@ -1,0 +1,6 @@
+id,org_id,symbol,name,type,isin,details_json
+inst_demo_reliance,org_indian_demo,RELIANCE,Reliance Industries Ltd,STOCK,INE002A01018,{}
+inst_demo_infosys,org_indian_demo,INFY,Infosys Ltd,STOCK,INE009A01021,{}
+inst_demo_sbin,org_indian_demo,SBIN,State Bank of India,STOCK,INE062A01020,{}
+inst_demo_niftybees,org_indian_demo,NIFTYBEES,Nippon India ETF Nifty Bees,ETF,INF204K014E5,{}
+inst_demo_licmf,org_indian_demo,LICMFGOLD,LIC MF Gold ETF,ETF,INF767K01CX8,{}

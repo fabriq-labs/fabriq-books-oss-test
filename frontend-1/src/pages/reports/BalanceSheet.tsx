@@ -55,8 +55,9 @@ type LegalEntityOption = {
   legal_name?: string;
   name?: string | null;
   is_it_headquartres?: string | null;
+  basecurrency_id?: string | null;
   /** From `entity.basecurrency_id` → `currency` (see `entity_view` data graph). */
-  currency?: { code?: string | null } | null;
+  currency?: { id?: string | null; code?: string | null } | null;
 };
 
 /** ISO 4217 code from the entity’s linked `currency` row (`basecurrency_id`). */
@@ -78,15 +79,30 @@ function resolveHeadquartersBaseCurrency(list: LegalEntityOption[]): string {
   return resolveEntityBaseCurrencyCode(hq) ?? "INR";
 }
 
+/** `currency.id` for HQ (or first) entity’s base currency — for `filters.currency_id` on default load. */
+function resolveHeadquartersBaseCurrencyId(list: LegalEntityOption[]): string {
+  const hq = list.find(isHeadquartersEntity) ?? list[0];
+  if (!hq) return "";
+  const fromNested = hq.currency?.id?.trim();
+  if (fromNested) return fromNested;
+  const fk = hq.basecurrency_id?.trim();
+  if (fk) return fk;
+  return "";
+}
+
 const useTrialBalance = ({
   dateRange,
   view,
-  currency,
+  currencyId,
+  currencyCode,
   legalEntityIds,
 }: {
   dateRange?: [dayjs.Dayjs, dayjs.Dayjs];
   view: string;
-  currency: string;
+  /** `currency.id` — explicit pick or HQ default; sent as `filters.currency_id` when non-empty. */
+  currencyId: string;
+  /** ISO reporting code — always sent as `filters.currency` (display + fallback for backend). */
+  currencyCode: string;
   legalEntityIds: string[];
 }) => {
   const [loading, setLoading] = useState(false);
@@ -107,8 +123,9 @@ const useTrialBalance = ({
         if (account) {
           filters.account_id = account?.id;
         }
-
-        filters.currency = currency || "INR";
+        if (currencyId.trim()) {
+          filters.currency_id = currencyId.trim();
+        }
 
         if (legalEntityIds.length > 0) {
           filters.legal_entity_ids = legalEntityIds;
@@ -140,7 +157,7 @@ const useTrialBalance = ({
         setError(err instanceof Error ? err.message : "An error occurred");
         toast({
           title: "Error",
-          description: "Failed to load trial balance data",
+          description: "Failed to load balance sheet data",
           variant: "destructive",
         });
       } finally {
@@ -149,7 +166,7 @@ const useTrialBalance = ({
         }
       }
     },
-    [dateRange, view, currency, legalEntityIds]
+    [dateRange, view, currencyId, currencyCode, legalEntityIds]
   );
 
   useEffect(() => {
@@ -182,7 +199,7 @@ export default function BalanceSheet() {
   const [view, setView] = useState("Summary");
   const [showOnlyNonZero, setShowOnlyNonZero] = useState(true);
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
-  const [currency, setCurrency] = useState("");
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState("");
   const [currencies, setCurrencies] = useState<CurrencyListRow[]>([]);
   const [currenciesLoading, setCurrenciesLoading] = useState(false);
   const [legalEntityOptions, setLegalEntityOptions] = useState<LegalEntityOption[]>([]);
@@ -192,18 +209,37 @@ export default function BalanceSheet() {
   // Use report controller context
   const { dateRange } = useReportController();
 
-  /** ISO code sent to trial_balance report and used for formatting. */
+  /** ISO code for `formatCurrency` / PDF; from selected `currency.id` row or HQ org default. */
   const reportCurrencyCode = useMemo(() => {
-    if (currency.trim()) return currency.trim().toUpperCase();
+    if (selectedCurrencyId.trim()) {
+      const row = currencies.find((c) => c.id === selectedCurrencyId.trim());
+      const code = row?.code?.trim().toUpperCase();
+      if (code) return code;
+    }
     return resolveHeadquartersBaseCurrency(legalEntityOptions);
-  }, [currency, legalEntityOptions]);
+  }, [selectedCurrencyId, currencies, legalEntityOptions]);
 
   const displayCurrencyCode = reportCurrencyCode;
+
+  /** HQ / first entity base `currency.id` or FK; used when user leaves “Org default” so API gets `currency_id`. */
+  const defaultReportingCurrencyId = useMemo(() => {
+    const fromEntity = resolveHeadquartersBaseCurrencyId(legalEntityOptions);
+    if (fromEntity) return fromEntity;
+    const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
+    const row = currencies.find((c) => c.code.toUpperCase() === code.toUpperCase());
+    return row?.id ?? "";
+  }, [legalEntityOptions, currencies]);
+
+  const effectiveReportCurrencyId = useMemo(
+    () => selectedCurrencyId.trim() || defaultReportingCurrencyId,
+    [selectedCurrencyId, defaultReportingCurrencyId],
+  );
 
   const { data, loading, error, fetchTrialBalance } = useTrialBalance({
     dateRange,
     view,
-    currency: reportCurrencyCode,
+    currencyId: effectiveReportCurrencyId,
+    currencyCode: reportCurrencyCode,
     legalEntityIds: selectedLegalEntityIds,
   });
 
@@ -288,11 +324,10 @@ export default function BalanceSheet() {
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [currencies]);
 
-  const currencyCodeInList = useMemo(() => {
-    if (!currency.trim()) return true;
-    const u = currency.trim().toUpperCase();
-    return sortedActiveCurrencies.some((c) => c.code.toUpperCase() === u);
-  }, [sortedActiveCurrencies, currency]);
+  const selectedCurrencyInMasterList = useMemo(() => {
+    if (!selectedCurrencyId.trim()) return true;
+    return sortedActiveCurrencies.some((c) => c.id === selectedCurrencyId.trim());
+  }, [sortedActiveCurrencies, selectedCurrencyId]);
 
   const orgDefaultLabel = useMemo(() => {
     const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
@@ -416,10 +451,10 @@ export default function BalanceSheet() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `trial-balance-${fromDate}-to-${toDate}.pdf`;
+      link.download = `balance-sheet-${fromDate}-to-${toDate}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
-      toast({ title: "PDF exported", description: "Trial balance has been downloaded." });
+      toast({ title: "PDF exported", description: "Balance sheet has been downloaded." });
     } catch (err) {
       console.error(err);
       toast({
@@ -510,7 +545,7 @@ export default function BalanceSheet() {
         <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
         <div className="absolute inset-0 rounded-full border-2 border-blue-200"></div>
       </div>
-      <p className="text-slate-600 mt-3 font-medium text-sm">Loading trial balance data...</p>
+      <p className="text-slate-600 mt-3 font-medium text-sm">Loading balance sheet data...</p>
       <p className="text-xs text-slate-500 mt-1">Please wait while we fetch your financial data</p>
     </div>
   );
@@ -519,7 +554,7 @@ export default function BalanceSheet() {
     if (reportLoading) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="text-center">
+          <TableCell colSpan={4} className="text-center">
             <LoadingContent />
           </TableCell>
         </TableRow>
@@ -557,7 +592,7 @@ export default function BalanceSheet() {
     if (group.items.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="text-center py-4">
+          <TableCell colSpan={4} className="text-center py-4">
             <div className="flex flex-col items-center justify-center">
               <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center mb-1">
                 <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
@@ -715,9 +750,9 @@ export default function BalanceSheet() {
                     </PopoverContent>
                   </Popover>
                   <Select
-                    value={currency ? currency : "__default__"}
+                    value={selectedCurrencyId ? selectedCurrencyId : "__default__"}
                     onValueChange={(v) => {
-                      setCurrency(v === "__default__" ? "" : v);
+                      setSelectedCurrencyId(v === "__default__" ? "" : v);
                     }}
                     disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
                   >
@@ -733,14 +768,14 @@ export default function BalanceSheet() {
                         const code = row.code.toUpperCase();
                         const label = row.name ? `${code} — ${row.name}` : code;
                         return (
-                          <SelectItem key={row.id || code} value={code}>
+                          <SelectItem key={row.id || code} value={row.id}>
                             {label}
                           </SelectItem>
                         );
                       })}
-                      {currency && !currencyCodeInList && (
-                        <SelectItem value={currency.trim().toUpperCase()}>
-                          {currency.trim().toUpperCase()} (not in master list)
+                      {selectedCurrencyId && !selectedCurrencyInMasterList && (
+                        <SelectItem value={selectedCurrencyId}>
+                          {reportCurrencyCode} (id)
                         </SelectItem>
                       )}
                     </SelectContent>

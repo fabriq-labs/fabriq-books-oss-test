@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { isBuyer, isFinanceTeam, getUserRoles, hasRole } from '@/utils/roleUtils';
+import { isBuyer, isFinanceTeam, getUserRoles, hasRole, isSuperAdmin, isTenantAdmin } from '@/utils/roleUtils';
 
 /**
  * Hook to access user role utilities
@@ -20,6 +20,10 @@ export const useUserRoles = () => {
 
         // Check if current user has a specific role
         hasRole: (roleName: string) => hasRole(user, roleName),
+
+        isSuperAdmin: () => isSuperAdmin(user),
+
+        isTenantAdmin: () => isTenantAdmin(user),
 
         // Get the user object (for advanced usage)
         user

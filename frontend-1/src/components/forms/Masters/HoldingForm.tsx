@@ -43,7 +43,7 @@ const itemMasterSchema = z.object({
         (value) => !value || !isNaN(parseFloat(value)),
         { message: 'Realized P&L must be a valid number' }
     ),
-    currency: z.string().optional(),
+    currency_id: z.string().optional(),
     is_active: z.boolean().optional(),
     notes: z.string().optional(),
     tags: z.string().optional(),
@@ -76,7 +76,7 @@ export const HoldingForm: React.FC<ItemMasterFormProps> = ({
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const { latestFormToolResponse } = useTool();
-    
+
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
         defaultValues: initialValues || {
@@ -88,7 +88,7 @@ export const HoldingForm: React.FC<ItemMasterFormProps> = ({
             market_value: '',
             unrealized_pnl: '',
             realized_pnl: '',
-            currency: 'USD',
+            currency_id: 'USD',
             is_active: true,
             notes: '',
             tags: '',
@@ -119,7 +119,7 @@ export const HoldingForm: React.FC<ItemMasterFormProps> = ({
                         market_value: toolResultData.market_value?.toString() || '',
                         unrealized_pnl: toolResultData.unrealized_pnl?.toString() || '',
                         realized_pnl: toolResultData.realized_pnl?.toString() || '',
-                        currency: toolResultData.currency || 'USD',
+                        currency_id: toolResultData.currency_id || 'USD',
                         is_active: toolResultData.is_active ?? true,
                         notes: toolResultData.notes || '',
                         tags: toolResultData.tags?.join(', ') || '',
@@ -143,7 +143,7 @@ export const HoldingForm: React.FC<ItemMasterFormProps> = ({
                     market_value: res.data.market_value?.toString() || '',
                     unrealized_pnl: res.data.unrealized_pnl?.toString() || '',
                     realized_pnl: res.data.realized_pnl?.toString() || '',
-                    currency: res.data.currency || 'USD',
+                    currency_id: res.data.currency_id || 'USD',
                     is_active: res.data.is_active ?? true,
                     notes: res.data.notes || '',
                     tags: res.data.tags?.join(', ') || '',
@@ -210,7 +210,7 @@ export const HoldingForm: React.FC<ItemMasterFormProps> = ({
                 market_value: data.market_value ? parseFloat(data.market_value) : null,
                 unrealized_pnl: data.unrealized_pnl ? parseFloat(data.unrealized_pnl) : null,
                 realized_pnl: data.realized_pnl ? parseFloat(data.realized_pnl) : null,
-                currency: data.currency || 'USD',
+                currency_id: data.currency_id || 'USD',
                 is_active: data.is_active ?? true,
                 notes: data.notes || null,
                 tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [],
@@ -488,17 +488,24 @@ export const HoldingForm: React.FC<ItemMasterFormProps> = ({
 
                                     <FormField
                                         control={form.control}
-                                        name="currency"
+                                        name="currency_id"
                                         render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Currency</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        type="text"
-                                                        placeholder="Enter Currency (e.g., USD)"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
+                                                <SearchDropDown
+                                                    instanceType="currency"
+                                                    instanceSourceKey="currency_id"
+                                                    instanceKey="id"
+                                                    instanceLabel="code"
+                                                    instanceValue={
+                                                        initialValues?.currency
+                                                    }
+                                                    onSelectItem={onhandleSelectChange}
+                                                    onClear={handleSelectClear}
+                                                    limit="10"
+                                                    searchParams="code"
+                                                    type="holding"
+                                                />
                                                 <FormMessage />
                                             </FormItem>
                                         )}

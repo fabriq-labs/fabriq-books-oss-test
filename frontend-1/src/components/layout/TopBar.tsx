@@ -1,10 +1,13 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Menu, Bell, UserRound, Settings, LogOut, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserData } from '@/hooks/useUserData';
+import { useUserRoles } from '@/hooks/useUserRoles';
 import { useChat } from '@/contexts/ChatContext';
 import { User } from '@/models/User';
 import {
@@ -25,7 +28,9 @@ interface TopBarProps {
 
 const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
   const [profileOpen, setProfileOpen] = useState(false);
+  const navigate = useNavigate();
   const { logout } = useAuth();
+  const { isTenantAdmin } = useUserRoles();
   const { toggleChat } = useChat();
   const {
     user,
@@ -130,9 +135,18 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
                 <UserRound className="h-4 w-4" />
                 <span>My Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
+              <DropdownMenuItem
+                className="flex items-center gap-2 cursor-pointer"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  if (!isTenantAdmin()) {
+                    toast.error("You do not have access to organization settings.");
+                    return;
+                  }
+                  navigate("/settings/connections");
+                }}
+              >
+
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

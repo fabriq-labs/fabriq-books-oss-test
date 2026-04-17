@@ -12,20 +12,22 @@ interface SuperAdminGuardProps {
  * Otherwise redirects to dashboard (and shows loading while checking).
  */
 export function SuperAdminGuard({ children }: SuperAdminGuardProps) {
-  const { hasRole, user } = useUserRoles();
+  const { user, isSuperAdmin } = useUserRoles();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
-    if (!hasRole("Super Admin")) {
+    if (!isSuperAdmin()) {
       navigate("/", { replace: true });
     }
-  }, [user, hasRole, navigate]);
+    // isSuperAdmin reads latest `user` from hook; avoid unstable function ref in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, navigate]);
 
   if (!user) {
     return <Loading message="Loading..." />;
   }
-  if (!hasRole("Super Admin")) {
+  if (!isSuperAdmin()) {
     return <Loading message="Redirecting..." />;
   }
   return <>{children}</>;

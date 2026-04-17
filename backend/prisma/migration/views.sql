@@ -357,7 +357,7 @@ AS WITH RECURSIVE hierarchy AS (
             account.name::character varying(1000) AS path,
             0 AS level,
             account.org_id,
-            account.currency,
+            account.base_currency_id AS currency,
             account.legal_entity_id
            FROM account
           WHERE account.parent_account_id = ''::text OR account.parent_account_id IS NULL
@@ -371,7 +371,7 @@ AS WITH RECURSIVE hierarchy AS (
             (((ah.path::text || ' -> '::text) || a.name))::character varying(1000) AS "varchar",
             ah.level + 1,
             a.org_id,
-            a.currency,
+            a.base_currency_id AS currency,
             a.legal_entity_id
            FROM account a
              JOIN hierarchy ah ON a.parent_account_id = ah.id::text

@@ -38,6 +38,17 @@ async function setupChartOfAccounts(orgId: string, legalEntityId: string, templa
 
   console.log(`   Template loaded: ${templateData.length} top-level accounts`);
 
+  // FK uses currency.id; `code` is unique on currency (ISO 4217).
+  const currencyCode = currency.trim().toUpperCase();
+  const resolvedCurrency = await prisma.currency.findUnique({
+    where: { code: currencyCode }
+  });
+  if (!resolvedCurrency) {
+    console.warn(
+      `   ⚠ No currency row with code ${currencyCode}; accounts will be created without base_currency_id`
+    );
+  }
+
   // Track created accounts for parent-child relationships
   const createdAccounts: Map<string, CreatedAccount> = new Map();
 
@@ -86,7 +97,7 @@ async function setupChartOfAccounts(orgId: string, legalEntityId: string, templa
         parent_account_id: parentId,
         org_id: orgId,
         legal_entity_id: legalEntityId,
-        currency,
+        base_currency_id: resolvedCurrency?.id ?? null,
         is_active: true,
         created_at: new Date(),
         modified_at: new Date()

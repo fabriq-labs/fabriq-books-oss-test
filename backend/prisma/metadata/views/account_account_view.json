@@ -40,12 +40,6 @@
       "displayName": "Balance",
       "isColumnShow": true
     },
-    "currency": {
-      "dataType": "string",
-      "permission": "update",
-      "displayName": "Currency",
-      "isColumnShow": true
-    },
     "frequency": {
       "dataType": "string",
       "permission": "update",
@@ -71,6 +65,17 @@
       },
       "dataType": "table",
       "displayName": "Legal Entity",
+      "isColumnShow": false
+    },
+    "currency": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "update",
+        "symbol": "update"
+      },
+      "dataType": "table",
+      "displayName": "Currency",
       "isColumnShow": false
     },
     "hq_account_id": {
@@ -138,6 +143,30 @@
         "defaultValue": ""
       },
       "displayName": "Legal Entity",
+      "isColumnShow": true
+    },
+    "base_currency_id": {
+      "dataType": "string",
+      "required": false,
+      "listProps": {
+        "type": "text",
+        "recordPath": "currency.code"
+      },
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "currency",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
+          "instanceSourceKey": "base_currency_id"
+        },
+        "defaultValue": ""
+      },
+      "displayName": "Currency",
       "isColumnShow": true
     },
     "parent_account_id": {

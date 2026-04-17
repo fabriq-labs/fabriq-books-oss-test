@@ -5,3 +5,4 @@ payr_demo_003,REC-DEMO-003,cust_reliance_industries,inv_demo_004,120000,FULL,INV
 payr_demo_004,REC-DEMO-004,cust_hdfc_bank,inv_demo_005,30000,PARTIAL,INV-005,-30,org_indian_demo,cur_iso_INR
 payr_demo_005,REC-DEMO-005,cust_wipro,inv_demo_008,90000,FULL,INV-008,-20,org_indian_demo,cur_iso_INR
 payr_demo_006,REC-DEMO-006,cust_wipro,,25000,ADVANCE,,-5,org_indian_demo,cur_iso_INR
+payr_demo_007,REC-DEMO-007,cust_wipro,inv_demo_003,25000,PARTIAL,NEFT-WIPRO-INV003-1,-52,org_indian_demo,cur_iso_INR

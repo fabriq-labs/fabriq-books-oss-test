@@ -30,6 +30,21 @@ async function setupIndianDemoData() {
   console.log('');
 
   try {
+    const indianDemoSeedRowCounts = {
+      salesOrders: 0,
+      salesOrderItems: 0,
+      quotes: 0,
+      quoteItems: 0,
+      deliveryChallans: 0,
+      deliveryChallanItems: 0,
+      creditNotes: 0,
+      creditNoteItems: 0,
+      exchangeRates: 0,
+      instruments: 0,
+      holdings: 0,
+      trades: 0,
+    };
+
     // ===== 1. LOAD AND INSERT ORG DATA =====
     console.log('🏢 Loading organization data...');
     const orgData = await loadCsvData(path.join(__dirname, 'org.csv'));
@@ -630,6 +645,442 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Business units: ${businessUnitData.length}, Departments: ${departmentData.length}`);
 
+    // ===== 8.55. SALES PIPELINE (SO, QUOTE, DC, CREDIT NOTE), FX, INVESTMENTS =====
+    const baseTxnDate = new Date();
+    baseTxnDate.setMonth(baseTxnDate.getMonth() - 2);
+    const dateWithOffset = (daysOffset: number) => {
+      const d = new Date(baseTxnDate);
+      d.setDate(d.getDate() + daysOffset);
+      return d;
+    };
+    const csvStr = (v?: string) => (v != null && String(v).trim() !== '' ? String(v).trim() : '');
+    const csvOpt = (v?: string) => {
+      const s = csvStr(v);
+      return s === '' || s === 'null' || s === 'undefined' ? null : s;
+    };
+    const parseTags = (v?: string) => {
+      const s = csvStr(v);
+      if (!s) return [] as string[];
+      return s.split('|').map((t) => t.trim()).filter(Boolean);
+    };
+
+    const accountIdByCoaCode = async (code: string) => {
+      const acc = await prisma.account.findFirst({
+        where: { org_id: 'org_indian_demo', legal_entity_id: 'org_indian_demo', code },
+      });
+      if (!acc) {
+        throw new Error(`Indian demo: COA account code "${code}" not found for org org_indian_demo`);
+      }
+      return acc.id;
+    };
+
+    const currencyIdByOrgAndCode = async (orgId: string, isoCode: string) => {
+      const code = isoCode.toUpperCase();
+      const cur = await prisma.currency.findFirst({
+        where: { org_id: orgId, code },
+      });
+      if (!cur) {
+        throw new Error(`Indian demo: currency code "${code}" not found for org ${orgId}`);
+      }
+      return cur.id;
+    };
+
+    /** exchange_rate.csv: use public.currency.id (e.g. cur_iso_USD); ISO code fallback for legacy rows */
+    const exchangeRateCurrencyId = async (orgId: string, cell: string | undefined) => {
+      const raw = csvStr(cell ?? '');
+      if (!raw) {
+        throw new Error(`Indian demo: exchange_rate row missing currency id/code for org ${orgId}`);
+      }
+      const byIdOrg = await prisma.currency.findFirst({
+        where: { id: raw, org_id: orgId },
+      });
+      if (byIdOrg) return byIdOrg.id;
+      const byId = await prisma.currency.findUnique({ where: { id: raw } });
+      if (byId) return byId.id;
+      return currencyIdByOrgAndCode(orgId, raw);
+    };
+
+    console.log('🧾 Loading sales orders and line items from CSV...');
+    const salesOrderRows = await loadCsvData(path.join(__dirname, 'sales_order.csv'));
+    for (const row of salesOrderRows) {
+      const soDate = dateWithOffset(parseInt(row.days_offset, 10) || 0);
+      await prisma.sales_order.upsert({
+        where: { id: row.id },
+        update: {
+          so_number: row.so_number || null,
+          so_date: soDate,
+          customer_id: csvOpt(row.customer_id),
+          location_id: csvOpt(row.location_id),
+          total_amount: parseFloat(row.total_amount),
+          status: csvStr(row.status) || null,
+          payment_terms_id: csvOpt(row.payment_terms_id),
+          shipping_method_id: csvOpt(row.shipping_method_id),
+          shipping_terms_id: csvOpt(row.shipping_terms_id),
+          org_id: row.org_id,
+          created_by: csvOpt(row.created_by),
+          notes: csvOpt(row.notes),
+        },
+        create: {
+          id: row.id,
+          so_number: row.so_number || null,
+          so_date: soDate,
+          customer_id: csvOpt(row.customer_id),
+          location_id: csvOpt(row.location_id),
+          total_amount: parseFloat(row.total_amount),
+          status: csvStr(row.status) || null,
+          payment_terms_id: csvOpt(row.payment_terms_id),
+          shipping_method_id: csvOpt(row.shipping_method_id),
+          shipping_terms_id: csvOpt(row.shipping_terms_id),
+          org_id: row.org_id,
+          created_by: csvOpt(row.created_by),
+          notes: csvOpt(row.notes),
+        },
+      });
+    }
+    const salesOrderItemRows = await loadCsvData(path.join(__dirname, 'sales_order_item.csv'));
+    for (const row of salesOrderItemRows) {
+      await prisma.sales_order_item.upsert({
+        where: { id: row.id },
+        update: {
+          sales_order_id: csvOpt(row.sales_order_id),
+          item_master_id: csvOpt(row.item_master_id),
+          item_name: csvOpt(row.item_name),
+          quantity: parseFloat(row.quantity),
+          rate: parseFloat(row.rate),
+          line_total: parseFloat(row.line_total),
+          uom: csvOpt(row.uom),
+          org_id: row.org_id,
+        },
+        create: {
+          id: row.id,
+          sales_order_id: csvOpt(row.sales_order_id),
+          item_master_id: csvOpt(row.item_master_id),
+          item_name: csvOpt(row.item_name),
+          quantity: parseFloat(row.quantity),
+          rate: parseFloat(row.rate),
+          line_total: parseFloat(row.line_total),
+          uom: csvOpt(row.uom),
+          org_id: row.org_id,
+        },
+      });
+    }
+    console.log(`  ✓ Sales orders: ${salesOrderRows.length}, Line items: ${salesOrderItemRows.length}`);
+
+    console.log('📑 Loading quotes and quote line items from CSV...');
+    const quoteRows = await loadCsvData(path.join(__dirname, 'quote.csv'));
+    for (const row of quoteRows) {
+      const quoteDate = dateWithOffset(parseInt(row.days_offset, 10) || 0);
+      const expOff = parseInt(row.expiry_days_offset, 10);
+      const expiryDate = new Date(quoteDate);
+      expiryDate.setDate(expiryDate.getDate() + (Number.isFinite(expOff) ? expOff : 30));
+      await prisma.quote.upsert({
+        where: { id: row.id },
+        update: {
+          quote_number: row.quote_number || null,
+          quote_date: quoteDate,
+          expiry_date: expiryDate,
+          reference_number: csvOpt(row.reference_number),
+          customer_id: csvOpt(row.customer_id),
+          location_id: csvOpt(row.location_id),
+          sales_order_id: csvOpt(row.sales_order_id),
+          project_id: csvOpt(row.project_id),
+          status: csvStr(row.status) || null,
+          total_amount: parseFloat(row.total_amount),
+          org_id: row.org_id,
+          created_by: csvOpt(row.created_by),
+        },
+        create: {
+          id: row.id,
+          quote_number: row.quote_number || null,
+          quote_date: quoteDate,
+          expiry_date: expiryDate,
+          reference_number: csvOpt(row.reference_number),
+          customer_id: csvOpt(row.customer_id),
+          location_id: csvOpt(row.location_id),
+          sales_order_id: csvOpt(row.sales_order_id),
+          project_id: csvOpt(row.project_id),
+          status: csvStr(row.status) || null,
+          total_amount: parseFloat(row.total_amount),
+          org_id: row.org_id,
+          created_by: csvOpt(row.created_by),
+        },
+      });
+    }
+    const quoteItemRows = await loadCsvData(path.join(__dirname, 'quote_item.csv'));
+    for (const row of quoteItemRows) {
+      await prisma.quote_item.upsert({
+        where: { id: row.id },
+        update: {
+          quote_id: row.quote_id,
+          item_master_id: csvOpt(row.item_master_id),
+          item_name: csvOpt(row.item_name),
+          quantity: parseFloat(row.quantity),
+          rate: parseFloat(row.rate),
+          line_total: parseFloat(row.line_total),
+          uom: csvOpt(row.uom),
+          org_id: row.org_id,
+        },
+        create: {
+          id: row.id,
+          quote_id: row.quote_id,
+          item_master_id: csvOpt(row.item_master_id),
+          item_name: csvOpt(row.item_name),
+          quantity: parseFloat(row.quantity),
+          rate: parseFloat(row.rate),
+          line_total: parseFloat(row.line_total),
+          uom: csvOpt(row.uom),
+          org_id: row.org_id,
+        },
+      });
+    }
+    console.log(`  ✓ Quotes: ${quoteRows.length}, Quote line items: ${quoteItemRows.length}`);
+
+    console.log('🚚 Loading delivery challans and line items from CSV...');
+    const dcRows = await loadCsvData(path.join(__dirname, 'delivery_challan.csv'));
+    for (const row of dcRows) {
+      const challanDate = dateWithOffset(parseInt(row.days_offset, 10) || 0);
+      const delOff = parseInt(row.delivery_days_offset, 10);
+      const deliveryDate = Number.isFinite(delOff) ? dateWithOffset(delOff) : null;
+      await prisma.delivery_challan.upsert({
+        where: { id: row.id },
+        update: {
+          challan_number: row.challan_number || null,
+          challan_date: challanDate,
+          challan_type: (csvStr(row.challan_type) || 'DELIVERY') as any,
+          sales_order_id: csvOpt(row.sales_order_id),
+          customer_id: csvOpt(row.customer_id),
+          location_id: csvOpt(row.location_id),
+          delivery_status: (csvStr(row.delivery_status) || null) as any,
+          delivery_date: deliveryDate,
+          driver_name: csvOpt(row.driver_name),
+          vehicle_number: csvOpt(row.vehicle_number),
+          reference_number: csvOpt(row.reference_number),
+          total_amount: parseFloat(row.total_amount),
+          status: csvStr(row.status) || null,
+          org_id: row.org_id,
+        },
+        create: {
+          id: row.id,
+          challan_number: row.challan_number || null,
+          challan_date: challanDate,
+          challan_type: (csvStr(row.challan_type) || 'DELIVERY') as any,
+          sales_order_id: csvOpt(row.sales_order_id),
+          customer_id: csvOpt(row.customer_id),
+          location_id: csvOpt(row.location_id),
+          delivery_status: (csvStr(row.delivery_status) || null) as any,
+          delivery_date: deliveryDate,
+          driver_name: csvOpt(row.driver_name),
+          vehicle_number: csvOpt(row.vehicle_number),
+          reference_number: csvOpt(row.reference_number),
+          total_amount: parseFloat(row.total_amount),
+          status: csvStr(row.status) || null,
+          org_id: row.org_id,
+        },
+      });
+    }
+    const dcItemRows = await loadCsvData(path.join(__dirname, 'delivery_challan_item.csv'));
+    for (const row of dcItemRows) {
+      await prisma.delivery_challan_item.upsert({
+        where: { id: row.id },
+        update: {
+          delivery_challan_id: row.delivery_challan_id,
+          sales_order_item_id: csvOpt(row.sales_order_item_id),
+          item_master_id: csvOpt(row.item_master_id),
+          quantity_ordered: parseFloat(row.quantity_ordered),
+          quantity_delivered: parseFloat(row.quantity_delivered),
+          rate: parseFloat(row.rate),
+          line_total: parseFloat(row.line_total),
+          uom: csvOpt(row.uom),
+          delivery_status: (csvStr(row.delivery_status) || null) as any,
+          org_id: row.org_id,
+        },
+        create: {
+          id: row.id,
+          delivery_challan_id: row.delivery_challan_id,
+          sales_order_item_id: csvOpt(row.sales_order_item_id),
+          item_master_id: csvOpt(row.item_master_id),
+          quantity_ordered: parseFloat(row.quantity_ordered),
+          quantity_delivered: parseFloat(row.quantity_delivered),
+          rate: parseFloat(row.rate),
+          line_total: parseFloat(row.line_total),
+          uom: csvOpt(row.uom),
+          delivery_status: (csvStr(row.delivery_status) || null) as any,
+          org_id: row.org_id,
+        },
+      });
+    }
+    console.log(`  ✓ Delivery challans: ${dcRows.length}, DC line items: ${dcItemRows.length}`);
+
+    console.log('💱 Loading exchange rates from CSV...');
+    const exchangeRateRows = await loadCsvData(path.join(__dirname, 'exchange_rate.csv'));
+    for (const row of exchangeRateRows) {
+      const eff = row.effective_date ? new Date(row.effective_date) : new Date();
+      const exOrgId = csvStr(row.org_id) || 'org_indian_demo';
+      const fromCell = row.from_currency_id ?? row.from_currency;
+      const toCell = row.to_currency_id ?? row.to_currency;
+      const fromCurrencyId = await exchangeRateCurrencyId(exOrgId, fromCell);
+      const toCurrencyId = await exchangeRateCurrencyId(exOrgId, toCell);
+      await prisma.exchange_rate.upsert({
+        where: { id: row.id },
+        update: {
+          org_id: row.org_id,
+          from_currency_id: fromCurrencyId,
+          to_currency_id: toCurrencyId,
+          effective_date: eff,
+          rate: row.rate,
+          rate_type: (csvStr(row.rate_type) || 'SPOT') as any,
+          source: csvOpt(row.source),
+        },
+        create: {
+          id: row.id,
+          org_id: row.org_id,
+          from_currency_id: fromCurrencyId,
+          to_currency_id: toCurrencyId,
+          effective_date: eff,
+          rate: row.rate,
+          rate_type: (csvStr(row.rate_type) || 'SPOT') as any,
+          source: csvOpt(row.source),
+        },
+      });
+    }
+    console.log(`  ✓ Exchange rates: ${exchangeRateRows.length}`);
+
+    console.log('📈 Loading instruments, holdings, and trades from CSV...');
+    const instrumentRows = await loadCsvData(path.join(__dirname, 'instrument.csv'));
+    for (const row of instrumentRows) {
+      let details: any = undefined;
+      const dj = csvStr(row.details_json);
+      if (dj) {
+        try {
+          details = JSON.parse(dj);
+        } catch {
+          details = {};
+        }
+      }
+      await prisma.instrument.upsert({
+        where: { id: row.id },
+        update: {
+          org_id: csvOpt(row.org_id),
+          symbol: row.symbol,
+          name: row.name,
+          type: csvStr(row.type) as any,
+          isin: csvOpt(row.isin),
+          details: details ?? undefined,
+        },
+        create: {
+          id: row.id,
+          org_id: csvOpt(row.org_id),
+          symbol: row.symbol,
+          name: row.name,
+          type: csvStr(row.type) as any,
+          isin: csvOpt(row.isin),
+          details: details ?? undefined,
+        },
+      });
+    }
+
+    const holdingRows = await loadCsvData(path.join(__dirname, 'holding.csv'));
+    for (const row of holdingRows) {
+      const accId = await accountIdByCoaCode(csvStr(row.account_code));
+      const holdingOrgId = csvStr(row.org_id) || 'org_indian_demo';
+      const currencyId = await currencyIdByOrgAndCode(
+        holdingOrgId,
+        csvStr(row.currency) || 'INR',
+      );
+      const lastTradeOff = parseInt(row.last_trade_days_offset, 10);
+      const lastTradeDate = Number.isFinite(lastTradeOff) ? dateWithOffset(lastTradeOff) : null;
+      await prisma.holding.upsert({
+        where: { id: row.id },
+        update: {
+          org_id: csvOpt(row.org_id),
+          account_id: accId,
+          instrument_id: row.instrument_id,
+          quantity: row.quantity,
+          average_cost: row.average_cost,
+          current_price: csvOpt(row.current_price) ? row.current_price : null,
+          market_value: csvOpt(row.market_value) ? row.market_value : null,
+          currency_id: currencyId,
+          last_trade_date: lastTradeDate,
+          notes: csvOpt(row.notes),
+          tags: parseTags(row.tags),
+        },
+        create: {
+          id: row.id,
+          org_id: csvOpt(row.org_id),
+          account_id: accId,
+          instrument_id: row.instrument_id,
+          quantity: row.quantity,
+          average_cost: row.average_cost,
+          current_price: csvOpt(row.current_price) ? row.current_price : null,
+          market_value: csvOpt(row.market_value) ? row.market_value : null,
+          currency_id: currencyId,
+          last_trade_date: lastTradeDate,
+          notes: csvOpt(row.notes),
+          tags: parseTags(row.tags),
+        },
+      });
+    }
+
+    const tradeRows = await loadCsvData(path.join(__dirname, 'trade.csv'));
+    for (const row of tradeRows) {
+      const accId = await accountIdByCoaCode(csvStr(row.account_code));
+      const tgtCode = csvStr(row.target_account_code);
+      const tgtId = tgtCode ? await accountIdByCoaCode(tgtCode) : null;
+      const vd = dateWithOffset(parseInt(row.value_days_offset, 10) || 0);
+      await prisma.trade.upsert({
+        where: { id: row.id },
+        update: {
+          org_id: csvOpt(row.org_id),
+          instrument_id: csvOpt(row.instrument_id),
+          account_id: accId,
+          target_account_id: tgtId,
+          type: csvStr(row.type) as any,
+          quantity: row.quantity,
+          price: row.price,
+          brokerage: csvOpt(row.brokerage) ? row.brokerage : null,
+          tax: csvOpt(row.tax) ? row.tax : null,
+          net_amount: csvOpt(row.net_amount) ? row.net_amount : null,
+          total_amount: csvOpt(row.total_amount) ? row.total_amount : null,
+          exchange: csvOpt(row.exchange),
+          value_date: vd,
+          trade_id: csvOpt(row.trade_id_external),
+          name: csvOpt(row.name),
+        },
+        create: {
+          id: row.id,
+          org_id: csvOpt(row.org_id),
+          instrument_id: csvOpt(row.instrument_id),
+          account_id: accId,
+          target_account_id: tgtId,
+          type: csvStr(row.type) as any,
+          quantity: row.quantity,
+          price: row.price,
+          brokerage: csvOpt(row.brokerage) ? row.brokerage : null,
+          tax: csvOpt(row.tax) ? row.tax : null,
+          net_amount: csvOpt(row.net_amount) ? row.net_amount : null,
+          total_amount: csvOpt(row.total_amount) ? row.total_amount : null,
+          exchange: csvOpt(row.exchange),
+          value_date: vd,
+          trade_id: csvOpt(row.trade_id_external),
+          name: csvOpt(row.name),
+        },
+      });
+    }
+    console.log(`  ✓ Instruments: ${instrumentRows.length}, Holdings: ${holdingRows.length}, Trades: ${tradeRows.length}`);
+
+    Object.assign(indianDemoSeedRowCounts, {
+      salesOrders: salesOrderRows.length,
+      salesOrderItems: salesOrderItemRows.length,
+      quotes: quoteRows.length,
+      quoteItems: quoteItemRows.length,
+      deliveryChallans: dcRows.length,
+      deliveryChallanItems: dcItemRows.length,
+      exchangeRates: exchangeRateRows.length,
+      instruments: instrumentRows.length,
+      holdings: holdingRows.length,
+      trades: tradeRows.length,
+    });
+
     // ===== 8.6. LOAD BUDGET_PERIOD, BUDGET_LINE, GENERAL_LEDGER, PROJECT_MASTER =====
     const createdByUser = userData.length > 0 ? userData[0].id : 'system';
     const demoAccountForBudget = await prisma.account.findFirst({
@@ -860,6 +1311,83 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Invoices: ${invoiceData.length}, Invoice line items: ${invoiceLineItemData.length}`);
 
+    console.log('📄 Loading credit notes and line items from CSV (after invoices for FK)...');
+    const cnAccountIdAr = await accountIdByCoaCode('1105');
+    const creditNoteRows = await loadCsvData(path.join(__dirname, 'credit_note.csv'));
+    for (const row of creditNoteRows) {
+      const cnDays = parseInt(row.days_offset, 10) || 0;
+      const cnDate = new Date(baseDate);
+      cnDate.setDate(cnDate.getDate() + cnDays);
+      const acctCode = csvStr(row.account_code);
+      const acctId = acctCode ? await accountIdByCoaCode(acctCode) : cnAccountIdAr;
+      await prisma.credit_note.upsert({
+        where: { id: row.id },
+        update: {
+          credit_note_number: row.credit_note_number || null,
+          credit_note_date: cnDate,
+          customer_id: csvOpt(row.customer_id),
+          location_id: csvOpt(row.location_id),
+          invoice_id: csvOpt(row.invoice_id),
+          sales_order_id: csvOpt(row.sales_order_id),
+          account_id: acctId,
+          credit_note_total: parseFloat(row.credit_note_total),
+          balance_amount: parseFloat(row.balance_amount),
+          credit_note_status: csvStr(row.credit_note_status) || null,
+          credit_note_type: csvStr(row.credit_note_type) || null,
+          reason: csvOpt(row.reason),
+          org_id: row.org_id,
+        },
+        create: {
+          id: row.id,
+          credit_note_number: row.credit_note_number || null,
+          credit_note_date: cnDate,
+          customer_id: csvOpt(row.customer_id),
+          location_id: csvOpt(row.location_id),
+          invoice_id: csvOpt(row.invoice_id),
+          sales_order_id: csvOpt(row.sales_order_id),
+          account_id: acctId,
+          credit_note_total: parseFloat(row.credit_note_total),
+          balance_amount: parseFloat(row.balance_amount),
+          credit_note_status: csvStr(row.credit_note_status) || null,
+          credit_note_type: csvStr(row.credit_note_type) || null,
+          reason: csvOpt(row.reason),
+          org_id: row.org_id,
+        },
+      });
+    }
+    const creditNoteItemRows = await loadCsvData(path.join(__dirname, 'credit_note_item.csv'));
+    for (const row of creditNoteItemRows) {
+      await prisma.credit_note_item.upsert({
+        where: { id: row.id },
+        update: {
+          credit_note_id: row.credit_note_id,
+          item_master_id: csvOpt(row.item_master_id),
+          invoice_line_item_id: csvOpt(row.invoice_line_item_id),
+          item_name: csvOpt(row.item_name),
+          quantity: parseFloat(row.quantity),
+          rate: parseFloat(row.rate),
+          line_total: parseFloat(row.line_total),
+          uom: csvOpt(row.uom),
+          org_id: row.org_id,
+        },
+        create: {
+          id: row.id,
+          credit_note_id: row.credit_note_id,
+          item_master_id: csvOpt(row.item_master_id),
+          invoice_line_item_id: csvOpt(row.invoice_line_item_id),
+          item_name: csvOpt(row.item_name),
+          quantity: parseFloat(row.quantity),
+          rate: parseFloat(row.rate),
+          line_total: parseFloat(row.line_total),
+          uom: csvOpt(row.uom),
+          org_id: row.org_id,
+        },
+      });
+    }
+    console.log(`  ✓ Credit notes: ${creditNoteRows.length}, CN line items: ${creditNoteItemRows.length}`);
+    indianDemoSeedRowCounts.creditNotes = creditNoteRows.length;
+    indianDemoSeedRowCounts.creditNoteItems = creditNoteItemRows.length;
+
     console.log('💳 Loading payment receipts from CSV...');
     const paymentReceiptData = await loadCsvData(path.join(__dirname, 'payment_receipt.csv'));
     for (const row of paymentReceiptData) {
@@ -957,6 +1485,12 @@ async function setupIndianDemoData() {
     console.log(`   📄 Sales invoices: ${invoiceData.length}, Invoice line items: ${invoiceLineItemData.length}`);
     console.log(`   💳 Payment receipts: ${paymentReceiptData.length}`);
     console.log(`   🏦 Bank postings: ${postingData.length}`);
+    console.log(
+      `   🧾 Sales pipeline: SO ${indianDemoSeedRowCounts.salesOrders} (+${indianDemoSeedRowCounts.salesOrderItems} lines), quotes ${indianDemoSeedRowCounts.quotes} (+${indianDemoSeedRowCounts.quoteItems} lines), DC ${indianDemoSeedRowCounts.deliveryChallans} (+${indianDemoSeedRowCounts.deliveryChallanItems} lines), credit notes ${indianDemoSeedRowCounts.creditNotes} (+${indianDemoSeedRowCounts.creditNoteItems} lines)`
+    );
+    console.log(
+      `   💱 FX & investments: exchange rates ${indianDemoSeedRowCounts.exchangeRates}, instruments ${indianDemoSeedRowCounts.instruments}, holdings ${indianDemoSeedRowCounts.holdings}, trades ${indianDemoSeedRowCounts.trades}`
+    );
     console.log('');
     console.log('🎯 Demo Users Available:');
     console.log('   Super Admin: sanjay.gupta@demo-india.com (Password: Metalimits@123)');
@@ -986,7 +1520,15 @@ const DEMO_POSTING_IDS = [
 ];
 
 /** Payment receipt IDs seeded by setup (keep these; only delete receipts created by confirming). */
-const SEED_RECEIPT_IDS = ['payr_demo_001', 'payr_demo_002', 'payr_demo_003', 'payr_demo_004', 'payr_demo_005', 'payr_demo_006'];
+const SEED_RECEIPT_IDS = [
+  'payr_demo_001',
+  'payr_demo_002',
+  'payr_demo_003',
+  'payr_demo_004',
+  'payr_demo_005',
+  'payr_demo_006',
+  'payr_demo_007',
+];
 
 type PostingRow = { id: string; isCredit: boolean; amount: number; description: string; daysOffset: number };
 

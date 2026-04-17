@@ -33,7 +33,7 @@ const itemMasterSchema = z.object({
     parent_account_id: z.string().optional(),
     hq_account_id: z.string().optional(),
     type: z.array(z.string()).optional(),
-    currency: z.string().optional(),
+    base_currency_id: z.string().optional(),
     code: z.string().optional(),
     frequency: z.string().optional(),
     legal_entity_id: z.string().optional(),
@@ -77,7 +77,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
             hq_account_id: '',
             type: [],
             code: '',
-            currency: '',
+            base_currency_id: '',
             frequency: '',
             legal_entity_id: '',
         },
@@ -102,7 +102,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                     code: res.data.code?.toString() || '',
                     parent_account_id: res.data.parent_account_id?.toString() || '',
                     hq_account_id: res.data.hq_account_id?.toString() || '',
-                    currency: res.data.currency?.toString() || '',
+                    base_currency_id: res.data.base_currency_id?.toString() || '',
                     frequency: res.data.frequency?.toString() || '',
                     legal_entity_id: res.data.legal_entity_id?.toString() || '',
                 });
@@ -138,7 +138,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                         code: toolResultData.code?.toString() || '',
                         parent_account_id: toolResultData.parent_account_id?.toString() || '',
                         hq_account_id: toolResultData.hq_account_id?.toString() || '',
-                        currency: toolResultData.currency?.toString() || '',
+                        base_currency_id: toolResultData.base_currency_id?.toString() || '',
                         frequency: toolResultData.frequency?.toString() || '',
                         legal_entity_id: toolResultData.legal_entity_id?.toString() || '',
                     });
@@ -372,22 +372,28 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
 
                                     <FormField
                                         control={form.control}
-                                        name="currency"
+                                        name="base_currency_id"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Currency</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        type="text"
-                                                        placeholder="Enter Currency"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
+                                                <FormLabel>Base Currency</FormLabel>
+                                                <SearchDropDown
+                                                    instanceType="currency"
+                                                    instanceSourceKey="base_currency_id"
+                                                    instanceKey="id"
+                                                    instanceLabel="code"
+                                                    instanceValue={
+                                                        initialValues?.currency
+                                                    }
+                                                    onSelectItem={onhandleSelectChange}
+                                                    onClear={handleSelectClear}
+                                                    limit="10"
+                                                    searchParams="code"
+                                                    type="account"
+                                                />
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
-
                                     <FormField
                                         control={form.control}
                                         name="type"

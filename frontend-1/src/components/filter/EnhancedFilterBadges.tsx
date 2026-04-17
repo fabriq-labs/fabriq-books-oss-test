@@ -96,7 +96,7 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
                 if (value.eq) shippingMethodIds.add(value.eq);
                 if (value.neq) shippingMethodIds.add(value.neq);
             }
-            if (field === "preferred_currency_id") {
+            if (field === "preferred_currency_id" || field === "currency_id" || field === "base_currency_id") {
                 if (value.eq) currencyMasterIds.add(value.eq);
                 if (value.neq) currencyMasterIds.add(value.neq);
             }
@@ -171,7 +171,7 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
                 await fetchEntity(paymentTermIds, "payment_terms", "payment_terms"); // payment terms use 'payment_term' as label
                 await fetchEntity(shippingTermIds, "shipping_terms", "shipping_terms"); // shipping terms use 'shipping_term' as label
                 await fetchEntity(shippingMethodIds, "shipping_method", "shipping_method"); // shipping methods use 'shipping_method' as label
-                await fetchEntity(currencyMasterIds, "currency", "symbol"); // currency masters use 'base_currency' as label
+                await fetchEntity(currencyMasterIds, "currency", "code"); // modern currency model: ISO code
                 await fetchEntity(itemIds, "item_master", "item_name"); // items use 'item_name' as label
             } finally {
                 if (isMounted) {
@@ -406,14 +406,20 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
                 return `Shipping Method: Not "${shippingMethodName}"`;
             }
         }
-        if (field === "preferred_currency_id") {
+        if (
+            field === "preferred_currency_id" ||
+            field === "currency_id" ||
+            field === "base_currency_id"
+        ) {
+            const title =
+                field === "base_currency_id" ? "Base currency" : "Currency";
             if (value.eq) {
                 const currencyName = labelMappings[value.eq] || value.eq;
-                return `Currency: ${currencyName}`;
+                return `${title}: ${currencyName}`;
             }
             if (value.neq) {
                 const currencyName = labelMappings[value.neq] || value.neq;
-                return `Currency: Not "${currencyName}"`;
+                return `${title}: Not "${currencyName}"`;
             }
         }
         if (field === "item_id") {
@@ -468,7 +474,7 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
                     {isLoading && field === "legal_entity_id" || isLoading && field === "business_unit_id" ||
                         isLoading && field === "coa_id" || isLoading && field === "budget_line_id" || isLoading && field === "budget_period_id" || isLoading && field === "location_id"
                         || isLoading && field === "cost_center_id" || isLoading && field === "department_id" || isLoading && field === "supplier_id" || isLoading && field === "payment_term_id"
-                        || isLoading && field === "shipping_term_id" || isLoading && field === "shipping_method_id" || isLoading && field === "preferred_currency_id" || isLoading && field === "item_id" || isLoading && field === "coa_code" ? (
+                        || isLoading && field === "shipping_term_id" || isLoading && field === "shipping_method_id" || isLoading && field === "preferred_currency_id" || isLoading && field === "currency_id" || isLoading && field === "base_currency_id" || isLoading && field === "item_id" || isLoading && field === "coa_code" ? (
                         <span className="animate-pulse">Loading...</span>
                     ) : (
                         getFilterLabel(field, value)

@@ -27,9 +27,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
+import { SearchDropDown } from "@/components/search_dropdown/dropdown";
+import { constructObject } from "@/components/utils/helper";
 const itemMasterSchema = z.object({
-    to_currency: z.string().min(1, { message: "To Currency is required" }),
-    from_currency: z.string().min(1, { message: "From Currency is required" }),
+    to_currency_id: z.string().min(1, { message: "To Currency is required" }),
+    from_currency_id: z.string().min(1, { message: "From Currency is required" }),
     effective_date: z.date({ required_error: "Effective Date is required" }),
     rate: z
         .string()
@@ -63,8 +65,8 @@ export const ExchangeRateForm: React.FC<ItemMasterFormProps> = () => {
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
         defaultValues: initialValues || {
-            to_currency: "",
-            from_currency: "",
+            to_currency_id: "",
+            from_currency_id: "",
             rate: "",
             rate_type: "",
             source: "",
@@ -84,8 +86,8 @@ export const ExchangeRateForm: React.FC<ItemMasterFormProps> = () => {
             .then((res: any) => {
                 setInitialValues(res.data);
                 form.reset({
-                    to_currency: res.data.to_currency || "",
-                    from_currency: res.data.from_currency,
+                    to_currency_id: res.data.to_currency_id || "",
+                    from_currency_id: res.data.from_currency_id,
                     rate: res.data.rate?.toString() || "",
                     rate_type: res.data.rate_type || "",
                     source: res.data.source || "",
@@ -151,7 +153,19 @@ export const ExchangeRateForm: React.FC<ItemMasterFormProps> = () => {
             onChange(value); // ✅ tell RHF about the change
         }
     };
+    const onhandleSelectChange = (
+        sourceKey: any,
+        key: string,
+        value: any,
+        fields: any
+    ) => {
+        const lookupData = constructObject(value.item, fields);
+        form.setValue(sourceKey, value[key], { shouldValidate: true });
+    };
 
+    const handleSelectClear = (sourceKey: any) => {
+        form.setValue(sourceKey, '', { shouldValidate: true });
+    };
     const handleCancel = () => {
         navigate("/accounting/exchange-rates");
     };
@@ -203,15 +217,24 @@ export const ExchangeRateForm: React.FC<ItemMasterFormProps> = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <FormField
                                         control={form.control}
-                                        name="from_currency"
+                                        name="from_currency_id"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>
-                                                    From Currency <span className="text-red-500">*</span>
-                                                </FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="Enter From Currency" {...field} />
-                                                </FormControl>
+                                                <FormLabel>From Currency</FormLabel>
+                                                <SearchDropDown
+                                                    instanceType="currency"
+                                                    instanceSourceKey="from_currency_id"
+                                                    instanceKey="id"
+                                                    instanceLabel="code"
+                                                    instanceValue={
+                                                        initialValues?.from_currency
+                                                    }
+                                                    onSelectItem={onhandleSelectChange}
+                                                    onClear={handleSelectClear}
+                                                    limit="10"
+                                                    searchParams="code"
+                                                    type="holding"
+                                                />
                                                 <FormMessage />
                                             </FormItem>
                                         )}
@@ -219,18 +242,24 @@ export const ExchangeRateForm: React.FC<ItemMasterFormProps> = () => {
 
                                     <FormField
                                         control={form.control}
-                                        name="to_currency"
+                                        name="to_currency_id"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>
-                                                    To Currency <span className="text-red-500">*</span>
-                                                </FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        placeholder="Enter To Currency "
-                                                        {...field}
-                                                    />
-                                                </FormControl>
+                                                <FormLabel>To Currency</FormLabel>
+                                                <SearchDropDown
+                                                    instanceType="currency"
+                                                    instanceSourceKey="to_currency_id"
+                                                    instanceKey="id"
+                                                    instanceLabel="code"
+                                                    instanceValue={
+                                                        initialValues?.to_currency
+                                                    }
+                                                    onSelectItem={onhandleSelectChange}
+                                                    onClear={handleSelectClear}
+                                                    limit="10"
+                                                    searchParams="code"
+                                                    type="holding"
+                                                />
                                                 <FormMessage />
                                             </FormItem>
                                         )}

@@ -46,14 +46,28 @@
       "displayName": "Account",
       "isColumnShow": false
     },
-    "currency": {
+    "currency_id": {
       "datatype": "string",
       "required": true,
-      "permission": "read",
+      "permission": "update",
       "tableProps": {
         "width": "300",
-        "columnType": "text",
+        "columnType": "select",
+        "selectProps": {
+          "type": "holding",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
+          "instanceValue": "currency",
+          "instanceSourceKey": "currency_id"
+        },
         "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "currency.code"
       },
       "displayName": "Currency",
       "isColumnShow": true
@@ -105,6 +119,17 @@
       "dataType": "table",
       "required": false,
       "displayName": "Account",
+      "isColumnShow": false
+    },
+    "currency": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "read"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Currency",
       "isColumnShow": false
     },
     "average_cost": {
