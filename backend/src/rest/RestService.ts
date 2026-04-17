@@ -10,6 +10,11 @@ import {
   NotFoundError,
   ValidationError
 } from './errors/ApiError';
+import {
+  handleRestControllerError,
+  mapServiceMessageToApiError,
+  respondWithMappedServiceFailure
+} from './errors/restErrorHandling';
 import prisma from '../lib/prisma';
 import { AuthContext } from '../auth/types';
 import { SearchQueryBuilder } from '../services/query/SearchQueryBuilder';
@@ -91,19 +96,11 @@ export class RestService {
         { viewName: finalViewName }
       );
       if (!result.success) {
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in getAll', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to fetch records' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'getAll', 'Failed to fetch records');
     }
   }
 
@@ -126,20 +123,16 @@ export class RestService {
       );
       if (!result.success) {
         if (result.error === 'Record not found') {
-          throw new NotFoundError(`${modelName} not found`);
+          throw new NotFoundError(
+            `No ${modelName} record was found for the id you requested. It may have been removed, or the id may be mistyped.`,
+            { originalError: result.error }
+          );
         }
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in getById', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError ||
-        error instanceof NotFoundError) {
-        return res.status(error instanceof NotFoundError ? 404 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to fetch record' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'getById', 'Failed to fetch record');
     }
   }
 
@@ -198,20 +191,16 @@ export class RestService {
 
       if (!result.success) {
         if (result.error === 'Record not found') {
-          throw new NotFoundError(`User not found with auth_id: ${authId}`);
+          throw new NotFoundError(
+            'No user profile was found for your signed-in account. Your user record may be missing or deactivated.',
+            { originalError: result.error, authId }
+          );
         }
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in getByAuthId', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError ||
-        error instanceof NotFoundError) {
-        return res.status(error instanceof NotFoundError ? 404 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to fetch record by auth_id' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'getByAuthId', 'Failed to fetch record by auth_id');
     }
   }
 
@@ -238,17 +227,11 @@ export class RestService {
       });
 
       if (!result.success) {
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.status(201).json(result);
-    } catch (error: any) {
-      logger.error('Error in create', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError) {
-        return res.status(error instanceof ValidationError ? 400 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to create record' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'create', 'Failed to create record');
     }
   }
 
@@ -273,20 +256,16 @@ export class RestService {
       );
       if (!result.success) {
         if (result.error === 'Record not found') {
-          throw new NotFoundError(`${modelName} not found`);
+          throw new NotFoundError(
+            `No ${modelName} record was found to update. Check the id, or confirm the record still exists.`,
+            { originalError: result.error }
+          );
         }
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in update', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError ||
-        error instanceof NotFoundError) {
-        return res.status(error instanceof NotFoundError ? 404 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to update record' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'update', 'Failed to update record');
     }
   }
 
@@ -312,17 +291,11 @@ export class RestService {
         { viewName: finalViewName }
       );
       if (!result.success) {
-        return res.status(400).json({ error: result.error });
+        return respondWithMappedServiceFailure(res, result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in updateChild', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError) {
-        return res.status(error instanceof ValidationError ? 400 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to update child', message: error.message });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'updateChild', 'Failed to update child');
     }
   }
 
@@ -335,20 +308,16 @@ export class RestService {
       const result = await this.modelService.delete(modelName, context, id);
       if (!result.success) {
         if (result.error === 'Record not found') {
-          throw new NotFoundError(`${modelName} not found`);
+          throw new NotFoundError(
+            `No ${modelName} record was found to delete. It may have already been removed.`,
+            { originalError: result.error }
+          );
         }
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.status(204).send();
-    } catch (error: any) {
-      logger.error('Error in delete', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError ||
-        error instanceof NotFoundError) {
-        return res.status(error instanceof NotFoundError ? 404 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to delete record' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'delete', 'Failed to delete record');
     }
   }
 
@@ -376,17 +345,11 @@ export class RestService {
       );
 
       if (!result.success) {
-        return res.status(400).json({ error: result.error });
+        return respondWithMappedServiceFailure(res, result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in addChildrenToParent', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError) {
-        return res.status(error instanceof ValidationError ? 400 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to add children to parent', message: error.message });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'addChildrenToParent', 'Failed to add children to parent');
     }
   }
 
@@ -410,17 +373,11 @@ export class RestService {
         { viewName: finalViewName }
       );
       if (!result.success) {
-        return res.status(400).json({ error: result.error });
+        return respondWithMappedServiceFailure(res, result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in deleteRelation', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError) {
-        return res.status(error instanceof ValidationError ? 400 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to delete relation', message: error.message });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'deleteRelation', 'Failed to delete relation');
     }
   }
 
@@ -456,19 +413,11 @@ export class RestService {
         { viewName: finalViewName }
       );
       if (!result.success) {
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in search', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to search records' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'search', 'Failed to search records');
     }
   }
 
@@ -479,18 +428,12 @@ export class RestService {
       const context = this.getAuthContext(req);
       const result = await run_report(context, id, body.filters);
       res.json({ success: true, data: result });
-    } catch (error: any) {
-      logger.error('Error generating report', { error: error.message, reportId: req.params.id });
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to generate report' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'generateReport', 'Failed to generate report', {
+        logExtras: { reportId: req.params.id }
+      });
     }
-  };
+  }
 
   public async uploadCSV(req: AuthRequest, res: Response) {
     try {
@@ -505,20 +448,12 @@ export class RestService {
       const result = await uploadService.uploadCSV(modelName, context, req.body, viewId);
 
       if (!result.success) {
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
 
       res.json(result);
-    } catch (error: any) {
-      logger.error('Error in uploadCSV', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to upload CSV data' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'uploadCSV', 'Failed to upload CSV data');
     }
   }
 
@@ -534,17 +469,11 @@ export class RestService {
         { viewName }
       );
       if (!result.success) {
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.status(201).json(result);
-    } catch (error: any) {
-      logger.error('Error in createMany', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError ||
-        error instanceof ForbiddenError ||
-        error instanceof ValidationError) {
-        return res.status(error instanceof ValidationError ? 400 : 403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to create records' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'createMany', 'Failed to create records');
     }
   }
 
@@ -557,9 +486,8 @@ export class RestService {
       const data = req.body || {};
       const result = await this.modelService.runCustomAction(context, model, id, action, data);
       return res.status(200).json(result);
-    } catch (error: any) {
-      logger.error('Error in runCustomAction', { error: error.message });
-      res.status(500).json({ error: error.message || 'Failed to run custom action' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'runCustomAction', 'Failed to run custom action');
     }
   }
 
@@ -588,20 +516,11 @@ export class RestService {
         { viewName: finalViewName }
       );
       if (!result.success) {
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error("Error in updateMany", { error: error.message, path: req.path });
-
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      res.status(500).json({ error: "Failed to update records" });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'updateMany', 'Failed to update records');
     }
   }
   public async deleteMany(req: AuthRequest, res: Response) {
@@ -626,19 +545,11 @@ export class RestService {
         { viewName: finalViewName }
       );
       if (!result.success) {
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
       res.json(result);
-    } catch (error: any) {
-      logger.error("Error in deleteMany", { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      }
-      res.status(500).json({ error: "Failed to delete records" });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'deleteMany', 'Failed to delete records');
     }
   }
 
@@ -687,7 +598,7 @@ export class RestService {
       );
 
       if (!result.success) {
-        throw new Error(result.error);
+        throw mapServiceMessageToApiError(result.error);
       }
 
       logger.info('PDF parsing completed', {
@@ -699,26 +610,12 @@ export class RestService {
 
       res.json(result);
 
-    } catch (error: any) {
-      logger.error('Error in parseDocument', {
-        error: error.message,
-        modelName: req.params.modelName,
-        fileName: req.file?.originalname
-      });
-
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      } else if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: error.message });
-      }
-
-      res.status(500).json({
-        error: 'Failed to parse PDF document',
-        details: error.message
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'parseDocument', 'Failed to parse PDF document', {
+        logExtras: {
+          modelName: req.params.modelName,
+          fileName: req.file?.originalname
+        }
       });
     }
   }
@@ -747,18 +644,8 @@ export class RestService {
           description: view.description
         }
       });
-    } catch (error: any) {
-      logger.error('Error in getDatagraph', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      } else if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to fetch datagraph' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'getDatagraph', 'Failed to fetch datagraph');
     }
   }
 
@@ -789,18 +676,8 @@ export class RestService {
         success: true,
         data: schema
       });
-    } catch (error: any) {
-      logger.error('Error in getModelSchema', { error: error.message, path: req.path });
-      if (error instanceof UnauthorizedError) {
-        return res.status(401).json({ error: error.message });
-      } else if (error instanceof ForbiddenError) {
-        return res.status(403).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        return res.status(400).json({ error: error.message });
-      } else if (error instanceof NotFoundError) {
-        return res.status(404).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to fetch model schema' });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'getModelSchema', 'Failed to fetch model schema');
     }
   }
 
