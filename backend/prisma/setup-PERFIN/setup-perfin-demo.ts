@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
-import { setupCurrency } from '../setup-currency';
+
 import prisma from '../../src/lib/prisma';
 const csv = require('csv-parser');
 
@@ -48,12 +48,6 @@ async function setupPerfinDemoData() {
       });
     }
     console.log(`  ✓ Loaded ${orgData.length} organizations`);
-
-    // ===== 1.5. SETUP CURRENCY FROM CSV (before entity — basecurrency_id FK → currency.id) =====
-    console.log('💱 Loading currency from CSV...');
-    await setupCurrency(path.join(__dirname, 'currency.csv'));
-    const currencyData = await loadCsvData(path.join(__dirname, 'currency.csv'));
-    console.log(`  ✓ Loaded ${currencyData.length} currencies`);
 
     // ===== 2. LOAD AND INSERT ORGANIZATION DATA =====
     console.log('🏢 Loading business organization data...');
@@ -394,7 +388,7 @@ async function setupPerfinDemoData() {
     console.log('📊 Summary:');
     console.log(`   🏢 Organizations: ${orgData.length}`);
     console.log(`   🏢 Business Orgs: ${organizationData.length}`);
-    console.log(`   💱 Currencies: ${currencyData.length}`);
+
     console.log(`   💰 Chart of Accounts: Set up for ${organizationData.length} organizations`);
     console.log(`   👥 Customers: ${customerData.length}`);
     console.log(`   🏭 Suppliers: ${supplierData.length}`);

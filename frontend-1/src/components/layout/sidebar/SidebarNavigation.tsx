@@ -75,7 +75,6 @@ const topLevelNavItems: MasterNavItem[] = [
       { label: 'Budget Periods', path: '/accounting/budget-periods' },
       { label: 'Budget Lines', path: '/accounting/budget-lines' },
       { label: 'Exchange Rates', path: '/accounting/exchange-rates' },
-      { label: 'Currency', path: '/accounting/currency' }
     ]
   },
   {
@@ -148,8 +147,8 @@ const superAdminNavItems: MasterNavItem[] = [
       { label: 'Roles', path: '/settings/roles' },
       { label: 'AI Templates', path: '/settings/ai-templates' },
       { label: 'LLM Traces', path: '/settings/llm-traces' },
-      { label: 'Tenant Onboarding', path: '/settings/tenant-onboarding' },
-      { label: 'Developer options', path: '/settings/dev-options' },
+      { label: 'Tenant Administration', path: '/settings/tenant-admin' },
+      { label: 'Currency', path: '/accounting/currency' },
     ],
   },
 ];

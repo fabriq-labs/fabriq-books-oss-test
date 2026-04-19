@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const prisma = new PrismaClient();
+const defaultPrisma = new PrismaClient();
 
 interface AccountTemplate {
   name: string;
@@ -21,7 +21,19 @@ interface CreatedAccount {
   code?: string | null;
 }
 
-async function setupChartOfAccounts(orgId: string, legalEntityId: string, templatePath?: string, currency: string = 'USD') {
+export interface SetupChartOfAccountsResult {
+  accounts: Map<string, CreatedAccount>;
+  created: number;
+  existing: number;
+}
+
+async function setupChartOfAccounts(
+  orgId: string,
+  legalEntityId: string,
+  templatePath?: string,
+  currency: string = 'USD',
+  prisma: PrismaClient = defaultPrisma
+): Promise<SetupChartOfAccountsResult> {
   console.log('💰 Setting up Chart of Accounts...');
   console.log(`   Organization: ${orgId}`);
   console.log(`   Legal Entity: ${legalEntityId}`);
@@ -51,44 +63,28 @@ async function setupChartOfAccounts(orgId: string, legalEntityId: string, templa
 
   // Track created accounts for parent-child relationships
   const createdAccounts: Map<string, CreatedAccount> = new Map();
+  let createdCount = 0;
+  let existingCount = 0;
 
-  // Recursive function to create accounts depth-first (parents first)
+  // Recursive function to upsert accounts depth-first (parents first)
   async function createAccount(
     template: AccountTemplate,
     parentId?: string
   ): Promise<string> {
-    // Create unique key for upsert - prefer org_id + code, fallback to org_id + name
+    // Deterministic ID encodes the composite key (legalEntityId + code/name)
     const uniqueKey = template.code
       ? `${legalEntityId}-${template.code}`
       : `${legalEntityId}-${template.name}`;
-
-    // Check if account already exists
-    const existingAccount = await prisma.account.findFirst({
-      where: {
-        org_id: orgId,
-        legal_entity_id: legalEntityId,
-        OR: [
-          template.code ? { code: template.code } : {},
-          { name: template.name }
-        ].filter(condition => Object.keys(condition).length > 0)
-      }
-    });
-
-    if (existingAccount) {
-      console.log(`   ✓ Account exists: ${template.name} (${template.code || 'no code'})`);
-      createdAccounts.set(uniqueKey, {
-        id: existingAccount.id,
-        name: existingAccount.name,
-        classification: existingAccount.classification as AccountClassification,
-        code: existingAccount.code || undefined
-      });
-      return existingAccount.id;
-    }
-
-    // Create the account (we've already verified it doesn't exist above)
     const deterministicId = `acco_${uniqueKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    const newAccount = await prisma.account.create({
-      data: {
+
+    const alreadyExists = !!(await prisma.account.findUnique({
+      where: { id: deterministicId },
+      select: { id: true },
+    }));
+
+    const account = await prisma.account.upsert({
+      where: { id: deterministicId },
+      create: {
         id: deterministicId,
         name: template.name,
         classification: template.classification as any,
@@ -100,21 +96,35 @@ async function setupChartOfAccounts(orgId: string, legalEntityId: string, templa
         base_currency_id: resolvedCurrency?.id ?? null,
         is_active: true,
         created_at: new Date(),
-        modified_at: new Date()
-      }
+        modified_at: new Date(),
+      },
+      update: {
+        name: template.name,
+        classification: template.classification as any,
+        type: template.types,
+        code: template.code,
+        parent_account_id: parentId,
+        base_currency_id: resolvedCurrency?.id ?? null,
+        modified_at: new Date(),
+      },
     });
 
-    console.log(`   ✓ Created account: ${template.name} (${template.code || 'no code'})`);
+    if (alreadyExists) {
+      console.log(`   ✓ Account exists: ${template.name} (${template.code || 'no code'})`);
+      existingCount++;
+    } else {
+      console.log(`   ✓ Created account: ${template.name} (${template.code || 'no code'})`);
+      createdCount++;
+    }
 
-    // Store for parent-child relationships
     createdAccounts.set(uniqueKey, {
-      id: newAccount.id,
-      name: newAccount.name,
-      classification: newAccount.classification as AccountClassification,
-      code: newAccount.code || undefined
+      id: account.id,
+      name: account.name,
+      classification: account.classification as AccountClassification,
+      code: account.code || undefined,
     });
 
-    return newAccount.id;
+    return account.id;
   }
 
   // Recursive function to process the hierarchy
@@ -123,10 +133,7 @@ async function setupChartOfAccounts(orgId: string, legalEntityId: string, templa
     parentId?: string
   ): Promise<void> {
     for (const template of templates) {
-      // Create parent account first
       const accountId = await createAccount(template, parentId);
-
-      // Then create children recursively
       if (template.children && template.children.length > 0) {
         await processAccountHierarchy(template.children, accountId);
       }
@@ -140,7 +147,7 @@ async function setupChartOfAccounts(orgId: string, legalEntityId: string, templa
   const totalAccounts = createdAccounts.size;
   console.log('');
   console.log('📊 Chart of Accounts Setup Complete!');
-  console.log(`   Total accounts: ${totalAccounts}`);
+  console.log(`   Total accounts: ${totalAccounts} (created: ${createdCount}, existing: ${existingCount})`);
 
   // Show breakdown by classification
   const classificationCounts: Record<string, number> = {};
@@ -156,7 +163,7 @@ async function setupChartOfAccounts(orgId: string, legalEntityId: string, templa
   });
 
   console.log('');
-  return createdAccounts;
+  return { accounts: createdAccounts, created: createdCount, existing: existingCount };
 }
 
 if (require.main === module) {
@@ -177,7 +184,7 @@ if (require.main === module) {
       process.exit(1);
     })
     .finally(() => {
-      prisma.$disconnect();
+      defaultPrisma.$disconnect();
     });
 }
 

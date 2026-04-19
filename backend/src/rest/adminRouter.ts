@@ -414,4 +414,73 @@ adminRouter.post(
   }
 );
 
+// ─── Chart of Accounts Setup ──────────────────────────────────────────────────
+
+const COA_TEMPLATE_MAP: Record<string, { relativePath: string; currency: string }> = {
+  'indian':     { relativePath: 'prisma/setup-IN/chart-of-accounts.json',          currency: 'INR' },
+  'us-ca':      { relativePath: 'prisma/setup-US_CA/chart-of-accounts.json',       currency: 'USD' },
+  'perfin':     { relativePath: 'prisma/setup-PERFIN/chart-of-accounts.json',      currency: 'USD' },
+  'nri-india':  { relativePath: 'prisma/setup-NRI/chart-of-accounts-india.json',   currency: 'INR' },
+  'nri-canada': { relativePath: 'prisma/setup-NRI/chart-of-accounts-canada.json',  currency: 'CAD' },
+};
+
+function getBackendRootDir(): string {
+  // dist/rest/*.js or src/rest/*.ts → backend root (two levels up)
+  return path.join(__dirname, '..', '..');
+}
+
+adminRouter.post(
+  '/setup-chart-of-accounts',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    const userId = (req as any).user?.id;
+    if (!(await isSuperAdmin(userId))) {
+      return res.status(403).json({ error: 'Super Admin role required' });
+    }
+
+    const { entityId, coaTemplate } = req.body as { entityId?: string; coaTemplate?: string };
+
+    if (!entityId || typeof entityId !== 'string') {
+      return res.status(400).json({ error: 'entityId is required' });
+    }
+    if (!coaTemplate || !COA_TEMPLATE_MAP[coaTemplate]) {
+      return res.status(400).json({
+        error: `coaTemplate must be one of: ${Object.keys(COA_TEMPLATE_MAP).join(', ')}`,
+      });
+    }
+
+    const entity = await prisma.entity.findUnique({ where: { id: entityId } });
+    if (!entity) {
+      return res.status(404).json({ error: `Entity not found: ${entityId}` });
+    }
+
+    const orgId = entity.org_id;
+    const { relativePath, currency } = COA_TEMPLATE_MAP[coaTemplate];
+    const absoluteTemplatePath = path.join(getBackendRootDir(), relativePath);
+
+    if (!fs.existsSync(absoluteTemplatePath)) {
+      return res.status(500).json({
+        error: `COA template file not found on server: ${relativePath}`,
+      });
+    }
+
+    try {
+      const { setupChartOfAccounts } = await import('../../prisma/setup-chart-of-accounts');
+      const result = await setupChartOfAccounts(orgId, entityId, absoluteTemplatePath, currency, prisma);
+
+      return res.status(200).json({
+        success: true,
+        entityId,
+        orgId,
+        template: coaTemplate,
+        currency,
+        counts: { created: result.created, existing: result.existing, total: result.accounts.size },
+      });
+    } catch (err: any) {
+      logger.error('setup-chart-of-accounts error', { error: err?.message, stack: err?.stack });
+      return res.status(500).json({ error: err?.message || 'Failed to setup chart of accounts' });
+    }
+  }
+);
+
 export default adminRouter;

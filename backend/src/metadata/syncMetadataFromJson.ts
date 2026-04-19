@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import { runSeedAgentTemplatesSql } from './seedAgentTemplatesSql';
+import { runSeedCurrenciesSql } from './seedCurrenciesSql';
 
 const prisma = new PrismaClient();
 
@@ -278,6 +279,12 @@ export async function main(
     if (totalViewsErrors > 0 || totalTemplatesErrors > 0) {
       console.log(`   Total Errors: ${totalViewsErrors + totalTemplatesErrors}`);
     }
+    console.log('');
+
+    console.log('💱 Seeding global currencies (prisma/seed-currencies.sql)...');
+    console.log('');
+    runSeedCurrenciesSql(getBackendRootDir());
+    console.log('✅ Currencies seed complete (seed-currencies.sql).');
     console.log('');
 
     console.log('🤖 Seeding system agent templates (prisma/seed-agent-templates.sql)...');

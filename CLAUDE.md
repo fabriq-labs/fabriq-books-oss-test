@@ -1,6 +1,6 @@
 # Fabriq Financial Suite - AI Context Guide
 
-**Last Updated**: 2026-04-04
+**Last Updated**: 2026-04-18
 
 ---
 
@@ -175,7 +175,8 @@ WHERE wi.model_id = 'RECORD_ID';
 2. **Use views** for all data access (never bypass)
 3. **Follow conventions**: snake_case for DB, camelCase for TS
 4. **Check permissions** before any operation
-5. **Filter by org_id** for all data queries
+5. **Filter by org_id** for all data queries — except models in `METADATA_MODELS_WITHOUT_ORG_FILTER`: `role`, `view`, `permission`, `role_view`, `workflow_*`, `prompt_template`, `currency`
+6. **Currency is global** — `currency` rows use `org_id = 'system'` and are visible to all tenants. Do not filter currency queries by `org_id`.
 
 ### Proactive Database Querying
 

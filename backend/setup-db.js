@@ -259,6 +259,29 @@ async function main() {
       }
       console.log("");
 
+      // Step 1.7: Seed global currencies
+      console.log("💱 Step 1.7: Seeding global currencies...");
+      const seedCurrenciesSqlPath = path.join(
+        __dirname,
+        "prisma",
+        "seed-currencies.sql"
+      );
+
+      if (fs.existsSync(seedCurrenciesSqlPath)) {
+        console.log(`Target: ${databaseTargetLog}`);
+        try {
+          runPrismaSqlFile(seedCurrenciesSqlPath, "Global currencies seeded");
+          console.log("✅ Global currencies seeded successfully");
+        } catch (error) {
+          console.error("⚠️  Error seeding currencies:", error.message);
+          console.log("   Continuing setup...");
+        }
+      } else {
+        console.log(`⚠️  Currency SQL file not found at: ${seedCurrenciesSqlPath}`);
+        console.log("   Skipping currency seed...");
+      }
+      console.log("");
+
       // Step 2: Setup metadata (roles, views, permissions)
       console.log("👥 Step 2: Setting up metadata...");
       console.log("Command: npx ts-node prisma/setup-metadata.ts");

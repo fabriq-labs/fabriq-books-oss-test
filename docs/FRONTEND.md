@@ -109,7 +109,12 @@ frontend-1/
 │   ├── index.css                   # Global styles + Tailwind
 │   │
 │   ├── api/
-│   │   └── api.ts                  # Unified API client
+│   │   ├── api.ts                  # Barrel re-export — preserves all existing imports
+│   │   ├── apiClient.ts            # Shared fetch helpers + API_URL constant
+│   │   ├── metadataApi.ts          # viewAPI, workflowAPI, userAPI, attachmentAPI, erpConnectionsAPI, …
+│   │   ├── agentApi.ts             # sessionAPI, agentTemplateAPI, pendingActionAPI, agentAPI
+│   │   ├── postingApi.ts           # invoiceAPI, importAPI, reportAPI
+│   │   └── superAdminApi.ts        # adminAPI (onboard tenant, COA setup, sync metadata, DB reset)
 │   │
 │   ├── contexts/
 │   │   ├── AuthContext.tsx         # Authentication state
@@ -301,12 +306,48 @@ const bulkActions: BulkAction[] = [
 /{type}/{id}/state/{stateId}           → Detail page with actions
 ```
 
+**C. Super Admin Routes** (wrapped in `<SuperAdminGuard>`):
+
+```
+/settings/tenant-admin     → TenantAdministrationPage (COA setup, metadata sync, onboard tenant, DB reset)
+/settings/workflows        → WorkflowManagementPage
+/settings/views            → Views master
+/settings/permissions      → Permissions master
+/settings/roles            → Roles master
+/settings/ai-templates     → AI Templates (prompt + agent templates)
+/settings/llm-traces       → LLM trace viewer
+/accounting/currency       → Currency master (global — accessible via Super Admin sidebar)
+```
+
+Old routes redirect to the unified page:
+- `/settings/tenant-onboarding` → `/settings/tenant-admin`
+- `/settings/dev-options` → `/settings/tenant-admin`
+- `/settings/demo-database-reset` → `/settings/tenant-admin`
+
 ### 3. API Integration
 
-All API calls go through `src/api/api.ts`:
+The API layer is split into focused modules under `src/api/`. Import directly from the module or from the barrel:
 
 ```typescript
-// List/Search
+// Preferred — import from the focused module
+import { viewAPI } from '@/api/metadataApi';
+import { agentAPI } from '@/api/agentApi';
+import { adminAPI } from '@/api/superAdminApi';
+
+// Also works — barrel re-export keeps all existing imports working
+import { viewAPI, agentAPI, adminAPI } from '@/api/api';
+```
+
+| Module | Exports |
+|--------|---------|
+| `apiClient.ts` | `API_URL`, `fetchAPI`, `uploadAPI`, `fetchBinaryAPI` |
+| `metadataApi.ts` | `viewAPI`, `workflowAPI`, `workflowManagementAPI`, `bulkEditAPI`, `modelSchemaAPI`, `datagraphAPI`, `userAPI`, `erpConnectionsAPI`, `attachmentAPI` |
+| `agentApi.ts` | `sessionAPI`, `agentTemplateAPI`, `pendingActionAPI`, `agentAPI` |
+| `postingApi.ts` | `invoiceAPI`, `importAPI`, `reportAPI` |
+| `superAdminApi.ts` | `adminAPI` |
+
+```typescript
+// View/Search
 viewAPI.search(type, view, page, pageSize, searchTerm, filters, sortOption);
 
 // CRUD
@@ -322,6 +363,12 @@ viewAPI.deleteChild(type, id, view, childRelation, childId);
 // Workflow
 workflowAPI.update(workflowInstanceId, actionId, { comment });
 workflowAPI.getHistory(type, instanceId);
+
+// Super Admin
+adminAPI.setupChartOfAccounts({ entityId, coaTemplate });
+adminAPI.devOptionsSyncMetadata();
+adminAPI.demoDatabaseReset({ demoData, demoDataOnly });
+adminAPI.onboardTenant({ tenant, adminUsers });
 ```
 
 ### 4. Authentication Flow

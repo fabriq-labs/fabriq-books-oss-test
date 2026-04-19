@@ -62,7 +62,7 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 
 ## 🎯 Setup Overview
 
-The Fabriq deployment process consists of **5 main steps**:
+The Fabriq deployment process consists of several steps:
 
 ```
 Step 0.5: Validate Prisma Schema
@@ -72,6 +72,8 @@ Step 1: Reset Database Schema (DDL)
 Step 1.5: Load Database Functions
     ↓
 Step 1.6: Setup Fabriq Source System
+    ↓
+Step 1.7: Seed Global Currencies (25 currencies, org_id='system')
     ↓
 Step 2: Setup Metadata (Roles, Views, Permissions)
     ↓
@@ -191,6 +193,17 @@ Command: psql "${DATABASE_URL}" -f "prisma/setup-fabriq-source-system.sql"
 - Initializes system constants
 
 **File**: `prisma/setup-fabriq-source-system.sql`
+
+#### Step 1.7: Seed Global Currencies
+```bash
+Command: npx prisma db execute --schema prisma/schema.prisma --file prisma/seed-currencies.sql
+```
+- Seeds 25 global currencies (USD, EUR, GBP, INR, CAD, AUD, …) with deterministic IDs (`curr_usd`, `curr_inr`, etc.)
+- Upsert-safe — safe to run repeatedly; existing rows are updated in-place
+- Currencies use `org_id = 'system'` and are visible to all tenants (exempt from per-tenant org filter)
+- Also runs automatically on every "Sync Metadata" call from the UI
+
+**File**: `prisma/seed-currencies.sql`
 
 #### Step 2: Setup Metadata
 ```bash

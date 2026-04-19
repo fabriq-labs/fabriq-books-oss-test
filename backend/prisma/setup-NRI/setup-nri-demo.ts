@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
-import { setupCurrency } from '../setup-currency';
+
 import prisma from '../../src/lib/prisma';
 const csv = require('csv-parser');
 
@@ -52,12 +52,6 @@ async function setupNRIDemoData() {
       });
     }
     console.log(`  ✓ Loaded ${orgData.length} tenant(s)`);
-
-    // ===== 1.5. SETUP CURRENCY FROM CSV (before entity — basecurrency_id FK → currency.id) =====
-    console.log('💱 Loading currency from CSV...');
-    await setupCurrency(path.join(__dirname, 'currency.csv'));
-    const currencyData = await loadCsvData(path.join(__dirname, 'currency.csv'));
-    console.log(`  ✓ Loaded ${currencyData.length} currencies`);
 
     // ===== 2. LOAD AND INSERT ORGANIZATION DATA (LEGAL ENTITIES) =====
     console.log('🏢 Loading organization (legal entity) data...');
@@ -201,7 +195,7 @@ async function setupNRIDemoData() {
     console.log('');
     console.log('📊 Summary:');
     console.log(`   🏢 Tenant: ${orgData.length} (Rajesh Kumar)`);
-    console.log(`   💱 Currencies: ${currencyData.length}`);
+
     console.log(`   🏠 Organizations (Legal Entities): ${organizationData.length}`);
     console.log(`      - Rajesh (Canada) - Toronto, Ontario (CAD accounts: RRSP, TFSA, GICs, etc.)`);
     console.log(`      - Rajesh (India) - Chennai, Tamil Nadu (INR accounts: PPF, EPF, NPS, FDs, etc.)`);

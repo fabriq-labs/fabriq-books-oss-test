@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
-import { setupCurrency } from '../setup-currency';
+
 import prisma from '../../src/lib/prisma';
 import { buildAirbyteExtractionConfigFromEnv } from '../setup-airbyte-extraction-config';
 import {
@@ -72,12 +72,6 @@ async function setupIndianDemoData() {
       });
     }
     console.log(`  ✓ Loaded ${orgData.length} organizations`);
-
-    // ===== 1.5. SETUP CURRENCY FROM CSV (before entity — basecurrency_id FK → currency.id) =====
-    console.log('💱 Loading currency from CSV...');
-    await setupCurrency(path.join(__dirname, 'currency.csv'));
-    const currencyData = await loadCsvData(path.join(__dirname, 'currency.csv'));
-    console.log(`  ✓ Loaded ${currencyData.length} currencies`);
 
     // ===== 2. LOAD AND INSERT ORGANIZATION DATA =====
     console.log('🏢 Loading business organization data...');
@@ -674,30 +668,25 @@ async function setupIndianDemoData() {
       return acc.id;
     };
 
-    const currencyIdByOrgAndCode = async (orgId: string, isoCode: string) => {
+    // Currencies are global (org_id = 'system') — look up by code only
+    const currencyIdByCode = async (isoCode: string) => {
       const code = isoCode.toUpperCase();
-      const cur = await prisma.currency.findFirst({
-        where: { org_id: orgId, code },
-      });
+      const cur = await prisma.currency.findUnique({ where: { code } });
       if (!cur) {
-        throw new Error(`Indian demo: currency code "${code}" not found for org ${orgId}`);
+        throw new Error(`Indian demo: currency code "${code}" not found in global currency table`);
       }
       return cur.id;
     };
 
-    /** exchange_rate.csv: use public.currency.id (e.g. cur_iso_USD); ISO code fallback for legacy rows */
-    const exchangeRateCurrencyId = async (orgId: string, cell: string | undefined) => {
+    /** exchange_rate.csv: use public.currency.id (e.g. curr_usd); ISO code fallback for legacy rows */
+    const exchangeRateCurrencyId = async (_orgId: string, cell: string | undefined) => {
       const raw = csvStr(cell ?? '');
       if (!raw) {
-        throw new Error(`Indian demo: exchange_rate row missing currency id/code for org ${orgId}`);
+        throw new Error(`Indian demo: exchange_rate row missing currency id/code`);
       }
-      const byIdOrg = await prisma.currency.findFirst({
-        where: { id: raw, org_id: orgId },
-      });
-      if (byIdOrg) return byIdOrg.id;
       const byId = await prisma.currency.findUnique({ where: { id: raw } });
       if (byId) return byId.id;
-      return currencyIdByOrgAndCode(orgId, raw);
+      return currencyIdByCode(raw);
     };
 
     console.log('🧾 Loading sales orders and line items from CSV...');
@@ -983,8 +972,7 @@ async function setupIndianDemoData() {
     for (const row of holdingRows) {
       const accId = await accountIdByCoaCode(csvStr(row.account_code));
       const holdingOrgId = csvStr(row.org_id) || 'org_indian_demo';
-      const currencyId = await currencyIdByOrgAndCode(
-        holdingOrgId,
+      const currencyId = await currencyIdByCode(
         csvStr(row.currency) || 'INR',
       );
       const lastTradeOff = parseInt(row.last_trade_days_offset, 10);

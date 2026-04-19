@@ -46,6 +46,7 @@ import CreateConnectionPage from "./pages/settings/CreateConnectionPage";
 import ConnectionDetailPage from "./pages/settings/ConnectionDetailPage";
 import TenantOnboardingPage from "./pages/settings/TenantOnboardingPage";
 import DeveloperOptionsPage from "./pages/settings/DeveloperOptionsPage";
+import TenantAdministrationPage from "./pages/settings/TenantAdministrationPage";
 import { SuperAdminGuard } from "./components/layout/SuperAdminGuard";
 import { PromptTemplateForm } from "./components/forms/Masters/PromptTemplateForm";
 import { AgentTemplateForm } from "./components/forms/Masters/AgentTemplateForm";
@@ -419,18 +420,14 @@ const AppRoutes: React.FC = () => {
                   </SuperAdminGuard>
                 } />
 
-                <Route path="settings/tenant-onboarding" element={
+                <Route path="settings/tenant-admin" element={
                   <SuperAdminGuard>
-                    <TenantOnboardingPage />
+                    <TenantAdministrationPage />
                   </SuperAdminGuard>
                 } />
-
-                <Route path="settings/dev-options" element={
-                  <SuperAdminGuard>
-                    <DeveloperOptionsPage />
-                  </SuperAdminGuard>
-                } />
-                <Route path="settings/demo-database-reset" element={<Navigate to="/settings/dev-options" replace />} />
+                <Route path="settings/tenant-onboarding" element={<Navigate to="/settings/tenant-admin" replace />} />
+                <Route path="settings/dev-options" element={<Navigate to="/settings/tenant-admin" replace />} />
+                <Route path="settings/demo-database-reset" element={<Navigate to="/settings/tenant-admin" replace />} />
 
                 {/* Investments Routes */}
                 <Route path="investments/instruments" element={<Master type="instrument" view="instrument_view" displayName="Instruments" />} />

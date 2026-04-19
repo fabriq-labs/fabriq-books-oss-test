@@ -22,7 +22,8 @@ export class DataAccessLayer {
     'view',
     'permission',
     'role_view',
-    'prompt_template'
+    'prompt_template',
+    'currency', // Global platform data — seeded once, shared across all tenants
   ];
 
   private constructor(prisma: PrismaClient) {

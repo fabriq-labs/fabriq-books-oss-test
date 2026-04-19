@@ -1,11 +1,11 @@
 id,base_currency,from_currency,currency_value,name,status,org_id
-cur_iso_USD,USD,USD,1,US Dollar,Active,org_techflow_us
-cur_iso_EUR,EUR,EUR,1,Euro,Active,org_techflow_us
-cur_iso_GBP,GBP,GBP,1,British Pound,Active,org_techflow_us
-cur_iso_INR,INR,INR,1,Indian Rupee,Active,org_techflow_us
-cur_iso_JPY,JPY,JPY,1,Japanese Yen,Active,org_techflow_us
-cur_iso_CAD,CAD,CAD,1,Canadian Dollar,Active,org_techflow_us
-cur_iso_AUD,AUD,AUD,1,Australian Dollar,Active,org_techflow_us
-cur_iso_CHF,CHF,CHF,1,Swiss Franc,Active,org_techflow_us
-cur_iso_CNY,CNY,CNY,1,Chinese Yuan,Active,org_techflow_us
-cur_iso_SGD,SGD,SGD,1,Singapore Dollar,Active,org_techflow_us
+curr_usd,USD,USD,1,US Dollar,Active,org_techflow_us
+curr_eur,EUR,EUR,1,Euro,Active,org_techflow_us
+curr_gbp,GBP,GBP,1,British Pound,Active,org_techflow_us
+curr_inr,INR,INR,1,Indian Rupee,Active,org_techflow_us
+curr_jpy,JPY,JPY,1,Japanese Yen,Active,org_techflow_us
+curr_cad,CAD,CAD,1,Canadian Dollar,Active,org_techflow_us
+curr_aud,AUD,AUD,1,Australian Dollar,Active,org_techflow_us
+curr_chf,CHF,CHF,1,Swiss Franc,Active,org_techflow_us
+curr_cny,CNY,CNY,1,Chinese Yuan,Active,org_techflow_us
+curr_sgd,SGD,SGD,1,Singapore Dollar,Active,org_techflow_us

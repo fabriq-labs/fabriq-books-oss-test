@@ -174,8 +174,9 @@ View {
 
 ### 3. Multi-Tenancy
 - Every user has `org_id`
-- DataAccessLayer auto-adds `WHERE org_id = user.org_id`
-- Metadata models (role, view) are exempt
+- `DataAccessLayer.addOrgFilter()` auto-adds `WHERE org_id = user.org_id` to all queries
+- Models in `METADATA_MODELS_WITHOUT_ORG_FILTER` are exempt: `role`, `workflow_flow`, `workflow_state`, `workflow_action`, `view`, `permission`, `role_view`, `prompt_template`, `currency`
+- **Currency is global platform data** — seeded once at `org_id = 'system'` via `prisma/seed-currencies.sql`, shared across all tenants. Adding a new globally-shared model requires adding it to this list in `DataAccessLayer.ts`.
 
 ### 4. Auto-Generated Routes
 For every Prisma model, these routes are auto-created:
@@ -282,7 +283,8 @@ npx prisma generate
 | `POST /api/parse-document/{model}` | PDF extraction |
 | `POST /api/workflow/instances/{id}/actions/{actionId}` | Execute workflow action |
 | `POST /api/admin/demo-database-reset` | Super Admin: start `setup-db.js` in background. Body: `demoData` (`indian-demo` \| `us-ca-demo` \| `perfin-demo` \| `both` \| `nri`), optional `demoDataOnly` (adds `--demo-data-only`), optional `runTests` (default false; true omits `--skip-tests` and runs `npm test -- src/__tests__`). Disabled when `ALLOW_DEMO_RESET_API` is false and `NODE_ENV=production`. Child stdout/stderr is printed to the backend process console (`[demo-database-reset/setup-db …]`). |
-| `POST /api/admin/dev-options/sync-metadata` | Super Admin: runs `syncMetadataFromJson()` (same pipeline as `npm run sync-metadata`): views + prompt templates from `prisma/metadata`, then `prisma db execute` on `prisma/seed-agent-templates.sql`. Returns JSON with counts and `agentTemplatesSeeded`. Disabled when `ALLOW_DEV_OPTIONS_API` is false and `NODE_ENV=production`. Cannot run concurrently with `demo-database-reset`. |
+| `POST /api/admin/dev-options/sync-metadata` | Super Admin: runs `syncMetadataFromJson()` (same pipeline as `npm run sync-metadata`): views + prompt templates from `prisma/metadata`, then seeds currencies (`prisma/seed-currencies.sql`) and agent templates (`prisma/seed-agent-templates.sql`). Returns JSON with counts and `agentTemplatesSeeded`. Disabled when `ALLOW_DEV_OPTIONS_API` is false and `NODE_ENV=production`. Cannot run concurrently with `demo-database-reset`. |
+| `POST /api/admin/setup-chart-of-accounts` | Super Admin: runs `setupChartOfAccounts()` for a specific legal entity. Body: `entityId` (string), `coaTemplate` (`indian` \| `us-ca` \| `perfin` \| `nri-india` \| `nri-canada`). Returns `{ success, entityId, orgId, template, currency, counts: { created, existing, total } }`. Idempotent — existing accounts are preserved (upsert by deterministic ID). |
 
 ## Search Query Filters
 
@@ -327,13 +329,18 @@ model example {
 |------|---------|
 | `src/index.ts` | Server bootstrap, route setup |
 | `src/services/core/ModelService.ts` | All CRUD logic |
-| `src/services/dal/DataAccessLayer.ts` | Prisma wrapper + org filtering |
+| `src/services/dal/DataAccessLayer.ts` | Prisma wrapper + org filtering + `METADATA_MODELS_WITHOUT_ORG_FILTER` |
 | `src/services/permissions/PermissionService.ts` | RBAC logic |
 | `src/rest/routes.ts` | Route generation |
+| `src/rest/adminRouter.ts` | Super Admin API: onboard tenant, COA setup, sync metadata, DB reset |
 | `src/auth/middleware.ts` | JWT validation |
 | `src/agent/AgentService.ts` | AI chat handler |
+| `src/metadata/syncMetadataFromJson.ts` | Metadata sync pipeline (views, prompts, currencies, agent templates) |
 | `prisma/schema/*.prisma` | Database schema |
-| `setup-db.js` | Database initialization script |
+| `prisma/seed-currencies.sql` | 25 global currencies — upsert-safe, `org_id = 'system'` |
+| `prisma/seed-agent-templates.sql` | Agent template seeds |
+| `prisma/setup-chart-of-accounts.ts` | COA setup per legal entity + currency, returns `{ created, existing }` counts |
+| `setup-db.js` | Database initialization script (Step 1.7 seeds global currencies) |
 
 ## Debugging Tips
 
