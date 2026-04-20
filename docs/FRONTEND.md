@@ -586,6 +586,12 @@ export const SupplierForm = () => {
 | `ProtectedRouteWithLoading` | Auth guard                   | `components/layout/`                  |
 | `FilterModal`               | Advanced filters             | `components/filter/FilterModal.tsx`   |
 
+### Known Technical Debt
+
+**`EnhancedFilterBadges` (`components/filter/EnhancedFilterBadges.tsx`)** contains hardcoded domain knowledge — it has explicit `if (field === "known_field_name")` cases for ~15 fields (`legal_entity_id`, `supplier_id`, `account_id_or_credit_account_id`, etc.) each with model-specific API lookups and label strings. This works but means every new field that needs a resolved label requires editing this generic component.
+
+The right fix is a caller-provided `labelConfig` prop so each `Master` consumer describes its own field labels and lookups, and `EnhancedFilterBadges` becomes truly generic. This refactor has been deferred — see `docs/FILTER_SYSTEM.md` for the full filter architecture.
+
 ## Adding a New Master Data Type
 
 1. **Add route in `App.tsx`**:

@@ -27,6 +27,17 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
       filters.legal_entity_ids,
       filters.currency_id ?? filters.currency
     );
+  } else if (report_id === "personal_income") {
+    const entityId = filters.legal_entity_id;
+    return await getIncomeStatement(
+      filters.from_date,
+      filters.to_date,
+      context.user.org_id,
+      undefined,
+      entityId ? [entityId] : undefined,
+      filters.currency_id ?? filters.currency,
+      2 // cap at level 2 (3 levels: 0, 1, 2)
+    );
   }
   else if (report_id === "networth") {
     const assets = await getNetworthForAssets(

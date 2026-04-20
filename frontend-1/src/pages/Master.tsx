@@ -18,7 +18,7 @@ import { useChat as useChatContext } from "@/contexts/ChatContext";
 import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
 import { BulkAction, MergeRow } from "@/types/bulkActions";
 import type { CellHighlightMap } from "@/components/masters/DynamicTable";
-import type { CustomRowRenderer } from "@/types/customRowRenderer";
+import type { CustomRowRenderer, FilterEnhancements } from "@/types/customRowRenderer";
 
 /**
  * Handle exposed to parent components via ref.
@@ -75,6 +75,24 @@ interface MasterProps {
     direction: "asc" | "desc";
   };
   defaultFilters?: Record<string, any>;
+  /**
+   * Filters seeded into the user-controlled filter state on mount.
+   *
+   * Unlike `defaultFilters` (which are permanent and invisible to the user),
+   * `presetFilters` populate `appliedFilters` so they appear as removable badge
+   * chips and participate in the normal filter UI lifecycle.
+   *
+   * ## Virtual composite keys
+   * A key of the form `"fieldA_or_fieldB"` is treated as a virtual OR filter.
+   * It renders as a single badge and is expanded to a Prisma OR clause before
+   * the API call, e.g.:
+   *   `account_id_or_credit_account_id: { eq: "abc" }`
+   * expands to:
+   *   `OR: [{ account_id: { eq: "abc" } }, { credit_account_id: { eq: "abc" } }]`
+   *
+   * See `expandVirtualFilters` for the expansion logic.
+   */
+  presetFilters?: Record<string, any>;
   /** Optional content rendered next to the page title (e.g. segmented control) */
   titleExtra?: React.ReactNode;
   /** Optional map of rowId → columnKey for cell-level highlighting */
@@ -88,6 +106,8 @@ interface MasterProps {
   isImport?: boolean;
   /** When provided, replaces metadata-generated columns and body rendering in DynamicTable */
   customRowRenderer?: CustomRowRenderer;
+  /** Optional per-field filter enhancements (e.g. extra search filters for specific dropdowns) */
+  filterEnhancements?: FilterEnhancements;
 }
 
 type DateRangeType = {
@@ -102,6 +122,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   filterConfig,
   defaultSortOption,
   defaultFilters,
+  presetFilters,
   listConfig,
   bulkActions,
   supportPath,
@@ -112,6 +133,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   isCreate,
   isImport,
   customRowRenderer,
+  filterEnhancements,
 }, masterRef) => {
   // Extract import-related config from listConfig.importConfig
   const {
@@ -143,12 +165,23 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   const [showImport, setShowImport] = useState(false);
 
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>({});
-  const [filterOutput, setFilterOutput] = useState<string>("");
+  // Seeded from presetFilters on mount so drill-through filters appear as removable badges.
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>(
+    () => presetFilters ?? {}
+  );
+  const [filterOutput, setFilterOutput] = useState<string>(
+    () => (presetFilters && Object.keys(presetFilters).length > 0 ? JSON.stringify(presetFilters) : "")
+  );
   const [filterSearchOutput, setFilterSearchOutput] = useState<any>({});
-  const [dateRange, setDateRange] = useState<DateRangeType>({
-    from: undefined,
-    to: undefined,
+  // Seeded from presetFilters when a date range key is configured, so the FilterModal
+  // date picker reflects drill-through dates on open.
+  const [dateRange, setDateRange] = useState<DateRangeType>(() => {
+    const dateKey = filterConfig?.dateRangeFilter?.key;
+    const vd = dateKey ? presetFilters?.[dateKey] : undefined;
+    if (vd?.gte && vd?.lte) {
+      return { from: new Date(vd.gte), to: new Date(vd.lte) };
+    }
+    return { from: undefined, to: undefined };
   });
 
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
@@ -209,6 +242,10 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
     delete newFilters[field];
     setAppliedFilters(newFilters);
     setFilterOutput(JSON.stringify(newFilters, null, 2));
+    // Keep dateRange in sync when the date range chip is individually cleared.
+    if (field === filterConfig?.dateRangeFilter?.key) {
+      setDateRange({ from: undefined, to: undefined });
+    }
   };
 
   const handleClearAllFilters = () => {
@@ -218,10 +255,13 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   };
 
   useEffect(() => {
+    // Reset pagination and import UI when the model/view changes.
+    // Do NOT clear appliedFilters here — that would wipe presetFilters seeded on mount.
+    // Filter state is only cleared by the user via "Clear All" or closing the import flow.
     setPage(1);
     setPageSize(10);
     setTotal(0);
-    clearImport();
+    setShowImport(false);
     setSelectedRows([]);
   }, [type, view]);
 
@@ -302,6 +342,41 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
     return result;
   };
 
+  /**
+   * Expands virtual composite keys (e.g. `account_id_or_credit_account_id`) into
+   * proper Prisma OR clauses before the filter object is sent to the API.
+   *
+   * A virtual key has the form `"fieldA_or_fieldB"` and a value shaped like a
+   * normal single-field filter operator object, e.g. `{ eq: "abc" }`.
+   * It is rewritten to: `OR: [{ fieldA: <value> }, { fieldB: <value> }]`
+   *
+   * Any existing `OR` array is preserved and merged.
+   *
+   * This keeps the badge/chip UI simple (one key → one badge) while allowing
+   * OR semantics in the actual query. See Master `presetFilters` JSDoc for usage.
+   */
+  const expandVirtualFilters = (filters: Record<string, any>): Record<string, any> => {
+    const result: Record<string, any> = {};
+    const orClauses: any[] = [];
+
+    for (const [key, value] of Object.entries(filters)) {
+      const orMatch = key.match(/^(.+?)_or_(.+)$/);
+      if (orMatch) {
+        const [, fieldA, fieldB] = orMatch;
+        orClauses.push({ [fieldA]: value }, { [fieldB]: value });
+      } else {
+        result[key] = value;
+      }
+    }
+
+    if (orClauses.length > 0) {
+      const existing = result.OR ? (Array.isArray(result.OR) ? result.OR : [result.OR]) : [];
+      result.OR = [...existing, ...orClauses];
+    }
+
+    return result;
+  };
+
   const fetchModelData = () => {
     setIsLoading(true);
     const sortOption = defaultSortOption
@@ -310,10 +385,12 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
       }
       : {};
 
-    const userFilters = {
+    const rawUserFilters = {
       ...JSON.parse(filterOutput || "{}"),
       ...filterSearchOutput,
     };
+    // Expand virtual composite keys (e.g. account_id_or_credit_account_id) to OR clauses.
+    const userFilters = expandVirtualFilters(rawUserFilters);
 
     const allFilters = mergeFiltersWithAnd(userFilters, defaultFilters || {});
 
@@ -717,7 +794,14 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
         metaData={masterList?.metaData}
         onClose={() => setIsFilterModalOpen(false)}
         onApplyFilters={handleApplyFilters}
-        initialFilters={appliedFilters}
+        initialFilters={Object.fromEntries(
+          // Strip virtual composite keys (fieldA_or_fieldB) — they represent OR conditions
+          // across multiple fields which the FilterModal cannot represent. They remain
+          // visible as badge chips in EnhancedFilterBadges with a label that explains
+          // the OR semantics (e.g. "Account (debit or credit): X").
+          Object.entries(appliedFilters).filter(([key]) => !/_or_/.test(key))
+        )}
+        filterEnhancements={filterEnhancements}
         dateRangeFilter={{
           ...filterConfig?.dateRangeFilter,
           dateRange: dateRange,

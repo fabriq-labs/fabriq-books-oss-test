@@ -45,7 +45,7 @@ export function createPostingRowRenderer(predictedFields: CellHighlightMap): Cus
             )}
             {(record.legal_entity?.legal_name || record.legal_entity?.name) && (
               <div className="mt-1">
-                <Badge variant="outline" className="text-xs py-0 h-5">
+                <Badge variant="outline" className="text-xs py-0 h-5 font-normal text-muted-foreground border-muted-foreground/30 bg-muted/40">
                   {record.legal_entity.legal_name || record.legal_entity.name}
                 </Badge>
               </div>
@@ -59,6 +59,13 @@ export function createPostingRowRenderer(predictedFields: CellHighlightMap): Cus
             })}>
               {record.account?.name || '—'}
             </span>
+            {record.account?.code && (
+              <div className="mt-0.5">
+                <Badge variant="outline" className="text-xs py-0 h-4 font-normal text-muted-foreground border-muted-foreground/30 bg-muted/40">
+                  {record.account.code}
+                </Badge>
+              </div>
+            )}
           </TableCell>
 
           {/* Credit account — highlight if AI predicted */}
@@ -68,6 +75,13 @@ export function createPostingRowRenderer(predictedFields: CellHighlightMap): Cus
             })}>
               {record.credit_account?.name || record.category?.name || '—'}
             </span>
+            {record.credit_account?.code && (
+              <div className="mt-0.5">
+                <Badge variant="outline" className="text-xs py-0 h-4 font-normal text-muted-foreground border-muted-foreground/30 bg-muted/40">
+                  {record.credit_account.code}
+                </Badge>
+              </div>
+            )}
           </TableCell>
 
           {/* Amount with currency prefix — debit account currency, fall back to credit account */}

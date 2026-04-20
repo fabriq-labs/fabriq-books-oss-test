@@ -24,7 +24,7 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
 
     // Memoize the account IDs to prevent unnecessary re-renders
 
-    const { legalEntityIds, businessUnitIds, coaCodeIds, coaIds, budgetLineIds, budgetPeriodIds, locationIds, costCenterIds, departmentIds, supplierIds, paymentTermIds, shippingTermIds, shippingMethodIds, currencyMasterIds, itemIds } = useMemo(() => {
+    const { legalEntityIds, businessUnitIds, coaCodeIds, coaIds, budgetLineIds, budgetPeriodIds, locationIds, costCenterIds, departmentIds, supplierIds, paymentTermIds, shippingTermIds, shippingMethodIds, currencyMasterIds, itemIds, accountOrIds } = useMemo(() => {
         const legalEntityIds = new Set<string>();
         const businessUnitIds = new Set<string>();
         const coaCodeIds = new Set<string>();
@@ -40,6 +40,8 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
         const shippingMethodIds = new Set<string>();
         const currencyMasterIds = new Set<string>();
         const itemIds = new Set<string>();
+        // Virtual composite key: account_id_or_credit_account_id — see Master presetFilters docs.
+        const accountOrIds = new Set<string>();
 
         Object.entries(filters).forEach(([field, value]) => {
             if (field === "legal_entity_id") {
@@ -104,6 +106,10 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
                 if (value.eq) itemIds.add(value.eq);
                 if (value.neq) itemIds.add(value.neq);
             }
+            // Virtual composite key produced by Master's presetFilters mechanism.
+            if (field === "account_id_or_credit_account_id") {
+                if (value.eq) accountOrIds.add(value.eq);
+            }
         });
 
         return {
@@ -121,7 +127,8 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
             shippingTermIds: Array.from(shippingTermIds),
             shippingMethodIds: Array.from(shippingMethodIds),
             currencyMasterIds: Array.from(currencyMasterIds),
-            itemIds: Array.from(itemIds)
+            itemIds: Array.from(itemIds),
+            accountOrIds: Array.from(accountOrIds),
         };
     }, [filters]);
 
@@ -173,6 +180,7 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
                 await fetchEntity(shippingMethodIds, "shipping_method", "shipping_method"); // shipping methods use 'shipping_method' as label
                 await fetchEntity(currencyMasterIds, "currency", "code"); // modern currency model: ISO code
                 await fetchEntity(itemIds, "item_master", "item_name"); // items use 'item_name' as label
+                await fetchEntity(accountOrIds, "account", "name"); // virtual OR key: account name
             } finally {
                 if (isMounted) {
                     setLabelMappings(prev => ({ ...prev, ...mappings }));
@@ -186,7 +194,7 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
         return () => {
             isMounted = false;
         };
-    }, [legalEntityIds, businessUnitIds, coaCodeIds, coaIds, budgetLineIds, budgetPeriodIds, locationIds, costCenterIds, departmentIds, supplierIds, paymentTermIds, shippingTermIds, shippingMethodIds, currencyMasterIds, itemIds]);
+    }, [legalEntityIds, businessUnitIds, coaCodeIds, coaIds, budgetLineIds, budgetPeriodIds, locationIds, costCenterIds, departmentIds, supplierIds, paymentTermIds, shippingTermIds, shippingMethodIds, currencyMasterIds, itemIds, accountOrIds]);
 
     // Early return after all hooks are called
     if (filterCount === 0) {
@@ -430,6 +438,16 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
             if (value.neq) {
                 const itemName = labelMappings[value.neq] || value.neq;
                 return `Item: Not "${itemName}"`;
+            }
+        }
+
+        // Virtual composite key: account_id_or_credit_account_id
+        // Produced by Master's presetFilters drill-through mechanism. Renders as a
+        // single "Account" badge; the OR expansion happens in Master before the API call.
+        if (field === "account_id_or_credit_account_id") {
+            if (value.eq) {
+                const accountName = labelMappings[value.eq] || value.eq;
+                return `Account (debit or credit): ${accountName}`;
             }
         }
 

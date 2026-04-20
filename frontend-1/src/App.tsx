@@ -83,6 +83,7 @@ import IncomeStatement from "./pages/reports/IncomeStatement";
 import CashFlow from "./pages/reports/CashFlow";
 import PostingList from "./pages/reports/PostingList";
 import BankTransactions from "./pages/reports/BankTransactions";
+import PersonalIncomeReport from "./pages/reports/PersonalIncomeReport";
 import Transactions from "./pages/Transactions";
 import { ReportControllerProvider } from "./contexts/ReportControllerContext";
 import { PaymentReceiptForm } from "./components/forms/Masters/PaymentReceiptForm";
@@ -157,6 +158,7 @@ const AppRoutes: React.FC = () => {
                 <Route path="reports/income-statement" element={<IncomeStatement />} />
                 <Route path="reports/cash-flow" element={<CashFlow />} />
                 <Route path="reports/posting-list" element={<PostingList />} />
+                <Route path="reports/personal-income" element={<PersonalIncomeReport />} />
 
                 {/* Sales Routes */}
                 <Route path="sales/customers" element={<Master type="customers" view="customers_view" displayName="Customers" />} />

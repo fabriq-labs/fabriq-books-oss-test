@@ -16,6 +16,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HQAccountMappingTab } from './HQAccountMappingTab';
+
+const FINANCIAL_YEAR_OPTIONS = [
+  { value: 'APR_MAR', label: 'April – March (India / UK)' },
+  { value: 'JAN_DEC', label: 'January – December (Calendar Year)' },
+  { value: 'JUL_JUN', label: 'July – June (Australia)' },
+  { value: 'OCT_SEP', label: 'October – September' },
+] as const;
+
 const organizationSchema = z.object({
   organization_name: z.string().min(1, { message: 'Organization Name is required' }),
   legal_name: z.string().min(1, { message: 'Legal Name is required' }),
@@ -29,31 +37,30 @@ const organizationSchema = z.object({
   is_it_a_groupcompany: z.string().min(1, { message: 'Is it a Group Company is required' }),
   group_company_name: z.string().optional(),
   basecurrency_id: z.string().optional(),
+  is_individual: z.string().optional(),
+  financial_year_type: z.enum(['APR_MAR', 'JAN_DEC', 'JUL_JUN', 'OCT_SEP']).optional(),
 });
 
-type ItemMasterValues = z.infer<typeof organizationSchema>;
+type OrganizationFormValues = z.infer<typeof organizationSchema>;
 
 interface ItemMasterFormProps {
   initialValues?: any;
   onSubmit?: (data: any) => Promise<void>;
   onCancel?: () => void;
   isSubmitting?: boolean;
-  uomOptions?: any[];
-  itemCategoryOptions?: any[];
-  supplierOptions?: any[];
 }
 
-export const OrganizationForm: React.FC<ItemMasterFormProps> = (
-) => {
-  const { id, viewId } = useParams<{ id: string, viewId: string }>();
+export const OrganizationForm: React.FC<ItemMasterFormProps> = () => {
+  const { id, viewId } = useParams<{ id: string; viewId: string }>();
   const [initialValues, setInitialValues] = useState<any>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const form = useForm<ItemMasterValues>({
+
+  const form = useForm<OrganizationFormValues>({
     resolver: zodResolver(organizationSchema),
-    defaultValues: initialValues || {
+    defaultValues: {
       organization_name: '',
       legal_name: '',
       address: '',
@@ -65,15 +72,16 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
       basecurrency_id: '',
       is_it_headquartres: '',
       is_it_a_groupcompany: '',
+      is_individual: '',
+      financial_year_type: undefined,
     },
   });
-  useEffect(() => {
-    if (id) {
-      fetchingDetails(id);
-    }
-  }, [id])
 
-  const fetchingDetails = (id: any) => {
+  useEffect(() => {
+    if (id) fetchingDetails(id);
+  }, [id]);
+
+  const fetchingDetails = (id: string) => {
     setIsLoading(true);
     viewAPI.getById("entity", id, viewId)
       .then((res: any) => {
@@ -90,66 +98,44 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
           basecurrency_id: res.data.basecurrency_id || '',
           is_it_headquartres: res.data.is_it_headquartres || '',
           is_it_a_groupcompany: res.data.is_it_a_groupcompany || '',
+          is_individual: res.data.is_individual != null ? String(res.data.is_individual) : '',
+          financial_year_type: res.data.financial_year_type || undefined,
         });
         setIsLoading(false);
-      }).catch((err) => {
+      })
+      .catch((err) => {
         setIsLoading(false);
         console.log(err);
       });
   };
 
-  const handleSubmit = async (data: ItemMasterValues) => {
+  const handleSubmit = async (data: OrganizationFormValues) => {
     try {
       setIsSubmitting(true);
-
       const submissionData = {
         ...data,
         basecurrency_id: data.basecurrency_id || undefined,
+        is_individual: data.is_individual === 'true' ? true : data.is_individual === 'false' ? false : undefined,
+        financial_year_type: data.financial_year_type || undefined,
       };
 
       if (!id) {
-        await viewAPI.create(
-          "entity",
-          viewId,
-          submissionData
-        );
-        toast({
-          title: "Success",
-          description: "Organization created successfully",
-        });
-        navigate('/masters/entity');
+        await viewAPI.create("entity", viewId, submissionData);
+        toast({ title: "Success", description: "Organization created successfully" });
       } else {
-        await viewAPI.update(
-          "entity",
-          id,
-          viewId,
-          submissionData
-        );
-        toast({
-          title: "Success",
-          description: "Organization updated successfully",
-        });
+        await viewAPI.update("entity", id, viewId, submissionData);
+        toast({ title: "Success", description: "Organization updated successfully" });
       }
       navigate('/masters/entity');
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Something went wrong",
-      });
-      console.error("Error:", error.message);
+      toast({ variant: "destructive", title: "Error", description: error.message || "Something went wrong" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleSelectChange = (
-    sourceKey: any,
-    key: string,
-    value: any,
-    fields: any
-  ) => {
-    const lookupData = constructObject(value.item, fields);
+  const handleSelectChange = (sourceKey: any, key: string, value: any, fields: any) => {
+    constructObject(value.item, fields);
     form.setValue(sourceKey, value[key]);
   };
 
@@ -157,17 +143,149 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
     form.setValue(sourceKey, '');
   };
 
-
-
-  const handleCancel = () => {
-    navigate('/masters/entity');
-  };
+  const handleCancel = () => navigate('/masters/entity');
 
   const isSubEntity = initialValues?.is_it_headquartres !== 'Yes';
   const showTabs = id && isSubEntity;
 
-  return (
+  const loadingSkeleton = (
+    <div className="space-y-6">
+      <div><Skeleton className="h-4 w-[100px] mb-2" /><Skeleton className="h-10 w-full" /></div>
+      <div><Skeleton className="h-4 w-[120px] mb-2" /><Skeleton className="h-10 w-full" /></div>
+      <div className="flex justify-end space-x-2">
+        <Skeleton className="h-10 w-[100px]" /><Skeleton className="h-10 w-[100px]" />
+      </div>
+    </div>
+  );
 
+  const formContent = isLoading ? loadingSkeleton : (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormField control={form.control} name="organization_name" render={({ field }) => (
+            <FormItem><FormLabel>Organization Name <span className="text-red-500">*</span></FormLabel>
+              <FormControl><Input placeholder="Enter Organization Name" {...field} /></FormControl>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="legal_name" render={({ field }) => (
+            <FormItem><FormLabel>Legal Name <span className="text-red-500">*</span></FormLabel>
+              <FormControl><Input placeholder="Enter Legal Name" {...field} /></FormControl>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="address" render={({ field }) => (
+            <FormItem><FormLabel>Address <span className="text-red-500">*</span></FormLabel>
+              <FormControl><Input placeholder="Enter Address" {...field} /></FormControl>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="city" render={({ field }) => (
+            <FormItem><FormLabel>City <span className="text-red-500">*</span></FormLabel>
+              <FormControl><Input placeholder="Enter City" {...field} /></FormControl>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="state" render={({ field }) => (
+            <FormItem><FormLabel>State <span className="text-red-500">*</span></FormLabel>
+              <FormControl><Input placeholder="Enter State" {...field} /></FormControl>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="country" render={({ field }) => (
+            <FormItem><FormLabel>Country <span className="text-red-500">*</span></FormLabel>
+              <FormControl><Input placeholder="Enter Country" {...field} /></FormControl>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="zip_code" render={({ field }) => (
+            <FormItem><FormLabel>Zip Code <span className="text-red-500">*</span></FormLabel>
+              <FormControl><Input placeholder="Enter Zip Code" {...field} /></FormControl>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="website" render={({ field }) => (
+            <FormItem><FormLabel>Website</FormLabel>
+              <FormControl><Input placeholder="https://example.com" {...field} /></FormControl>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="basecurrency_id" render={({ field }) => (
+            <FormItem><FormLabel>Base Currency</FormLabel>
+              <SearchDropDown
+                instanceType="currency"
+                instanceSourceKey="basecurrency_id"
+                instanceKey="id"
+                instanceLabel="code"
+                instanceValue={initialValues?.currency}
+                onSelectItem={handleSelectChange}
+                onClear={handleSelectClear}
+                limit="10"
+                searchParams="code"
+                type={showTabs ? "entity" : "organization"}
+              />
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="is_it_headquartres" render={({ field }) => (
+            <FormItem><FormLabel>Is It Headquarters <span className="text-red-500">*</span></FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="is_it_a_groupcompany" render={({ field }) => (
+            <FormItem><FormLabel>Is It a Group Company <span className="text-red-500">*</span></FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="is_individual" render={({ field }) => (
+            <FormItem><FormLabel>Is Individual</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  <SelectItem value="true">Yes</SelectItem>
+                  <SelectItem value="false">No</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="financial_year_type" render={({ field }) => (
+            <FormItem><FormLabel>Financial Year</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select financial year" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {FINANCIAL_YEAR_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage /></FormItem>
+          )} />
+        </div>
+
+        <div className="flex justify-end space-x-2">
+          <Button type="button" variant="outline" onClick={handleCancel}>Cancel</Button>
+          <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90">Save</Button>
+        </div>
+      </form>
+    </Form>
+  );
+
+  return (
     <div className="mx-auto w-[70%]">
       <div className="mb-4 flex items-center justify-between">
         <div>
@@ -176,11 +294,7 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
             {initialValues ? 'Edit Organization' : 'Create New Organization'}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          className="flex items-center gap-2 text-muted-foreground"
-          onClick={() => navigate('/masters/entity')}
-        >
+        <Button variant="ghost" className="flex items-center gap-2 text-muted-foreground" onClick={() => navigate('/masters/entity')}>
           <ArrowLeft size={16} />
           Back to list
         </Button>
@@ -194,484 +308,24 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = (
           </TabsList>
           <TabsContent value="details">
             <Card>
-              <CardHeader>
-                <CardTitle>
-                  {/* {initialValues ? 'Edit Item Category' : 'Create Item Category'} */}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="space-y-6">
-                    <div>
-                      <Skeleton className="h-4 w-[100px] mb-2" />
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                    <div>
-                      <Skeleton className="h-4 w-[120px] mb-2" />
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                    <div className="flex justify-end space-x-2">
-                      <Skeleton className="h-10 w-[100px]" />
-                      <Skeleton className="h-10 w-[100px]" />
-                    </div>
-                  </div>
-                ) : (
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField
-                          control={form.control}
-                          name="organization_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Organization Name <span className="text-red-500">*</span></FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter Organization Name" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="legal_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Legal Name <span className="text-red-500">*</span></FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter Legal Name " {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="address"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Address <span className="text-red-500">*</span></FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter Address" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="city"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>City <span className="text-red-500">*</span></FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter City" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="state"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>State <span className="text-red-500">*</span></FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter State" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="country"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Country <span className="text-red-500">*</span></FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter Country" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="zip_code"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Zip Code <span className="text-red-500">*</span></FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter Zip Code" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="website"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Website</FormLabel>
-                              <FormControl>
-                                <Input placeholder="https://example.com" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="basecurrency_id"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Base Currency</FormLabel>
-                              <SearchDropDown
-                                instanceType="currency"
-                                instanceSourceKey="basecurrency_id"
-                                instanceKey="id"
-                                instanceLabel="code"
-                                instanceValue={
-                                  initialValues?.currency
-                                }
-                                onSelectItem={handleSelectChange}
-                                onClear={handleSelectClear}
-                                limit="10"
-                                searchParams="code"
-                                type="entity"
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="is_it_headquartres"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Is It Headquarters <span className="text-red-500">*</span></FormLabel>
-                              <Select
-                                onValueChange={field.onChange}
-                                value={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select Headquarters" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="Yes">Yes</SelectItem>
-                                  <SelectItem value="No">No</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="is_it_a_groupcompany"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Is It a Group Company <span className="text-red-500">*</span></FormLabel>
-                              <Select
-                                onValueChange={field.onChange}
-                                value={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select Group Company" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="Yes">Yes</SelectItem>
-                                  <SelectItem value="No">No</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleCancel}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="bg-primary hover:bg-primary/90"
-                        >
-                          Save
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>)}
-              </CardContent>
+              <CardHeader><CardTitle /></CardHeader>
+              <CardContent>{formContent}</CardContent>
             </Card>
           </TabsContent>
           <TabsContent value="hq-mapping">
             {id ? (
-              <HQAccountMappingTab
-                organizationId={id}
-                orgId={initialValues?.org_id || ''}
-              />
+              <HQAccountMappingTab organizationId={id} orgId={initialValues?.org_id || ''} />
             ) : (
-              <Card>
-                <CardContent>
-                  <div className="text-center py-8 text-muted-foreground">
-                    Organization ID is required
-                  </div>
-                </CardContent>
-              </Card>
+              <Card><CardContent><div className="text-center py-8 text-muted-foreground">Organization ID is required</div></CardContent></Card>
             )}
           </TabsContent>
         </Tabs>
       ) : (
         <Card>
-          <CardHeader>
-            <CardTitle>
-              {/* {initialValues ? 'Edit Item Category' : 'Create Item Category'} */}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-6">
-                <div>
-                  <Skeleton className="h-4 w-[100px] mb-2" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-                <div>
-                  <Skeleton className="h-4 w-[120px] mb-2" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Skeleton className="h-10 w-[100px]" />
-                  <Skeleton className="h-10 w-[100px]" />
-                </div>
-              </div>
-            ) : (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="organization_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Organization Name <span className="text-red-500">*</span></FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter Organization Name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="legal_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Legal Name <span className="text-red-500">*</span></FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter Legal Name " {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="address"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Address <span className="text-red-500">*</span></FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter Address" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>City <span className="text-red-500">*</span></FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter City" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="state"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>State <span className="text-red-500">*</span></FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter State" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="country"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Country <span className="text-red-500">*</span></FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter Country" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="zip_code"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Zip Code <span className="text-red-500">*</span></FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter Zip Code" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="website"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Website</FormLabel>
-                          <FormControl>
-                            <Input placeholder="https://example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="basecurrency_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Base Currency</FormLabel>
-                          <SearchDropDown
-                            instanceType="currency"
-                            instanceSourceKey="basecurrency_id"
-                            instanceKey="id"
-                            instanceLabel="code"
-                            instanceValue={
-                              initialValues?.currency
-                            }
-                            onSelectItem={handleSelectChange}
-                            onClear={handleSelectClear}
-                            limit="10"
-                            searchParams="code"
-                            type="organization"
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="is_it_headquartres"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Is It Headquarters <span className="text-red-500">*</span></FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select Headquarters" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Yes">Yes</SelectItem>
-                              <SelectItem value="No">No</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="is_it_a_groupcompany"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Is It a Group Company <span className="text-red-500">*</span></FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select Group Company" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Yes">Yes</SelectItem>
-                              <SelectItem value="No">No</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCancel}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="bg-primary hover:bg-primary/90"
-                    >
-                      Save
-                    </Button>
-                  </div>
-                </form>
-              </Form>)}
-          </CardContent>
+          <CardHeader><CardTitle /></CardHeader>
+          <CardContent>{formContent}</CardContent>
         </Card>
       )}
     </div>
-
   );
 };

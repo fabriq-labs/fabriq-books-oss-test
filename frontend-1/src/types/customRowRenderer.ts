@@ -24,3 +24,11 @@ export interface CustomRowRenderer {
   /** Optional row-level className based on record data */
   rowClassName?: (record: any) => string | undefined;
 }
+
+/** Extra search filters to inject into a specific filter field's dropdown. */
+export interface FilterFieldEnhancement {
+  additionalFilters?: Record<string, any>;
+}
+
+/** Map of filter field key → enhancement. Page-level customisation only — generic components stay entity-agnostic. */
+export type FilterEnhancements = Record<string, FilterFieldEnhancement>;

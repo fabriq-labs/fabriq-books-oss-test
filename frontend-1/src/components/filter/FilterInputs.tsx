@@ -2,6 +2,7 @@ import { Background } from "reactflow";
 import { SearchDropDown } from "../search_dropdown/dropdown";
 import { Input } from "../ui/input";
 import { ModernDropDown } from "../search_dropdown/modern_dropdown";
+import type { FilterFieldEnhancement } from "@/types/customRowRenderer";
 
 interface FilterInputsProps {
     value: string;
@@ -11,9 +12,10 @@ interface FilterInputsProps {
     setSelectFilterValues?: any;
     selectFilterValues?: any;
     operator?: string;
+    filterEnhancement?: FilterFieldEnhancement;
 }
 
-export function FilterInputs({ value, onChange, col, className, setSelectFilterValues, selectFilterValues, operator }: FilterInputsProps) {
+export function FilterInputs({ value, onChange, col, className, setSelectFilterValues, selectFilterValues, operator, filterEnhancement }: FilterInputsProps) {
     const { columnType, tableProps } = col;
     if (operator === 'is_null' || operator === 'is_not_null') {
         return null;
@@ -58,6 +60,7 @@ export function FilterInputs({ value, onChange, col, className, setSelectFilterV
                         type={tableProps.selectProps?.type}
                         lookup_id_name={tableProps.selectProps?.lookup_id_name}
                         instanceSubLabel={tableProps.selectProps?.instanceSubLabel}
+                        additionalFilters={filterEnhancement?.additionalFilters}
                         style={{
                             flex: 1,
                             backgroundColor: '#F1F0FB',

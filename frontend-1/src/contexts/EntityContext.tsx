@@ -7,6 +7,10 @@ export interface Entity {
   id: string;
   legal_name: string;
   is_it_headquartres?: boolean;
+  is_individual?: boolean;
+  financial_year_type?: 'JAN_DEC' | 'APR_MAR' | 'JUL_JUN' | 'OCT_SEP';
+  basecurrency_id?: string;
+  currency?: { id?: string; code?: string };
 }
 
 interface EntityContextType {

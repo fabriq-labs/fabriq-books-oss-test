@@ -11,6 +11,7 @@ import { CalendarIcon, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FilterInputs } from "./FilterInputs";
 import { FilterOperators } from "./FilterOperators";
+import type { FilterEnhancements } from "@/types/customRowRenderer";
 
 interface FilterModalProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ interface FilterModalProps {
     onApplyFilters: (filters: Record<string, any>) => void;
     initialFilters: Record<string, any>;
     metaData: Record<string, any>;
+    filterEnhancements?: FilterEnhancements;
     dateRangeFilter?: {
         key: string;
         label: string;
@@ -37,7 +39,7 @@ type FilterType = {
 
 
 
-export function FilterModal({ isOpen, onClose, onApplyFilters, initialFilters, metaData, dateRangeFilter }: FilterModalProps) {
+export function FilterModal({ isOpen, onClose, onApplyFilters, initialFilters, metaData, filterEnhancements, dateRangeFilter }: FilterModalProps) {
     const [filters, setFilters] = useState<FilterType[]>([]);
     const [selectFilterValues, setSelectFilterValues] = useState<Record<string, any>>([]);
 
@@ -206,6 +208,7 @@ export function FilterModal({ isOpen, onClose, onApplyFilters, initialFilters, m
                                     setSelectFilterValues={setSelectFilterValues}
                                     selectFilterValues={selectFilterValues}
                                     operator={filter.operator}
+                                    filterEnhancement={filterEnhancements?.[filter.field]}
                                 />
                             }
 

@@ -14,6 +14,7 @@ import type { CellHighlightMap } from "@/components/masters/DynamicTable";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createPostingRowRenderer } from "@/components/masters/posting/PostingListRow";
 import { useEntity } from "@/contexts/EntityContext";
+import type { FilterEnhancements } from "@/types/customRowRenderer";
 
 /**
  * Per-posting reconciliation result kept in memory after a bulk reconcile call.
@@ -31,13 +32,14 @@ export default function Transactions() {
   const { currentEntityId } = useEntity();
 
   // ── URL-based filter support ──────────────────────────────────────────
-  // Read filter from URL query params (e.g., ?filter=unreconciled)
   const urlFilter = searchParams.get('filter');
+  const urlAccountId = searchParams.get('account_id');
+  const urlFromDate = searchParams.get('from_date');
+  const urlToDate = searchParams.get('to_date');
 
-  // Build default filters based on URL params + global entity context
+  // Permanent filters applied to every query regardless of user filter state.
   const defaultFilters = useMemo(() => {
     const baseFilter: Record<string, any> = {
-      description: { ncontains: "Closing" },
       ...(currentEntityId ? { legal_entity_id: currentEntityId } : {}),
     };
 
@@ -53,6 +55,35 @@ export default function Transactions() {
 
     return baseFilter;
   }, [urlFilter, currentEntityId]);
+
+  // Filters seeded into the user-controlled badge state on mount.
+  // These appear as removable chips in the filter badge row.
+  // Uses Master's virtual composite key pattern for OR filters.
+  const presetFilters = useMemo(() => {
+    const preset: Record<string, any> = {};
+    if (urlAccountId) {
+      // account_id_or_credit_account_id is a virtual key expanded to an OR clause
+      // by Master's expandVirtualFilters before the API call. See Master.tsx and
+      // docs/FILTER_SYSTEM.md for the full pattern.
+      preset.account_id_or_credit_account_id = { eq: urlAccountId };
+    }
+    if (urlFromDate && urlToDate) {
+      preset.value_date = {
+        gte: new Date(urlFromDate).toISOString(),
+        lte: new Date(urlToDate + 'T23:59:59').toISOString(),
+      };
+    }
+    return Object.keys(preset).length > 0 ? preset : undefined;
+  }, [urlAccountId, urlFromDate, urlToDate]);
+
+  const filterEnhancements = useMemo<FilterEnhancements>(() => {
+    if (!currentEntityId) return {};
+    const entityFilter = { legal_entity_id: { eq: currentEntityId } };
+    return {
+      account_id: { additionalFilters: entityFilter },
+      credit_account_id: { additionalFilters: entityFilter },
+    };
+  }, [currentEntityId]);
 
   // Title is always "Transactions"; segment indicates view
   const displayName = 'Transactions';
@@ -459,7 +490,7 @@ export default function Transactions() {
   return (
     <>
       <Master
-        key={currentEntityId ?? 'all'}
+        key={`${currentEntityId ?? 'all'}-${urlAccountId ?? ''}-${urlFromDate ?? ''}`}
         ref={masterRef}
         type="posting"
         view="posting_view"
@@ -480,11 +511,13 @@ export default function Transactions() {
           },
         }}
         defaultFilters={defaultFilters}
+        presetFilters={presetFilters}
         titleExtra={titleExtra}
         bulkActions={bulkActions}
         renderRowExtra={renderRowExtra}
         injectRowActions={injectRowActions}
         customRowRenderer={customRowRenderer}
+        filterEnhancements={filterEnhancements}
       />
 
       {/* Reconciliation suggestions modal */}

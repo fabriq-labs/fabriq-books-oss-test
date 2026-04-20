@@ -2,6 +2,7 @@ import prisma from '../prisma';
 import { Prisma } from '@prisma/client';
 
 interface IncomeStatementRow {
+  account_id: string;
   account_path: string;
   account_name: string;
   classification: "Income" | "Expense";
@@ -77,7 +78,8 @@ export const getIncomeStatement = async (
   orgId: string,
   accountId?: string,
   legalEntityIds?: string[],
-  reportCurrency?: string // `currency.id` or ISO code; if omitted, uses org base currency
+  reportCurrency?: string, // `currency.id` or ISO code; if omitted, uses org base currency
+  maxLevel?: number // cap hierarchy depth; undefined = no cap
 ): Promise<IncomeStatementRow[]> => {
   // NULL means "use org default"; a value means "use this currency"
   const currencyParam = reportCurrency || null;
@@ -207,6 +209,7 @@ export const getIncomeStatement = async (
     GROUP BY hd.root_id
   )
   SELECT
+    display_ah.id as account_id,
     display_ah.path as account_path,
     display_ah.name as account_name,
     display_ah.classification,
@@ -220,6 +223,7 @@ export const getIncomeStatement = async (
   LEFT JOIN parent_totals pt ON display_ah.id = pt.id
   WHERE display_ah.org_id = ${orgId}
     AND display_ah.classification IN ('Income', 'Expense')
+    ${maxLevel !== undefined ? Prisma.sql`AND display_ah.level <= ${maxLevel}` : Prisma.empty}
     AND (
       display_ah.level = 0
       OR COALESCE(cb.posting_count, 0) > 0

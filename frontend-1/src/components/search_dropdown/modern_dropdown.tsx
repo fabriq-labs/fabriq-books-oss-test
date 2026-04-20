@@ -25,6 +25,7 @@ interface ModernDropDownProps {
     autoFocus?: boolean;
     instanceSubLabel?: string;
     excludeIds?: string[];
+    additionalFilters?: Record<string, any>;
 }
 
 interface LookupResponse {
@@ -53,6 +54,7 @@ export const ModernDropDown = ({
     style,
     instanceSubLabel,
     excludeIds = [],
+    additionalFilters,
 }: ModernDropDownProps) => {
     const [isLoader, setLoader] = useState(false);
     const [isLookupLoader, setLookupLoader] = useState(false);
@@ -197,12 +199,9 @@ export const ModernDropDown = ({
         if (value && value.length > 0) {
             setLoader(true);
         }
-        // Debug log
-        // Build filters object with proper structure
-        const filters = {};
-        // Add filter with searchTerm value if value is provided
+        // Build filters object — start with any page-level additional filters, then overlay search term
+        const filters: Record<string, any> = { ...additionalFilters };
         if (value && searchParams) {
-            // Use searchParams as the field name
             filters[searchParams] = { contains: value };
         }
 

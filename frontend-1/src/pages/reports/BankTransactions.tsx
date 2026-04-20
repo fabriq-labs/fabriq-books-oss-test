@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useEntity } from "@/contexts/EntityContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatters";
-import { useReportController } from "@/contexts/ReportControllerContext";
 import { ReportControls } from "@/components/Reports/ReportControls";
+import { FinancialYearSelector, getPreviousFYOption, type FinancialYearOption, type FinancialYearType } from "@/components/Reports/FinancialYearSelector";
 import { viewAPI } from "@/api/api";
 import {
     Table,
@@ -112,11 +112,29 @@ const transformPostingData = (
     });
 };
 
+function resolveEntityFYType(entities: { id: string; is_it_headquartres?: boolean; financial_year_type?: string }[], currentId: string | null): FinancialYearType {
+    const current = entities.find((e) => e.id === currentId);
+    if (current?.financial_year_type) return current.financial_year_type as FinancialYearType;
+    const hq = entities.find((e) => e.is_it_headquartres);
+    if (hq?.financial_year_type) return hq.financial_year_type as FinancialYearType;
+    return "JAN_DEC";
+}
+
 export default function BankTransactions() {
-    const { dateRange } = useReportController();
-    const { currentEntityId } = useEntity();
+    const { entities, currentEntityId } = useEntity();
     const location = useLocation();
     const { setPageContext } = useChatContext();
+
+    const fyType = useMemo(() => resolveEntityFYType(entities, currentEntityId), [entities, currentEntityId]);
+
+    const [selectedFY, setSelectedFY] = useState<FinancialYearOption>(() => getPreviousFYOption("JAN_DEC"));
+
+    // Re-default when entity's FY type resolves
+    useEffect(() => {
+        setSelectedFY(getPreviousFYOption(fyType));
+    }, [fyType]);
+
+    const fyDateRange = useMemo(() => [dayjs(selectedFY.from_date), dayjs(selectedFY.to_date)] as const, [selectedFY]);
 
     const [account, setAccount] = useState<any>(null);
     const [accountDropdownKey, setAccountDropdownKey] = useState(0);
@@ -254,18 +272,10 @@ export default function BankTransactions() {
             ],
         }),
         "AND": [
-            {
-                "value_date": {
-                    "gte": dateRange[0].startOf('day').toISOString()
-                }
-            },
-            {
-                "value_date": {
-                    "lte": dateRange[1].startOf('day').add(1, 'day').subtract(1, 'millisecond').toISOString()
-                }
-            }
+            { "value_date": { "gte": fyDateRange[0].startOf('day').toISOString() } },
+            { "value_date": { "lte": fyDateRange[1].endOf('day').toISOString() } },
         ]
-    }), [account, dateRange]);
+    }), [account, fyDateRange]);
 
     const fetchTransactions = useCallback(async () => {
         if (!account) {
@@ -343,14 +353,12 @@ export default function BankTransactions() {
                 { credit_account_id: { eq: account.id } },
             ];
         }
-        if (dateRange[0] && dateRange[1]) {
-            base.AND = [
-                { value_date: { gte: dateRange[0].startOf('day').toISOString() } },
-                { value_date: { lte: dateRange[1].startOf('day').add(1, 'day').subtract(1, 'millisecond').toISOString() } },
-            ];
-        }
+        base.AND = [
+            { value_date: { gte: fyDateRange[0].startOf('day').toISOString() } },
+            { value_date: { lte: fyDateRange[1].endOf('day').toISOString() } },
+        ];
         return base;
-    }, [account, dateRange, currentEntityId]);
+    }, [account, fyDateRange, currentEntityId]);
 
     const accountAdditionalFilters = useMemo(
         () =>
@@ -376,6 +384,11 @@ export default function BankTransactions() {
 
                 <Card className="p-4">
                     <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
+                        <FinancialYearSelector
+                            fyType={fyType}
+                            value={selectedFY.value}
+                            onChange={setSelectedFY}
+                        />
                         <ReportControls
                             selectedAccount={account}
                             onAccountChange={handleAccountChange}
@@ -404,7 +417,7 @@ export default function BankTransactions() {
                                 </div>
                             ) : (
                                 <Master
-                                    key={`${currentEntityId ?? 'all'}-${account?.id ?? 'none'}`}
+                                    key={`${currentEntityId ?? 'all'}-${account?.id ?? 'none'}-${selectedFY.value}`}
                                     type="posting"
                                     view="posting_simple_view"
                                     displayName="Transactions"

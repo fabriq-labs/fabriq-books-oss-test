@@ -159,6 +159,27 @@
       },
       "displayName": "Is It a Groupcompany",
       "isColumnShow": false
+    },
+    "is_individual": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "columnType": "checkbox",
+        "defaultValue": false
+      },
+      "displayName": "Is Individual",
+      "isColumnShow": true
+    },
+    "financial_year_type": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Financial Year Type",
+      "isColumnShow": true
     }
   },
   "org_id": "52",

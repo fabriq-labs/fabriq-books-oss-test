@@ -23,6 +23,14 @@ const sampleReports = [
     path: '/reports/income-statement'
   },
   {
+    id: 'personal-income',
+    name: 'Personal Income Report',
+    category: 'Personal Finance',
+    createdBy: 'System Generated',
+    lastVisited: '-',
+    path: '/reports/personal-income'
+  },
+  {
     id: 'cash-flow',
     name: 'Cash Flow Statement',
     category: 'Business Overview',

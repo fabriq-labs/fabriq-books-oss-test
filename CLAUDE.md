@@ -67,6 +67,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
+| Frontend filter system (defaultFilters, presetFilters, virtual OR keys, badge chips) | [docs/FILTER_SYSTEM.md](./docs/FILTER_SYSTEM.md) |
 | View data_graph / datagraph schema (properties, selectProps, relationName, list behaviour) | [docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md](./docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md) |
 | Visual datagraph builder (design, summary) | [docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md](./docs/datagraph-builder/DATAGRAPH_BUILDER_SUMMARY.md) |
 | Claude Web/Desktop prompts | [docs/CLAUDE_WEB_PROMPTS.md](./docs/CLAUDE_WEB_PROMPTS.md) |
@@ -202,6 +203,7 @@ DATABASE_URL=$(grep "^DATABASE_URL=" backend/.env | head -1 | sed 's/DATABASE_UR
 - ❌ Bypassing permission system
 - ❌ Hardcoding model names
 - ❌ Ignoring org_id filtering
+- ❌ **NEVER run `npx prisma db push`, `prisma migrate`, or any DDL (ALTER TABLE, CREATE TABLE, DROP …) — always propose the change and let the user run it**
 
 ---
 
