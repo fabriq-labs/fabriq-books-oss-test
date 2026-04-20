@@ -82,7 +82,13 @@
       "select": {
         "id": "read",
         "code": "update",
-        "name": "update"
+        "name": "update",
+        "currency": {
+          "select": {
+            "id": "read",
+            "code": "read"
+          }
+        }
       },
       "orderNo": 3,
       "dataType": "table",
@@ -247,7 +253,13 @@
       "select": {
         "id": "read",
         "code": "update",
-        "name": "update"
+        "name": "update",
+        "currency": {
+          "select": {
+            "id": "read",
+            "code": "read"
+          }
+        }
       },
       "orderNo": 4,
       "dataType": "table",

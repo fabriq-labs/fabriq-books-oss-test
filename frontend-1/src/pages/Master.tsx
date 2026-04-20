@@ -18,6 +18,7 @@ import { useChat as useChatContext } from "@/contexts/ChatContext";
 import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
 import { BulkAction, MergeRow } from "@/types/bulkActions";
 import type { CellHighlightMap } from "@/components/masters/DynamicTable";
+import type { CustomRowRenderer } from "@/types/customRowRenderer";
 
 /**
  * Handle exposed to parent components via ref.
@@ -85,6 +86,8 @@ interface MasterProps {
   isCreate?: boolean;
   /** When `false`, hides the Import button. Omitted or `true` shows it (default: show). */
   isImport?: boolean;
+  /** When provided, replaces metadata-generated columns and body rendering in DynamicTable */
+  customRowRenderer?: CustomRowRenderer;
 }
 
 type DateRangeType = {
@@ -108,6 +111,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   injectRowActions,
   isCreate,
   isImport,
+  customRowRenderer,
 }, masterRef) => {
   // Extract import-related config from listConfig.importConfig
   const {
@@ -273,14 +277,9 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
     const result: Record<string, any> = {};
     const andConditions: any[] = [];
 
-    // Check user filters - if same field in defaults, combine with AND
+    // Check user filters - user's explicit selection always wins over defaults
     for (const [key, userValue] of Object.entries(userFilters)) {
-      if (key in defaultFilters) {
-        andConditions.push({ [key]: defaultFilters[key] });
-        andConditions.push({ [key]: userValue });
-      } else {
-        result[key] = userValue;
-      }
+      result[key] = userValue;
     }
 
     // Add default filters that user doesn't have
@@ -826,6 +825,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
           onSelectionChange={handleSelectionChange}
           cellHighlights={cellHighlights}
           renderRowExtra={renderRowExtra}
+          customRowRenderer={customRowRenderer}
         />
         <div
           style={{ marginBottom: "10px" }}

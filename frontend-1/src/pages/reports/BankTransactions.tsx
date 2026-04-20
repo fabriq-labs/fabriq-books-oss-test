@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useEntity } from "@/contexts/EntityContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatters";
 import { useReportController } from "@/contexts/ReportControllerContext";
@@ -13,6 +14,8 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Master from "@/pages/Master";
+import { createBankTransactionRowRenderer } from "@/components/masters/posting/BankTransactionRow";
 import { formatDate } from "@/lib/formatters";
 import dayjs from "dayjs";
 import {
@@ -30,13 +33,7 @@ import {
     CartesianGrid,
     Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, ChevronDown } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
+import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat as useChatContext } from "@/contexts/ChatContext";
 import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
@@ -51,14 +48,6 @@ interface SimpleTransaction {
     amount: number;
     isMoneyIn: boolean;
     currency: string;
-}
-
-interface LegalEntity {
-    id: string;
-    organization_name?: string;
-    legal_name?: string;
-    basecurrency_id?: string | null;
-    currency?: { code?: string } | null;
 }
 
 // Chart colors
@@ -123,16 +112,14 @@ const transformPostingData = (
     });
 };
 
-export default function SimpleTransactionList() {
-    const { user } = useAuth();
+export default function BankTransactions() {
     const { dateRange } = useReportController();
+    const { currentEntityId } = useEntity();
     const location = useLocation();
     const { setPageContext } = useChatContext();
 
-    const [legalEntities, setLegalEntities] = useState<LegalEntity[]>([]);
-    const [selectedLegalEntity, setSelectedLegalEntity] = useState<LegalEntity | null>(null);
-    const [legalEntitiesLoading, setLegalEntitiesLoading] = useState(true);
     const [account, setAccount] = useState<any>(null);
+    const [accountDropdownKey, setAccountDropdownKey] = useState(0);
     const [transactions, setTransactions] = useState<SimpleTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [page, setPage] = useState(1);
@@ -167,45 +154,15 @@ export default function SimpleTransactionList() {
         setSelectedTransactionId(null);
     }, [account?.id]);
 
-    // Load legal entities and default to HQ on mount
+    // When global entity changes, reset account selection and force dropdown remount
+    const isMountedEntity = useRef(false);
     useEffect(() => {
-        if (!user?.org_id) {
-            setLegalEntitiesLoading(false);
-            return;
-        }
-        const loadLegalEntities = async () => {
-            setLegalEntitiesLoading(true);
-            try {
-                const [allRes, hqRes] = await Promise.all([
-                    viewAPI.search(
-                        "entity",
-                        "entity_view",
-                        1,
-                        500,
-                        undefined,
-                        { org_id: { eq: user.org_id } }
-                    ),
-                    viewAPI.search(
-                        "entity",
-                        "entity_view",
-                        1,
-                        10,
-                        undefined,
-                        { org_id: { eq: user.org_id }, is_it_headquartres: { eq: "Yes" } }
-                    ),
-                ]);
-                const list: LegalEntity[] = allRes?.data || [];
-                setLegalEntities(list);
-                const hq = hqRes?.data?.[0];
-                setSelectedLegalEntity(hq || list[0] || null);
-            } catch (e) {
-                console.error("Error loading legal entities:", e);
-            } finally {
-                setLegalEntitiesLoading(false);
-            }
-        };
-        loadLegalEntities();
-    }, [user?.org_id]);
+        if (!isMountedEntity.current) { isMountedEntity.current = true; return; }
+        setAccount(null);
+        setPage(1);
+        setAccountDropdownKey(k => k + 1);
+    }, [currentEntityId]);
+
 
     // Compute chart data from transactions
     const chartData = useMemo(() => {
@@ -350,12 +307,6 @@ export default function SimpleTransactionList() {
         }
     }, [account, fetchTransactions]);
 
-    const handleLegalEntitySelect = (entity: LegalEntity) => {
-        setSelectedLegalEntity(entity);
-        setAccount(null);
-        setPage(1);
-    };
-
     const handleAccountChange = (value: any) => {
         setAccount(value);
         setPage(1);
@@ -371,17 +322,42 @@ export default function SimpleTransactionList() {
     };
 
     const displayCurrency = useMemo(() => {
-        const code = selectedLegalEntity?.currency?.code;
-        if (code) return code;
+        if (account?.currency?.code) return account.currency.code;
         return transactions[0]?.currency || "INR";
-    }, [selectedLegalEntity, transactions]);
+    }, [account, transactions]);
+
+    const simpleRowRenderer = useMemo(
+        () => createBankTransactionRowRenderer(account?.id, displayCurrency),
+        [account?.id, displayCurrency]
+    );
+
+    // defaultFilters for Master — account OR/AND date range + global entity context
+    const masterDefaultFilters = useMemo(() => {
+        const base: Record<string, any> = {
+            description: { ncontains: 'Closing' },
+            ...(currentEntityId ? { legal_entity_id: currentEntityId } : {}),
+        };
+        if (account) {
+            base.OR = [
+                { account_id: { eq: account.id } },
+                { credit_account_id: { eq: account.id } },
+            ];
+        }
+        if (dateRange[0] && dateRange[1]) {
+            base.AND = [
+                { value_date: { gte: dateRange[0].startOf('day').toISOString() } },
+                { value_date: { lte: dateRange[1].startOf('day').add(1, 'day').subtract(1, 'millisecond').toISOString() } },
+            ];
+        }
+        return base;
+    }, [account, dateRange, currentEntityId]);
 
     const accountAdditionalFilters = useMemo(
         () =>
-            selectedLegalEntity?.id
-                ? { legal_entity_id: { eq: selectedLegalEntity.id } }
+            currentEntityId
+                ? { legal_entity_id: { eq: currentEntityId } }
                 : undefined,
-        [selectedLegalEntity?.id]
+        [currentEntityId]
     );
 
     const accountFilterOptions = useCallback((items: any[]) => {
@@ -392,60 +368,14 @@ export default function SimpleTransactionList() {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
             <div className="w-full p-4">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold tracking-tight">Simple Transactions</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Bank Transactions</h1>
                     <p className="text-muted-foreground">
-                        A simplified view of your transactions showing Account and Category instead of Debit/Credit.
+                        A simplified view of your bank and credit card transactions.
                     </p>
                 </div>
 
                 <Card className="p-4">
                     <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-4 flex-wrap">
-                        {/* Legal entity: subtle clickable name + popover to switch */}
-                        <div className="flex items-center gap-1">
-                            {legalEntitiesLoading ? (
-                                <span className="text-muted-foreground text-sm">Loading...</span>
-                            ) : selectedLegalEntity ? (
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <button
-                                            type="button"
-                                            className={cn(
-                                                "flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                            )}
-                                        >
-                                            <span>
-                                                {selectedLegalEntity.organization_name ||
-                                                    selectedLegalEntity.legal_name ||
-                                                    "Legal entity"}
-                                            </span>
-                                            <ChevronDown className="h-4 w-4 opacity-70" />
-                                        </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-64 p-2" align="start">
-                                        <div className="grid gap-0.5">
-                                            {legalEntities.map((entity) => (
-                                                <button
-                                                    key={entity.id}
-                                                    type="button"
-                                                    onClick={() => handleLegalEntitySelect(entity)}
-                                                    className={cn(
-                                                        "px-3 py-2 text-left text-sm rounded-md hover:bg-accent",
-                                                        entity.id === selectedLegalEntity?.id &&
-                                                        "bg-accent font-medium"
-                                                    )}
-                                                >
-                                                    {entity.organization_name ||
-                                                        entity.legal_name ||
-                                                        entity.id}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
-                            ) : (
-                                <span className="text-sm text-muted-foreground">No legal entity</span>
-                            )}
-                        </div>
                         <ReportControls
                             selectedAccount={account}
                             onAccountChange={handleAccountChange}
@@ -456,6 +386,8 @@ export default function SimpleTransactionList() {
                             showRefreshButton={true}
                             accountAdditionalFilters={accountAdditionalFilters}
                             accountFilterOptions={accountFilterOptions}
+                            skipInitialAccountSearch={true}
+                            accountKey={String(accountDropdownKey)}
                         />
                     </div>
 
@@ -470,87 +402,19 @@ export default function SimpleTransactionList() {
                                 <div className="text-center py-12 text-muted-foreground">
                                     Select an account to view transactions.
                                 </div>
-                            ) : isLoading ? (
-                                <div className="flex justify-center items-center h-64">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                                </div>
-                            ) : transactions.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    No transactions found for the selected period.
-                                </div>
                             ) : (
-                                <div className="rounded-md border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-[120px]">Date</TableHead>
-                                                <TableHead>Description</TableHead>
-                                                <TableHead>Account</TableHead>
-                                                <TableHead>Category</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {transactions.map((transaction) => (
-                                                <TableRow
-                                                    key={transaction.id}
-                                                    className={selectedTransactionId === transaction.id ? 'bg-muted/60' : 'cursor-pointer hover:bg-muted/40'}
-                                                    onClick={() => setSelectedTransactionId((prev) => (prev === transaction.id ? null : transaction.id))}
-                                                >
-                                                    <TableCell>
-                                                        {transaction.value_date
-                                                            ? formatDate(typeof transaction.value_date === 'string'
-                                                                ? transaction.value_date
-                                                                : new Date(transaction.value_date).toISOString())
-                                                            : 'N/A'}
-                                                    </TableCell>
-                                                    <TableCell className="max-w-md">
-                                                        {transaction.description || 'N/A'}
-                                                    </TableCell>
-                                                    <TableCell className="font-medium">
-                                                        {transaction.account_name || 'N/A'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {transaction.category_name || 'N/A'}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <span
-                                                            className={`font-medium ${transaction.isMoneyIn
-                                                                ? 'text-green-700'
-                                                                : 'text-red-700'
-                                                                }`}
-                                                        >
-                                                            {transaction.isMoneyIn ? '+' : '-'}
-                                                            {formatCurrency(Math.abs(transaction.amount), displayCurrency)}
-                                                        </span>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            )}
-
-                            {total > pageSize && (
-                                <div className="mt-4 flex justify-end gap-2">
-                                    <button
-                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                        disabled={page === 1}
-                                        className="px-4 py-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Previous
-                                    </button>
-                                    <span className="px-4 py-2">
-                                        Page {page} of {Math.ceil(total / pageSize)}
-                                    </span>
-                                    <button
-                                        onClick={() => setPage((p) => p + 1)}
-                                        disabled={page >= Math.ceil(total / pageSize)}
-                                        className="px-4 py-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Next
-                                    </button>
-                                </div>
+                                <Master
+                                    key={`${currentEntityId ?? 'all'}-${account?.id ?? 'none'}`}
+                                    type="posting"
+                                    view="posting_simple_view"
+                                    displayName="Transactions"
+                                    defaultFilters={masterDefaultFilters}
+                                    defaultSortOption={{ field: 'value_date', direction: 'desc' }}
+                                    filterConfig={{ enableFilters: false, enableSearch: true }}
+                                    customRowRenderer={simpleRowRenderer}
+                                    isCreate={false}
+                                    isImport={false}
+                                />
                             )}
                         </TabsContent>
 

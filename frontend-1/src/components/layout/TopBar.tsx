@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarLogo } from "./sidebar/SidebarLogo";
 import { MyProfileModal } from "./MyProfileModal";
+import { EntitySwitcher } from "./EntitySwitcher";
 
 interface TopBarProps {
   title: string;
@@ -68,7 +69,8 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
         </div> */}
       </div>
 
-      <div className="ml-auto flex items-center">
+      <div className="ml-auto flex items-center gap-2">
+        <EntitySwitcher />
         <HoverCard>
           <HoverCardTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">

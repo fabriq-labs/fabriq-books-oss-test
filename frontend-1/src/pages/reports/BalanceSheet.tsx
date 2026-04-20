@@ -275,10 +275,6 @@ export default function BalanceSheet() {
   }, [user?.org_id]);
 
   const loadCurrencies = useCallback(async () => {
-    if (!user?.org_id) {
-      setCurrencies([]);
-      return;
-    }
     setCurrenciesLoading(true);
     try {
       const res: any = await viewAPI.search(
@@ -287,7 +283,7 @@ export default function BalanceSheet() {
         1,
         500,
         undefined,
-        { org_id: { eq: user.org_id } },
+        {},
         {}
       );
       const list = Array.isArray(res?.data) ? res.data : [];
@@ -304,7 +300,7 @@ export default function BalanceSheet() {
     } finally {
       setCurrenciesLoading(false);
     }
-  }, [user?.org_id]);
+  }, []);
 
   useEffect(() => {
     void loadCurrencies();

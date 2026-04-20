@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import SignInPage from "./pages/sign-in";
 import PurchaseRequisitionDetailsPage from "./pages/PurchaseRequisitionDetail";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { EntityProvider } from "./contexts/EntityContext";
 import PurchaseRequisitionDashboardPage from "./pages/PurchaseRequisition/PurchaseRequisitionDashboard";
 import Master from "./pages/Master";
 import PurchaseOrderDetailsPage from "./pages/PurchaseOrderDetails";
@@ -81,7 +82,7 @@ import BalanceSheet from "./pages/reports/BalanceSheet";
 import IncomeStatement from "./pages/reports/IncomeStatement";
 import CashFlow from "./pages/reports/CashFlow";
 import PostingList from "./pages/reports/PostingList";
-import SimpleTransactionList from "./pages/reports/SimpleTransactionList";
+import BankTransactions from "./pages/reports/BankTransactions";
 import Transactions from "./pages/Transactions";
 import { ReportControllerProvider } from "./contexts/ReportControllerContext";
 import { PaymentReceiptForm } from "./components/forms/Masters/PaymentReceiptForm";
@@ -133,6 +134,7 @@ const AppRoutes: React.FC = () => {
       }}
     >
       <AuthProvider>
+        <EntityProvider>
         <ReportControllerProvider>
           <div className="font-lato">
             <Routes>
@@ -213,7 +215,7 @@ const AppRoutes: React.FC = () => {
 
                 {/* Accounting Routes */}
                 <Route path="accounting/transactions" element={<Transactions />} />
-                <Route path="accounting/simple-transactions" element={<SimpleTransactionList />} />
+                <Route path="accounting/bank-transactions" element={<BankTransactions />} />
                 <Route path="posting/:id/view/:viewId" element={<PostingForm />} />
                 <Route path="posting/view/:viewId" element={<PostingForm />} />
 
@@ -457,6 +459,7 @@ const AppRoutes: React.FC = () => {
             </Routes>
           </div>
         </ReportControllerProvider>
+        </EntityProvider>
       </AuthProvider>
     </BrowserRouter>
   );

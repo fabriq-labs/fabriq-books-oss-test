@@ -1,7 +1,15 @@
-import React from "react";
+import React, { useMemo } from "react";
 import Master from "./Master";
+import { useEntity } from "@/contexts/EntityContext";
 
 const AccountList: React.FC = () => {
+    const { currentEntityId } = useEntity();
+
+    const defaultFilters = useMemo(
+      () => (currentEntityId ? { legal_entity_id: currentEntityId } : {}),
+      [currentEntityId]
+    );
+
     // Transform CSV data: convert 'type' field to array (split comma-separated values)
     const updateCSVData = (formattedData: any, relationId: any) => {
         if (formattedData.data && Array.isArray(formattedData.data)) {
@@ -54,9 +62,11 @@ const AccountList: React.FC = () => {
 
     return (
         <Master
+            key={currentEntityId ?? 'all'}
             type="account"
             view="account_view"
             displayName="Chart of Accounts"
+            defaultFilters={defaultFilters}
             listConfig={{
                 importConfig: {
                     updateCSVData: updateCSVData,

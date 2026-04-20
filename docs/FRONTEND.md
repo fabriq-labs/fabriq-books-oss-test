@@ -289,6 +289,86 @@ const bulkActions: BulkAction[] = [
 - Routes without `bulkActions` prop continue to work normally
 - Default Edit and Delete buttons are always available (unless disabled via `listConfig`)
 
+#### Custom Row Renderer
+
+The `Master` component supports a `customRowRenderer` prop that replaces the metadata-generated column layout with a fully custom row design — while keeping all Master features (pagination, filters, search, bulk actions, sorting) untouched.
+
+**When to use:** when a model needs a richer row layout than columns allow — e.g. stacking fields, inline badges, or row-level colour coding.
+
+**Type Definition** (`src/types/customRowRenderer.ts`):
+
+```typescript
+interface CustomColumnDef {
+  key: string;
+  title: string;
+  align?: 'left' | 'right' | 'center';
+  width?: string;
+  sortKey?: string; // actual record field to sort by; omit to disable sort for this column
+}
+
+interface RowRenderContext {
+  isSelected: boolean;
+  onSelect: (checked: boolean) => void;
+  actions: React.ReactNode; // Edit/Delete + any injectRowActions output
+}
+
+interface CustomRowRenderer {
+  columns: CustomColumnDef[];
+  renderCells: (record: any, ctx: RowRenderContext) => React.ReactNode; // returns <td> elements
+  rowClassName?: (record: any) => string | undefined;
+}
+```
+
+**Usage pattern — factory function memoized on reactive state:**
+
+```tsx
+import { createPostingRowRenderer } from '@/components/masters/posting/PostingListRow';
+
+const customRowRenderer = useMemo(
+  () => createPostingRowRenderer(predictedFields),
+  [predictedFields]
+);
+
+<Master
+  type="posting"
+  view="posting_view"
+  displayName="Transactions"
+  customRowRenderer={customRowRenderer}
+  // all other Master props still work normally
+  bulkActions={bulkActions}
+  injectRowActions={injectRowActions}
+  renderRowExtra={renderRowExtra}
+/>
+```
+
+**How it works:**
+
+- `columns` replaces the metadata-generated headers. `sortKey` maps the display column to the real record field for sorting — e.g. `{ key: 'transaction', title: 'Transaction', sortKey: 'description' }`. Columns without `sortKey` are non-sortable (header click is a no-op).
+- `renderCells` receives each record and a context object. It must return one `<td>` per column (as `<TableCell>` elements). The select-all checkbox header is rendered automatically by `DynamicTable` — do **not** include a select column in `columns`.
+- `rowClassName` applies Tailwind classes to each `<tr>` based on record data — used for row-level highlights (e.g. reconciliation status, IN/OUT direction).
+- `renderRowExtra` still works — extra content renders in a full-width row below the custom row.
+- `injectRowActions` still works — its output is passed through `ctx.actions`.
+
+**Existing row renderers** (`src/components/masters/posting/`):
+
+| File | Factory | Used by |
+|------|---------|---------|
+| `PostingListRow.tsx` | `createPostingRowRenderer(predictedFields)` | `Transactions.tsx` |
+| `SimpleTransactionRow.tsx` | `createSimpleTransactionRowRenderer(accountId, currency)` | `SimpleTransactionList.tsx` |
+| `ReconciliationStatusBadge.tsx` | `<ReconciliationStatusBadge status={...} />` | Shared — used in forms and list rows |
+
+**Posting row design:**
+- Columns: Transaction (description + notes + legal entity badge) | Debit Account | Credit Account | Amount (currency prefix) | Date
+- `rowClassName`: green left border + tint for `CONFIRMED`, amber for `MATCHED`, transparent otherwise
+- Currency prefix: `record.account?.currency?.code ?? record.credit_account?.currency?.code`
+- `posting_view` data_graph must include `currency: { select: { id, code } }` nested under both `account` and `credit_account` — this is already in the committed JSON file
+
+**Simple transaction row design (bank statement perspective):**
+- Columns: Date | Description | Category (counter-account badge) | Amount (signed, coloured)
+- `rowClassName`: green left border for money IN, red for money OUT — replaces a status column
+- Factory takes `selectedAccountId` to compute direction inline per row
+- `displayCurrency` should come from `account?.currency?.code` (selected account), not the legal entity's base currency
+
 ### 2. Routing Patterns
 
 **A. View-Based Routes** (master data):

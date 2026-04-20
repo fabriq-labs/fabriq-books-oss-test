@@ -68,7 +68,7 @@ const topLevelNavItems: MasterNavItem[] = [
     label: 'Accounting',
     subNav: [
       { label: 'Transactions', path: '/accounting/transactions' },
-      { label: 'Simple Transactions', path: '/accounting/simple-transactions' },
+      { label: 'Bank Transactions', path: '/accounting/bank-transactions' },
       { label: 'Chart of Accounts', path: '/accounting/accounts' },
       { label: 'Tax Master', path: '/accounting/tax' },
       { label: 'Payment Terms', path: '/accounting/payment-terms' },

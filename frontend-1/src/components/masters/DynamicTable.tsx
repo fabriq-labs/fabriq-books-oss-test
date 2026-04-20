@@ -1,6 +1,8 @@
 import React, { useMemo, useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import {
     Table,
+    TableBody,
+    TableCell,
     TableHead,
     TableHeader,
     TableRow
@@ -12,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import DynamicTableBody from './DynamicTableBody';
 import DynamicTableHeader from './DynamicTableHeader';
 import { generateColumns, type TableColumn } from './table-columns';
+import type { CustomRowRenderer } from '@/types/customRowRenderer';
 
 interface ApiResponse {
     data: Record<string, any>[];
@@ -38,6 +41,8 @@ interface DynamicTableProps {
     cellHighlights?: CellHighlightMap;
     /** Optional render function to inject extra content after a row (e.g. suggestion buttons) */
     renderRowExtra?: (row: any) => React.ReactNode | null;
+    /** When provided, replaces metadata-generated columns and body rendering */
+    customRowRenderer?: CustomRowRenderer;
 }
 
 const DynamicTable = forwardRef<any, DynamicTableProps>(({
@@ -50,6 +55,7 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
     collapsibleMainColumnsCount = 3,
     cellHighlights,
     renderRowExtra,
+    customRowRenderer,
 }, ref) => {
     const [sortField, setSortField] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -74,9 +80,20 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
 
     // Generate table columns from metadata using the new modular system
     const columns = useMemo(() => {
+        if (customRowRenderer) {
+            // Map custom column defs to TableColumn format for DynamicTableHeader
+            return customRowRenderer.columns.map(col => ({
+                key: col.key,
+                title: col.title,
+                visible: true,
+                align: col.align,
+                width: col.width,
+                sortKey: col.sortKey,
+            })) as TableColumn[];
+        }
         if (!data?.metaData) return [];
         return generateColumns(data.metaData, renderActions);
-    }, [data?.metaData, renderActions]);
+    }, [data?.metaData, renderActions, customRowRenderer]);
 
     // Sort the data
     const sortedData = useMemo(() => {
@@ -129,12 +146,17 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
         });
     }, [data?.data, sortField, sortDirection, data?.metaData]);
 
-    const handleSort = (field: string) => {
+    const handleSort = (columnKey: string) => {
+        // When using a custom renderer, resolve sortKey from the column def
+        let field = columnKey;
+        if (customRowRenderer) {
+            const colDef = customRowRenderer.columns.find(c => c.key === columnKey);
+            if (!colDef?.sortKey) return; // column is not sortable
+            field = colDef.sortKey;
+        }
         if (sortField === field) {
-            // Toggle direction if same field
             setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
         } else {
-            // New field, set to ascending
             setSortField(field);
             setSortDirection('asc');
         }
@@ -217,7 +239,7 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
         <div className="rounded-md border">
             <Table>
                 <DynamicTableHeader
-                    columns={enableCollapsible ? mainColumns : columns}
+                    columns={customRowRenderer ? columns : (enableCollapsible ? mainColumns : columns)}
                     enableMultiSelect={enableMultiSelect}
                     selectedRows={selectedRows}
                     totalRows={sortedData?.length || 0}
@@ -225,21 +247,51 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
                     sortDirection={sortDirection}
                     onSort={handleSort}
                     onSelectAll={handleSelectAll}
-                    enableCollapsible={enableCollapsible}
+                    enableCollapsible={!customRowRenderer && enableCollapsible}
                 />
-                <DynamicTableBody
-                    data={sortedData || []}
-                    columns={enableCollapsible ? mainColumns : columns}
-                    enableMultiSelect={enableMultiSelect}
-                    selectedRows={selectedRows}
-                    onSelectRow={handleSelectRow}
-                    enableCollapsible={enableCollapsible}
-                    expandableColumns={expandableColumns}
-                    expandedRows={expandedRows}
-                    onToggleExpansion={toggleRowExpansion}
-                    cellHighlights={cellHighlights}
-                    renderRowExtra={renderRowExtra}
-                />
+                {customRowRenderer ? (
+                    <TableBody>
+                        {(sortedData || []).map((record) => {
+                            const isSelected = selectedRows.some(r => r.id === record.id);
+                            const actions = renderActions(record);
+                            const rowCls = customRowRenderer.rowClassName?.(record);
+                            const extraContent = renderRowExtra?.(record);
+                            return (
+                                <React.Fragment key={record.id}>
+                                    <TableRow className={rowCls}>
+                                        {customRowRenderer.renderCells(record, {
+                                            isSelected,
+                                            onSelect: (checked) => handleSelectRow(record, checked),
+                                            actions,
+                                        })}
+                                    </TableRow>
+                                    {extraContent && (
+                                        <TableRow>
+                                            {/* +1 for the select-all checkbox column rendered by DynamicTableHeader */}
+                                            <TableCell colSpan={customRowRenderer.columns.length + 1} className="p-0">
+                                                {extraContent}
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
+                    </TableBody>
+                ) : (
+                    <DynamicTableBody
+                        data={sortedData || []}
+                        columns={enableCollapsible ? mainColumns : columns}
+                        enableMultiSelect={enableMultiSelect}
+                        selectedRows={selectedRows}
+                        onSelectRow={handleSelectRow}
+                        enableCollapsible={enableCollapsible}
+                        expandableColumns={expandableColumns}
+                        expandedRows={expandedRows}
+                        onToggleExpansion={toggleRowExpansion}
+                        cellHighlights={cellHighlights}
+                        renderRowExtra={renderRowExtra}
+                    />
+                )}
             </Table>
         </div>
     );

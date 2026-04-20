@@ -12,6 +12,8 @@ import ReconciliationSuggestionsModal, {
 } from "@/components/forms/Masters/ReconciliationSuggestionsModal";
 import type { CellHighlightMap } from "@/components/masters/DynamicTable";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { createPostingRowRenderer } from "@/components/masters/posting/PostingListRow";
+import { useEntity } from "@/contexts/EntityContext";
 
 /**
  * Per-posting reconciliation result kept in memory after a bulk reconcile call.
@@ -26,20 +28,20 @@ export default function Transactions() {
   const navigate = useNavigate();
   const masterRef = useRef<MasterHandle>(null);
   const [searchParams] = useSearchParams();
+  const { currentEntityId } = useEntity();
 
   // ── URL-based filter support ──────────────────────────────────────────
   // Read filter from URL query params (e.g., ?filter=unreconciled)
   const urlFilter = searchParams.get('filter');
 
-  // Build default filters based on URL params
+  // Build default filters based on URL params + global entity context
   const defaultFilters = useMemo(() => {
     const baseFilter: Record<string, any> = {
       description: { ncontains: "Closing" },
+      ...(currentEntityId ? { legal_entity_id: currentEntityId } : {}),
     };
 
     if (urlFilter === 'unreconciled') {
-      // Show only unreconciled transactions (NULL or UNMATCHED status)
-      // Using OR condition for Prisma filter format
       return {
         ...baseFilter,
         OR: [
@@ -50,7 +52,7 @@ export default function Transactions() {
     }
 
     return baseFilter;
-  }, [urlFilter]);
+  }, [urlFilter, currentEntityId]);
 
   // Title is always "Transactions"; segment indicates view
   const displayName = 'Transactions';
@@ -87,6 +89,12 @@ export default function Transactions() {
   const [modalPostingId, setModalPostingId] = useState<string | null>(null);
   /** Row-level reconcile loading (single posting id) */
   const [reconcilingPostingId, setReconcilingPostingId] = useState<string | null>(null);
+
+  // Custom row renderer — updates when AI prediction highlights change
+  const customRowRenderer = useMemo(
+    () => createPostingRowRenderer(predictedFields),
+    [predictedFields]
+  );
 
   // ── CSV import helpers (unchanged) ────────────────────────────────────
   function getKeyBasedOnValue(obj: any, value: any) {
@@ -451,6 +459,7 @@ export default function Transactions() {
   return (
     <>
       <Master
+        key={currentEntityId ?? 'all'}
         ref={masterRef}
         type="posting"
         view="posting_view"
@@ -473,9 +482,9 @@ export default function Transactions() {
         defaultFilters={defaultFilters}
         titleExtra={titleExtra}
         bulkActions={bulkActions}
-        cellHighlights={predictedFields}
         renderRowExtra={renderRowExtra}
         injectRowActions={injectRowActions}
+        customRowRenderer={customRowRenderer}
       />
 
       {/* Reconciliation suggestions modal */}

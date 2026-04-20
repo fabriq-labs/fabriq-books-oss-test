@@ -37,6 +37,10 @@ interface ReportControlsProps {
     accountFilterOptions?: (items: any[]) => any[];
     /** Rendered after date/custom controls and before the refresh button (e.g. legal entity + currency on Balance Sheet). */
     beforeRefresh?: React.ReactNode;
+    /** If true, do not fetch accounts on initial render — wait for user to type. */
+    skipInitialAccountSearch?: boolean;
+    /** Key for the account dropdown — change to remount/reset it (e.g. when entity switches). */
+    accountKey?: string;
 }
 
 export const ReportControls: React.FC<ReportControlsProps> = ({
@@ -51,6 +55,8 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     accountAdditionalFilters,
     accountFilterOptions,
     beforeRefresh,
+    skipInitialAccountSearch = false,
+    accountKey,
 }) => {
     const {
         dateRange,
@@ -148,6 +154,7 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
         () => (
             <div className="w-full sm:w-44">
                 <SearchDropDown
+                    key={accountKey}
                     instanceType={"account"}
                     instanceSourceKey={"account_id"}
                     instanceKey="id"
@@ -169,10 +176,11 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                     style={{ width: "100%" }}
                     additionalFilters={accountAdditionalFilters}
                     filterOptions={accountFilterOptions}
+                    skipApiCall={skipInitialAccountSearch}
                 />
             </div>
         ),
-        [selectedAccount, onAccountChange, onAccountClear, accountAdditionalFilters, accountFilterOptions]
+        [selectedAccount, onAccountChange, onAccountClear, accountAdditionalFilters, accountFilterOptions, skipInitialAccountSearch, accountKey]
     );
 
     return (
