@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { adminAPI, type OnboardTenantPayload } from "@/api/api";
+import { v4 as uuidv4 } from "uuid";
 import { ArrowLeft, ArrowRight, Plus, Trash2, Building2, Users } from "lucide-react";
 
 interface AdminUserRow {
@@ -15,7 +16,7 @@ interface AdminUserRow {
 }
 
 const initialUserRow = (): AdminUserRow => ({
-  id: crypto.randomUUID(),
+  id: uuidv4(),
   email: "",
   name: "",
   password: "",

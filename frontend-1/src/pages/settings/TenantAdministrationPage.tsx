@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserData } from "@/hooks/useUserData";
 import { adminAPI, type CoaTemplate, type OnboardTenantPayload } from "@/api/superAdminApi";
 import { viewAPI } from "@/api/metadataApi";
+import { v4 as uuidv4 } from "uuid";
 import { DemoDatabaseResetSection } from "./DemoDatabaseResetSection";
 import {
   ArrowLeft,
@@ -56,7 +57,7 @@ interface AdminUserRow {
 }
 
 const initialUserRow = (): AdminUserRow => ({
-  id: crypto.randomUUID(),
+  id: uuidv4(),
   email: "",
   name: "",
   password: "",

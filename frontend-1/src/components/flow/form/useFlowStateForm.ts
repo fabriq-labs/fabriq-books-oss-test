@@ -8,6 +8,7 @@ import { Role } from '@/models/Role';
 import { User } from '@/models/User';
 import { getRoles } from '@/services/roleService';
 import { getUsers } from '@/services/userService';
+import { v4 as uuidv4 } from 'uuid';
 
 // Define form validation schema
 export const flowStateFormSchema = z.object({
@@ -51,7 +52,7 @@ export const useFlowStateForm = (
   }, [initialValues]);
 
   const defaultValues: FlowStateFormData = {
-    flow_id: initialValues?.flow_id || crypto.randomUUID(),
+    flow_id: initialValues?.flow_id || uuidv4(),
     process_name: initialValues?.process_name || '',
     state: initialValues?.state || '',
     assigned_role: initialValues?.assigned_role || null,
