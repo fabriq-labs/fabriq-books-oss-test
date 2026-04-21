@@ -15,14 +15,14 @@ export const extractPDFData = (data: any): any => {
         purchase_reason: data.purchase_reason,
         created_at: data.created_at,
 
-        organization: data.organization ? {
-            legal_name: data.organization.legal_name,
-            address: data.organization.address,
-            city: data.organization.city,
-            country: data.organization.country,
-            state: data.organization.state,
-            zip_code: data.organization.zip_code,
-            website: data.organization.website,
+        legal_entity: data.legal_entity ? {
+            legal_name: data.legal_entity.legal_name,
+            address: data.legal_entity.address,
+            city: data.legal_entity.city,
+            country: data.legal_entity.country,
+            state: data.legal_entity.state,
+            zip_code: data.legal_entity.zip_code,
+            website: data.legal_entity.website,
         } : null,
 
         supplier_details: data.supplier_details ? {
@@ -131,6 +131,7 @@ const styles = StyleSheet.create({
 
 const PurchaseOrderPDF = ({ purchaseOrder, currencySymbol = '₹' }: any) => {
     const po = extractPDFData(purchaseOrder);
+    console.log("po", po);
     const items = Array.isArray(po?.purchase_order_item) ? po.purchase_order_item : [];
     const subtotal = items.reduce((acc: number, it: any) => acc + (Number(it?.item_total) || 0), 0);
     const totalPOAmount = subtotal;
@@ -148,10 +149,10 @@ const PurchaseOrderPDF = ({ purchaseOrder, currencySymbol = '₹' }: any) => {
                 <View style={styles.row}>
                     <View style={styles.col}>
                         <Text style={styles.sectionTitle}>Ship To / Bill To:</Text>
-                        <Text style={styles.text}>{po?.organization?.legal_name || ''}</Text>
-                        <Text style={styles.text}>{po?.organization?.address || ''}</Text>
-                        <Text style={styles.text}>{[po?.organization?.city, po?.organization?.state, po?.organization?.zip_code].filter(Boolean).join(', ')}</Text>
-                        <Text style={styles.text}>{po?.organization?.country || ''}</Text>
+                        <Text style={styles.text}>{po?.legal_entity?.legal_name || ''}</Text>
+                        <Text style={styles.text}>{po?.legal_entity?.address || ''}</Text>
+                        <Text style={styles.text}>{[po?.legal_entity?.city, po?.legal_entity?.state, po?.legal_entity?.zip_code].filter(Boolean).join(', ')}</Text>
+                        <Text style={styles.text}>{po?.legal_entity?.country || ''}</Text>
                     </View>
                     <View style={styles.col}>
                         <Text style={styles.sectionTitle}>Vendor:</Text>
