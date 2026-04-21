@@ -9,20 +9,24 @@ import { formatCurrency } from "@/lib/formatters";
 import { Loader2, DollarSign, FileDown, ChevronDown, FileSpreadsheet, Filter, RefreshCw, TrendingUp, Receipt } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import dayjs from "dayjs";
-import { ReportControls } from "@/components/Reports/ReportControls";
-import { useReportController } from "@/contexts/ReportControllerContext";
-import { useAuth } from "@/contexts/AuthContext";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import * as XLSX from "xlsx";
 import { pdf } from "@react-pdf/renderer";
-
 import "@/styles/reports.css";
+import { ReportControls } from "@/components/Reports/ReportControls";
+import { useEntity } from "@/contexts/EntityContext";
 import { IncomeStatementPDFDocument, IncomeStatementPdfProps } from "@/components/pdf_generator/IncomePDFGenerator";
+import {
+  FinancialYearSelector,
+  getPreviousFYOption,
+  buildMonthOptions,
+  type FinancialYearOption,
+  type MonthOption,
+  type FinancialYearType,
+} from "@/components/Reports/FinancialYearSelector";
 
 interface IncomeStatementRow {
   account_id?: string;
@@ -34,7 +38,13 @@ interface IncomeStatementRow {
   account_type?: string[];
 }
 
-/** Map API classification to P&L bucket; balance-sheet / other rows return null (excluded from this report UI). */
+type CurrencyListRow = {
+  id: string;
+  code: string;
+  name: string;
+  is_active?: boolean;
+};
+
 function incomeStatementBucket(classification: string | null | undefined): "Income" | "Expense" | null {
   if (classification == null || !String(classification).trim()) return null;
   const n = String(classification).toLowerCase().trim();
@@ -46,62 +56,11 @@ function incomeStatementBucket(classification: string | null | undefined): "Inco
 const normalizeIncomeAmount = (amount: number) => (amount < 0 ? Math.abs(amount) : amount);
 
 const getDisplayAmount = (amount: number, classification?: string) => {
-  if (classification === "Income") {
-    return normalizeIncomeAmount(amount);
-  }
+  if (classification === "Income") return normalizeIncomeAmount(amount);
   return amount;
 };
 
-const displayPlAmount = (amount: number, classification?: string) =>
-  getDisplayAmount(amount, classification);
-
-type CurrencyListRow = {
-  id: string;
-  code: string;
-  name: string;
-  is_active?: boolean;
-};
-
-type LegalEntityOption = {
-  id: string;
-  organization_name?: string;
-  legal_name?: string;
-  name?: string | null;
-  is_it_headquartres?: string | null;
-  basecurrency_id?: string | null;
-  /** From `entity.basecurrency_id` → `currency` (see `entity_view` data graph). */
-  currency?: { id?: string | null; code?: string | null } | null;
-};
-
-/** ISO 4217 code from the entity’s linked `currency` row (`basecurrency_id`). */
-function resolveEntityBaseCurrencyCode(org: LegalEntityOption | undefined): string | null {
-  if (!org) return null;
-  const raw = org.currency?.code?.trim();
-  return raw ? raw.toUpperCase() : null;
-}
-
-/** HQ flag is stored as text; backend uses `yes`, some UIs use `Yes`. */
-function isHeadquartersEntity(org: Pick<LegalEntityOption, "is_it_headquartres">): boolean {
-  const v = String(org?.is_it_headquartres ?? "").trim().toLowerCase();
-  return v === "yes" || v === "true" || v === "1";
-}
-
-/** Reporting currency for the org: HQ entity’s base currency, else first entity, else INR. */
-function resolveHeadquartersBaseCurrency(list: LegalEntityOption[]): string {
-  const hq = list.find(isHeadquartersEntity) ?? list[0];
-  return resolveEntityBaseCurrencyCode(hq) ?? "INR";
-}
-
-/** `currency.id` for HQ (or first) entity’s base currency — for `filters.currency_id` on default load. */
-function resolveHeadquartersBaseCurrencyId(list: LegalEntityOption[]): string {
-  const hq = list.find(isHeadquartersEntity) ?? list[0];
-  if (!hq) return "";
-  const fromNested = hq.currency?.id?.trim();
-  if (fromNested) return fromNested;
-  const fk = hq.basecurrency_id?.trim();
-  if (fk) return fk;
-  return "";
-}
+const displayPlAmount = (amount: number, classification?: string) => getDisplayAmount(amount, classification);
 
 const useIncomeStatement = ({
   dateRange,
@@ -109,10 +68,8 @@ const useIncomeStatement = ({
   currencyCode,
   legalEntityIds,
 }: {
-  dateRange?: [dayjs.Dayjs, dayjs.Dayjs];
-  /** `currency.id` — explicit pick or HQ default; sent as `filters.currency_id` when non-empty. */
+  dateRange: [dayjs.Dayjs, dayjs.Dayjs];
   currencyId: string;
-  /** ISO reporting code — always sent as `filters.currency`. */
   currencyCode: string;
   legalEntityIds: string[];
 }) => {
@@ -127,19 +84,14 @@ const useIncomeStatement = ({
       setLoading(true);
       try {
         let filters: any = {
-          from_date: dateRange?.[0]?.format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD"),
-          to_date: dateRange?.[1]?.format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD"),
+          from_date: dateRange[0].format("YYYY-MM-DD"),
+          to_date: dateRange[1].format("YYYY-MM-DD"),
         };
 
-        if (account) {
-          filters.account_id = account?.id;
-        }
-        if (currencyId.trim()) {
-          filters.currency_id = currencyId.trim();
-        }
-        if (legalEntityIds.length > 0) {
-          filters.legal_entity_ids = legalEntityIds;
-        }
+        if (account) filters.account_id = account?.id;
+        if (currencyId.trim()) filters.currency_id = currencyId.trim();
+        if (legalEntityIds.length > 0) filters.legal_entity_ids = legalEntityIds;
+
         const result = (await reportAPI.getReport("income_statement", filters)) as any;
         if (seq !== fetchSeq.current) return;
         const rows = Array.isArray(result?.data) ? result.data : [];
@@ -154,29 +106,22 @@ const useIncomeStatement = ({
           variant: "destructive",
         });
       } finally {
-        if (seq === fetchSeq.current) {
-          setLoading(false);
-        }
+        if (seq === fetchSeq.current) setLoading(false);
       }
     },
     [dateRange, currencyId, currencyCode, legalEntityIds]
   );
 
   useEffect(() => {
-    return () => {
-      fetchSeq.current += 1;
-    };
+    return () => { fetchSeq.current += 1; };
   }, []);
 
-  return {
-    data,
-    loading,
-    error,
-    fetchIncomeStatement,
-  };
+  return { data, loading, error, fetchIncomeStatement };
 };
 
 export default function IncomeStatement() {
+  const { currentEntity, currentEntityId, loading: entityLoading } = useEntity();
+
   const [fetchOnButtonClick, setFetchOnButtonClick] = useState(false);
   const [account, setAccount]: any = useState(null);
   const [view, setView] = useState("Summary");
@@ -185,50 +130,61 @@ export default function IncomeStatement() {
   const [selectedCurrencyId, setSelectedCurrencyId] = useState("");
   const [currencies, setCurrencies] = useState<CurrencyListRow[]>([]);
   const [currenciesLoading, setCurrenciesLoading] = useState(false);
-  const [legalEntityOptions, setLegalEntityOptions] = useState<LegalEntityOption[]>([]);
-  const [legalEntitiesLoading, setLegalEntitiesLoading] = useState(true);
-  const [selectedLegalEntityIds, setSelectedLegalEntityIds] = useState<string[]>([]);
+  const [selectedFY, setSelectedFY] = useState<FinancialYearOption>(() => getPreviousFYOption("JAN_DEC"));
+  const [selectedMonth, setSelectedMonth] = useState<MonthOption | null>(null);
 
-  const { dateRange } = useReportController();
-  const { user } = useAuth();
+  // When entity changes: reset FY to previous FY for that entity's type, clear month, default currency to entity's base currency
+  useEffect(() => {
+    const type: FinancialYearType = currentEntity?.financial_year_type ?? "JAN_DEC";
+    setSelectedFY(getPreviousFYOption(type));
+    setSelectedMonth(null);
+    setSelectedCurrencyId(currentEntity?.currency?.id ?? "");
+  }, [currentEntity?.id]);
 
-  /** ISO code for `formatCurrency` / PDF; from selected `currency.id` row or HQ org default. */
+  const effectiveDateRange = useMemo((): [dayjs.Dayjs, dayjs.Dayjs] => {
+    const from = selectedMonth?.from_date ?? selectedFY.from_date;
+    const to = selectedMonth?.to_date ?? selectedFY.to_date;
+    return [dayjs(from), dayjs(to)];
+  }, [selectedFY, selectedMonth]);
+
+  const monthOptions = useMemo(() => buildMonthOptions(selectedFY), [selectedFY]);
+
   const reportCurrencyCode = useMemo(() => {
     if (selectedCurrencyId.trim()) {
       const row = currencies.find((c) => c.id === selectedCurrencyId.trim());
       const code = row?.code?.trim().toUpperCase();
       if (code) return code;
     }
-    return resolveHeadquartersBaseCurrency(legalEntityOptions);
-  }, [selectedCurrencyId, currencies, legalEntityOptions]);
+    return currentEntity?.currency?.code?.trim().toUpperCase() ?? "INR";
+  }, [selectedCurrencyId, currencies, currentEntity]);
 
   const displayCurrencyCode = reportCurrencyCode;
 
-  /** HQ / first entity base `currency.id` or FK; used when user leaves “Org default” so API gets `currency_id`. */
-  const defaultReportingCurrencyId = useMemo(() => {
-    const fromEntity = resolveHeadquartersBaseCurrencyId(legalEntityOptions);
-    if (fromEntity) return fromEntity;
-    const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
-    const row = currencies.find((c) => c.code.toUpperCase() === code.toUpperCase());
-    return row?.id ?? "";
-  }, [legalEntityOptions, currencies]);
+  const defaultReportingCurrencyId = useMemo(
+    () => currentEntity?.currency?.id ?? "",
+    [currentEntity]
+  );
 
   const effectiveReportCurrencyId = useMemo(
     () => selectedCurrencyId.trim() || defaultReportingCurrencyId,
-    [selectedCurrencyId, defaultReportingCurrencyId],
+    [selectedCurrencyId, defaultReportingCurrencyId]
+  );
+
+  const legalEntityIds = useMemo(
+    () => currentEntityId ? [currentEntityId] : [],
+    [currentEntityId]
   );
 
   const { data, loading, error, fetchIncomeStatement } = useIncomeStatement({
-    dateRange,
+    dateRange: effectiveDateRange,
     currencyId: effectiveReportCurrencyId,
     currencyCode: reportCurrencyCode,
-    legalEntityIds: selectedLegalEntityIds,
+    legalEntityIds,
   });
 
-  const reportLoading = loading || legalEntitiesLoading;
+  const reportLoading = loading || entityLoading;
 
   const ADD_BACK_TYPES = ["D&A", "Interest & Tax", "EBITDA Adjustments"];
-
   const hasAddBackType = (row: IncomeStatementRow) =>
     (row.account_type || []).some((type) => ADD_BACK_TYPES.includes(type));
 
@@ -236,17 +192,12 @@ export default function IncomeStatement() {
     ? data.filter((row) => Number(row.total_amount || 0) !== 0)
     : data;
   const isSummaryView = view === "Summary";
-  // Summary = level-0 only (same with or without legal entity). Backend includes ancestor rows for entity
-  // filters so level-0 P&L roots still appear with rolled-up amounts.
   const viewFilteredData = isSummaryView
     ? displayedData.filter((row) => Number(row.level ?? 0) === 0)
     : displayedData;
 
-  // Detail view lists parent + sub-accounts; each sub amount is already in rolled-up parents.
-  // Totals / EBITDA must use level-0 P&L rows only so sub-menu lines are not summed again.
   const topLevelPlRows = displayedData.filter(
-    (row) =>
-      Number(row.level ?? 0) === 0 && incomeStatementBucket(row.classification) != null
+    (row) => Number(row.level ?? 0) === 0 && incomeStatementBucket(row.classification) != null
   );
   const rowsForMainTotals =
     topLevelPlRows.length > 0
@@ -257,10 +208,10 @@ export default function IncomeStatement() {
   const expenseRowsExcludingAddBacks = rowsForMainTotals.filter(
     (row) => incomeStatementBucket(row.classification) === "Expense" && !hasAddBackType(row)
   );
-  // Add-backs are often on non-root accounts; take from full displayed set, not level-0-only.
   const addBackRows = displayedData.filter(
     (row) => incomeStatementBucket(row.classification) === "Expense" && hasAddBackType(row)
   );
+
   const depreciationAndAmortizationTotal = addBackRows.reduce((sum, row) => {
     if ((row.account_type || []).includes("D&A")) {
       return sum + displayPlAmount(Number(row.total_amount || 0), row.classification);
@@ -300,73 +251,32 @@ export default function IncomeStatement() {
       (acc, item) => {
         const key = incomeStatementBucket(item.classification);
         if (!key) return acc;
-        if (!acc[key]) {
-          acc[key] = [];
-        }
+        if (!acc[key]) acc[key] = [];
         acc[key].push(item);
         return acc;
       },
       {} as Record<string, IncomeStatementRow[]>
     );
-
     const orderOfClassifications = ["Income", "Expense"];
     return orderOfClassifications.map((classification) => ({
       classification,
       items: groups[classification] || [],
     }));
   };
+
   const statementGroups = groupedData(viewFilteredData).map((group) => ({
     ...group,
-    items:
-      group.classification === "Expense"
-        ? group.items.filter((row) => !hasAddBackType(row))
-        : group.items,
+    items: group.classification === "Expense" ? group.items.filter((row) => !hasAddBackType(row)) : group.items,
   }));
   const visibleStatementGroups = statementGroups.filter(
     (group) => !showOnlyNonZero || group.items.length > 0
   );
   const hasVisibleStatementRows = visibleStatementGroups.length > 0;
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLegalEntitiesLoading(true);
-      try {
-        const filters = user?.org_id ? { org_id: { eq: user.org_id } } : {};
-        const res: any = await viewAPI.search(
-          "entity",
-          "entity_view",
-          1,
-          500,
-          undefined,
-          filters,
-          {}
-        );
-        const list = Array.isArray(res?.data) ? res.data : [];
-        if (!cancelled) setLegalEntityOptions(list);
-      } catch {
-        if (!cancelled) setLegalEntityOptions([]);
-      } finally {
-        if (!cancelled) setLegalEntitiesLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.org_id]);
-
   const loadCurrencies = useCallback(async () => {
     setCurrenciesLoading(true);
     try {
-      const res: any = await viewAPI.search(
-        "currency",
-        "currency_view",
-        1,
-        500,
-        undefined,
-        {},
-        {}
-      );
+      const res: any = await viewAPI.search("currency", "currency_view", 1, 500, undefined, {}, {});
       const list = Array.isArray(res?.data) ? res.data : [];
       setCurrencies(
         list.map((row: any) => ({
@@ -383,9 +293,7 @@ export default function IncomeStatement() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadCurrencies();
-  }, [loadCurrencies]);
+  useEffect(() => { void loadCurrencies(); }, [loadCurrencies]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -395,11 +303,10 @@ export default function IncomeStatement() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [loadCurrencies]);
 
-  const sortedActiveCurrencies = useMemo(() => {
-    return [...currencies]
-      .filter((c) => c.code && c.is_active !== false)
-      .sort((a, b) => a.code.localeCompare(b.code));
-  }, [currencies]);
+  const sortedActiveCurrencies = useMemo(
+    () => [...currencies].filter((c) => c.code && c.is_active !== false).sort((a, b) => a.code.localeCompare(b.code)),
+    [currencies]
+  );
 
   const selectedCurrencyInMasterList = useMemo(() => {
     if (!selectedCurrencyId.trim()) return true;
@@ -407,42 +314,31 @@ export default function IncomeStatement() {
   }, [sortedActiveCurrencies, selectedCurrencyId]);
 
   const orgDefaultLabel = useMemo(() => {
-    const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
-    return `Org Default (${code})`;
-  }, [legalEntityOptions]);
+    return currentEntity?.currency?.code?.trim().toUpperCase() ?? "INR";
+  }, [currentEntity]);
 
   useEffect(() => {
-    if (legalEntitiesLoading) return;
+    if (entityLoading) return;
     void fetchIncomeStatement(account);
-  }, [legalEntitiesLoading, fetchIncomeStatement, account]);
+  }, [entityLoading, fetchIncomeStatement, account]);
 
   useEffect(() => {
     if (!fetchOnButtonClick) return;
-    if (legalEntitiesLoading) return;
+    if (entityLoading) return;
     void fetchIncomeStatement(account);
     setFetchOnButtonClick(false);
-  }, [fetchOnButtonClick, legalEntitiesLoading, fetchIncomeStatement, account]);
+  }, [fetchOnButtonClick, entityLoading, fetchIncomeStatement, account]);
 
-  const handleAccountChange = (value: any) => {
-    setAccount(value);
-  };
-
-  const handleAccountClear = () => {
-    setAccount(null);
-  };
-
-  const handleRefresh = () => {
-    setFetchOnButtonClick(true);
-  };
+  const handleAccountChange = (value: any) => setAccount(value);
+  const handleAccountClear = () => setAccount(null);
+  const handleRefresh = () => setFetchOnButtonClick(true);
 
   const getClassificationIcon = (classification: string) => {
     const normalized = classification.toLowerCase();
     if (normalized.includes("income") || normalized.includes("revenue")) {
       return <TrendingUp className="h-4 w-4 text-emerald-600" />;
     }
-    if (normalized.includes("expense")) {
-      return <Receipt className="h-4 w-4 text-orange-600" />;
-    }
+    if (normalized.includes("expense")) return <Receipt className="h-4 w-4 text-orange-600" />;
     return <DollarSign className="h-4 w-4 text-slate-600" />;
   };
 
@@ -451,24 +347,17 @@ export default function IncomeStatement() {
     try {
       const groups = groupedData(viewFilteredData).map((group) => ({
         ...group,
-        items:
-          group.classification === "Expense"
-            ? group.items.filter((row) => !hasAddBackType(row))
-            : group.items,
+        items: group.classification === "Expense" ? group.items.filter((row) => !hasAddBackType(row)) : group.items,
       }));
       const groupsWithData = groups.filter((group) => group.items.length > 0);
 
       if (groupsWithData.length === 0) {
-        toast({
-          title: "No data to export",
-          description: "Load the report first, then export.",
-          variant: "destructive",
-        });
+        toast({ title: "No data to export", description: "Load the report first, then export.", variant: "destructive" });
         return;
       }
 
-      const fromDate = dateRange?.[0]?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD");
-      const toDate = dateRange?.[1]?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD");
+      const fromDate = effectiveDateRange[0].format("YYYY-MM-DD");
+      const toDate = effectiveDateRange[1].format("YYYY-MM-DD");
 
       const blob = await pdf(
         <IncomeStatementPDFDocument
@@ -510,37 +399,26 @@ export default function IncomeStatement() {
     try {
       const groups = groupedData(viewFilteredData).map((group) => ({
         ...group,
-        items:
-          group.classification === "Expense"
-            ? group.items.filter((row) => !hasAddBackType(row))
-            : group.items,
+        items: group.classification === "Expense" ? group.items.filter((row) => !hasAddBackType(row)) : group.items,
       }));
       const groupsWithData = groups.filter((group) => group.items.length > 0);
 
       if (groupsWithData.length === 0) {
-        toast({
-          title: "No data to export",
-          description: "Load the report first, then export.",
-          variant: "destructive",
-        });
+        toast({ title: "No data to export", description: "Load the report first, then export.", variant: "destructive" });
         return;
       }
 
-      const fromDate = dateRange?.[0]?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD");
-      const toDate = dateRange?.[1]?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD");
+      const fromDate = effectiveDateRange[0].format("YYYY-MM-DD");
+      const toDate = effectiveDateRange[1].format("YYYY-MM-DD");
 
       const rows: string[][] = [["Account", "Total Amount"]];
-
       for (const group of groupsWithData) {
         rows.push([group.classification, ""]);
         for (const row of group.items) {
           const indent = row.level > 0 ? "  ".repeat(row.level) : "";
           rows.push([
             `${indent}${row.account_name}`,
-            formatCurrency(
-              displayPlAmount(Number(row.total_amount || 0), group.classification),
-              displayCurrencyCode
-            ),
+            formatCurrency(displayPlAmount(Number(row.total_amount || 0), group.classification), displayCurrencyCode),
           ]);
         }
         const groupTotal =
@@ -555,7 +433,6 @@ export default function IncomeStatement() {
         }
         rows.push([]);
       }
-
       rows.push(["Depreciation & Amortization", formatCurrency(depreciationAndAmortizationTotal, displayCurrencyCode)]);
       rows.push(["Interest & Tax", formatCurrency(interestAndTaxTotal, displayCurrencyCode)]);
       rows.push(["EBITDA Adjustments", formatCurrency(ebitdaAdjustmentsTotal, displayCurrencyCode)]);
@@ -564,7 +441,6 @@ export default function IncomeStatement() {
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws["!cols"] = [{ wch: 40 }, { wch: 20 }];
-
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Income Statement");
       XLSX.writeFile(wb, `income-statement-${fromDate}-to-${toDate}.xlsx`);
@@ -615,11 +491,10 @@ export default function IncomeStatement() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  fetchIncomeStatement(account);
-                }}
+                onClick={() => fetchIncomeStatement(account)}
                 className="border-red-300 text-red-600 hover:bg-red-50 text-xs"
               >
+                <RefreshCw className="h-3 w-3 mr-1" />
                 Retry
               </Button>
             </div>
@@ -636,9 +511,7 @@ export default function IncomeStatement() {
               <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center mb-1">
                 <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
               </div>
-              <p className="text-xs text-slate-500 font-medium">
-                No data found for {group.classification}
-              </p>
+              <p className="text-xs text-slate-500 font-medium">No data found for {group.classification}</p>
             </div>
           </TableCell>
         </TableRow>
@@ -648,7 +521,10 @@ export default function IncomeStatement() {
     return (
       <>
         {group.items.map((row, index) => (
-          <TableRow key={row.account_id || `row-${index}`} className="hover:bg-slate-50 transition-colors duration-150 border-b border-slate-100">
+          <TableRow
+            key={row.account_id || `row-${index}`}
+            className="hover:bg-slate-50 transition-colors duration-150 border-b border-slate-100"
+          >
             <TableCell className="py-2 px-3">
               <div className="flex items-center">
                 <div style={{ marginLeft: row.level * 12 }} className="flex items-center gap-1">
@@ -661,10 +537,7 @@ export default function IncomeStatement() {
             </TableCell>
             <TableCell className="text-right py-2 px-3 font-mono text-xs">
               <span className="text-slate-900 font-bold">
-                {formatCurrency(
-                  displayPlAmount(Number(row.total_amount || 0), group.classification),
-                  displayCurrencyCode
-                )}
+                {formatCurrency(displayPlAmount(Number(row.total_amount || 0), group.classification), displayCurrencyCode)}
               </span>
             </TableCell>
           </TableRow>
@@ -674,10 +547,7 @@ export default function IncomeStatement() {
   };
 
   const summary = (pageData: readonly IncomeStatementRow[], classification?: string) => {
-    const totals = pageData.reduce(
-      (acc, curr) => acc + Number(curr?.total_amount || 0),
-      0
-    );
+    const totals = pageData.reduce((acc, curr) => acc + Number(curr?.total_amount || 0), 0);
     const adjustedTotals =
       classification === "Income"
         ? incomeTotal
@@ -722,80 +592,57 @@ export default function IncomeStatement() {
               className="!flex-row !items-center !gap-2 shrink-0"
               beforeRefresh={
                 <>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 border-slate-300 justify-between min-w-[120px] shrink-0">
-                        <span className="text-slate-600 truncate text-xs">
-                          {selectedLegalEntityIds.length === 0
-                            ? "Legal Entity"
-                            : `${selectedLegalEntityIds.length} selected`}
-                        </span>
-                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-2" align="start">
-                      <div className="max-h-[240px] overflow-y-auto space-y-1">
-                        {legalEntityOptions.length === 0 ? (
-                          <p className="text-xs text-slate-500 py-2">No organizations loaded</p>
-                        ) : (
-                          legalEntityOptions.map((org) => (
-                            <label
-                              key={org.id}
-                              className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-slate-100 cursor-pointer text-sm"
-                            >
-                              <Checkbox
-                                checked={selectedLegalEntityIds.includes(org.id)}
-                                onCheckedChange={(checked) => {
-                                  setSelectedLegalEntityIds((prev) =>
-                                    checked ? [...prev, org.id] : prev.filter((id) => id !== org.id)
-                                  );
-                                }}
-                              />
-                              <span className="truncate">{org.legal_name ?? org.id}</span>
-                            </label>
-                          ))
-                        )}
-                      </div>
-                      {selectedLegalEntityIds.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 w-full text-xs"
-                          onClick={() => setSelectedLegalEntityIds([])}
-                        >
-                          Clear selection
-                        </Button>
-                      )}
-                    </PopoverContent>
-                  </Popover>
+                  {/* Financial year selector */}
+                  <FinancialYearSelector
+                    fyType={currentEntity?.financial_year_type}
+                    value={selectedFY.value}
+                    onChange={(opt) => { setSelectedFY(opt); setSelectedMonth(null); }}
+                    className="w-[130px] h-9 border-slate-300 text-sm shrink-0"
+                  />
+
+                  {/* Month selector — null = All Months */}
+                  <Select
+                    value={selectedMonth?.value ?? "__all__"}
+                    onValueChange={(v) => {
+                      if (v === "__all__") {
+                        setSelectedMonth(null);
+                      } else {
+                        setSelectedMonth(monthOptions.find((m) => m.value === v) ?? null);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[150px] h-9 border-slate-300 text-sm shrink-0">
+                      <SelectValue placeholder="All Months" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Months</SelectItem>
+                      {monthOptions.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Currency — shows ISO code only */}
                   <Select
                     value={selectedCurrencyId ? selectedCurrencyId : "__default__"}
-                    onValueChange={(v) => {
-                      setSelectedCurrencyId(v === "__default__" ? "" : v);
-                    }}
+                    onValueChange={(v) => setSelectedCurrencyId(v === "__default__" ? "" : v)}
                     disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
                   >
-                    <SelectTrigger className="w-[min(100vw-8rem,220px)] min-w-[150px] max-w-[220px] h-9 border-slate-300 text-sm shrink-0">
-                      <DollarSign className="h-4 w-4 mr-1 text-slate-500 shrink-0" />
-                      <SelectValue placeholder={currenciesLoading ? "Loading…" : "Org Default"} />
+                    <SelectTrigger className="w-[110px] h-9 border-slate-300 text-sm shrink-0">
+                      <DollarSign className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
+                      <SelectValue placeholder={currenciesLoading ? "…" : "Default"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__default__">
-                        {legalEntitiesLoading ? "Org Default (…)" : orgDefaultLabel}
+                        {entityLoading ? "…" : orgDefaultLabel}
                       </SelectItem>
-                      {sortedActiveCurrencies.map((row) => {
-                        const code = row.code.toUpperCase();
-                        const label = row.name ? `${code} — ${row.name}` : code;
-                        return (
-                          <SelectItem key={row.id || code} value={row.id}>
-                            {label}
-                          </SelectItem>
-                        );
-                      })}
-                      {selectedCurrencyId && !selectedCurrencyInMasterList && (
-                        <SelectItem value={selectedCurrencyId}>
-                          {reportCurrencyCode} (id)
+                      {sortedActiveCurrencies.map((row) => (
+                        <SelectItem key={row.id || row.code} value={row.id}>
+                          {row.code.toUpperCase()}
                         </SelectItem>
+                      ))}
+                      {selectedCurrencyId && !selectedCurrencyInMasterList && (
+                        <SelectItem value={selectedCurrencyId}>{reportCurrencyCode}</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -833,23 +680,26 @@ export default function IncomeStatement() {
           </div>
         </div>
 
+        {/* View tabs + activity filter */}
         <div className="mt-3 flex flex-wrap items-center gap-4">
           <div className="flex border-b border-slate-200 w-fit">
             <button
               onClick={() => setView("Summary")}
-              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${view === "Summary"
-                ? "text-slate-900 border-b-2 border-blue-600"
-                : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
-                }`}
+              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${
+                view === "Summary"
+                  ? "text-slate-900 border-b-2 border-blue-600"
+                  : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
+              }`}
             >
               Summary View
             </button>
             <button
               onClick={() => setView("Details")}
-              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${view === "Details"
-                ? "text-slate-900 border-b-2 border-blue-600"
-                : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
-                }`}
+              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${
+                view === "Details"
+                  ? "text-slate-900 border-b-2 border-blue-600"
+                  : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
+              }`}
             >
               Detailed View
             </button>
@@ -859,11 +709,7 @@ export default function IncomeStatement() {
             <Label htmlFor="show-nonzero" className="text-sm text-slate-700 cursor-pointer whitespace-nowrap">
               Show only rows with activity
             </Label>
-            <Switch
-              id="show-nonzero"
-              checked={showOnlyNonZero}
-              onCheckedChange={setShowOnlyNonZero}
-            />
+            <Switch id="show-nonzero" checked={showOnlyNonZero} onCheckedChange={setShowOnlyNonZero} />
           </div>
         </div>
       </div>
@@ -881,9 +727,7 @@ export default function IncomeStatement() {
               <CardContent className="p-6">
                 <div className="flex flex-col items-center justify-center">
                   <p className="text-destructive mb-3 font-medium text-sm">Error: {error}</p>
-                  <Button variant="outline" size="sm" onClick={() => {
-                    fetchIncomeStatement(account);
-                  }}>
+                  <Button variant="outline" size="sm" onClick={() => fetchIncomeStatement(account)}>
                     Retry
                   </Button>
                 </div>
@@ -997,6 +841,3 @@ export default function IncomeStatement() {
     </div>
   );
 }
-
-
-

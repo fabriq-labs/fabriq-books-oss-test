@@ -1,10 +1,25 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Master from "@/pages/Master";
 import dayjs from "dayjs";
 import { ReportControls } from "@/components/Reports/ReportControls";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatters";
-import { useReportController } from "@/contexts/ReportControllerContext";
+import { useEntity } from "@/contexts/EntityContext";
+import {
+    FinancialYearSelector,
+    FinancialYearOption,
+    FinancialYearType,
+    MonthOption,
+    buildMonthOptions,
+    getPreviousFYOption,
+} from "@/components/Reports/FinancialYearSelector";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 export default function PostingList() {
     const [account, setAccount]: any = useState(null);
@@ -14,8 +29,20 @@ export default function PostingList() {
         closingBalance: number;
     } | null>(null);
 
-    // Use report controller context
-    const { dateRange } = useReportController();
+    const { currentEntity } = useEntity();
+
+    const [selectedFY, setSelectedFY] = useState<FinancialYearOption>(() =>
+        getPreviousFYOption((currentEntity?.financial_year_type as FinancialYearType) ?? "JAN_DEC")
+    );
+    const [selectedMonth, setSelectedMonth] = useState<MonthOption | null>(null);
+
+    const monthOptions = useMemo(() => buildMonthOptions(selectedFY), [selectedFY]);
+
+    const effectiveDateRange = useMemo((): [dayjs.Dayjs, dayjs.Dayjs] => {
+        const from = selectedMonth?.from_date ?? selectedFY.from_date;
+        const to = selectedMonth?.to_date ?? selectedFY.to_date;
+        return [dayjs(from), dayjs(to)];
+    }, [selectedFY, selectedMonth]);
 
     const additionalFields = [
         { key: "account_name", label: "Account Name" },
@@ -24,52 +51,36 @@ export default function PostingList() {
         { key: "value_date", label: "Value Date" }
     ];
 
-    // Custom render function for amount column based on account type
     const renderAmountColumn = (value: any, record: any) => {
         if (!value) return formatCurrency(0);
 
         const amount = parseFloat(value);
         const selectedAccountId = account?.id;
 
-        // If no account is selected, show the amount as is
         if (!selectedAccountId) {
             return formatCurrency(amount);
         }
 
-        // If this account is the debit account (account_id), show positive amount
         if (record.account_id === selectedAccountId) {
             return (
                 <span className="text-green-700 font-medium">
                     {formatCurrency(amount)}
                 </span>
             );
-        }
-        // If this account is the credit account (credit_account_id), show negative amount
-        else if (record.credit_account_id === selectedAccountId) {
+        } else if (record.credit_account_id === selectedAccountId) {
             return (
                 <span className="text-red-700 font-medium">
                     -{formatCurrency(amount)}
                 </span>
             );
         }
-        // If the account is neither debit nor credit for this transaction, show as is
         return formatCurrency(amount);
     };
 
-    const handleAccountChange = (value: any) => {
-        setAccount(value);
-    };
+    const handleAccountChange = (value: any) => setAccount(value);
+    const handleAccountClear = () => setAccount(null);
+    const handleRefresh = () => window.location.reload();
 
-    const handleAccountClear = () => {
-        setAccount(null);
-    };
-
-    const handleRefresh = () => {
-        // Refresh will be handled by Master component
-        window.location.reload();
-    };
-
-    // Calculate closing balance for selected account
     const calculateClosingBalance = (data: any[], accountId: string | null) => {
         if (!data || !accountId) return { totalDebit: 0, totalCredit: 0, closingBalance: 0 };
 
@@ -78,32 +89,21 @@ export default function PostingList() {
 
         data.forEach((record: any) => {
             const amount = parseFloat(record.amount) || 0;
-
-            // If this account is the debit account (account_id), it's a debit
-            if (record.account_id === accountId) {
-                totalDebit += amount;
-            }
-            // If this account is the credit account (credit_account_id), it's a credit
-            if (record.credit_account_id === accountId) {
-                totalCredit += amount;
-            }
+            if (record.account_id === accountId) totalDebit += amount;
+            if (record.credit_account_id === accountId) totalCredit += amount;
         });
 
-        const closingBalance = totalDebit - totalCredit;
-        return { totalDebit, totalCredit, closingBalance };
+        return { totalDebit, totalCredit, closingBalance: totalDebit - totalCredit };
     };
 
-    // Handle data from Master component
     const handleMasterDataChange = (data: any) => {
         if (account?.id && data?.data && Array.isArray(data.data)) {
-            const balanceData = calculateClosingBalance(data.data, account.id);
-            setClosingBalanceData(balanceData);
+            setClosingBalanceData(calculateClosingBalance(data.data, account.id));
         } else {
             setClosingBalanceData(null);
         }
     };
 
-    // Create summary content for Master component
     const summaryContent = closingBalanceData && account ? (
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
             <div className="flex justify-end items-center">
@@ -122,10 +122,7 @@ export default function PostingList() {
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-600">Closing Balance:</span>
-                        <span className={`text-lg font-bold ${closingBalanceData.closingBalance >= 0
-                            ? 'text-blue-700'
-                            : 'text-orange-700'
-                            }`}>
+                        <span className={`text-lg font-bold ${closingBalanceData.closingBalance >= 0 ? "text-blue-700" : "text-orange-700"}`}>
                             {formatCurrency(closingBalanceData.closingBalance)}
                         </span>
                     </div>
@@ -135,30 +132,18 @@ export default function PostingList() {
     ) : null;
 
     const filter = useMemo(() => ({
-        "description": {
-            "ncontains": "Closing"
-        },
+        "description": { "ncontains": "Closing" },
         ...(account && {
             OR: [
                 { account_id: account.id },
                 { credit_account_id: account.id },
             ],
         }),
-        // Add date range filter
         "AND": [
-            {
-                "value_date": {
-                    "gte": dateRange[0].startOf('day').toISOString()
-                }
-            }
-            , {
-                "value_date": {
-                    "lte": dateRange[1].startOf('day').add(1, 'day').subtract(1, 'millisecond').toISOString()
-                }
-            }
-        ]
-
-    }), [account, dateRange]);
+            { "value_date": { "gte": effectiveDateRange[0].startOf("day").toISOString() } },
+            { "value_date": { "lte": effectiveDateRange[1].endOf("day").toISOString() } },
+        ],
+    }), [account, effectiveDateRange]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -170,7 +155,6 @@ export default function PostingList() {
                     </p>
                 </div>
 
-                {/* Posting List */}
                 <Card className="p-4">
                     <div className="mb-4">
                         <ReportControls
@@ -181,6 +165,33 @@ export default function PostingList() {
                             loading={false}
                             showAccountFilter={true}
                             showRefreshButton={true}
+                            beforeRefresh={
+                                <>
+                                    <FinancialYearSelector
+                                        fyType={currentEntity?.financial_year_type}
+                                        value={selectedFY.value}
+                                        onChange={(opt) => { setSelectedFY(opt); setSelectedMonth(null); }}
+                                        className="w-[130px] h-9 border-slate-300 text-sm shrink-0"
+                                    />
+                                    <Select
+                                        value={selectedMonth?.value ?? "__all__"}
+                                        onValueChange={(v) => {
+                                            if (v === "__all__") setSelectedMonth(null);
+                                            else setSelectedMonth(monthOptions.find((m) => m.value === v) ?? null);
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-[150px] h-9 border-slate-300 text-sm shrink-0">
+                                            <SelectValue placeholder="All Months" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__all__">All Months</SelectItem>
+                                            {monthOptions.map((m) => (
+                                                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </>
+                            }
                         />
                     </div>
                     {summaryContent}
@@ -206,6 +217,3 @@ export default function PostingList() {
         </div>
     );
 }
-
-
-

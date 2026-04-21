@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { API_URL, getAuthToken } from '@/api/apiClient';
+import { useAuth } from '@/contexts/AuthContext';
 
 const STORAGE_KEY = 'fabriq_current_entity_id';
 
@@ -53,12 +54,22 @@ async function fetchEntities(): Promise<Entity[]> {
 }
 
 export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [entities, setEntities] = useState<Entity[]>([]);
   const [currentEntity, setCurrentEntityState] = useState<Entity | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      setEntities([]);
+      setCurrentEntityState(null);
+      localStorage.removeItem(STORAGE_KEY);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
+    setLoading(true);
     fetchEntities().then((list) => {
       if (cancelled) return;
       setEntities(list);
@@ -72,11 +83,12 @@ export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const hq = list.find((e) => e.is_it_headquartres) ?? list[0] ?? null;
         setCurrentEntityState(hq);
         if (hq) localStorage.setItem(STORAGE_KEY, hq.id);
+        else localStorage.removeItem(STORAGE_KEY);
       }
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [user?.id]);
 
   const setCurrentEntity = (entity: Entity | null) => {
     setCurrentEntityState(entity);

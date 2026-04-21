@@ -10,8 +10,6 @@ import { RefreshCw, Loader2, Building2, CreditCard, TrendingUp, DollarSign, Rece
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 import dayjs from "dayjs";
@@ -20,10 +18,16 @@ import { pdf } from "@react-pdf/renderer";
 import { TrialBalancePDFDocument } from "@/components/pdf_generator/TrialBalancePdf";
 import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
-import { useReportController } from "@/contexts/ReportControllerContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEntity } from "@/contexts/EntityContext";
 import { aggregateTrialBalanceSectionRows } from "@/lib/aggregateTrialBalanceSectionRows";
-
+import {
+  FinancialYearSelector,
+  getPreviousFYOption,
+  buildMonthOptions,
+  type FinancialYearOption,
+  type MonthOption,
+  type FinancialYearType,
+} from "@/components/Reports/FinancialYearSelector";
 
 
 export interface TrialBalanceRow {
@@ -41,54 +45,12 @@ export interface TrialBalanceRow {
   total_balance: number;
 }
 
-/** View name for `viewAPI.search` on the currency model. */
 type CurrencyListRow = {
   id: string;
   code: string;
   name: string;
   is_active?: boolean;
 };
-
-type LegalEntityOption = {
-  id: string;
-  organization_name?: string;
-  legal_name?: string;
-  name?: string | null;
-  is_it_headquartres?: string | null;
-  basecurrency_id?: string | null;
-  /** From `entity.basecurrency_id` → `currency` (see `entity_view` data graph). */
-  currency?: { id?: string | null; code?: string | null } | null;
-};
-
-/** ISO 4217 code from the entity’s linked `currency` row (`basecurrency_id`). */
-function resolveEntityBaseCurrencyCode(org: LegalEntityOption | undefined): string | null {
-  if (!org) return null;
-  const raw = org.currency?.code?.trim();
-  return raw ? raw.toUpperCase() : null;
-}
-
-/** HQ flag is stored as text; backend uses `yes`, some UIs use `Yes`. */
-function isHeadquartersEntity(org: Pick<LegalEntityOption, "is_it_headquartres">): boolean {
-  const v = String(org?.is_it_headquartres ?? "").trim().toLowerCase();
-  return v === "yes" || v === "true" || v === "1";
-}
-
-/** Reporting currency for the org: HQ entity’s base currency, else first entity, else INR. */
-function resolveHeadquartersBaseCurrency(list: LegalEntityOption[]): string {
-  const hq = list.find(isHeadquartersEntity) ?? list[0];
-  return resolveEntityBaseCurrencyCode(hq) ?? "INR";
-}
-
-/** `currency.id` for HQ (or first) entity’s base currency — for `filters.currency_id` on default load. */
-function resolveHeadquartersBaseCurrencyId(list: LegalEntityOption[]): string {
-  const hq = list.find(isHeadquartersEntity) ?? list[0];
-  if (!hq) return "";
-  const fromNested = hq.currency?.id?.trim();
-  if (fromNested) return fromNested;
-  const fk = hq.basecurrency_id?.trim();
-  if (fk) return fk;
-  return "";
-}
 
 const useTrialBalance = ({
   dateRange,
@@ -97,11 +59,9 @@ const useTrialBalance = ({
   currencyCode,
   legalEntityIds,
 }: {
-  dateRange?: [dayjs.Dayjs, dayjs.Dayjs];
+  dateRange: [dayjs.Dayjs, dayjs.Dayjs];
   view: string;
-  /** `currency.id` — explicit pick or HQ default; sent as `filters.currency_id` when non-empty. */
   currencyId: string;
-  /** ISO reporting code — always sent as `filters.currency` (display + fallback for backend). */
   currencyCode: string;
   legalEntityIds: string[];
 }) => {
@@ -116,8 +76,8 @@ const useTrialBalance = ({
       setLoading(true);
       try {
         let filters: any = {
-          from_date: dateRange?.[0]?.format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD"),
-          to_date: dateRange?.[1]?.format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD"),
+          from_date: dateRange[0].format("YYYY-MM-DD"),
+          to_date: dateRange[1].format("YYYY-MM-DD"),
         };
 
         if (account) {
@@ -134,8 +94,6 @@ const useTrialBalance = ({
         const result = (await reportAPI.getReport("trial_balance", filters)) as any;
         if (seq !== fetchSeq.current) return;
         const rawRows = Array.isArray(result?.data) ? result.data : [];
-        // Summary always matches “top of chart” (level 0), with or without legal_entity_ids — same UI shape
-        // as unscoped summary. Detail expands to child accounts with activity (and keeps level-0 headers).
         const filteredData = rawRows.filter((row: any) => {
           const lev = Number(row?.level ?? 0);
           if (view === "Summary") {
@@ -175,12 +133,7 @@ const useTrialBalance = ({
     };
   }, []);
 
-  return {
-    data,
-    loading,
-    error,
-    fetchTrialBalance,
-  };
+  return { data, loading, error, fetchTrialBalance };
 };
 
 function hasNonZeroAmount(row: TrialBalanceRow): boolean {
@@ -193,7 +146,8 @@ function hasNonZeroAmount(row: TrialBalanceRow): boolean {
 }
 
 export default function BalanceSheet() {
-  const { user } = useAuth();
+  const { currentEntity, currentEntityId, loading: entityLoading } = useEntity();
+
   const [fetchOnButtonClick, setFetchOnButtonClick] = useState(false);
   const [account, setAccount]: any = useState(null);
   const [view, setView] = useState("Summary");
@@ -202,90 +156,65 @@ export default function BalanceSheet() {
   const [selectedCurrencyId, setSelectedCurrencyId] = useState("");
   const [currencies, setCurrencies] = useState<CurrencyListRow[]>([]);
   const [currenciesLoading, setCurrenciesLoading] = useState(false);
-  const [legalEntityOptions, setLegalEntityOptions] = useState<LegalEntityOption[]>([]);
-  const [legalEntitiesLoading, setLegalEntitiesLoading] = useState(true);
-  const [selectedLegalEntityIds, setSelectedLegalEntityIds] = useState<string[]>([]);
+  const [selectedFY, setSelectedFY] = useState<FinancialYearOption>(() => getPreviousFYOption("JAN_DEC"));
+  const [selectedMonth, setSelectedMonth] = useState<MonthOption | null>(null);
 
-  // Use report controller context
-  const { dateRange } = useReportController();
+  // When entity changes: reset FY to previous FY for that entity's type, clear month, default currency to entity's base currency
+  useEffect(() => {
+    const type: FinancialYearType = currentEntity?.financial_year_type ?? "JAN_DEC";
+    setSelectedFY(getPreviousFYOption(type));
+    setSelectedMonth(null);
+    setSelectedCurrencyId(currentEntity?.currency?.id ?? "");
+  }, [currentEntity?.id]);
 
-  /** ISO code for `formatCurrency` / PDF; from selected `currency.id` row or HQ org default. */
+  const effectiveDateRange = useMemo((): [dayjs.Dayjs, dayjs.Dayjs] => {
+    const from = selectedMonth?.from_date ?? selectedFY.from_date;
+    const to = selectedMonth?.to_date ?? selectedFY.to_date;
+    return [dayjs(from), dayjs(to)];
+  }, [selectedFY, selectedMonth]);
+
+  const monthOptions = useMemo(() => buildMonthOptions(selectedFY), [selectedFY]);
+
   const reportCurrencyCode = useMemo(() => {
     if (selectedCurrencyId.trim()) {
       const row = currencies.find((c) => c.id === selectedCurrencyId.trim());
       const code = row?.code?.trim().toUpperCase();
       if (code) return code;
     }
-    return resolveHeadquartersBaseCurrency(legalEntityOptions);
-  }, [selectedCurrencyId, currencies, legalEntityOptions]);
+    return currentEntity?.currency?.code?.trim().toUpperCase() ?? "INR";
+  }, [selectedCurrencyId, currencies, currentEntity]);
 
   const displayCurrencyCode = reportCurrencyCode;
 
-  /** HQ / first entity base `currency.id` or FK; used when user leaves “Org default” so API gets `currency_id`. */
-  const defaultReportingCurrencyId = useMemo(() => {
-    const fromEntity = resolveHeadquartersBaseCurrencyId(legalEntityOptions);
-    if (fromEntity) return fromEntity;
-    const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
-    const row = currencies.find((c) => c.code.toUpperCase() === code.toUpperCase());
-    return row?.id ?? "";
-  }, [legalEntityOptions, currencies]);
+  const defaultReportingCurrencyId = useMemo(
+    () => currentEntity?.currency?.id ?? "",
+    [currentEntity]
+  );
 
   const effectiveReportCurrencyId = useMemo(
     () => selectedCurrencyId.trim() || defaultReportingCurrencyId,
-    [selectedCurrencyId, defaultReportingCurrencyId],
+    [selectedCurrencyId, defaultReportingCurrencyId]
+  );
+
+  const legalEntityIds = useMemo(
+    () => currentEntityId ? [currentEntityId] : [],
+    [currentEntityId]
   );
 
   const { data, loading, error, fetchTrialBalance } = useTrialBalance({
-    dateRange,
+    dateRange: effectiveDateRange,
     view,
     currencyId: effectiveReportCurrencyId,
     currencyCode: reportCurrencyCode,
-    legalEntityIds: selectedLegalEntityIds,
+    legalEntityIds,
   });
 
-  const reportLoading = loading || legalEntitiesLoading;
-
-  // Load legal entities (HQ flag + `currency.code` from basecurrency_id) for filters and org-default reporting currency
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLegalEntitiesLoading(true);
-      try {
-        const filters = user?.org_id ? { org_id: { eq: user.org_id } } : {};
-        const res: any = await viewAPI.search(
-          "entity",
-          "entity_view",
-          1,
-          500,
-          undefined,
-          filters,
-          {}
-        );
-        const list = Array.isArray(res?.data) ? res.data : [];
-        if (!cancelled) setLegalEntityOptions(list);
-      } catch {
-        if (!cancelled) setLegalEntityOptions([]);
-      } finally {
-        if (!cancelled) setLegalEntitiesLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.org_id]);
+  const reportLoading = loading || entityLoading;
 
   const loadCurrencies = useCallback(async () => {
     setCurrenciesLoading(true);
     try {
-      const res: any = await viewAPI.search(
-        "currency",
-        "currency_view",
-        1,
-        500,
-        undefined,
-        {},
-        {}
-      );
+      const res: any = await viewAPI.search("currency", "currency_view", 1, 500, undefined, {}, {});
       const list = Array.isArray(res?.data) ? res.data : [];
       setCurrencies(
         list.map((row: any) => ({
@@ -314,11 +243,10 @@ export default function BalanceSheet() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [loadCurrencies]);
 
-  const sortedActiveCurrencies = useMemo(() => {
-    return [...currencies]
-      .filter((c) => c.code && c.is_active !== false)
-      .sort((a, b) => a.code.localeCompare(b.code));
-  }, [currencies]);
+  const sortedActiveCurrencies = useMemo(
+    () => [...currencies].filter((c) => c.code && c.is_active !== false).sort((a, b) => a.code.localeCompare(b.code)),
+    [currencies]
+  );
 
   const selectedCurrencyInMasterList = useMemo(() => {
     if (!selectedCurrencyId.trim()) return true;
@@ -326,50 +254,34 @@ export default function BalanceSheet() {
   }, [sortedActiveCurrencies, selectedCurrencyId]);
 
   const orgDefaultLabel = useMemo(() => {
-    const code = resolveHeadquartersBaseCurrency(legalEntityOptions);
-    return `Org Default (${code})`;
-  }, [legalEntityOptions]);
+    return currentEntity?.currency?.code?.trim().toUpperCase() ?? "INR";
+  }, [currentEntity]);
 
   const displayedData = showOnlyNonZero ? data.filter(hasNonZeroAmount) : data;
 
   const groupedData = (data: TrialBalanceRow[]) => {
-    // Normalize classification names to handle case variations and typos
     const normalizeClassification = (classification: string | null | undefined) => {
-      // Handle null or undefined classification
-      if (!classification) return 'Unclassified';
-
+      if (!classification) return "Unclassified";
       const normalized = classification.toLowerCase().trim();
-      // Handle common variations and typos
-      if (normalized.includes('asset')) return 'Assets';
-      if (normalized.includes('liabilit')) return 'Liabilities';
-      if (normalized.includes('equit')) return 'Equity';
-      if (normalized.includes('income') || normalized.includes('revenue')) return 'Income';
-      if (normalized.includes('expense') || normalized.includes('expens')) return 'Expense';
-
-      // Return original if no match found
+      if (normalized.includes("asset")) return "Assets";
+      if (normalized.includes("liabilit")) return "Liabilities";
+      if (normalized.includes("equit")) return "Equity";
+      if (normalized.includes("income") || normalized.includes("revenue")) return "Income";
+      if (normalized.includes("expense") || normalized.includes("expens")) return "Expense";
       return classification;
     };
 
     const groups = data.reduce(
       (acc, item) => {
-        const normalizedClassification = normalizeClassification(item.classification);
-        if (!acc[normalizedClassification]) {
-          acc[normalizedClassification] = [];
-        }
-        acc[normalizedClassification].push(item);
+        const key = normalizeClassification(item.classification);
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
         return acc;
       },
       {} as Record<string, TrialBalanceRow[]>
     );
-    // Define the preferred order of classifications
-    const orderOfClassifications = [
-      "Assets",
-      "Liabilities",
-      "Equity",
-    ];
 
-    // Balance sheet only: Assets, Liabilities, Equity in both Summary and Detailed view.
-    // Summary uses level-0 rows from the API filter; Detailed shows the full hierarchy within each section.
+    const orderOfClassifications = ["Assets", "Liabilities", "Equity"];
     return orderOfClassifications.map((classification) => ({
       classification,
       items: groups[classification] || [],
@@ -377,59 +289,47 @@ export default function BalanceSheet() {
   };
 
   useEffect(() => {
-    if (legalEntitiesLoading) return;
+    if (entityLoading) return;
     void fetchTrialBalance(account);
-  }, [legalEntitiesLoading, fetchTrialBalance, account]);
+  }, [entityLoading, fetchTrialBalance, account]);
 
   useEffect(() => {
     if (!fetchOnButtonClick) return;
-    if (legalEntitiesLoading) return;
+    if (entityLoading) return;
     void fetchTrialBalance(account);
     setFetchOnButtonClick(false);
-  }, [fetchOnButtonClick, legalEntitiesLoading, fetchTrialBalance, account]);
-
+  }, [fetchOnButtonClick, entityLoading, fetchTrialBalance, account]);
 
   const getClassificationIcon = (classification: string) => {
     const normalized = classification.toLowerCase();
-    if (normalized.includes('asset')) return <Building2 className="h-4 w-4 text-blue-600" />;
-    if (normalized.includes('liabilit')) return <CreditCard className="h-4 w-4 text-red-600" />;
-    if (normalized.includes('equit')) return <TrendingUp className="h-4 w-4 text-green-600" />;
-    if (normalized.includes('income') || normalized.includes('revenue')) return <DollarSign className="h-4 w-4 text-emerald-600" />;
-    if (normalized.includes('expense') || normalized.includes('expens')) return <Receipt className="h-4 w-4 text-orange-600" />;
+    if (normalized.includes("asset")) return <Building2 className="h-4 w-4 text-blue-600" />;
+    if (normalized.includes("liabilit")) return <CreditCard className="h-4 w-4 text-red-600" />;
+    if (normalized.includes("equit")) return <TrendingUp className="h-4 w-4 text-green-600" />;
+    if (normalized.includes("income") || normalized.includes("revenue")) return <DollarSign className="h-4 w-4 text-emerald-600" />;
+    if (normalized.includes("expense") || normalized.includes("expens")) return <Receipt className="h-4 w-4 text-orange-600" />;
     return <Building2 className="h-4 w-4 text-slate-600" />;
   };
 
-
-  const handleAccountChange = (value: any) => {
-    setAccount(value);
-  };
-
-  const handleAccountClear = () => {
-    setAccount(null);
-  };
-
-  const handleRefresh = () => {
-    setFetchOnButtonClick(true);
-  };
+  const handleAccountChange = (value: any) => setAccount(value);
+  const handleAccountClear = () => setAccount(null);
+  const handleRefresh = () => setFetchOnButtonClick(true);
 
   const handleExportPdf = async () => {
     setExportPdfLoading(true);
     try {
-      const groups = groupedData(displayedData).filter(
-        (group) => !showOnlyNonZero || group.items.length > 0
-      );
+      const groups = groupedData(displayedData).filter((group) => !showOnlyNonZero || group.items.length > 0);
       if (groups.length === 0) {
         toast({
           title: "No data to export",
           description: showOnlyNonZero && data.length > 0
-            ? "No rows with activity. Try turning off “Show only rows with activity” to export all accounts."
+            ? "No rows with activity. Try turning off 'Show only rows with activity' to export all accounts."
             : "Load the report first, then export.",
           variant: "destructive",
         });
         return;
       }
-      const fromDate = dateRange?.[0]?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD");
-      const toDate = dateRange?.[1]?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD");
+      const fromDate = effectiveDateRange[0].format("YYYY-MM-DD");
+      const toDate = effectiveDateRange[1].format("YYYY-MM-DD");
       const accountName = account?.name ?? account?.account_name ?? (account ? "Selected account" : undefined);
 
       const blob = await pdf(
@@ -463,33 +363,27 @@ export default function BalanceSheet() {
     }
   };
 
-
   const handleExportExcel = () => {
     try {
-      const groups = groupedData(displayedData).filter(
-        (group) => !showOnlyNonZero || group.items.length > 0
-      );
+      const groups = groupedData(displayedData).filter((group) => !showOnlyNonZero || group.items.length > 0);
       if (groups.length === 0) {
         toast({
           title: "No data to export",
           description: showOnlyNonZero && data.length > 0
-            ? "No rows with activity. Try turning off \u201cShow only rows with activity\u201d to export all accounts."
+            ? "No rows with activity. Try turning off 'Show only rows with activity' to export all accounts."
             : "Load the report first, then export.",
           variant: "destructive",
         });
         return;
       }
 
-      const fromDate = dateRange?.[0]?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD");
-      const toDate = dateRange?.[1]?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD");
+      const fromDate = effectiveDateRange[0].format("YYYY-MM-DD");
+      const toDate = effectiveDateRange[1].format("YYYY-MM-DD");
 
-      const rows: string[][] = [
-        ["Account", "Debits", "Credits", "Total"],
-      ];
+      const rows: string[][] = [["Account", "Debits", "Credits", "Total"]];
 
       for (const group of groups) {
         rows.push([group.classification, "", "", ""]);
-
         for (const row of group.items) {
           const indent = row.level > 0 ? "  ".repeat(row.level) : "";
           rows.push([
@@ -499,7 +393,6 @@ export default function BalanceSheet() {
             formatCurrency(Number(row.total_balance || 0), displayCurrencyCode),
           ]);
         }
-
         const totals = aggregateTrialBalanceSectionRows(group.items);
         rows.push([
           `${group.classification} Total`,
@@ -511,18 +404,11 @@ export default function BalanceSheet() {
       }
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
-
-      ws["!cols"] = [
-        { wch: 40 },
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 20 },
-      ];
+      ws["!cols"] = [{ wch: 40 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Balance Sheet");
       XLSX.writeFile(wb, `balance-sheet-${fromDate}-to-${toDate}.xlsx`);
-
       toast({ title: "Excel exported", description: "Balance sheet has been downloaded." });
     } catch (err) {
       console.error(err);
@@ -534,7 +420,6 @@ export default function BalanceSheet() {
     }
   };
 
-  // Loading and No Data Components
   const LoadingContent = () => (
     <div className="flex flex-col items-center justify-center py-6">
       <div className="relative">
@@ -571,9 +456,7 @@ export default function BalanceSheet() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  fetchTrialBalance(account);
-                }}
+                onClick={() => fetchTrialBalance(account)}
                 className="border-red-300 text-red-600 hover:bg-red-50 text-xs"
               >
                 <RefreshCw className="h-3 w-3 mr-1" />
@@ -593,9 +476,7 @@ export default function BalanceSheet() {
               <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center mb-1">
                 <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
               </div>
-              <p className="text-xs text-slate-500 font-medium">
-                No data found for {group.classification}
-              </p>
+              <p className="text-xs text-slate-500 font-medium">No data found for {group.classification}</p>
             </div>
           </TableCell>
         </TableRow>
@@ -614,29 +495,21 @@ export default function BalanceSheet() {
               <TableCell className="py-2 px-3">
                 <div className="flex items-center">
                   <div style={{ marginLeft: row.level * 12 }} className="flex items-center gap-1">
-                    {row.level > 0 && (
-                      <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                    )}
-                    <span className={`text-xs ${row.level === 0 ? 'font-semibold text-slate-800' : 'text-slate-700'}`}>
+                    {row.level > 0 && <div className="w-1 h-1 rounded-full bg-slate-400"></div>}
+                    <span className={`text-xs ${row.level === 0 ? "font-semibold text-slate-800" : "text-slate-700"}`}>
                       {row.account_name}
                     </span>
                   </div>
                 </div>
               </TableCell>
               <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
-                <span className="text-slate-600">
-                  {formatCurrency(debits, displayCurrencyCode)}
-                </span>
+                <span className="text-slate-600">{formatCurrency(debits, displayCurrencyCode)}</span>
               </TableCell>
               <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
-                <span className="text-slate-600">
-                  {formatCurrency(credits, displayCurrencyCode)}
-                </span>
+                <span className="text-slate-600">{formatCurrency(credits, displayCurrencyCode)}</span>
               </TableCell>
               <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
-                <span className="text-slate-900 font-bold">
-                  {formatCurrency(totalBalance, displayCurrencyCode)}
-                </span>
+                <span className="text-slate-900 font-bold">{formatCurrency(totalBalance, displayCurrencyCode)}</span>
               </TableCell>
             </TableRow>
           );
@@ -648,7 +521,6 @@ export default function BalanceSheet() {
 
   const summary = (pageData: readonly TrialBalanceRow[]) => {
     const totals = aggregateTrialBalanceSectionRows(pageData);
-
     return (
       <TableRow className="font-bold bg-gradient-to-r from-slate-100 to-blue-50 border-t-2 border-slate-300">
         <TableCell className="text-left w-[140px] py-2 px-3 text-slate-800">
@@ -658,19 +530,13 @@ export default function BalanceSheet() {
           </div>
         </TableCell>
         <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
-          <span className="text-slate-700 font-bold">
-            {formatCurrency(totals.total_debits, displayCurrencyCode)}
-          </span>
+          <span className="text-slate-700 font-bold">{formatCurrency(totals.total_debits, displayCurrencyCode)}</span>
         </TableCell>
         <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
-          <span className="text-slate-700 font-bold">
-            {formatCurrency(totals.total_credits, displayCurrencyCode)}
-          </span>
+          <span className="text-slate-700 font-bold">{formatCurrency(totals.total_credits, displayCurrencyCode)}</span>
         </TableCell>
         <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
-          <span className="text-slate-900 font-bold">
-            {formatCurrency(totals.total_balance, displayCurrencyCode)}
-          </span>
+          <span className="text-slate-900 font-bold">{formatCurrency(totals.total_balance, displayCurrencyCode)}</span>
         </TableCell>
       </TableRow>
     );
@@ -678,7 +544,6 @@ export default function BalanceSheet() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Sticky Top Header */}
       <div className="reports-header">
         <div className="flex items-center gap-3">
           <div className="shrink-0">
@@ -686,7 +551,6 @@ export default function BalanceSheet() {
             <p className="text-xs text-slate-600">Financial position overview</p>
           </div>
 
-          {/* Controls Section */}
           <div className="flex items-center gap-2 flex-nowrap overflow-x-auto ml-auto">
             <ReportControls
               selectedAccount={account}
@@ -699,80 +563,57 @@ export default function BalanceSheet() {
               className="!flex-row !items-center !gap-2 shrink-0"
               beforeRefresh={
                 <>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 border-slate-300 justify-between min-w-[120px] shrink-0">
-                        <span className="text-slate-600 truncate text-xs">
-                          {selectedLegalEntityIds.length === 0
-                            ? "Legal Entity"
-                            : `${selectedLegalEntityIds.length} selected`}
-                        </span>
-                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-2" align="start">
-                      <div className="max-h-[240px] overflow-y-auto space-y-1">
-                        {legalEntityOptions.length === 0 ? (
-                          <p className="text-xs text-slate-500 py-2">No organizations loaded</p>
-                        ) : (
-                          legalEntityOptions.map((org) => (
-                            <label
-                              key={org.id}
-                              className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-slate-100 cursor-pointer text-sm"
-                            >
-                              <Checkbox
-                                checked={selectedLegalEntityIds.includes(org.id)}
-                                onCheckedChange={(checked) => {
-                                  setSelectedLegalEntityIds((prev) =>
-                                    checked ? [...prev, org.id] : prev.filter((id) => id !== org.id)
-                                  );
-                                }}
-                              />
-                              <span className="truncate">{org.legal_name ?? org.id}</span>
-                            </label>
-                          ))
-                        )}
-                      </div>
-                      {selectedLegalEntityIds.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 w-full text-xs"
-                          onClick={() => setSelectedLegalEntityIds([])}
-                        >
-                          Clear selection
-                        </Button>
-                      )}
-                    </PopoverContent>
-                  </Popover>
+                  {/* Financial year selector */}
+                  <FinancialYearSelector
+                    fyType={currentEntity?.financial_year_type}
+                    value={selectedFY.value}
+                    onChange={(opt) => { setSelectedFY(opt); setSelectedMonth(null); }}
+                    className="w-[130px] h-9 border-slate-300 text-sm shrink-0"
+                  />
+
+                  {/* Month selector — null = All Months */}
+                  <Select
+                    value={selectedMonth?.value ?? "__all__"}
+                    onValueChange={(v) => {
+                      if (v === "__all__") {
+                        setSelectedMonth(null);
+                      } else {
+                        setSelectedMonth(monthOptions.find((m) => m.value === v) ?? null);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[150px] h-9 border-slate-300 text-sm shrink-0">
+                      <SelectValue placeholder="All Months" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Months</SelectItem>
+                      {monthOptions.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Currency — shows ISO code only */}
                   <Select
                     value={selectedCurrencyId ? selectedCurrencyId : "__default__"}
-                    onValueChange={(v) => {
-                      setSelectedCurrencyId(v === "__default__" ? "" : v);
-                    }}
+                    onValueChange={(v) => setSelectedCurrencyId(v === "__default__" ? "" : v)}
                     disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
                   >
-                    <SelectTrigger className="w-[min(100vw-8rem,220px)] min-w-[150px] max-w-[220px] h-9 border-slate-300 text-sm shrink-0">
-                      <DollarSign className="h-4 w-4 mr-1 text-slate-500 shrink-0" />
-                      <SelectValue placeholder={currenciesLoading ? "Loading…" : "Org Default"} />
+                    <SelectTrigger className="w-[110px] h-9 border-slate-300 text-sm shrink-0">
+                      <DollarSign className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
+                      <SelectValue placeholder={currenciesLoading ? "…" : "Default"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__default__">
-                        {legalEntitiesLoading ? "Org Default (…)" : orgDefaultLabel}
+                        {entityLoading ? "…" : orgDefaultLabel}
                       </SelectItem>
-                      {sortedActiveCurrencies.map((row) => {
-                        const code = row.code.toUpperCase();
-                        const label = row.name ? `${code} — ${row.name}` : code;
-                        return (
-                          <SelectItem key={row.id || code} value={row.id}>
-                            {label}
-                          </SelectItem>
-                        );
-                      })}
-                      {selectedCurrencyId && !selectedCurrencyInMasterList && (
-                        <SelectItem value={selectedCurrencyId}>
-                          {reportCurrencyCode} (id)
+                      {sortedActiveCurrencies.map((row) => (
+                        <SelectItem key={row.id || row.code} value={row.id}>
+                          {row.code.toUpperCase()}
                         </SelectItem>
+                      ))}
+                      {selectedCurrencyId && !selectedCurrencyInMasterList && (
+                        <SelectItem value={selectedCurrencyId}>{reportCurrencyCode}</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -810,24 +651,26 @@ export default function BalanceSheet() {
           </div>
         </div>
 
-        {/* Professional Tabs */}
+        {/* View tabs + activity filter */}
         <div className="mt-3 flex flex-wrap items-center gap-4">
           <div className="flex border-b border-slate-200 w-fit">
             <button
               onClick={() => setView("Summary")}
-              className={`px-4 py-2 text-sm font-medium transition-all duration-200 relative ${view === "Summary"
-                ? "text-slate-900 border-b-2 border-blue-600"
-                : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
-                }`}
+              className={`px-4 py-2 text-sm font-medium transition-all duration-200 relative ${
+                view === "Summary"
+                  ? "text-slate-900 border-b-2 border-blue-600"
+                  : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
+              }`}
             >
               Summary View
             </button>
             <button
               onClick={() => setView("Details")}
-              className={`px-4 py-2 text-sm font-medium transition-all duration-200 relative ${view === "Details"
-                ? "text-slate-900 border-b-2 border-blue-600"
-                : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
-                }`}
+              className={`px-4 py-2 text-sm font-medium transition-all duration-200 relative ${
+                view === "Details"
+                  ? "text-slate-900 border-b-2 border-blue-600"
+                  : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
+              }`}
             >
               Detailed View
             </button>
@@ -837,19 +680,13 @@ export default function BalanceSheet() {
             <Label htmlFor="show-nonzero" className="text-sm text-slate-700 cursor-pointer whitespace-nowrap">
               Show only rows with activity
             </Label>
-            <Switch
-              id="show-nonzero"
-              checked={showOnlyNonZero}
-              onCheckedChange={setShowOnlyNonZero}
-            />
+            <Switch id="show-nonzero" checked={showOnlyNonZero} onCheckedChange={setShowOnlyNonZero} />
           </div>
         </div>
       </div>
 
-      {/* Full Width Content */}
+      {/* Content */}
       <div className="p-3 space-y-3">
-
-        {/* Data Tables Section */}
         <div className="space-y-3">
           {reportLoading && data.length === 0 ? (
             <Card className="shadow-sm border-slate-200">
@@ -862,9 +699,7 @@ export default function BalanceSheet() {
               <CardContent className="p-6">
                 <div className="flex flex-col items-center justify-center">
                   <p className="text-destructive mb-3 font-medium text-sm">Error: {error}</p>
-                  <Button variant="outline" size="sm" onClick={() => {
-                    fetchTrialBalance(account);
-                  }}>
+                  <Button variant="outline" size="sm" onClick={() => fetchTrialBalance(account)}>
                     Retry
                   </Button>
                 </div>
@@ -887,7 +722,7 @@ export default function BalanceSheet() {
                       </p>
                       <p className="text-xs text-slate-500 mt-1">
                         {showOnlyNonZero && data.length > 0
-                          ? "Try turning off “Show only rows with activity” to see all accounts."
+                          ? "Try turning off 'Show only rows with activity' to see all accounts."
                           : "No data found for the selected period and filters"}
                       </p>
                     </div>
@@ -916,9 +751,7 @@ export default function BalanceSheet() {
                               <TableHead className="text-right w-[140px] font-semibold text-slate-800 py-2 px-3 text-xs">Total</TableHead>
                             </TableRow>
                           </TableHeader>
-                          <TableBody>
-                            {renderTableContent(group)}
-                          </TableBody>
+                          <TableBody>{renderTableContent(group)}</TableBody>
                         </Table>
                       </div>
                     </CardContent>

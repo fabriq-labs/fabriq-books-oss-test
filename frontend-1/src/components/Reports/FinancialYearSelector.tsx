@@ -23,7 +23,35 @@ function lastDayOfMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate();
 }
 
-function buildFYOptions(fyType: FinancialYearType, count = 5): FinancialYearOption[] {
+export interface MonthOption {
+  value: string;
+  label: string;
+  from_date: string;
+  to_date: string;
+}
+
+export function buildMonthOptions(fy: FinancialYearOption): MonthOption[] {
+  const months: MonthOption[] = [];
+  const [startYear, startMonth] = fy.from_date.split("-").map(Number);
+  const [endYear, endMonth] = fy.to_date.split("-").map(Number);
+  let year = startYear;
+  let month = startMonth;
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    const lastDay = lastDayOfMonth(year, month);
+    const label = new Date(year, month - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+    months.push({
+      value: `${year}-${pad2(month)}`,
+      label,
+      from_date: `${year}-${pad2(month)}-01`,
+      to_date: `${year}-${pad2(month)}-${pad2(lastDay)}`,
+    });
+    month++;
+    if (month > 12) { month = 1; year++; }
+  }
+  return months;
+}
+
+export function buildFYOptions(fyType: FinancialYearType, count = 5): FinancialYearOption[] {
   const { startMonth, crossYear } = FY_CONFIG[fyType];
   const today = new Date();
   const todayMonth = today.getMonth() + 1;

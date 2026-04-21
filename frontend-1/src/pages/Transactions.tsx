@@ -24,12 +24,75 @@ interface ReconcileResultEntry {
   reconciliation: ReconciliationData | null;
 }
 
+/** Transforms debit/credit split columns into unified account_id / credit_account_id fields. */
+function transformPostingCSVData(formattedData: any, relationId: any): any {
+  const { mapping, data } = formattedData;
+  let mappingValue: any = { ...mapping };
+
+  if (relationId && Object.values(mappingValue).includes("debit_amount") && Object.values(mappingValue).includes("credit_amount")) {
+    const getKeyByValue = (obj: any, value: any) => Object.keys(obj).find(k => obj[k] === value) ?? null;
+    const debitAmountColumn: any = getKeyByValue(mappingValue, "debit_amount");
+    const creditAmountColumn: any = getKeyByValue(mappingValue, "credit_amount");
+    const contraAccountColumn: any = getKeyByValue(mappingValue, "credit_account_id");
+
+    mappingValue = {
+      ...mappingValue,
+      "account_id": "account_id",
+      "credit_account_id": "credit_account_id",
+      "amount": "amount",
+    };
+    delete mappingValue[debitAmountColumn];
+    delete mappingValue[creditAmountColumn];
+    delete mappingValue[contraAccountColumn];
+
+    const csvData = data?.map((record: any) => {
+      const hasDebitAmount = record[debitAmountColumn] != null && record[debitAmountColumn] !== 0 && record[debitAmountColumn] !== '';
+      const hasCreditAmount = record[creditAmountColumn] != null && record[creditAmountColumn] !== 0 && record[creditAmountColumn] !== '';
+      const finalRecord = {
+        ...record,
+        amount: hasDebitAmount ? record[debitAmountColumn] : record[creditAmountColumn],
+        account_id: hasCreditAmount ? relationId : (record[contraAccountColumn] ? record[contraAccountColumn] : null),
+        credit_account_id: hasDebitAmount ? relationId : (record[contraAccountColumn] ? record[contraAccountColumn] : null),
+      };
+      delete finalRecord[debitAmountColumn];
+      delete finalRecord[creditAmountColumn];
+      delete finalRecord[contraAccountColumn];
+      return finalRecord;
+    });
+    return { mapping: mappingValue, isJSON: true, data: csvData };
+  }
+
+  if (relationId && !mappingValue.debit_amount && !mappingValue.credit_amount && Object.values(mappingValue).includes("amount")) {
+    const account_mapping: any = {};
+    if (Object.values(mappingValue).includes("credit_account_id")) account_mapping["account_id"] = "account_id";
+    else account_mapping["credit_account_id"] = "credit_account_id";
+    mappingValue = { ...mappingValue, ...account_mapping };
+
+    const csvData = data?.map((record: any) => ({
+      ...record,
+      account_id: Object.values(mappingValue).includes("credit_account_id") ? relationId : null,
+      credit_account_id: Object.values(mappingValue).includes("account_id") ? relationId : null,
+    }));
+    return { mapping: mappingValue, isJSON: true, data: csvData };
+  }
+
+  const finalData: any = { ...formattedData };
+  delete finalData.parentData;
+  return finalData;
+}
+
 export default function Transactions() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const masterRef = useRef<MasterHandle>(null);
   const [searchParams] = useSearchParams();
-  const { currentEntityId } = useEntity();
+  const { currentEntityId, entities } = useEntity();
+
+  // When "All Entities" is selected, fall back to the HQ (or first) entity for imports.
+  const effectiveEntityId = useMemo(
+    () => currentEntityId ?? entities.find((e) => e.is_it_headquartres)?.id ?? entities[0]?.id ?? null,
+    [currentEntityId, entities]
+  );
 
   // ── URL-based filter support ──────────────────────────────────────────
   const urlFilter = searchParams.get('filter');
@@ -127,74 +190,16 @@ export default function Transactions() {
     [predictedFields]
   );
 
-  // ── CSV import helpers (unchanged) ────────────────────────────────────
-  function getKeyBasedOnValue(obj: any, value: any) {
-    for (const [key, val] of Object.entries(obj)) {
-      if (val === value) return key;
-    }
-    return null;
-  }
-
-  const updateCSVData = (formattedData: any, relationId: any) => {
-    const { mapping, data } = formattedData;
-    let mappingValue: any = { ...mapping };
-    if (relationId && Object.values(mappingValue).includes("debit_amount") && Object.values(mappingValue).includes("credit_amount")) {
-      return new Promise((resolve) => {
-        const debitAmountColumn: any = getKeyBasedOnValue(mappingValue, "debit_amount");
-        const creditAmountColumn: any = getKeyBasedOnValue(mappingValue, "credit_amount");
-        const contraAccountColumn: any = getKeyBasedOnValue(mappingValue, "credit_account_id");
-
-        mappingValue = {
-          ...mappingValue,
-          "account_id": "account_id",
-          "credit_account_id": "credit_account_id",
-          "amount": "amount",
-        };
-
-        delete mappingValue[debitAmountColumn];
-        delete mappingValue[creditAmountColumn];
-        delete mappingValue[contraAccountColumn];
-
-        const csvData = data?.map((record: any) => {
-          const hasDebitAmount = record[debitAmountColumn] != null && record[debitAmountColumn] != undefined && record[debitAmountColumn] != 0 && record[debitAmountColumn] !== '';
-          const hasCreditAmount = record[creditAmountColumn] != null && record[creditAmountColumn] != undefined && record[creditAmountColumn] != 0 && record[creditAmountColumn] !== '';
-
-          let finalRecord = {
-            ...record,
-            amount: hasDebitAmount ? record[debitAmountColumn] : record[creditAmountColumn],
-            account_id: hasCreditAmount ? relationId : (record[contraAccountColumn] ? record[contraAccountColumn] : null),
-            credit_account_id: hasDebitAmount ? relationId : (record[contraAccountColumn] ? record[contraAccountColumn] : null),
-          };
-          delete finalRecord[debitAmountColumn];
-          delete finalRecord[creditAmountColumn];
-          delete finalRecord[contraAccountColumn];
-          return finalRecord;
-        });
-        resolve({ mapping: mappingValue, isJSON: true, data: csvData });
-      });
-    } else if (relationId && !mappingValue.debit_amount && !mappingValue.credit_amount && Object.values(mappingValue).includes("amount")) {
-      return new Promise((resolve) => {
-        const account_mapping: any = {};
-        if (Object.values(mappingValue).includes("credit_account_id")) account_mapping["account_id"] = "account_id";
-        else account_mapping["credit_account_id"] = "credit_account_id";
-
-        mappingValue = { ...mappingValue, ...account_mapping };
-
-        const csvData = data?.map((record: any) => {
-          let finalRecord = {
-            ...record,
-            account_id: Object.values(mappingValue).includes("credit_account_id") ? relationId : null,
-            credit_account_id: Object.values(mappingValue).includes("account_id") ? relationId : null,
-          };
-          return finalRecord;
-        });
-        resolve({ mapping: mappingValue, isJSON: true, data: csvData });
-      });
-    }
-    let finalData: any = formattedData;
-    delete finalData.parentData;
-    return finalData;
-  };
+  // ── CSV import helpers ────────────────────────────────────────────────
+  const updateCSVData = useCallback(async (formattedData: any, relationId: any) => {
+    const result = transformPostingCSVData(formattedData, relationId);
+    if (!effectiveEntityId || !result?.data) return result;
+    return {
+      ...result,
+      mapping: { ...result.mapping, legal_entity_id: 'legal_entity_id' },
+      data: result.data.map((record: any) => ({ ...record, legal_entity_id: effectiveEntityId })),
+    };
+  }, [effectiveEntityId]);
 
   const additionalFields = [
     { key: "debit_amount", mappingFiled: "account_id" },
