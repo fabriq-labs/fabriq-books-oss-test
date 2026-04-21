@@ -73,87 +73,104 @@ async function createFixtures() {
     skipDuplicates: true,
   });
 
-  // Historical postings (both sides filled — form the corpus)
-  // post_hist_1: manual entry — Swiggy → Meals
+  // ── Historical corpus (both sides filled — already categorized) ──────────────
+  //
+  // These use clean short descriptions as they would appear from a credit card
+  // statement import or manual entry. The normalization pipeline reduces these to
+  // 1-2 token vendor names, which then score 100 via token_set_ratio against the
+  // noisy UPI/NEFT/IMPS format descriptions that arrive in later imports.
+
+  // post_hist_1: manual entry, Swiggy food order → Meals & Entertainment
+  // Normalized corpus entry: "swiggy"
   await prisma.posting.create({ data: {
     id: 'post_hist_1_v2', org_id: ORG,
-    description: 'Swiggy Technologies',
+    description: 'Swiggy',
     account_id: ACCT.expMeals, credit_account_id: ACCT.bankHdfc,
     amount: -450, ai_cat_score: null,
     created_at: new Date('2026-01-10'),
   }});
 
-  // post_hist_2: AI-categorized (ai_cat_score non-null) — must be included (T15)
+  // post_hist_2: AI-categorized + human-approved (ai_cat_score non-null) — T15 verifies corpus includes it
+  // Kotak CC statement format, Uber → Travel Expenses
+  // Normalized corpus entry: "uber india"
   await prisma.posting.create({ data: {
     id: 'post_hist_2_v2', org_id: ORG,
-    description: 'Uber India ride',
+    description: 'Uber India',
     account_id: ACCT.expTravel, credit_account_id: ACCT.bankHdfc,
     amount: -320, ai_cat_score: 0.91,
     created_at: new Date('2026-01-15'),
   }});
 
-  // post_hist_3: older Amazon → Travel (should LOSE to post_hist_4 in T17)
+  // post_hist_3: OLDER Amazon → Travel Expenses (wrong category, later corrected)
+  // Both normalize to "amazon.in" — T17 verifies only the newer entry survives
   await prisma.posting.create({ data: {
     id: 'post_hist_3_v2', org_id: ORG,
-    description: 'Amazon IN purchase',
+    description: 'Amazon.in',
     account_id: ACCT.expTravel, credit_account_id: ACCT.bankHdfc,
     amount: -1200, ai_cat_score: null,
     created_at: new Date('2026-01-05'),
   }});
 
-  // post_hist_4: newer Amazon → Office (should WIN over post_hist_3 in T17)
+  // post_hist_4: NEWER Amazon → Office Supplies (user corrected it)
+  // Same description normalizes to same "amazon.in" — this entry should WIN (T17)
   await prisma.posting.create({ data: {
     id: 'post_hist_4_v2', org_id: ORG,
-    description: 'AMAZON IN purchase',
+    description: 'Amazon.in',
     account_id: ACCT.expOffice, credit_account_id: ACCT.bankHdfc,
     amount: -890, ai_cat_score: null,
     created_at: new Date('2026-03-01'),
   }});
 
-  // post_hist_5: bank-to-bank transfer — must NOT appear in corpus (T16)
+  // post_hist_5: ICICI→Kotak fund transfer (bank-to-bank) — T16 verifies excluded from corpus
   await prisma.posting.create({ data: {
     id: 'post_hist_5_v2', org_id: ORG,
-    description: 'Transfer to ICICI',
+    description: 'NEFT/TRF/KKBK12345678901234/ICICI CURRENT ACCOUNT',
     account_id: ACCT.bankIcici, credit_account_id: ACCT.bankHdfc,
     amount: -50000, ai_cat_score: null,
     created_at: new Date('2026-02-01'),
   }});
 
-  // post_hist_6: money_in — Rental Income
+  // post_hist_6: money_in — tenant rent via UPI → Rental Income
+  // Normalized corpus entry: "rental credit sharma"
   await prisma.posting.create({ data: {
     id: 'post_hist_6_v2', org_id: ORG,
-    description: 'Rent received from tenant',
+    description: 'Rental Credit Sharma',
     account_id: ACCT.bankHdfc, credit_account_id: ACCT.incRental,
     amount: 25000, ai_cat_score: null,
     created_at: new Date('2026-02-05'),
   }});
 
-  // Uncategorized postings (for batch handler tests T19–T23)
-  // post_new_1: matches post_hist_1 via fuzzy (Swiggy)
+  // ── New uncategorized postings (realistic bank format descriptions) ───────────
+  //
+  // These use real ICICI/Kotak UPI/IMPS/NEFT format strings as they appear in
+  // downloaded bank statements. After normalization, the vendor core matches the
+  // corpus entries above (score = 100 via token_set_ratio).
+
+  // post_new_1: ICICI UPI debit — Swiggy, different reference → matches "swiggy" corpus (score 100)
   await prisma.posting.create({ data: {
     id: 'post_new_1_v2', org_id: ORG,
-    description: 'UPI/423156789012/Swiggy Technologies Pvt Ltd/swiggy@paytm',
+    description: 'UPI/DR/987654321098/SWIGGY TECHNOLOGIES/swiggy@axisbank',
     credit_account_id: ACCT.bankHdfc, account_id: null,
     amount: -520,
   }});
 
-  // post_new_2: matches post_hist_2 via fuzzy (Uber)
+  // post_new_2: ICICI IMPS — Uber, different operator → matches "uber india" corpus (score 100)
   await prisma.posting.create({ data: {
     id: 'post_new_2_v2', org_id: ORG,
-    description: 'NEFT-HDFC0001234-Uber India-REF20260312001',
+    description: 'MMT/IMPS/412345678901/UBER INDIA PVT LTD',
     credit_account_id: ACCT.bankHdfc, account_id: null,
     amount: -280,
   }});
 
-  // post_new_3: matches post_hist_4 (most recent Amazon = Office Supplies)
+  // post_new_3: Kotak UPI — Amazon, different ref → matches "amazon.in" corpus (newer = Office Supplies, score 100)
   await prisma.posting.create({ data: {
     id: 'post_new_3_v2', org_id: ORG,
-    description: 'POS 441234XXXXXX1234 AMAZON IN',
+    description: 'UPI/DR/500600700800/AMAZON.IN/amazonpay@icici',
     credit_account_id: ACCT.bankHdfc, account_id: null,
     amount: -1500,
   }});
 
-  // post_new_4: no historical match → falls to LLM
+  // post_new_4: ICICI EBA — equity trade on ICICI Direct → no corpus match (score 39) → LLM
   await prisma.posting.create({ data: {
     id: 'post_new_4_v2', org_id: ORG,
     description: 'EBA/20260312/ICICI DIRECT/SELL',
@@ -161,7 +178,7 @@ async function createFixtures() {
     amount: -75000,
   }});
 
-  // post_new_5: no historical match → falls to LLM (money_in)
+  // post_new_5: Kotak savings interest credit → no corpus match (score 32) → LLM (money_in)
   await prisma.posting.create({ data: {
     id: 'post_new_5_v2', org_id: ORG,
     description: 'INT.PD 01-FEB-2026 TO 28-FEB-2026',
@@ -169,10 +186,10 @@ async function createFixtures() {
     amount: 1250,
   }});
 
-  // post_new_6: already categorized — should be skipped
+  // post_new_6: Kotak ECS home loan — already fully categorized → skipped by batch handler
   await prisma.posting.create({ data: {
     id: 'post_new_6_v2', org_id: ORG,
-    description: 'Office rent payment',
+    description: 'ECS DR HDFC BANK LTD HOME LOAN EMI',
     account_id: ACCT.expRent, credit_account_id: ACCT.bankHdfc,
     amount: -45000,
   }});
