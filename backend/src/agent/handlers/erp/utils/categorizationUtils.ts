@@ -550,8 +550,8 @@ export function normalizeDescription(description: string | null): string {
 
   // Pass 1 — strip noise tokens (applied in order)
 
-  // 1. Payment rail keywords (upi, neft, rtgs, imps, nach, ecs) — strip the word
-  s = s.replace(/\b(upi|neft|rtgs|imps|nach|ecs)\b/g, '');
+  // 1. Payment rail keywords and bank-specific transfer prefixes
+  s = s.replace(/\b(upi|neft|rtgs|imps|nach|ecs|mmt|trf)\b/g, '');
 
   // 2. Alpha-prefix + long digit codes: bank routing codes (hdfc0001234) and ref codes (ref20250312001)
   s = s.replace(/\b[a-z]{2,6}\d{6,}\b/g, '');
@@ -569,8 +569,11 @@ export function normalizeDescription(description: string | null): string {
   // 6. Bank name phrases (exact multi-word) — must come before standalone bank-word patterns
   s = s.replace(/\b(hdfc bank|icici bank|axis bank|kotak bank|yes bank|indusind bank|indusind|sbi)\b/g, '');
 
-  // 7. Transaction-type prefix tokens
-  s = s.replace(/\b(pos|atm|clg|chq|si|cr|dr)\b/g, '');
+  // 7. Transaction-type prefix tokens (atw/atl = Kotak ATM codes)
+  s = s.replace(/\b(pos|atm|atw|atl|clg|chq|si|cr|dr)\b/g, '');
+
+  // 7b. Decimal amounts like 5000.00 (e.g. Kotak ATW descriptions)
+  s = s.replace(/\b\d+\.\d+\b/g, '');
 
   // 8. Masked card number fragments: digits + X/asterisk run + optional digits (e.g. 441234XXXXXX1234)
   s = s.replace(/\d*[x*]{3,}\d*/g, '');
