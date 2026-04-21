@@ -7,8 +7,8 @@ export class PermissionService {
 
   static async getView(viewName: string | null, modelName: string) {
     const whereClause: any = {
-    model_name: modelName,
-    ...(viewName !== 'workflow' ? { NOT: { name: 'workflow' } } : {})
+      model_name: modelName,
+      ...(viewName !== 'workflow' ? { NOT: { name: 'workflow' } } : {})
     };
     if (viewName !== null) {
       whereClause.name = viewName;
@@ -17,7 +17,6 @@ export class PermissionService {
       where: whereClause,
       include: { permissions: true }
     });
-
     return view;
   }
 
@@ -79,7 +78,7 @@ export class PermissionService {
         if (hasWildcardPermission) {
           // If wildcard permission exists, grant access to all fields
           const wildcardAccess = role_view.view.permissions.find((field: any) => field.field_name === '*').access;
-          permissions[role_view.view.model_name]['*'] = wildcardAccess;          
+          permissions[role_view.view.model_name]['*'] = wildcardAccess;
         } else {
           // Process individual field permissions
           role_view.view.permissions.forEach((field: any) => {
@@ -88,7 +87,7 @@ export class PermissionService {
 
             // Take the most permissive access level
             if (!currentAccess || newAccess === 'write') {
-              permissions[role_view.view.model_name][field.fieldName] = newAccess;
+              permissions[role_view.view.model_name][field.field_name] = newAccess;
             }
           });
         }
