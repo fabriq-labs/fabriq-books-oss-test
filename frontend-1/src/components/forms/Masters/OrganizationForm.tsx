@@ -121,10 +121,10 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = () => {
 
       if (!id) {
         await viewAPI.create("entity", viewId, submissionData);
-        toast({ title: "Success", description: "Organization created successfully" });
+        toast({ title: "Success", description: "Entity created successfully" });
       } else {
         await viewAPI.update("entity", id, viewId, submissionData);
-        toast({ title: "Success", description: "Organization updated successfully" });
+        toast({ title: "Success", description: "Entity updated successfully" });
       }
       navigate('/masters/entity');
     } catch (error: any) {
