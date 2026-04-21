@@ -289,7 +289,10 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
 
   useEffect(() => {
     fetchModelData();
+    // type/view: same Master instance is reused across routes; must refetch when props change.
   }, [
+    type,
+    view,
     page,
     pageSize,
     searchTerm,
