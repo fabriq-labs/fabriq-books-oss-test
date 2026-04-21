@@ -56,4 +56,6 @@ export interface ExtractionContext extends AuthContext {
 export interface CategorizationExtractionOptions {
   orgId: string;
   legalEntityId?: string;
+  /** Free-form hints about this account's statement format, injected into the extraction prompt (Feature B). */
+  extractionNotes?: string | null;
 }

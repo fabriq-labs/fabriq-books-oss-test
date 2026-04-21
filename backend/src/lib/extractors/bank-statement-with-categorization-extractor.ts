@@ -26,6 +26,7 @@ export class BankStatementWithCategorizationExtractor extends BaseDocumentExtrac
   private cachedAccounts: AccountsGrouped | null = null;
   private cachedOrgId: string | null = null;
   private cachedLegalEntityId: string | null = null;
+  private cachedExtractionNotes: string | null = null;
 
   getSupportedTypes(): string[] {
     return ['posting_with_categorization', 'bank_statement_categorized'];
@@ -103,20 +104,30 @@ IMPORTANT:
   }
 
   /**
-   * Augment the base prompt with categorization instructions and Chart of Accounts
+   * Augment the base prompt with categorization instructions and Chart of Accounts.
+   * If options.extractionNotes (or cachedExtractionNotes) is non-empty, injects an
+   * account-specific notes block before the Chart of Accounts (Feature B).
    */
   protected augmentPromptWithContext(basePrompt: string, options?: any): string {
     if (!this.cachedAccounts) {
       return basePrompt;
     }
 
+    const notes: string | null | undefined =
+      options?.extractionNotes ?? this.cachedExtractionNotes;
+
     const categorizationInstructions = buildCategorizationInstructions();
     const accountsList = formatAllAccountsForPrompt(this.cachedAccounts);
+
+    const notesBlock =
+      notes && notes.trim()
+        ? `\n=== ACCOUNT-SPECIFIC NOTES ===\nThe following notes were provided by the account owner about this particular bank account.\nApply these when interpreting transaction descriptions:\n\n${notes}\n`
+        : '';
 
     return `${basePrompt}
 
 ${categorizationInstructions}
-
+${notesBlock}
 === CHART OF ACCOUNTS ===
 ${accountsList}
 
@@ -134,11 +145,15 @@ Return the data in the exact JSON structure specified.`;
   }
 
   /**
-   * Prepare categorization context by fetching accounts
-   * Must be called before extract() for categorization to work
+   * Prepare categorization context by fetching accounts.
+   * Must be called before extract() for categorization to work.
+   * Pass options.extractionNotes to inject account-specific hints into the prompt (Feature B).
    */
   async prepareCategorizationContext(options: CategorizationExtractionOptions): Promise<void> {
-    // Return cached if same org/entity
+    // Always update extraction notes even when accounts are cached
+    this.cachedExtractionNotes = options.extractionNotes ?? null;
+
+    // Return cached accounts if same org/entity
     if (
       this.cachedAccounts &&
       this.cachedOrgId === options.orgId &&
@@ -194,6 +209,7 @@ Return the data in the exact JSON structure specified.`;
     this.cachedAccounts = null;
     this.cachedOrgId = null;
     this.cachedLegalEntityId = null;
+    this.cachedExtractionNotes = null;
   }
 
   /**

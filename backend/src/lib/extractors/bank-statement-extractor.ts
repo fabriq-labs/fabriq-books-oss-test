@@ -1,12 +1,33 @@
 import { BaseDocumentExtractor } from './base-extractor';
 
 export class BankStatementExtractor extends BaseDocumentExtractor {
+  private extractionNotes: string | null = null;
+
   getSupportedTypes(): string[] {
     return ['posting', 'bank_statement', 'account_statement', 'credit_card_statement'];
   }
 
   getTargetModel(): string {
     return 'posting'; // This extractor maps to posting model only
+  }
+
+  /** Inject account-specific extraction notes for this statement (Feature B). */
+  setExtractionNotes(notes: string | null | undefined): void {
+    this.extractionNotes = notes ?? null;
+  }
+
+  /** Append account-specific notes block to the base prompt when present (Feature B). */
+  protected augmentPromptWithContext(basePrompt: string, options?: any): string {
+    const notes: string | null | undefined = options?.extractionNotes ?? this.extractionNotes;
+    if (!notes || !notes.trim()) return basePrompt;
+
+    return `${basePrompt}
+
+=== ACCOUNT-SPECIFIC NOTES ===
+The following notes were provided by the account owner about this particular bank account.
+Apply these when interpreting transaction descriptions:
+
+${notes}`;
   }
 
   getExtractionPrompt(): string {

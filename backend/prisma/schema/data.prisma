@@ -27,6 +27,8 @@ model account {
   hq_account_id         String?
   legal_entity_id       String?
   status                String?
+  // Per-account extraction hints injected into bank statement extraction prompts (Feature B)
+  extraction_notes      String?                 @db.Text
   // Lineage fields for data integration tracking
   source_system_id      String?                 @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
   source_record_id      String? // Source system record ID (e.g., Zoho account_id)

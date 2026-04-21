@@ -430,95 +430,149 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
         });
       }
 
-      // Step 5: Bulk LLM categorization for unmatched postings
+      // Step 5: Bulk LLM categorization — split by direction so each sub-batch gets
+      // only the relevant account subset (A5): money_out → expense+liability,
+      // money_in → income+asset.
       let llmTokenUsage: { promptTokens?: number; completionTokens?: number } = {};
       let llmCategorizedCount = 0;
 
       if (postingsNeedingLLM.length > 0) {
-        logger.info('Calling LLM for uncategorized postings', {
-          count: postingsNeedingLLM.length,
+        // Direction-filtered account views
+        const moneyOutAccounts: AccountsGrouped = {
+          expense: accounts.expense,
+          income: [],
+          asset: [],
+          liability: accounts.liability,
+        };
+        const moneyInAccounts: AccountsGrouped = {
+          expense: [],
+          income: accounts.income,
+          asset: accounts.asset,
+          liability: [],
+        };
+
+        // Split queue by direction
+        const outQueue: { posting: PostingForCategorization; originalIndex: number }[] = [];
+        const inQueue: { posting: PostingForCategorization; originalIndex: number }[] = [];
+
+        for (const item of postingsNeedingLLM) {
+          const dir = determineTransactionDirection(
+            item.posting.amount,
+            item.posting.accountType,
+            item.posting.creditAccountType,
+            { strict: true }
+          );
+          if (dir === 'money_out') {
+            outQueue.push(item);
+          } else {
+            inQueue.push(item);
+          }
+        }
+
+        logger.info('Calling LLM for uncategorized postings (direction-split)', {
+          moneyOut: outQueue.length,
+          moneyIn: inQueue.length,
           batchSize: CATEGORIZATION_CONFIG.BULK_LLM_BATCH_SIZE,
         });
 
-        toolTracker.track('bulkCategorizeWithLLM', true);
-        const llmPostings = postingsNeedingLLM.map((p) => p.posting);
-        const { results: llmResults, usage } = await bulkCategorizeWithLLM(llmPostings, accounts, orgId);
-        llmTokenUsage = usage;
+        // Helper: process LLM results back into the results array
+        const applyLLMResults = async (
+          queue: { posting: PostingForCategorization; originalIndex: number }[],
+          llmResults: Map<number, BulkCategorizationItem>,
+          usage: { promptTokens?: number; completionTokens?: number }
+        ) => {
+          llmTokenUsage.promptTokens = (llmTokenUsage.promptTokens ?? 0) + (usage.promptTokens ?? 0);
+          llmTokenUsage.completionTokens = (llmTokenUsage.completionTokens ?? 0) + (usage.completionTokens ?? 0);
 
-        // Process LLM results
-        for (let llmIndex = 0; llmIndex < postingsNeedingLLM.length; llmIndex++) {
-          const { posting, originalIndex } = postingsNeedingLLM[llmIndex];
-          const llmResult = llmResults.get(llmIndex);
+          for (let llmIndex = 0; llmIndex < queue.length; llmIndex++) {
+            const { posting, originalIndex } = queue[llmIndex];
+            const llmResult = llmResults.get(llmIndex);
 
-          if (llmResult) {
-            // Validate account
-            const isValidAccount = await validateAccount(llmResult.predicted_account_id, orgId);
-            if (!isValidAccount) {
+            if (llmResult) {
+              const isValidAccount = await validateAccount(llmResult.predicted_account_id, orgId);
+              if (!isValidAccount) {
+                results[originalIndex] = {
+                  posting_id: posting.id,
+                  predicted_account_id: llmResult.predicted_account_id,
+                  predicted_account_name: null,
+                  confidence: mapConfidenceLevel(llmResult.confidence_score),
+                  confidence_score: llmResult.confidence_score,
+                  reasoning: llmResult.reasoning,
+                  applied: false,
+                  error: `Invalid account ID: ${llmResult.predicted_account_id}`,
+                };
+                continue;
+              }
+
+              const predictedAccount = await getAccountById(llmResult.predicted_account_id, orgId);
+              const confidenceLevel = mapConfidenceLevel(llmResult.confidence_score);
+              const minScore = getMinConfidenceScore(params.options?.min_confidence ?? 'medium');
+              const meetsThreshold = llmResult.confidence_score >= minScore;
+              const shouldApply = !params.options?.dry_run && meetsThreshold;
+
+              let applied = false;
+              if (shouldApply) {
+                const direction = determineTransactionDirection(
+                  posting.amount,
+                  posting.accountType,
+                  posting.creditAccountType,
+                  { strict: true }
+                );
+                const fieldToUpdate = getFieldToUpdate(direction);
+                await updatePostingWithCategorization(
+                  posting.id,
+                  llmResult.predicted_account_id,
+                  llmResult.confidence_score,
+                  fieldToUpdate,
+                  userId
+                );
+                applied = true;
+              }
+
               results[originalIndex] = {
                 posting_id: posting.id,
                 predicted_account_id: llmResult.predicted_account_id,
-                predicted_account_name: null,
-                confidence: mapConfidenceLevel(llmResult.confidence_score),
+                predicted_account_name: predictedAccount?.name ?? null,
+                confidence: confidenceLevel,
                 confidence_score: llmResult.confidence_score,
                 reasoning: llmResult.reasoning,
-                applied: false,
-                error: `Invalid account ID: ${llmResult.predicted_account_id}`,
+                applied,
+                skipped_reason: !meetsThreshold ? `Confidence below threshold` : undefined,
               };
-              continue;
+              llmCategorizedCount++;
+            } else {
+              results[originalIndex] = {
+                posting_id: posting.id,
+                predicted_account_id: null,
+                predicted_account_name: null,
+                confidence: null,
+                confidence_score: null,
+                reasoning: null,
+                applied: false,
+                error: 'LLM did not return a prediction for this posting',
+              };
             }
-
-            // Get account details
-            const predictedAccount = await getAccountById(llmResult.predicted_account_id, orgId);
-            const confidenceLevel = mapConfidenceLevel(llmResult.confidence_score);
-
-            // Check if should apply
-            const minScore = getMinConfidenceScore(params.options?.min_confidence ?? 'medium');
-            const meetsThreshold = llmResult.confidence_score >= minScore;
-            const shouldApply = !params.options?.dry_run && meetsThreshold;
-
-            let applied = false;
-            if (shouldApply) {
-              const direction = determineTransactionDirection(
-                posting.amount,
-                posting.accountType,
-                posting.creditAccountType,
-                { strict: true }
-              );
-              const fieldToUpdate = getFieldToUpdate(direction);
-              await updatePostingWithCategorization(
-                posting.id,
-                llmResult.predicted_account_id,
-                llmResult.confidence_score,
-                fieldToUpdate,
-                userId
-              );
-              applied = true;
-            }
-
-            results[originalIndex] = {
-              posting_id: posting.id,
-              predicted_account_id: llmResult.predicted_account_id,
-              predicted_account_name: predictedAccount?.name ?? null,
-              confidence: confidenceLevel,
-              confidence_score: llmResult.confidence_score,
-              reasoning: llmResult.reasoning,
-              applied,
-              skipped_reason: !meetsThreshold ? `Confidence below threshold` : undefined,
-            };
-            llmCategorizedCount++;
-          } else {
-            // LLM didn't return result for this posting
-            results[originalIndex] = {
-              posting_id: posting.id,
-              predicted_account_id: null,
-              predicted_account_name: null,
-              confidence: null,
-              confidence_score: null,
-              reasoning: null,
-              applied: false,
-              error: 'LLM did not return a prediction for this posting',
-            };
           }
+        };
+
+        toolTracker.track('bulkCategorizeWithLLM', true);
+
+        if (outQueue.length > 0) {
+          const { results: outResults, usage } = await bulkCategorizeWithLLM(
+            outQueue.map((p) => p.posting),
+            moneyOutAccounts,
+            orgId
+          );
+          await applyLLMResults(outQueue, outResults, usage);
+        }
+
+        if (inQueue.length > 0) {
+          const { results: inResults, usage } = await bulkCategorizeWithLLM(
+            inQueue.map((p) => p.posting),
+            moneyInAccounts,
+            orgId
+          );
+          await applyLLMResults(inQueue, inResults, usage);
         }
       }
 

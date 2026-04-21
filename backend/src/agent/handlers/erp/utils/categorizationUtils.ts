@@ -8,6 +8,7 @@
 import prisma from '../../../../lib/prisma';
 import logger from '../../../../utils/logger';
 import { AuthContext } from '../../../../auth/types';
+import * as fuzz from 'fuzzball';
 
 /**
  * Account structure for categorization
@@ -506,8 +507,8 @@ export async function getAccountById(
 export const CATEGORIZATION_CONFIG = {
   /** Maximum number of transactions per LLM call */
   BULK_LLM_BATCH_SIZE: 20,
-  /** Minimum similarity score for fuzzy matching (0-1) */
-  FUZZY_MATCH_THRESHOLD: 0.85,
+  /** Minimum token_set_ratio score for fuzzy matching (0-1 scale; fuzzball returns 0-100 internally) */
+  FUZZY_MATCH_THRESHOLD: 0.80,
   /** Fixed confidence score for historical matches */
   HISTORICAL_MATCH_CONFIDENCE: 0.95,
 };
@@ -532,53 +533,59 @@ export interface BulkCategorizationItem {
   reasoning: string;
 }
 
+const BANK_TYPE_SET = new Set(['BANK', 'CREDIT_CARD', 'CHECKING', 'SAVINGS']);
+
 /**
- * Normalize a transaction description for matching
- * Uses light normalization: lowercase and trim
+ * Normalize a transaction description for fuzzy matching.
+ *
+ * Two-pass pipeline (A2):
+ *   Pass 1 — strip noise tokens (payment rails, reference numbers, dates, bank prefixes, card masks)
+ *   Pass 2 — take first 6 tokens to cap length
  */
 export function normalizeDescription(description: string | null): string {
   if (!description) return '';
-  return description.toLowerCase().trim();
+
+  // Step 0: lowercase + replace common separators with spaces
+  let s = description.toLowerCase().replace(/[\/\-_]/g, ' ');
+
+  // Pass 1 — strip noise tokens (applied in order)
+
+  // 1. Payment rail keywords (upi, neft, rtgs, imps, nach, ecs) — strip the word
+  s = s.replace(/\b(upi|neft|rtgs|imps|nach|ecs)\b/g, '');
+
+  // 2. Alpha-prefix + long digit codes: bank routing codes (hdfc0001234) and ref codes (ref20250312001)
+  s = s.replace(/\b[a-z]{2,6}\d{6,}\b/g, '');
+
+  // 3. Standalone long reference numbers (8+ digits)
+  s = s.replace(/\b\d{8,}\b/g, '');
+
+  // 4. Embedded dates as separate tokens (after separator-to-space conversion, dates become
+  //    sequences like "01 03 2026" — the year component is caught by pattern 3; short numbers
+  //    like "01" "03" are left, which is acceptable)
+
+  // 5. Month names with optional trailing year digits (mar2026, march, jan 2025)
+  s = s.replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{0,4}\b/g, '');
+
+  // 6. Bank name phrases (exact multi-word) — must come before standalone bank-word patterns
+  s = s.replace(/\b(hdfc bank|icici bank|axis bank|kotak bank|yes bank|indusind bank|indusind|sbi)\b/g, '');
+
+  // 7. Transaction-type prefix tokens
+  s = s.replace(/\b(pos|atm|clg|chq|si|cr|dr)\b/g, '');
+
+  // 8. Masked card number fragments: digits + X/asterisk run + optional digits (e.g. 441234XXXXXX1234)
+  s = s.replace(/\d*[x*]{3,}\d*/g, '');
+
+  // 9. Collapse multiple spaces
+  s = s.replace(/\s{2,}/g, ' ').trim();
+
+  // Pass 2 — take first 6 tokens to prevent long descriptions from diluting similarity scores
+  return s.split(/\s+/).slice(0, 6).join(' ');
 }
 
 /**
- * Calculate Levenshtein distance between two strings
- * Returns similarity score from 0 to 1
- */
-export function calculateSimilarity(str1: string, str2: string): number {
-  if (str1 === str2) return 1;
-  if (str1.length === 0 || str2.length === 0) return 0;
-
-  const matrix: number[][] = [];
-
-  // Initialize matrix
-  for (let i = 0; i <= str1.length; i++) {
-    matrix[i] = [i];
-  }
-  for (let j = 0; j <= str2.length; j++) {
-    matrix[0][j] = j;
-  }
-
-  // Fill matrix
-  for (let i = 1; i <= str1.length; i++) {
-    for (let j = 1; j <= str2.length; j++) {
-      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,      // deletion
-        matrix[i][j - 1] + 1,      // insertion
-        matrix[i - 1][j - 1] + cost // substitution
-      );
-    }
-  }
-
-  const distance = matrix[str1.length][str2.length];
-  const maxLength = Math.max(str1.length, str2.length);
-  return 1 - distance / maxLength;
-}
-
-/**
- * Find a fuzzy match in historical mappings
- * Returns the best match above threshold, or null
+ * Find a fuzzy match in historical mappings using fuzzball.token_set_ratio (A3).
+ * Returns the best match above threshold, or null.
+ * Threshold is in 0–1 scale (0.80 default); fuzzball scores are divided by 100 internally.
  */
 export function findFuzzyMatch(
   description: string,
@@ -587,13 +594,16 @@ export function findFuzzyMatch(
 ): HistoricalMapping | null {
   const normalized = normalizeDescription(description);
   if (!normalized) return null;
+  if (historicalMappings.length === 0) return null;
 
+  const thresholdPct = threshold * 100;
   let bestMatch: HistoricalMapping | null = null;
   let bestScore = 0;
 
   for (const mapping of historicalMappings) {
-    const score = calculateSimilarity(normalized, mapping.descriptionNormalized);
-    if (score >= threshold && score > bestScore) {
+    if (!mapping.descriptionNormalized) continue;
+    const score = fuzz.token_set_ratio(normalized, mapping.descriptionNormalized);
+    if (score >= thresholdPct && score > bestScore) {
       bestScore = score;
       bestMatch = mapping;
     }
@@ -603,24 +613,27 @@ export function findFuzzyMatch(
 }
 
 /**
- * Fetch historical description → counter-account mappings from past transactions
- * Only returns mappings where both sides are filled (human-approved or manually entered)
+ * Fetch historical description → counter-account mappings from past transactions (A1–A4).
+ *
+ * Includes all postings where both sides are filled, regardless of ai_cat_score (A1).
+ * Excludes bank-to-bank transfers (both sides are bank/credit-card accounts) (A1 edge case).
+ * Resolves duplicates by most-recent created_at; ties broken by manual entry (null score) > AI (A4).
  */
 export async function fetchHistoricalMappings(orgId: string): Promise<HistoricalMapping[]> {
-  // Query postings where both account_id and credit_account_id are filled
-  // and ai_cat_score is null (meaning human-approved, not AI-assigned)
   const postings = await prisma.posting.findMany({
     where: {
       org_id: orgId,
       account_id: { not: null },
       credit_account_id: { not: null },
       description: { not: null },
-      ai_cat_score: null, // Only human-approved transactions
+      // A1: removed ai_cat_score: null filter — include AI-categorized postings that were approved
     },
     select: {
       description: true,
       account_id: true,
       credit_account_id: true,
+      created_at: true,
+      ai_cat_score: true,
       account: {
         select: { id: true, name: true, type: true, classification: true },
       },
@@ -628,44 +641,66 @@ export async function fetchHistoricalMappings(orgId: string): Promise<Historical
         select: { id: true, name: true, type: true, classification: true },
       },
     },
-    distinct: ['description'],
+    orderBy: { created_at: 'desc' },
   });
 
-  const mappings: HistoricalMapping[] = [];
-  const seen = new Set<string>();
+  type CandidateEntry = HistoricalMapping & { createdAt: Date; aiCatScore: number | null };
+  const byNormalized = new Map<string, CandidateEntry>();
 
   for (const posting of postings) {
     const normalized = normalizeDescription(posting.description);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
+    if (!normalized) continue;
 
-    // Determine which side is the counter-account (non-bank side)
-    const creditIsBank = posting.credit_account?.type?.some(
-      (t) => ['BANK', 'CREDIT_CARD', 'CHECKING', 'SAVINGS'].includes(t)
-    );
-    const debitIsBank = posting.account?.type?.some(
-      (t) => ['BANK', 'CREDIT_CARD', 'CHECKING', 'SAVINGS'].includes(t)
-    );
+    const creditIsBank = posting.credit_account?.type?.some((t) => BANK_TYPE_SET.has(t));
+    const debitIsBank = posting.account?.type?.some((t) => BANK_TYPE_SET.has(t));
+
+    // A1 edge case: exclude bank-to-bank transfers from corpus
+    if (creditIsBank && debitIsBank) continue;
 
     let counterAccount: { id: string; name: string | null; classification: string | null } | null = null;
 
     if (creditIsBank && !debitIsBank && posting.account) {
-      // Bank on credit side, counter-account is on debit side
       counterAccount = posting.account;
     } else if (debitIsBank && !creditIsBank && posting.credit_account) {
-      // Bank on debit side, counter-account is on credit side
       counterAccount = posting.credit_account;
     }
 
-    if (counterAccount) {
-      mappings.push({
-        descriptionNormalized: normalized,
-        counterAccountId: counterAccount.id,
-        counterAccountName: counterAccount.name ?? '',
-        classification: counterAccount.classification ?? '',
-      });
+    if (!counterAccount) continue;
+
+    const candidate: CandidateEntry = {
+      descriptionNormalized: normalized,
+      counterAccountId: counterAccount.id,
+      counterAccountName: counterAccount.name ?? '',
+      classification: counterAccount.classification ?? '',
+      createdAt: posting.created_at,
+      aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
+    };
+
+    const existing = byNormalized.get(normalized);
+    if (!existing) {
+      byNormalized.set(normalized, candidate);
+      continue;
+    }
+
+    // A4: most-recent created_at wins
+    if (candidate.createdAt > existing.createdAt) {
+      byNormalized.set(normalized, candidate);
+    } else if (candidate.createdAt.getTime() === existing.createdAt.getTime()) {
+      // Tie-break: manual entry (null ai_cat_score) beats AI-categorized
+      if (existing.aiCatScore !== null && candidate.aiCatScore === null) {
+        byNormalized.set(normalized, candidate);
+      }
     }
   }
+
+  const mappings = Array.from(byNormalized.values()).map(
+    ({ descriptionNormalized, counterAccountId, counterAccountName, classification }) => ({
+      descriptionNormalized,
+      counterAccountId,
+      counterAccountName,
+      classification,
+    })
+  );
 
   logger.debug('Fetched historical mappings', {
     orgId,

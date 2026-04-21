@@ -374,13 +374,14 @@ describe('fetchHistoricalMappings + batch handler', () => {
     expect(mockGenerateObject).not.toHaveBeenCalled();
   });
 
-  // T20: 7 historical matches + 3 LLM → LLM called with exactly 3 items (AC-A9)
-  it('T20 batch of 6: 3 match history + 1 already-categorized + 2 to LLM → LLM called with 2 items (AC-A9)', async () => {
+  // T20: 3 historical matches + 1 already-categorized + 2 no-match-to-LLM (different directions)
+  // Direction-split means generateObject is called twice: once for money_out, once for money_in (AC-A9)
+  it('T20 batch of 6: 3 history + 1 skipped + 2 to LLM across 2 direction sub-batches (AC-A9)', async () => {
+    // Each direction sub-batch has 1 posting → each call returns 1 categorization at index 0
     mockGenerateObject.mockResolvedValue({
       object: {
         categorizations: [
-          { index: 0, predicted_account_id: ACCT.expRent, confidence_score: 0.75, reasoning: 'mocked EBA' },
-          { index: 1, predicted_account_id: ACCT.incInterest, confidence_score: 0.80, reasoning: 'mocked INT' },
+          { index: 0, predicted_account_id: ACCT.expRent, confidence_score: 0.75, reasoning: 'mocked' },
         ],
       },
       usage: { promptTokens: 100, completionTokens: 50 },
@@ -389,8 +390,9 @@ describe('fetchHistoricalMappings + batch handler', () => {
     const result = await categorizeTransactionBatchHandler.execute(
       null as any,
       {
-        // post_new_1, _2, _3: historical matches
-        // post_new_4, _5: no match → LLM
+        // post_new_1, _2, _3: historical matches (money_out)
+        // post_new_4: money_out, no match → LLM (money_out sub-batch)
+        // post_new_5: money_in, no match → LLM (money_in sub-batch)
         // post_new_6: already categorized → skipped
         posting_ids: ['post_new_1_v2', 'post_new_2_v2', 'post_new_3_v2', 'post_new_4_v2', 'post_new_5_v2', 'post_new_6_v2'],
         options: { dry_run: true, use_historical_matching: true },
@@ -400,12 +402,11 @@ describe('fetchHistoricalMappings + batch handler', () => {
     );
 
     expect(result.success).toBe(true);
-    // LLM called once for the 2 non-matching postings
-    expect(mockGenerateObject).toHaveBeenCalledTimes(1);
-    const llmCallArg = mockGenerateObject.mock.calls[0][0];
-    // The prompt passed to the LLM should list exactly the 2 unmatched transactions
-    expect(llmCallArg.prompt).toContain('EBA');
-    expect(llmCallArg.prompt).toContain('INT.PD');
+    // LLM called twice: once for money_out sub-batch (EBA), once for money_in sub-batch (INT.PD)
+    expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+    const prompts = mockGenerateObject.mock.calls.map((c: any[]) => c[0].prompt as string);
+    expect(prompts.some((p) => p.includes('EBA'))).toBe(true);
+    expect(prompts.some((p) => p.includes('INT.PD'))).toBe(true);
     expect(result.data!.summary.historical_match_count).toBe(3);
     expect(result.data!.summary.llm_categorized_count).toBe(2);
   });

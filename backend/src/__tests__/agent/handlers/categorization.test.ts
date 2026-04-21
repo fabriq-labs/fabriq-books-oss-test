@@ -15,7 +15,6 @@ import {
   buildSystemPrompt,
   buildUserPrompt,
   normalizeDescription,
-  calculateSimilarity,
   findFuzzyMatch,
   buildBulkPrompt,
   buildBulkSystemPrompt,
@@ -225,33 +224,12 @@ describe('Categorization Utilities', () => {
   });
 
   describe('normalizeDescription', () => {
-    it('should lowercase and trim descriptions', () => {
+    it('should lowercase, replace separators, and strip noise tokens', () => {
+      // Separators (-) become spaces in the V2 pipeline
       expect(normalizeDescription('  MONTHLY ACCOUNT FEE  ')).toBe('monthly account fee');
-      expect(normalizeDescription('E-TRANSFER')).toBe('e-transfer');
+      expect(normalizeDescription('E-TRANSFER')).toBe('e transfer');
       expect(normalizeDescription(null)).toBe('');
       expect(normalizeDescription('')).toBe('');
-    });
-  });
-
-  describe('calculateSimilarity', () => {
-    it('should return 1 for identical strings', () => {
-      expect(calculateSimilarity('hello', 'hello')).toBe(1);
-      expect(calculateSimilarity('monthly account fee', 'monthly account fee')).toBe(1);
-    });
-
-    it('should return 0 for empty strings', () => {
-      expect(calculateSimilarity('', 'hello')).toBe(0);
-      expect(calculateSimilarity('hello', '')).toBe(0);
-    });
-
-    it('should return high similarity for similar strings', () => {
-      const similarity = calculateSimilarity('monthly account fee', 'monthly acct fee');
-      expect(similarity).toBeGreaterThan(0.8);
-    });
-
-    it('should return low similarity for different strings', () => {
-      const similarity = calculateSimilarity('monthly account fee', 'amazon web services');
-      expect(similarity).toBeLessThan(0.3);
     });
   });
 
@@ -314,7 +292,7 @@ describe('Categorization Utilities', () => {
   describe('CATEGORIZATION_CONFIG', () => {
     it('should have expected default values', () => {
       expect(CATEGORIZATION_CONFIG.BULK_LLM_BATCH_SIZE).toBe(20);
-      expect(CATEGORIZATION_CONFIG.FUZZY_MATCH_THRESHOLD).toBe(0.85);
+      expect(CATEGORIZATION_CONFIG.FUZZY_MATCH_THRESHOLD).toBe(0.80);
       expect(CATEGORIZATION_CONFIG.HISTORICAL_MATCH_CONFIDENCE).toBe(0.95);
     });
   });
