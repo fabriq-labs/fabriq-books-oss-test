@@ -15,6 +15,7 @@ import {
   ImportExtensionOptions,
   ExtensionProcessResult,
 } from '../types';
+import prisma from '../../../lib/prisma';
 import { BankStatementWithCategorizationExtractor } from '../../extractors/bank-statement-with-categorization-extractor';
 import logger from '../../../utils/logger';
 
@@ -39,7 +40,7 @@ export class PostingImportExtension implements ImportExtension {
    * Required options for extraction
    */
   getRequiredOptions(): string[] {
-    return ['legalEntityId'];
+    return ['legalEntityId', 'accountId'];
   }
 
   /**
@@ -61,11 +62,16 @@ export class PostingImportExtension implements ImportExtension {
         bufferSize: buffer.length,
       });
 
+      // Fetch extraction_notes from the bank account if accountId was provided
+      const extractionNotes = options.accountId
+        ? await fetchAccountExtractionNotes(options.accountId)
+        : (options.extractionNotes ?? null);
+
       // Prepare categorization context (fetches Chart of Accounts + account-specific notes)
       await this.extractor.prepareCategorizationContext({
         orgId: context.user.org_id,
         legalEntityId: options.legalEntityId,
-        extractionNotes: options.extractionNotes ?? undefined,
+        extractionNotes: extractionNotes ?? undefined,
       });
 
       // Use extractor framework for combined extraction + categorization
@@ -135,5 +141,17 @@ export class PostingImportExtension implements ImportExtension {
       success: true,
       data,
     };
+  }
+}
+
+async function fetchAccountExtractionNotes(accountId: string): Promise<string | null> {
+  try {
+    const account = await (prisma as any).account.findUnique({
+      where: { id: accountId },
+      select: { extraction_notes: true },
+    });
+    return account?.extraction_notes ?? null;
+  } catch {
+    return null;
   }
 }

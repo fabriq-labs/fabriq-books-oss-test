@@ -57,7 +57,7 @@ export const postingImportExtension: ImportExtension = {
    */
   async handlePdfUpload(file: File, options: PdfUploadOptions): Promise<PdfUploadResult> {
     // Use the combined extraction + categorization API
-    const res: any = await importAPI.parseDocumentWithCategorization(file, options.legalEntityId);
+    const res: any = await importAPI.parseDocumentWithCategorization(file, options.legalEntityId, options.accountId);
 
     if (!res.success) {
       throw new Error(res.error || 'PDF parsing failed');
@@ -113,7 +113,9 @@ export const postingImportExtension: ImportExtension = {
       selected?.item?.legal_entity_id ||
       selected?.item?.legalEntityId ||
       undefined;
-    return { legalEntityId };
+    // relationId is the actual selected account ID (relationFieldId is the field name "account_id")
+    const accountId = context.relationId || undefined;
+    return { legalEntityId, accountId };
   },
 
   /**

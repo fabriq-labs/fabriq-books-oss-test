@@ -76,6 +76,7 @@ export interface PdfUploadResult {
  */
 export interface PdfUploadOptions {
   legalEntityId?: string;
+  accountId?: string;
 }
 
 /**
@@ -84,7 +85,10 @@ export interface PdfUploadOptions {
 export interface PdfUploadContext {
   modelType: string;
   relationField?: string;
+  /** Field name used as the parentData key (e.g. "account_id") — NOT the ID value */
   relationFieldId?: string;
+  /** The actual selected record ID value (e.g. "acco_org_indian_demo_1103") */
+  relationId?: string;
   relationSelection?: any;
 }
 

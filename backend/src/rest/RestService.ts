@@ -246,7 +246,7 @@ export class RestService {
       // Use viewId from path params if viewName from query is not available
       const finalViewName = viewName || viewId;
 
-      logger.warn('Updating record via model service', { modelName, id, user: context.user?.id });
+      logger.debug('Updating record via model service', { modelName, id, user: context.user?.id });
       const result = await this.modelService.update(
         modelName,
         context,

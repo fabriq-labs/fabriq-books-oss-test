@@ -94,6 +94,7 @@ export const ImportPannel = ({
           modelType,
           relationField,
           relationFieldId,
+          relationId,
           relationSelection,
         }) || {};
         const result = await extension.handlePdfUpload(file, {
