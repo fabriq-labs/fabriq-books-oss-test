@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
@@ -37,6 +38,7 @@ const itemMasterSchema = z.object({
     code: z.string().optional(),
     frequency: z.string().optional(),
     legal_entity_id: z.string().optional(),
+    extraction_notes: z.string().max(2000).optional(),
 });
 
 type ItemMasterValues = z.infer<typeof itemMasterSchema>;
@@ -80,6 +82,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
             base_currency_id: '',
             frequency: '',
             legal_entity_id: '',
+            extraction_notes: '',
         },
     });
 
@@ -105,6 +108,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                     base_currency_id: res.data.base_currency_id?.toString() || '',
                     frequency: res.data.frequency?.toString() || '',
                     legal_entity_id: res.data.legal_entity_id?.toString() || '',
+                    extraction_notes: res.data.extraction_notes || '',
                 });
                 setIsLoading(false);
             }).catch((err) => {
@@ -141,6 +145,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                         base_currency_id: toolResultData.base_currency_id?.toString() || '',
                         frequency: toolResultData.frequency?.toString() || '',
                         legal_entity_id: toolResultData.legal_entity_id?.toString() || '',
+                        extraction_notes: toolResultData.extraction_notes || '',
                     });
                 }
             }
@@ -526,6 +531,28 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                                                     searchParams="legal_name"
                                                     type="account"
                                                 />
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="extraction_notes"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Bank Statement Extraction Notes</FormLabel>
+                                                <FormControl>
+                                                    <Textarea
+                                                        placeholder="Describe any account-specific quirks that help the AI interpret transaction descriptions. Example: 'EBA prefix means a transfer to/from ICICI Direct trading account.'"
+                                                        className="resize-y min-h-[100px]"
+                                                        maxLength={2000}
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    These notes are injected into the AI prompt when importing bank statements for this account. Max 2000 characters.
+                                                </FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )}

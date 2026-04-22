@@ -172,9 +172,15 @@ export class PostingImportService {
         ? await resolveLegalEntityId(legalEntityId, context.user?.org_id)
         : undefined;
 
+      // Fetch account-specific extraction notes (may be null if not set)
+      const extractionNotes = categorize
+        ? await fetchAccountExtractionNotes(accountId)
+        : null;
+
       const modelName = categorize ? 'posting_with_categorization' : 'posting';
       const parseOptions: Record<string, any> = { mimeType, fileSize, fileName };
       if (resolvedLegalEntityId) parseOptions.legalEntityId = resolvedLegalEntityId;
+      if (extractionNotes) parseOptions.extractionNotes = extractionNotes;
 
       const parseResult = await ModelService.getInstance().parseDocument(
         modelName, context, fileBuffer, parseOptions
@@ -519,6 +525,22 @@ function handleError(
   log.error('PostingImportService error', { error: msg, fileName });
   emit({ step: 'error', message: msg, error: msg });
   return { success: false, error: msg };
+}
+
+/**
+ * Fetch extraction_notes from the account record. Returns null if not set or account not found.
+ */
+async function fetchAccountExtractionNotes(accountId: string): Promise<string | null> {
+  try {
+    const { default: prisma } = await import('../../lib/prisma');
+    const account = await (prisma as any).account.findUnique({
+      where: { id: accountId },
+      select: { extraction_notes: true },
+    });
+    return account?.extraction_notes ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

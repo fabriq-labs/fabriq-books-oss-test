@@ -61,10 +61,11 @@ export class PostingImportExtension implements ImportExtension {
         bufferSize: buffer.length,
       });
 
-      // Prepare categorization context (fetches Chart of Accounts)
+      // Prepare categorization context (fetches Chart of Accounts + account-specific notes)
       await this.extractor.prepareCategorizationContext({
         orgId: context.user.org_id,
         legalEntityId: options.legalEntityId,
+        extractionNotes: options.extractionNotes ?? undefined,
       });
 
       // Use extractor framework for combined extraction + categorization
