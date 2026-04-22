@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fabriq — CSV Import</title>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary: #7028a0;
+  --primary-h: #591e80;
+  --primary-light: #f5ebf9;
+  --primary-100: #e8d4f2;
+  --border: #dde3ed;
+  --muted: #f1f5f9;
+  --muted-fg: #64748b;
+  --fg: #0f172a;
+  --radius: 8px;
+  --sidebar-bg: #faf5fd;
+  --sidebar-border: #e2d5ef;
+  --sidebar-fg: #3d1a5c;
+  --destructive: #ef4444;
+  --green-100: #dcfce7; --green-800: #166534;
+  --red-100: #fee2e2; --red-700: #b91c1c;
+}
+body { font-family: 'Lato', sans-serif; background: #f8fafc; color: var(--fg); font-size: 14px; line-height: 1.5; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.45); border-radius: 9999px; }
+
+/* ── Layout ── */
+.topbar { position: fixed; top: 0; left: 0; right: 0; height: 52px; background: #fff; border-bottom: 1px solid var(--border); z-index: 50; display: flex; align-items: center; padding: 0 16px; gap: 12px; }
+.topbar-logo { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 18px; color: var(--primary); }
+.sidebar { position: fixed; top: 52px; left: 0; bottom: 0; width: 196px; background: var(--sidebar-bg); border-right: 1px solid var(--sidebar-border); overflow-y: auto; padding: 10px 0; z-index: 40; }
+.sidebar-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--sidebar-fg); border-radius: 6px; margin: 1px 6px; transition: background 0.1s; }
+.sidebar-item:hover { background: #f0e6f8; }
+.sidebar-item.active { background: var(--primary); color: #fff; font-weight: 600; }
+.sidebar-item.sub { padding-left: 26px; font-size: 12px; }
+.sidebar-item.sub.active { background: var(--primary-100); color: var(--primary); font-weight: 600; }
+.main { margin-left: 196px; margin-top: 52px; min-height: calc(100vh - 52px); padding: 20px 24px 72px; }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; height: 34px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; outline: none; transition: background 0.1s; font-family: 'Lato', sans-serif; white-space: nowrap; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-h); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-outline { background: #fff; color: #374151; border: 1px solid var(--border); }
+.btn-outline:hover { background: var(--muted); }
+.btn-ghost { background: transparent; color: var(--muted-fg); }
+.btn-ghost:hover { background: var(--muted); }
+.btn-destr { background: #fff; color: var(--destructive); border: 1px solid #fca5a5; }
+.btn-destr:hover { background: var(--red-100); }
+
+/* ── Progress strip ── */
+.prog-bg { flex: 1; height: 4px; background: var(--border); border-radius: 9999px; }
+.prog-fill { height: 100%; border-radius: 9999px; background: var(--primary); transition: width 0.35s ease; }
+.prog-fill.done { background: #22c55e; }
+
+/* ── Table ── */
+.tbl-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: #fff; }
+.tbl { width: 100%; border-collapse: collapse; }
+
+/* Column header cell */
+.th-cell { background: #fafafa; border-bottom: 1px solid var(--border); padding: 10px 14px 9px; vertical-align: top; }
+.th-field-name { font-size: 12px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+.req-star { color: var(--destructive); font-size: 11px; }
+
+/* Unmapped column stripe */
+.col-unmapped-bg { background: repeating-linear-gradient(135deg, #fafafa, #fafafa 6px, #f1f5f9 6px, #f1f5f9 12px); }
+
+/* CSV pill — the clickable selector */
+.csv-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px 2px 7px; border-radius: 9999px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1.5px solid transparent; user-select: none; line-height: 1.5;
+  transition: background 0.1s, box-shadow 0.1s;
+}
+.csv-pill.empty { background: #f1f5f9; color: var(--muted-fg); border-color: var(--border); }
+.csv-pill.empty:hover { background: var(--primary-light); border-color: var(--primary-100); color: var(--primary); }
+.csv-pill.filled { background: var(--primary-light); color: var(--primary); border-color: var(--primary-100); }
+.csv-pill.filled:hover { background: var(--primary-100); }
+.csv-pill.open { box-shadow: 0 0 0 2px rgba(112,40,160,0.22); }
+
+/* Remove optional col button */
+.col-remove { opacity: 0; width: 16px; height: 16px; border-radius: 9999px; background: #e2e8f0; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: opacity 0.1s, background 0.1s; flex-shrink: 0; }
+.th-cell:hover .col-remove { opacity: 1; }
+.col-remove:hover { background: var(--red-100); }
+
+/* Add column button (last th) */
+.th-add { background: #fafafa; border-bottom: 1px solid var(--border); padding: 10px 10px 9px; vertical-align: top; width: 120px; }
+.add-col-btn { display: flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--primary); background: var(--primary-light); border: 1.5px dashed var(--primary-100); cursor: pointer; white-space: nowrap; transition: background 0.1s, border-color 0.1s; }
+.add-col-btn:hover { background: var(--primary-100); border-color: var(--primary); }
+
+/* Popover */
+.pop-anchor { position: relative; display: inline-block; }
+.popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.13); width: 232px; overflow: hidden;
+  animation: popIn 0.14s ease;
+}
+.pop-head { padding: 9px 12px 6px; border-bottom: 1px solid var(--border); }
+.pop-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-fg); margin-bottom: 6px; }
+.pop-search { width: 100%; height: 27px; border: 1px solid var(--border); border-radius: 6px; padding: 0 8px; font-size: 12px; font-family: 'Lato', sans-serif; outline: none; }
+.pop-search:focus { border-color: var(--primary); }
+.pop-list { max-height: 200px; overflow-y: auto; padding: 4px; }
+.pop-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.08s; }
+.pop-item:hover { background: var(--primary-light); }
+.pop-item.sel { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+.pop-item.dim { color: var(--muted-fg); }
+.pop-item.dim:hover { color: var(--fg); }
+.pop-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* Table body */
+.tbl tbody tr { border-bottom: 1px solid var(--border); transition: background 0.07s; cursor: pointer; }
+.tbl tbody tr:last-child { border-bottom: none; }
+.tbl tbody tr:hover td { background: #fafafa; }
+.tbl tbody tr.row-err td { background: #fff8f8; }
+.tbl tbody tr.row-err:hover td { background: #fff0f0; }
+.tbl tbody tr.row-sel td { background: var(--primary-light) !important; }
+.tbl td { padding: 7px 14px; font-size: 13px; vertical-align: middle; }
+.tbl td.num { font-variant-numeric: tabular-nums; text-align: right; }
+/* Unmapped cells */
+.tbl td.unmapped-cell { background: repeating-linear-gradient(135deg, #fafafa, #fafafa 6px, #f1f5f9 6px, #f1f5f9 12px); color: var(--muted-fg); font-size: 11px; text-align: center; font-style: italic; }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; gap: 3px; border-radius: 9999px; padding: 1px 7px; font-size: 11px; font-weight: 600; }
+.badge-green { background: var(--green-100); color: var(--green-800); }
+.badge-red { background: var(--red-100); color: var(--red-700); }
+.badge-gray { background: #f1f5f9; color: #475569; }
+
+/* Toggle */
+.toggle-wrap { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.toggle { width: 30px; height: 17px; border-radius: 9999px; background: var(--border); position: relative; transition: background 0.14s; flex-shrink: 0; }
+.toggle.on { background: var(--primary); }
+.toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 9999px; background: #fff; transition: left 0.14s; }
+.toggle.on::after { left: 15px; }
+
+/* Pagination */
+.pag-btn { width: 27px; height: 27px; border-radius: 5px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; transition: background 0.08s; }
+.pag-btn:hover:not(:disabled) { background: var(--muted); }
+.pag-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pag-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Footer */
+.footer-bar { position: fixed; bottom: 0; left: 196px; right: 0; background: rgba(255,255,255,0.97); backdrop-filter: blur(8px); border-top: 1px solid var(--border); padding: 9px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 30; }
+
+/* Tweaks */
+.tweaks-panel { position: fixed; bottom: 58px; right: 20px; width: 250px; background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 100; overflow: hidden; transition: opacity 0.18s, transform 0.18s; }
+.tweaks-panel.hidden { opacity: 0; pointer-events: none; transform: translateY(6px); }
+.tweak-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted-fg); margin-bottom: 5px; }
+.tweak-opt { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 5px; }
+.tweak-opt:hover { background: var(--muted); }
+.tweak-opt input { accent-color: var(--primary); }
+
+.checkbox { width: 13px; height: 13px; accent-color: var(--primary); cursor: pointer; }
+
+@keyframes popIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateX(-50%) translateY(4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useEffect, useRef, useCallback } = React;
+
+/* ── Tiny icon ── */
+const Ic = ({ d, size = 14, color = "currentColor", sw = 1.75 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+    stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+    {[].concat(d).map((p, i) => <path key={i} d={p} />)}
+  </svg>
+);
+const I = {
+  menu:    "M4 6h16M4 12h16M4 18h16",
+  bell:    "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0",
+  chevD:   "M6 9l6 6 6-6",
+  chevL:   "M15 18l-6-6 6-6",
+  chevR:   "M9 18l6-6-6-6",
+  check:   "M20 6L9 17l-5-5",
+  upload:  "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
+  trash:   "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
+  file:    "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6",
+  sparkle: "M5 3l.5 1.5L7 5l-1.5.5L5 7l-.5-1.5L3 5l1.5-.5zm12 0l.5 1.5L19 5l-1.5.5L17 7l-.5-1.5L15 5l1.5-.5zM12 9l1 3 3 1-3 1-1 3-1-3-3-1 3-1z",
+  alert:   "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01",
+  info:    "M12 16v-4M12 8h.01M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z",
+  plus:    "M12 5v14M5 12h14",
+  x:       "M18 6L6 18M6 6l12 12",
+  xSm:     "M15 9l-6 6M9 9l6 6",
+};
+
+/* ── Schema (DB fields) ── */
+const SCHEMA_FIELDS = [
+  { id: "value_date",    label: "Value Date",    required: true  },
+  { id: "description",   label: "Description",   required: true  },
+  { id: "debit_amount",  label: "Debit Amount",  required: true  },
+  { id: "credit_amount", label: "Credit Amount", required: true  },
+  { id: "balance",       label: "Balance",       required: false },
+  { id: "reference",     label: "Reference No.", required: false },
+  { id: "account",       label: "Account",       required: false, isLookup: true },
+  { id: "narration2",    label: "Narration 2",   required: false },
+];
+
+/* ── CSV columns (from uploaded file) ── */
+const CSV_COLS = [
+  { id: "txn_date",   label: "txn_date"   },
+  { id: "narration",  label: "narration"  },
+  { id: "ref_no",     label: "ref_no"     },
+  { id: "debit_amt",  label: "debit_amt"  },
+  { id: "credit_amt", label: "credit_amt" },
+  { id: "balance",    label: "balance"    },
+  // simulate a wider legacy CSV
+  { id: "extra1",     label: "branch_code"  },
+  { id: "extra2",     label: "ifsc"         },
+  { id: "extra3",     label: "chq_no"       },
+];
+
+/* initial mapping: schema field id → csv col id */
+const INIT_MAPPING = {
+  value_date:   "txn_date",
+  description:  "narration",
+  debit_amount: "debit_amt",
+  credit_amount: "",
+};
+
+/* ── Fake rows ── */
+const NAMES = [
+  "TATA CONSULTANCY SERVICES","IIFL Finance Limited","NATIONAL SECURITIES DEPOSITORY LTD",
+  "Manappuram Finance Limited","HDFC Bank Transfer","Infosys BPO Ltd","Reliance Industries",
+  "Amazon Pay India","Zomato Ltd","ICICI Securities","SBI Life Insurance","Bajaj Finance EMI",
+  "UNKNOWN VENDOR XYZ","PhonePe Transfer","Google India Pvt Ltd","Razorpay Settlement",
+  "Cashfree Payments","Paytm Money","Navi Technologies","Invalid Corp 999",
+];
+const ALL_ROWS = (() => {
+  let bal = 120000;
+  return Array.from({ length: 40 }, (_, i) => {
+    const isDebit = Math.random() > 0.4;
+    const amt = Math.round(Math.random() * 80000 + 500);
+    bal += isDebit ? -amt : amt;
+    const name = NAMES[i % NAMES.length];
+    return {
+      id: i + 1,
+      txn_date:   `2026-0${Math.floor(i / 10) + 1}-${String((i % 28) + 1).padStart(2, "0")}`,
+      narration:  name,
+      ref_no:     `REF${String(100000 + i * 17).slice(1)}`,
+      debit_amt:  isDebit ? (Math.round(Math.random() * 80000 + 500)).toFixed(2) : "",
+      credit_amt: !isDebit ? (Math.round(Math.random() * 80000 + 500)).toFixed(2) : "",
+      balance:    bal.toFixed(2),
+      branch_code: "MUM001", ifsc: "HDFC0001234", chq_no: isDebit ? `CHQ${1000+i}` : "",
+      hasError:   name.startsWith("UNKNOWN") || name.startsWith("Invalid"),
+      selected:   false,
+    };
+  });
+})();
+
+/* ── CSV Pill + Popover ── */
+function CsvPill({ schemaField, mapping, onMap }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef(null);
+
+  const csvId = mapping[schemaField.id] || "";
+  const csvCol = CSV_COLS.find(c => c.id === csvId);
+
+  useEffect(() => {
+    if (!open) return;
+    const fn = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setQ(""); } };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, [open]);
+
+  // CSV cols not already used by another schema field
+  const usedCsvIds = new Set(
+    Object.entries(mapping).filter(([k]) => k !== schemaField.id).map(([, v]) => v).filter(Boolean)
+  );
+  const available = CSV_COLS.filter(c =>
+    !usedCsvIds.has(c.id) &&
+    c.label.toLowerCase().includes(q.toLowerCase())
+  );
+  const alreadyUsed = CSV_COLS.filter(c =>
+    usedCsvIds.has(c.id) &&
+    c.label.toLowerCase().includes(q.toLowerCase())
+  );
+
+  const select = id => { onMap(schemaField.id, id); setOpen(false); setQ(""); };
+
+  const pillCls = `csv-pill ${csvCol ? "filled" : "empty"}${open ? " open" : ""}`;
+
+  return (
+    <div className="pop-anchor" ref={ref}>
+      <div className={pillCls} onClick={() => setOpen(v => !v)}>
+        {csvCol
+          ? <><span style={{ opacity: 0.55, fontSize: 10 }}>←</span><span style={{ fontFamily:"monospace", fontSize:11 }}>{csvCol.label}</span><Ic d={I.chevD} size={10} /></>
+          : <><span style={{ opacity:0.6 }}>← Map…</span><Ic d={I.chevD} size={10} /></>
+        }
+      </div>
+
+      {open && (
+        <div className="popover">
+          <div className="pop-head">
+            <div className="pop-title">Map to <span style={{ color: "var(--fg)" }}>{schemaField.label}</span></div>
+            <input className="pop-search" placeholder="Search…" value={q} onChange={e => setQ(e.target.value)} autoFocus />
+          </div>
+          <div className="pop-list">
+            {available.length > 0 && (
+              <>
+                <div style={{ padding: "4px 10px 2px", fontSize: 10, fontWeight: 700, color: "var(--muted-fg)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Available
+                </div>
+                {available.map(c => (
+                  <div key={c.id} className={`pop-item${csvId === c.id ? " sel" : ""}`} onClick={() => select(c.id)}>
+                    <span style={{ fontFamily: "monospace", fontSize: 12 }}>{c.label}</span>
+                    {csvId === c.id && <Ic d={I.check} size={12} color="var(--primary)" />}
+                  </div>
+                ))}
+              </>
+            )}
+            {alreadyUsed.length > 0 && (
+              <>
+                <div className="pop-divider" />
+                <div style={{ padding: "4px 10px 2px", fontSize: 10, fontWeight: 700, color: "var(--muted-fg)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Already used
+                </div>
+                {alreadyUsed.map(c => (
+                  <div key={c.id} className="pop-item dim" style={{ opacity: 0.6 }} onClick={() => select(c.id)}>
+                    <span style={{ fontFamily: "monospace", fontSize: 12 }}>{c.label}</span>
+                    <span style={{ fontSize: 10, color: "var(--muted-fg)" }}>reassign</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {available.length === 0 && alreadyUsed.length === 0 && (
+              <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--muted-fg)", textAlign: "center" }}>No match</div>
+            )}
+            {csvId && (
+              <>
+                <div className="pop-divider" />
+                <div className="pop-item dim" onClick={() => select("")}>
+                  <span style={{ color: "var(--destructive)" }}>✕ Clear mapping</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Add Column Popover ── */
+function AddColumnPopover({ visibleFieldIds, onAdd }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const fn = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, [open]);
+
+  const opts = SCHEMA_FIELDS.filter(f => !f.required && !visibleFieldIds.includes(f.id));
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <div className="add-col-btn" onClick={() => setOpen(v => !v)}>
+        <Ic d={I.plus} size={12} color="var(--primary)" />
+        Add column
+      </div>
+      {open && opts.length > 0 && (
+        <div className="popover" style={{ width: 210, left: 0 }}>
+          <div className="pop-head">
+            <div className="pop-title">Optional schema fields</div>
+          </div>
+          <div className="pop-list">
+            {opts.map(f => (
+              <div key={f.id} className="pop-item" onClick={() => { onAdd(f.id); setOpen(false); }}>
+                <span>{f.label}</span>
+                {f.isLookup && <span style={{ fontSize: 10, color: "var(--muted-fg)" }}>lookup</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {open && opts.length === 0 && (
+        <div className="popover" style={{ width: 210 }}>
+          <div style={{ padding: "12px", fontSize: 12, color: "var(--muted-fg)", textAlign: "center" }}>
+            All optional fields added
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Main App ── */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "showAIButton": true,
+  "tableSize": "default"
+}/*EDITMODE-END*/;
+
+function App() {
+  const savedState  = (() => { try { return JSON.parse(localStorage.getItem("fabriq_imp3") || "{}"); } catch { return {}; } })();
+  const savedTweaks = (() => { try { return JSON.parse(localStorage.getItem("fabriq_tweaks3") || "null"); } catch { return null; } })();
+
+  // Active schema columns = required always + user-added optional
+  const requiredIds = SCHEMA_FIELDS.filter(f => f.required).map(f => f.id);
+  const [optionalIds, setOptionalIds] = useState(savedState.optionalIds || []);
+  const visibleFieldIds = [...requiredIds, ...optionalIds];
+
+  const [mapping, setMapping]   = useState({ ...INIT_MAPPING, ...(savedState.mapping || {}) });
+  const [rows, setRows]         = useState(ALL_ROWS);
+  const [page, setPage]         = useState(savedState.page || 1);
+  const [pageSize, setPageSize] = useState(savedState.pageSize || 10);
+  const [onlyErrors, setOnlyErrors] = useState(false);
+  const [showTweaks, setShowTweaks] = useState(false);
+  const [tweaks, setTweaks]     = useState(savedTweaks ? { ...TWEAK_DEFAULTS, ...savedTweaks } : TWEAK_DEFAULTS);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [toast, setToast]       = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem("fabriq_imp3", JSON.stringify({ mapping, page, pageSize, optionalIds }));
+  }, [mapping, page, pageSize, optionalIds]);
+
+  useEffect(() => {
+    const fn = e => {
+      if (e.data?.type === "__activate_edit_mode") setShowTweaks(true);
+      if (e.data?.type === "__deactivate_edit_mode") setShowTweaks(false);
+    };
+    window.addEventListener("message", fn);
+    window.parent.postMessage({ type: "__edit_mode_available" }, "*");
+    return () => window.removeEventListener("message", fn);
+  }, []);
+
+  const applyTweak = (k, v) => {
+    const next = { ...tweaks, [k]: v };
+    setTweaks(next);
+    localStorage.setItem("fabriq_tweaks3", JSON.stringify(next));
+    window.parent.postMessage({ type: "__edit_mode_set_keys", edits: { [k]: v } }, "*");
+  };
+
+  const handleMap = useCallback((schemaId, csvId) => {
+    setMapping(p => ({ ...p, [schemaId]: csvId }));
+  }, []);
+
+  const addOptional   = id  => setOptionalIds(p => [...p, id]);
+  const removeOptional = id => {
+    setOptionalIds(p => p.filter(x => x !== id));
+    setMapping(p => { const n = { ...p }; delete n[id]; return n; });
+  };
+
+  // Derived
+  const requiredFields  = SCHEMA_FIELDS.filter(f => f.required);
+  const mappedReqCount  = requiredFields.filter(f => mapping[f.id]).length;
+  const allReqMapped    = mappedReqCount === requiredFields.length;
+  const visibleFields   = SCHEMA_FIELDS.filter(f => visibleFieldIds.includes(f.id));
+  const mappedCsvIds    = new Set(Object.values(mapping).filter(Boolean));
+  const unusedCsvCount  = CSV_COLS.filter(c => !mappedCsvIds.has(c.id)).length;
+
+  const filtered = useMemo(() => {
+    let r = [...rows];
+    if (onlyErrors) r = r.filter(x => x.hasError);
+    return r;
+  }, [rows, onlyErrors]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageRows   = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const selCount   = rows.filter(r => r.selected).length;
+
+  const toggleRow = id => setRows(p => p.map(r => r.id === id ? { ...r, selected: !r.selected } : r));
+  const toggleAll = () => {
+    const ids = new Set(pageRows.map(r => r.id));
+    const allSel = pageRows.every(r => r.selected);
+    setRows(p => p.map(r => ids.has(r.id) ? { ...r, selected: !allSel } : r));
+  };
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2800); };
+  const deleteSelected = () => { setRows(p => p.filter(r => !r.selected)); showToast("Rows deleted"); };
+
+  const compact = tweaks.tableSize === "compact";
+  const tdP = compact ? "5px 14px" : "9px 14px";
+
+  // Get cell value for a schema field from a row
+  const getCellValue = (row, schemaId) => {
+    const csvId = mapping[schemaId];
+    if (!csvId) return null; // unmapped
+    return row[csvId] ?? "";
+  };
+
+  return (
+    <div>
+      {/* TopBar */}
+      <header className="topbar">
+        <Ic d={I.menu} size={17} color="#9ca3af" />
+        <span className="topbar-logo">fabriq</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <button style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center" }}>
+            <Ic d={I.bell} size={16} color="#9ca3af" />
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <div style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>AS</div>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>Anusha Srinivasan</span>
+            <Ic d={I.chevD} size={12} color="#9ca3af" />
+          </div>
+        </div>
+      </header>
+
+      {/* Sidebar */}
+      <nav className="sidebar">
+        {[["Dashboard","M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"],
+          ["Reports","M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"],
+          ["Workbench","M22 12h-4l-3 9L9 3l-3 9H2"]
+        ].map(([l, ic]) => (
+          <div key={l} className="sidebar-item"><Ic d={ic} size={13} color="var(--sidebar-fg)" /><span>{l}</span></div>
+        ))}
+        {[["Sales","M20 12V22H4V12"],["Purchases","M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"]].map(([l, ic]) => (
+          <div key={l} className="sidebar-item" style={{ justifyContent: "space-between" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Ic d={ic} size={13} color="var(--sidebar-fg)" />{l}</span>
+            <Ic d={I.chevR} size={11} color="#9ca3af" />
+          </div>
+        ))}
+        <div className="sidebar-item active" style={{ justifyContent: "space-between" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Ic d="M12 2a10 10 0 1 0 0 20A10 10 0 1 0 12 2z" size={13} color="#fff" />Accounting</span>
+          <Ic d={I.chevD} size={11} color="rgba(255,255,255,0.6)" />
+        </div>
+        {["Transactions","Bank Transactions","Chart of Accounts","Tax Master","Payment Terms"].map(s => (
+          <div key={s} className={`sidebar-item sub${s === "Bank Transactions" ? " active" : ""}`}>{s}</div>
+        ))}
+      </nav>
+
+      {/* Main */}
+      <main className="main">
+
+        {/* Page header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12, gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Ic d={I.file} size={19} color="var(--primary)" />
+            <div>
+              <h1 style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>Map CSV Columns</h1>
+              <p style={{ fontSize: 12, color: "var(--muted-fg)", marginTop: 1 }}>
+                HDFC_Statement_Feb2026.csv &nbsp;·&nbsp; {ALL_ROWS.length} rows &nbsp;·&nbsp; {CSV_COLS.length} CSV columns detected
+              </p>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {tweaks.showAIButton && (
+              <button className="btn btn-outline" style={{ fontSize: 12 }}
+                onClick={() => { setAiLoading(true); setTimeout(() => { setAiLoading(false); showToast("AI categorization applied"); }, 1600); }}
+                disabled={aiLoading}>
+                <Ic d={I.sparkle} size={13} color={aiLoading ? "var(--muted-fg)" : "var(--primary)"} />
+                {aiLoading ? "Analyzing…" : "AI Categorize"}
+              </button>
+            )}
+            <button className="btn btn-outline" style={{ fontSize: 12 }}>
+              <Ic d={I.chevL} size={13} /> Discard
+            </button>
+            <button className="btn btn-primary" disabled={!allReqMapped}
+              onClick={() => allReqMapped && showToast("Import started — 40 transactions queued")}>
+              <Ic d={I.upload} size={13} /> Upload CSV
+            </button>
+          </div>
+        </div>
+
+        {/* Progress strip */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <div className="prog-bg">
+            <div className={`prog-fill${allReqMapped ? " done" : ""}`}
+              style={{ width: `${(mappedReqCount / requiredFields.length) * 100}%` }} />
+          </div>
+          <span style={{ fontSize: 11, color: "var(--muted-fg)", whiteSpace: "nowrap" }}>
+            {mappedReqCount}/{requiredFields.length} required
+          </span>
+          {allReqMapped
+            ? <span style={{ fontSize: 11, fontWeight: 600, color: "#166534", background: "#dcfce7", padding: "2px 9px", borderRadius: 9999, whiteSpace: "nowrap" }}>✓ ready</span>
+            : <span style={{ fontSize: 11, fontWeight: 600, color: "#92400e", background: "#fef3c7", padding: "2px 9px", borderRadius: 9999, whiteSpace: "nowrap" }}>★ required fields needed</span>}
+          {unusedCsvCount > 0 && (
+            <span style={{ fontSize: 11, color: "var(--muted-fg)", marginLeft: 4 }}>
+              {unusedCsvCount} CSV column{unusedCsvCount !== 1 ? "s" : ""} not mapped — that's OK
+            </span>
+          )}
+        </div>
+
+        {/* Table toolbar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 12, color: "var(--muted-fg)", fontWeight: 600 }}>{filtered.length} rows</span>
+            {rows.some(r => r.hasError) && (
+              <label className="toggle-wrap" onClick={() => { setOnlyErrors(v => !v); setPage(1); }}>
+                <div className={`toggle${onlyErrors ? " on" : ""}`} />
+                <span style={{ fontSize: 12, color: onlyErrors ? "var(--destructive)" : "var(--muted-fg)" }}>
+                  Errors only ({rows.filter(r => r.hasError).length})
+                </span>
+              </label>
+            )}
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <AddColumnPopover visibleFieldIds={visibleFieldIds} onAdd={addOptional} />
+            {selCount > 0 && (
+              <button className="btn btn-destr" style={{ fontSize: 12, height: 30 }} onClick={deleteSelected}>
+                <Ic d={I.trash} size={12} /> Delete {selCount} rows
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Table ── */}
+        <div className="tbl-wrap" style={{ overflowX: "auto" }}>
+          <table className="tbl" style={{ tableLayout: "fixed", minWidth: "100%", width: `${Math.max(100, visibleFields.length * 160 + 40 + 36 + 120)}px` }}>
+            <thead>
+              <tr>
+                {/* Checkbox */}
+                <th className="th-cell" style={{ width: 36 }}>
+                  <input type="checkbox" className="checkbox"
+                    checked={pageRows.length > 0 && pageRows.every(r => r.selected)}
+                    onChange={toggleAll} />
+                </th>
+                {/* Row # */}
+                <th className="th-cell" style={{ width: 32 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-fg)" }}>#</span>
+                </th>
+
+                {/* Schema field columns */}
+                {visibleFields.map(field => {
+                  const csvId = mapping[field.id];
+                  const isMapped = !!csvId;
+                  return (
+                    <th key={field.id} className={`th-cell${!isMapped ? " col-unmapped-bg" : ""}`}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div className="th-field-name">
+                          {field.label}
+                          {field.required && <span className="req-star">★</span>}
+                          {field.isLookup && <span style={{ fontSize: 9, fontWeight: 700, color: "#0369a1", background: "#e0f2fe", padding: "0 5px", borderRadius: 9999, textTransform: "uppercase", letterSpacing: "0.05em" }}>lookup</span>}
+                        </div>
+                        {/* Remove button for optional */}
+                        {!field.required && (
+                          <button className="col-remove" onClick={() => removeOptional(field.id)} title="Remove column">
+                            <Ic d={I.xSm} size={9} color="#64748b" />
+                          </button>
+                        )}
+                      </div>
+                      {/* CSV selector pill */}
+                      <CsvPill schemaField={field} mapping={mapping} onMap={handleMap} />
+                      {/* Unmapped hint */}
+                      {!isMapped && (
+                        <div style={{ fontSize: 10, color: "var(--muted-fg)", marginTop: 4, fontStyle: "italic" }}>
+                          {field.required ? "Required — select a CSV column" : "Select a CSV column"}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
+
+
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.length === 0
+                ? <tr><td colSpan={visibleFields.length + 3} style={{ padding: "32px 16px", textAlign: "center", color: "var(--muted-fg)", fontSize: 13 }}>No rows to display</td></tr>
+                : pageRows.map((row, idx) => (
+                  <tr key={row.id}
+                    className={`${row.hasError ? "row-err" : ""}${row.selected ? " row-sel" : ""}`}
+                    onClick={() => toggleRow(row.id)}>
+                    <td style={{ padding: tdP }}>
+                      <input type="checkbox" className="checkbox" checked={row.selected}
+                        onChange={() => toggleRow(row.id)} onClick={e => e.stopPropagation()} />
+                    </td>
+                    <td style={{ padding: tdP, fontSize: 11, color: "var(--muted-fg)" }}>
+                      {(page - 1) * pageSize + idx + 1}
+                    </td>
+                    {visibleFields.map(field => {
+                      const val = getCellValue(row, field.id);
+                      const isMapped = mapping[field.id];
+                      if (!isMapped) {
+                        return <td key={field.id} className="unmapped-cell" style={{ padding: tdP }}>—</td>;
+                      }
+                      // Style by field type
+                      const isDebit  = field.id === "debit_amount";
+                      const isCredit = field.id === "credit_amount";
+                      const isErr    = row.hasError && field.id === "description";
+                      return (
+                        <td key={field.id} style={{ padding: tdP, textAlign: (isDebit || isCredit || field.id === "balance") ? "right" : "left", fontVariantNumeric: "tabular-nums", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {isErr
+                            ? <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                <Ic d={I.alert} size={11} color="#ef4444" />
+                                <span>{val}</span>
+                                <span className="badge badge-red" style={{ marginLeft: 2 }}>Not found</span>
+                              </span>
+                            : <span style={{ color: isDebit && val ? "#dc2626" : isCredit && val ? "#16a34a" : "inherit" }}>
+                                {val || <span style={{ color: "var(--muted-fg)", fontSize: 11 }}>—</span>}
+                              </span>}
+                        </td>
+                      );
+                    })}
+
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+          <span style={{ fontSize: 12, color: "var(--muted-fg)" }}>
+            {Math.min((page-1)*pageSize+1, filtered.length)}–{Math.min(page*pageSize, filtered.length)} of {filtered.length}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="pag-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}><Ic d={I.chevL} size={11} /></button>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              const pg = totalPages <= 5 ? i+1 : page <= 3 ? i+1 : page >= totalPages-2 ? totalPages-4+i : page-2+i;
+              return <button key={pg} className={`pag-btn${page===pg?" active":""}`} onClick={() => setPage(pg)}>{pg}</button>;
+            })}
+            <button className="pag-btn" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}><Ic d={I.chevR} size={11} /></button>
+            <div style={{ position: "relative", marginLeft: 4 }}>
+              <select style={{ height: 27, border: "1px solid var(--border)", borderRadius: 6, fontSize: 12, padding: "0 22px 0 8px", background: "#fff", fontFamily: "Lato,sans-serif", appearance: "none", cursor: "pointer" }}
+                value={pageSize} onChange={e => { setPageSize(+e.target.value); setPage(1); }}>
+                {[10,20,50].map(n => <option key={n} value={n}>{n} / page</option>)}
+              </select>
+              <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}><Ic d={I.chevD} size={10} color="var(--muted-fg)" /></span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer bar */}
+      <div className="footer-bar">
+        <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+          {allReqMapped
+            ? <span style={{ color: "#16a34a", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <Ic d={I.check} size={14} color="#16a34a" /> All required fields mapped — ready to import
+              </span>
+            : <span style={{ color: "var(--muted-fg)", display: "flex", alignItems: "center", gap: 6 }}>
+                <Ic d={I.info} size={14} />
+                {requiredFields.length - mappedReqCount} required field{requiredFields.length - mappedReqCount !== 1 ? "s" : ""} unmapped — click the pills in the column headers
+              </span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {selCount > 0 && (
+            <button className="btn btn-destr" style={{ fontSize: 12, height: 30 }} onClick={deleteSelected}>
+              <Ic d={I.trash} size={12} /> Delete {selCount}
+            </button>
+          )}
+          <button className="btn btn-outline" style={{ fontSize: 12 }}><Ic d={I.chevL} size={12} /> Discard</button>
+          <button className="btn btn-primary" disabled={!allReqMapped}
+            onClick={() => allReqMapped && showToast("Import started — 40 transactions queued")}>
+            <Ic d={I.upload} size={13} /> Upload CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 64, left: "50%", transform: "translateX(-50%)", background: "#111827", color: "#fff", padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.18)", zIndex: 300, animation: "fadeUp 0.18s ease", whiteSpace: "nowrap" }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Tweaks */}
+      <div className={`tweaks-panel${showTweaks ? "" : " hidden"}`}>
+        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>Tweaks</span>
+          <button style={{ background: "none", border: "none", cursor: "pointer" }} onClick={() => setShowTweaks(false)}><Ic d={I.x} size={13} color="var(--muted-fg)" /></button>
+        </div>
+        <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <div className="tweak-label">AI Categorize button</div>
+            <label className="toggle-wrap" onClick={() => applyTweak("showAIButton", !tweaks.showAIButton)}>
+              <div className={`toggle${tweaks.showAIButton ? " on" : ""}`} />
+              <span style={{ fontSize: 13 }}>{tweaks.showAIButton ? "Visible" : "Hidden"}</span>
+            </label>
+          </div>
+          <div>
+            <div className="tweak-label">Row density</div>
+            {["compact","default"].map(opt => (
+              <label key={opt} className="tweak-opt">
+                <input type="radio" name="dens" value={opt} checked={tweaks.tableSize===opt} onChange={() => applyTweak("tableSize", opt)} />
+                {opt.charAt(0).toUpperCase()+opt.slice(1)}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
