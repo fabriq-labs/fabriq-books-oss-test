@@ -69,7 +69,6 @@ INSERT INTO public.permission (id, view_id, field_name, access, created_at, upda
 -- Data for Name: role; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_47b4b3cf-5660-4b85-96ee-3c456af60f56', 'test', '2025-08-12 08:42:25.934', '2025-08-12 08:42:25.934', '2d9d64e9-634b-41e1-896f-434472283988', '2d9d64e9-634b-41e1-896f-434472283988', '52');
 INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_cc202e8c-204b-4451-b0fd-a9dc4cec5e38', 'Super Admin', '2025-04-11 01:33:59.808', '2025-04-11 01:33:59.808', NULL, NULL, '7');
 INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_6ccb8e78-f6cb-4ad5-bb6a-038958a71bad', 'Admin', '2025-04-11 01:33:59.892', '2025-04-11 01:33:59.892', NULL, NULL, '7');
 INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_2c4accef-74a0-4b10-9bc9-dcad64442013', 'Finance Team', '2025-04-11 01:34:06.056', '2025-04-11 01:34:06.056', NULL, NULL, '7');
@@ -77,7 +76,6 @@ INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_
 INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_0919d752-97df-4123-97d8-083d92cb273d', 'Expense Manager', '2025-04-11 01:34:10.892', '2025-04-11 13:45:05.451', NULL, 'user_b62fe19a-64f1-4623-b00b-5fce3a5c8c90', '7');
 INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_83c8876b-a13b-4098-84ca-da0832abade3', 'Buyer', '2025-06-03 02:27:08.486', '2025-06-03 02:27:08.486', NULL, NULL, '7');
 INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_f0f5d683-09cc-4bf4-8f99-70ca4769859d', 'Delivery', '2025-06-03 02:27:08.565', '2025-06-03 02:27:08.565', NULL, NULL, '7');
-INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_d8a4959c-9368-4834-a4c3-2b5a8b1b52f3', 'Test', '2025-08-12 15:56:57.822', '2025-08-12 15:56:57.822', 'user_e3aa0c8a-5945-437c-a03f-3503c7d76431', 'user_e3aa0c8a-5945-437c-a03f-3503c7d76431', '8');
 INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_demo1', 'Demo User', '2025-10-25 17:27:17.985', '2025-10-25 17:27:17.985', 'system', 'system', '52');
 INSERT INTO public.role (id, name, created_at, updated_at, created_by, modified_by, org_id) VALUES ('role_manager1', 'Manager', '2025-10-25 17:27:20.386', '2025-10-25 17:27:20.386', 'system', 'system', '52');
 
