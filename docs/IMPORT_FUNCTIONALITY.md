@@ -171,6 +171,11 @@ The main import interface that provides:
 
 Modal component for file selection with optional parent record selection dropdown. When a record is selected, the full item object (including all fields like `legal_entity_id`) is passed to the parent — not just the ID.
 
+For posting PDF imports, this modal now includes an **Advanced options** toggle with a processing mode selector:
+
+- **Extract only** — calls `POST /api/parse-document/posting`, then categorization can be run later from the CSV mapper **Categorize** button.
+- **Extract + Categorize** — calls `POST /api/parse-document/posting_with_categorization` during extraction, returning initial `categorizations[]` alongside `transactions[]`.
+
 ### Import Extension Hooks
 
 Extensions can provide model-specific functionality without modifying generic components:
@@ -372,9 +377,12 @@ const isUploadButtonEnabled = () => {
 
 When a PDF is uploaded through the generic `ImportPannel`:
 1. `extension.getPdfUploadOptions()` extracts options from `relationSelection`
-2. File sent to `POST /api/parse-document/{modelName}`
+2. For posting imports, user can open **Advanced options** in the upload modal and choose:
+   - **Extract only** → `POST /api/parse-document/posting`
+   - **Extract + Categorize** → `POST /api/parse-document/posting_with_categorization`
+   For non-posting imports, file is sent to `POST /api/parse-document/{modelName}`.
 3. `ModelService.parseDocument` → extractor registry → `BaseDocumentExtractor`
-4. LLM extracts transactions; response: `{ success, data: { transactions: [...] }, metaData }`
+4. LLM extracts transactions; response: `{ success, data: { transactions: [...] }, metaData }` (and for posting-with-categorization: `categorizations[]`)
 5. Frontend converts extracted transactions to a CSV blob → kicks off the CSV mapping flow
 6. User reviews field mappings and uploads via standard CSV path
 

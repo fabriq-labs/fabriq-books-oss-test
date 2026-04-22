@@ -47,6 +47,7 @@ export const ImportPannel = ({
   const [bulkOriginalData, setBulkOriginalData] = useState<any>([]);
   // Store categorizations from PDF extraction (managed by extension)
   const [pdfCategorizations, setPdfCategorizations] = useState<any[]>([]);
+  const [pdfCategorizationMode, setPdfCategorizationMode] = useState<"extract_only" | "extract_and_categorize">("extract_only");
 
   // Get import extension for this model type (if any)
   const extension = importExtensionRegistry.getForModel(modelType);
@@ -82,7 +83,10 @@ export const ImportPannel = ({
    *
    * @param file - PDF file selected by user
    */
-  const uploadPdf = async (file: any) => {
+  const uploadPdf = async (
+    file: any,
+    uploadOptions?: { categorizeInExtraction?: boolean }
+  ) => {
     try {
       let csvContent: string;
       let categorizations: any[] = [];
@@ -99,6 +103,7 @@ export const ImportPannel = ({
         }) || {};
         const result = await extension.handlePdfUpload(file, {
           ...pdfOptions,
+          categorizeInExtraction: uploadOptions?.categorizeInExtraction === true,
         });
 
         csvContent = result.csvContent;
@@ -440,6 +445,9 @@ export const ImportPannel = ({
           setUploading={setUploading}
           relationField={relationField}
           relationFieldId={relationFieldId}
+          showPdfCategorizationToggle={modelType === "posting"}
+          pdfCategorizationMode={pdfCategorizationMode}
+          onPdfCategorizationModeChange={setPdfCategorizationMode}
         />
       )}
       {csvContent && csvContent.length > 0 && (

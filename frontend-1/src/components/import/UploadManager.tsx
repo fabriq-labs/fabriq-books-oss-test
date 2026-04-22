@@ -1,6 +1,7 @@
 import {
   Button,
   Form,
+  Radio,
   Select,
   Result,
   Modal,
@@ -25,12 +26,16 @@ export const UploadManager = ({
   setUploading,
   relationField,
   relationFieldId,
+  showPdfCategorizationToggle,
+  pdfCategorizationMode,
+  onPdfCategorizationModeChange,
 }: any) => {
   const [form] = Form.useForm();
   const { readString } = usePapaParse();
   const [relationSelectedState, setRelationSelectedState] = useState(null);
   const [isRelationState, setIsRelationState] = useState(false);
   const [isUploadComplete, setIsUploadComplete] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [api, contextHolder] = notification.useNotification();
   const [isSuccess, setSuccess] = useState<any>({
     status: "success",
@@ -55,7 +60,9 @@ export const UploadManager = ({
   const handleFileChange = (file: any) => {
     setUploading(true);
     if (type === "pdf") {
-      uploadPdf(file);
+      uploadPdf(file, {
+        categorizeInExtraction: pdfCategorizationMode === "extract_and_categorize",
+      });
       return;
     }
 
@@ -187,6 +194,33 @@ export const UploadManager = ({
                 />
               </Form.Item>
             </Form>
+          )}
+          {type === "pdf" && showPdfCategorizationToggle && (
+            <div className="mt-2">
+              <button
+                type="button"
+                className="text-sm text-[#7D23B2] hover:underline"
+                onClick={() => setShowAdvancedOptions((prev) => !prev)}
+              >
+                {showAdvancedOptions ? "Hide Advanced options" : "Advanced options"}
+              </button>
+              {showAdvancedOptions && (
+                <Form layout="vertical" className="mt-3">
+                  <Form.Item label="PDF Processing Mode" className="mb-0">
+                    <Radio.Group
+                      value={pdfCategorizationMode}
+                      onChange={(e) => onPdfCategorizationModeChange?.(e.target.value)}
+                    >
+                      <Radio value="extract_only">Extract only</Radio>
+                      <Radio value="extract_and_categorize">Extract + Categorize</Radio>
+                    </Radio.Group>
+                    <p className="text-xs text-gray-500 mt-2 mb-0">
+                      You can always run Categorize later from the CSV Mapper.
+                    </p>
+                  </Form.Item>
+                </Form>
+              )}
+            </div>
           )}
         </>
       )}

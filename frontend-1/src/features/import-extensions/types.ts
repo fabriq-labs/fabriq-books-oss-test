@@ -79,6 +79,7 @@ export interface PdfUploadResult {
 export interface PdfUploadOptions {
   legalEntityId?: string;
   accountId?: string;
+  categorizeInExtraction?: boolean;
 }
 
 /**

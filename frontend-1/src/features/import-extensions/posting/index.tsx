@@ -53,11 +53,13 @@ export const postingImportExtension: ImportExtension = {
   },
 
   /**
-   * Handle PDF upload with categorization
+   * Handle PDF upload (with optional categorization)
    */
   async handlePdfUpload(file: File, options: PdfUploadOptions): Promise<PdfUploadResult> {
-    // Use the combined extraction + categorization API
-    const res: any = await importAPI.parseDocumentWithCategorization(file, options.legalEntityId, options.accountId);
+    const shouldCategorizeInExtraction = options.categorizeInExtraction === true;
+    const res: any = shouldCategorizeInExtraction
+      ? await importAPI.parseDocumentWithCategorization(file, options.legalEntityId, options.accountId)
+      : await importAPI.parseDocument('posting', file);
 
     if (!res.success) {
       throw new Error(res.error || 'PDF parsing failed');
