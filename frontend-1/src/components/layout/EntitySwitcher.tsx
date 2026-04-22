@@ -15,7 +15,27 @@ export function EntitySwitcher() {
     );
   }
 
-  if (entities.length <= 1) return null;
+  if (entities.length === 0) {
+    return null;
+  }
+
+  // Single tenant: show the active legal entity in the top bar (no switcher menu).
+  if (entities.length === 1) {
+    const only = entities[0];
+    const name = currentEntity?.legal_name ?? only.legal_name;
+    return (
+      <div
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm font-medium',
+          'bg-background text-foreground'
+        )}
+        title={name}
+      >
+        <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="max-w-[160px] truncate">{name}</span>
+      </div>
+    );
+  }
 
   const label = currentEntity?.legal_name ?? 'All Entities';
 
