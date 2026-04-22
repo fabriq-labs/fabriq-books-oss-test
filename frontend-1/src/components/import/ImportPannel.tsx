@@ -471,6 +471,8 @@ export const ImportPannel = ({
           onUploadComplete={onUploadComplete}
           additionalFileds={additionalFileds}
           onList={onList}
+          relationId={relationId}
+          relationSelection={relationSelection}
           // Pass AI categorizations from PDF extraction (empty for CSV uploads)
           initialCategorizations={pdfCategorizations}
         />

@@ -8,6 +8,8 @@ interface CategorizationButtonProps {
   selectedValues: string[];
   lookUpData: any[];
   filedSets: any;
+  relationId?: string;
+  relationSelection?: any;
   isProcessing: boolean;
   onProcessingStart: () => void;
   onProcessingEnd: () => void;
@@ -36,6 +38,8 @@ export function CategorizationButton({
   selectedValues,
   lookUpData,
   filedSets,
+  relationId,
+  relationSelection,
   isProcessing,
   onProcessingStart,
   onProcessingEnd,
@@ -44,6 +48,23 @@ export function CategorizationButton({
 }: CategorizationButtonProps) {
   const [api, contextHolder] = notification.useNotification();
   const canActivate = canCategorize(csvData, selectedValues);
+
+  const toNumber = (value: unknown): number => {
+    if (value === null || value === undefined || value === "") return 0;
+    const normalized = typeof value === "string" ? value.replace(/,/g, "").trim() : value;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const getSelectedAccountType = (): string[] => {
+    const candidate =
+      relationSelection?.item?.type ??
+      relationSelection?.type ??
+      [];
+    if (Array.isArray(candidate)) return candidate;
+    if (typeof candidate === "string" && candidate.trim().length > 0) return [candidate.trim()];
+    return [];
+  };
 
   const handleCategorize = async () => {
     if (!canActivate) {
@@ -60,6 +81,13 @@ export function CategorizationButton({
     try {
       // Build postings array from CSV data using current field mappings
       const tableHeaders = Object.keys(csvData[0] || {});
+      const debitAmountColumnIndex = selectedValues.findIndex((value: string) => value === "debit_amount");
+      const creditAmountColumnIndex = selectedValues.findIndex((value: string) => value === "credit_amount");
+      const debitAmountColumnKey = debitAmountColumnIndex >= 0 ? tableHeaders[debitAmountColumnIndex] : null;
+      const creditAmountColumnKey = creditAmountColumnIndex >= 0 ? tableHeaders[creditAmountColumnIndex] : null;
+      const selectedAccountType = getSelectedAccountType();
+      const hasSelectedBankAccount = !!relationId && selectedAccountType.length > 0;
+
       const postings = csvData.map((row: any, index: number) => {
         const posting: any = { id: `temp_${index}` };
 
@@ -92,6 +120,25 @@ export function CategorizationButton({
             posting[fieldName] = value;
           }
         });
+
+        if (hasSelectedBankAccount) {
+          const debitAmount = debitAmountColumnKey ? toNumber(row[debitAmountColumnKey]) : 0;
+          const creditAmount = creditAmountColumnKey ? toNumber(row[creditAmountColumnKey]) : 0;
+          const hasDebitAmount = debitAmount !== 0;
+          const hasCreditAmount = creditAmount !== 0;
+
+          // Money OUT (debit_amount present): bank must be on credit side.
+          if (hasDebitAmount && !hasCreditAmount) {
+            posting.credit_account_id = relationId;
+            posting.credit_account_type = selectedAccountType;
+          }
+
+          // Money IN (credit_amount present): bank must be on debit side.
+          if (hasCreditAmount && !hasDebitAmount) {
+            posting.account_id = relationId;
+            posting.account_type = selectedAccountType;
+          }
+        }
 
         return posting;
       });

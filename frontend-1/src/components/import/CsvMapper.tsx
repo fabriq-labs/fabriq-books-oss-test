@@ -56,6 +56,8 @@ export const CSVMapper = ({
   onUploadComplete,
   additionalFileds,
   onList,
+  relationId,
+  relationSelection,
   // Categorizations from PDF extraction (passed from ImportPannel)
   initialCategorizations = [],
 }: any) => {
@@ -551,6 +553,8 @@ export const CSVMapper = ({
               selectedValues,
               lookUpData,
               filedSets,
+              relationId,
+              relationSelection,
               onCategorizationsReceived: handleCategorizationsReceived,
             })}
             {hasNotAvailableRows() && (

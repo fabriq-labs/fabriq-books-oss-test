@@ -566,6 +566,9 @@ export function normalizeDescription(description: string | null): string {
   // 5. Month names with optional trailing year digits (mar2026, march, jan 2025)
   s = s.replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{0,4}\b/g, '');
 
+  // 5b. Day+month compact or spaced tokens (08apr, 8 apr, 08 apr2026)
+  s = s.replace(/\b\d{1,2}\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{0,4}\b/g, '');
+
   // 6. Bank name phrases (exact multi-word) — must come before standalone bank-word patterns
   s = s.replace(/\b(hdfc bank|icici bank|axis bank|kotak bank|yes bank|indusind bank|indusind|sbi)\b/g, '');
 

@@ -28,6 +28,12 @@ interface ReconcileResultEntry {
 function transformPostingCSVData(formattedData: any, relationId: any): any {
   const { mapping, data } = formattedData;
   let mappingValue: any = { ...mapping };
+  const toNumber = (value: unknown): number => {
+    if (value === null || value === undefined || value === "") return 0;
+    const normalized = typeof value === "string" ? value.replace(/,/g, "").trim() : value;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
 
   if (relationId && Object.values(mappingValue).includes("debit_amount") && Object.values(mappingValue).includes("credit_amount")) {
     const getKeyByValue = (obj: any, value: any) => Object.keys(obj).find(k => obj[k] === value) ?? null;
@@ -46,11 +52,13 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
     delete mappingValue[contraAccountColumn];
 
     const csvData = data?.map((record: any) => {
-      const hasDebitAmount = record[debitAmountColumn] != null && record[debitAmountColumn] !== 0 && record[debitAmountColumn] !== '';
-      const hasCreditAmount = record[creditAmountColumn] != null && record[creditAmountColumn] !== 0 && record[creditAmountColumn] !== '';
+      const debitAmount = toNumber(record[debitAmountColumn]);
+      const creditAmount = toNumber(record[creditAmountColumn]);
+      const hasDebitAmount = debitAmount !== 0;
+      const hasCreditAmount = creditAmount !== 0;
       const finalRecord = {
         ...record,
-        amount: hasDebitAmount ? record[debitAmountColumn] : record[creditAmountColumn],
+        amount: hasDebitAmount ? debitAmount : creditAmount,
         account_id: hasCreditAmount ? relationId : (record[contraAccountColumn] ? record[contraAccountColumn] : null),
         credit_account_id: hasDebitAmount ? relationId : (record[contraAccountColumn] ? record[contraAccountColumn] : null),
       };

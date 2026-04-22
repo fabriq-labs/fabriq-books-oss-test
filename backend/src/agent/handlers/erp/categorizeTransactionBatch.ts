@@ -20,6 +20,7 @@ import {
   fetchPostingsByIds,
   fetchHistoricalMappings,
   findFuzzyMatch,
+  normalizeDescription,
   determineTransactionDirection,
   getFieldToUpdate,
   mapConfidenceLevel,
@@ -301,7 +302,7 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
           description: p.description,
           amount: p.amount,
           valueDate: p.value_date ? new Date(p.value_date) : null,
-          accountId: p.account_id,
+          accountId: p.account_id ?? null,
           accountName: p.account_name ?? null,
           accountType: p.account_type ?? [],
           creditAccountId: p.credit_account_id ?? null,
@@ -347,7 +348,7 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
       if (params.options?.use_historical_matching !== false) {
         toolTracker.track('fetchHistoricalMappings', true);
         historicalMappings = await fetchHistoricalMappings(orgId);
-        logger.debug('Historical mappings loaded', { count: historicalMappings.length });
+        logger.warn('Historical mappings loaded', historicalMappings);
       }
 
       // Step 4: Process postings - separate into categories
@@ -357,9 +358,34 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
 
       for (let i = 0; i < postings.length; i++) {
         const posting = postings[i];
+        const normalizedDescription = normalizeDescription(posting.description);
+
 
         // Check if already categorized
-        if (params.options?.skip_already_categorized !== false && isAlreadyCategorized(posting)) {
+        let postingAlreadyCategorized = false;
+        if (params.options?.skip_already_categorized !== false) {
+          try {
+            postingAlreadyCategorized = isAlreadyCategorized(posting);
+          } catch (directionError: any) {
+            logger.debug('Step 4: direction detection failed while checking already categorized', {
+              postingId: posting.id,
+              index: i,
+              error: directionError?.message,
+              accountType: posting.accountType,
+              creditAccountType: posting.creditAccountType,
+              amount: posting.amount,
+            });
+            throw directionError;
+          }
+        }
+
+        if (postingAlreadyCategorized) {
+          logger.debug('Step 4: skipping posting because it is already categorized', {
+            postingId: posting.id,
+            index: i,
+            accountId: posting.accountId,
+            creditAccountId: posting.creditAccountId,
+          });
           results.push({
             posting_id: posting.id,
             predicted_account_id: null,
@@ -375,8 +401,23 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
 
         // Try historical matching
         if (historicalMappings.length > 0 && posting.description) {
+          logger.debug('Step 4: attempting historical match', {
+            postingId: posting.id,
+            index: i,
+            normalizedDescription,
+            historicalCorpusSize: historicalMappings.length,
+          });
           const match = findFuzzyMatch(posting.description, historicalMappings);
           if (match) {
+            logger.debug('Step 4: historical match found', {
+              postingId: posting.id,
+              index: i,
+              normalizedDescription,
+              matchedDescription: match.descriptionNormalized,
+              matchedAccountId: match.counterAccountId,
+              matchedAccountName: match.counterAccountName,
+              matchedClassification: match.classification,
+            });
             const direction = determineTransactionDirection(
             posting.amount,
             posting.accountType,
@@ -414,10 +455,29 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
             historicalMatchCount++;
             continue;
           }
+
+          logger.debug('Step 4: no historical match found, queuing for LLM', {
+            postingId: posting.id,
+            index: i,
+            normalizedDescription,
+          });
+        } else {
+          logger.debug('Step 4: historical match skipped', {
+            postingId: posting.id,
+            index: i,
+            reason: historicalMappings.length === 0 ? 'empty_historical_corpus' : 'missing_description',
+            hasDescription: !!posting.description,
+            historicalCorpusSize: historicalMappings.length,
+          });
         }
 
         // Queue for LLM categorization
         postingsNeedingLLM.push({ posting, originalIndex: i });
+        logger.debug('Step 4: posting added to LLM queue', {
+          postingId: posting.id,
+          index: i,
+          llmQueueSize: postingsNeedingLLM.length,
+        });
         // Add placeholder to maintain order
         results.push({
           posting_id: posting.id,

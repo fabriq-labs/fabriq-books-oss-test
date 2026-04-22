@@ -46,6 +46,8 @@ export interface ToolbarActionProps {
   selectedValues: string[];
   lookUpData: any[];
   filedSets: any;
+  relationId?: string;
+  relationSelection?: any;
   onCategorizationsReceived: (categorizations: Record<number, any>) => void;
 }
 

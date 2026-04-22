@@ -188,6 +188,8 @@ function CategorizationButtonWrapper(props: ToolbarActionProps) {
       selectedValues={props.selectedValues}
       lookUpData={props.lookUpData}
       filedSets={props.filedSets}
+      relationId={props.relationId}
+      relationSelection={props.relationSelection}
       isProcessing={isProcessing}
       onProcessingStart={() => setIsProcessing(true)}
       onProcessingEnd={() => setIsProcessing(false)}
