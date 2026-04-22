@@ -192,12 +192,31 @@ export const CSVMapper = ({
   }, [initialCategorizations, extension]);
 
   // Handler for receiving categorizations from extension
-  const handleCategorizationsReceived = (categorizations: Record<number, any>) => {
-    setExtensionState(prev => ({
-      ...prev,
-      isActive: true,
-      categorizations,
-    }));
+  const handleCategorizationsReceived = (
+    categorizations: Record<number, any>,
+    options?: { replaceIndices?: number[] }
+  ) => {
+    setExtensionState(prev => {
+      const nextCategorizations = { ...prev.categorizations };
+
+      // For selected-row recategorization, clear previous predictions only for those rows,
+      // then apply fresh results. Keeps unselected-row predictions intact.
+      if (options?.replaceIndices?.length) {
+        options.replaceIndices.forEach((index) => {
+          delete nextCategorizations[index];
+        });
+      }
+
+      Object.entries(categorizations).forEach(([index, value]) => {
+        nextCategorizations[Number(index)] = value;
+      });
+
+      return {
+        ...prev,
+        isActive: true,
+        categorizations: nextCategorizations,
+      };
+    });
   };
 
   const onSelectChange = (newSelectedRowKeys: any) => {

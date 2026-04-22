@@ -49,7 +49,10 @@ export interface ToolbarActionProps {
   filedSets: any;
   relationId?: string;
   relationSelection?: any;
-  onCategorizationsReceived: (categorizations: Record<number, any>) => void;
+  onCategorizationsReceived: (
+    categorizations: Record<number, any>,
+    options?: { replaceIndices?: number[] }
+  ) => void;
 }
 
 /**

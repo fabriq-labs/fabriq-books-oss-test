@@ -14,7 +14,10 @@ interface CategorizationButtonProps {
   isProcessing: boolean;
   onProcessingStart: () => void;
   onProcessingEnd: () => void;
-  onCategorizationsReceived: (categorizations: Record<number, any>) => void;
+  onCategorizationsReceived: (
+    categorizations: Record<number, any>,
+    options?: { replaceIndices?: number[] }
+  ) => void;
   onError: (error: string) => void;
 }
 
@@ -179,7 +182,7 @@ export function CategorizationButton({
             };
           }
         });
-        onCategorizationsReceived(catMap);
+        onCategorizationsReceived(catMap, { replaceIndices: selectedIndices });
 
         const summary = result.data.summary;
         api.success({
