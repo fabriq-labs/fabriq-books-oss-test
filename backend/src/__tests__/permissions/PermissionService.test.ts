@@ -20,10 +20,10 @@ function authWithPermissions(
 ): AuthContext {
   return {
     user: {
-      id: 'user_1',
-      email: 'u@example.com',
-      name: 'Test',
-      org_id: 'org_1',
+      id: 'user_pooja_saxena',
+      email: 'pooja.saxena@demo-india.com',
+      name: 'Pooja Saxena',
+      org_id: 'org_indian_demo',
     },
     permissions,
   };
@@ -65,7 +65,6 @@ describe('PermissionService', () => {
         include: { permissions: true },
       });
     });
-
     it('when viewName is null, matches any view name for the model (still hides workflow)', async () => {
       mockPrisma.view.findFirst.mockResolvedValue(null);
       await PermissionService.getView(null, 'item');
@@ -160,10 +159,10 @@ describe('PermissionService', () => {
     it('throws when the context has no permissions map', () => {
       const ctx: AuthContext = {
         user: {
-          id: 'user_1',
-          email: 'u@example.com',
-          name: 'Test',
-          org_id: 'org_1',
+          id: 'user_pooja_saxena',
+          email: 'pooja.saxena@demo-india.com',
+          name: 'Pooja Saxena',
+          org_id: 'org_indian_demo',
         },
       };
 
@@ -275,7 +274,6 @@ describe('PermissionService', () => {
         PermissionService.validateFieldPermissions(['id', 'total'], { '*': 'read' })
       ).not.toThrow();
     });
-
     it('throws listing fields that are missing or none', () => {
       expect(() =>
         PermissionService.validateFieldPermissions(['id', 'total', 'missing'], {
