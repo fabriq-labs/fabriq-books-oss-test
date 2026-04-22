@@ -6,6 +6,7 @@ import { notification } from "antd";
 interface CategorizationButtonProps {
   csvData: any[];
   selectedValues: string[];
+  selectedRowKeys?: Array<string | number>;
   lookUpData: any[];
   filedSets: any;
   relationId?: string;
@@ -36,6 +37,7 @@ function canCategorize(csvData: any[], selectedValues: string[]): boolean {
 export function CategorizationButton({
   csvData,
   selectedValues,
+  selectedRowKeys = [],
   lookUpData,
   filedSets,
   relationId,
@@ -47,7 +49,8 @@ export function CategorizationButton({
   onError,
 }: CategorizationButtonProps) {
   const [api, contextHolder] = notification.useNotification();
-  const canActivate = canCategorize(csvData, selectedValues);
+  const hasSelectedRows = selectedRowKeys.length > 0;
+  const canActivate = canCategorize(csvData, selectedValues) && hasSelectedRows;
 
   const toNumber = (value: unknown): number => {
     if (value === null || value === undefined || value === "") return 0;
@@ -87,8 +90,12 @@ export function CategorizationButton({
       const creditAmountColumnKey = creditAmountColumnIndex >= 0 ? tableHeaders[creditAmountColumnIndex] : null;
       const selectedAccountType = getSelectedAccountType();
       const hasSelectedBankAccount = !!relationId && selectedAccountType.length > 0;
+      const selectedIndices = selectedRowKeys
+        .map((key) => Number(key))
+        .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < csvData.length);
 
-      const postings = csvData.map((row: any, index: number) => {
+      const postings = selectedIndices.map((index: number) => {
+        const row = csvData[index];
         const posting: any = { id: `temp_${index}` };
 
         // Map CSV columns to posting fields based on selectedValues
@@ -157,8 +164,13 @@ export function CategorizationButton({
         // Store categorizations by index
         const catMap: Record<number, any> = {};
         result.data.results.forEach((r: any, i: number) => {
+          const indexFromId =
+            typeof r.posting_id === "string" && r.posting_id.startsWith("temp_")
+              ? Number(r.posting_id.replace("temp_", ""))
+              : NaN;
+          const originalIndex = Number.isInteger(indexFromId) ? indexFromId : selectedIndices[i];
           if (r.predicted_account_id) {
-            catMap[i] = {
+            catMap[originalIndex] = {
               account_id: r.predicted_account_id,
               account_name: r.predicted_account_name,
               confidence: r.confidence,
@@ -172,7 +184,7 @@ export function CategorizationButton({
         const summary = result.data.summary;
         api.success({
           message: "Categorization complete",
-          description: `${summary.categorized_count} of ${csvData.length} transactions categorized`,
+          description: `${summary.categorized_count} of ${selectedIndices.length} selected transaction(s) categorized`,
           placement: "topRight",
         });
       } else {
@@ -193,24 +205,26 @@ export function CategorizationButton({
   return (
     <>
       {contextHolder}
-      <Button
-        onClick={handleCategorize}
-        disabled={isProcessing || !canActivate}
-        variant="outline"
-        className="flex items-center gap-2"
-      >
-        {isProcessing ? (
-          <>
-            <Loader2 className="animate-spin" size={16} />
-            <span>Categorizing...</span>
-          </>
-        ) : (
-          <>
-            <Sparkles size={16} className="text-purple-500" />
-            <span>Categorize</span>
-          </>
-        )}
-      </Button>
+      <span title={!hasSelectedRows ? "Select one or more rows to categorize" : undefined}>
+        <Button
+          onClick={handleCategorize}
+          disabled={isProcessing || !canActivate}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 className="animate-spin" size={16} />
+              <span>Categorizing...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles size={16} className="text-purple-500" />
+              <span>Categorize</span>
+            </>
+          )}
+        </Button>
+      </span>
     </>
   );
 }

@@ -47,7 +47,7 @@ export const ImportPannel = ({
   const [bulkOriginalData, setBulkOriginalData] = useState<any>([]);
   // Store categorizations from PDF extraction (managed by extension)
   const [pdfCategorizations, setPdfCategorizations] = useState<any[]>([]);
-  const [pdfCategorizationMode, setPdfCategorizationMode] = useState<"extract_only" | "extract_and_categorize">("extract_only");
+  const [pdfCategorizationMode, setPdfCategorizationMode] = useState<"extract_only" | "extract_and_categorize">("extract_and_categorize");
 
   // Get import extension for this model type (if any)
   const extension = importExtensionRegistry.getForModel(modelType);

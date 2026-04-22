@@ -164,6 +164,7 @@ The main import interface that provides:
 2. **Data Validation**: Required field validation, lookup field validation ("Not Available" badges)
 3. **Data Management**: Row selection, bulk operations, pagination
 4. **Upload Process**: Validates required fields and lookup values, transforms data, sends to backend
+5. **Posting Categorize Action**: For posting imports, the **Categorize** toolbar action now operates on **selected rows only**. If no rows are selected, the button is disabled and shows a tooltip hint to select rows first.
 
 ### UploadManager Component
 
@@ -175,6 +176,8 @@ For posting PDF imports, this modal now includes an **Advanced options** toggle 
 
 - **Extract only** — calls `POST /api/parse-document/posting`, then categorization can be run later from the CSV mapper **Categorize** button.
 - **Extract + Categorize** — calls `POST /api/parse-document/posting_with_categorization` during extraction, returning initial `categorizations[]` alongside `transactions[]`.
+
+Default mode for posting PDF uploads is **Extract + Categorize**.
 
 ### Import Extension Hooks
 

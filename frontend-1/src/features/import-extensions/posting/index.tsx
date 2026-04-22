@@ -188,6 +188,7 @@ function CategorizationButtonWrapper(props: ToolbarActionProps) {
     <CategorizationButton
       csvData={props.csvData}
       selectedValues={props.selectedValues}
+      selectedRowKeys={props.selectedRowKeys}
       lookUpData={props.lookUpData}
       filedSets={props.filedSets}
       relationId={props.relationId}

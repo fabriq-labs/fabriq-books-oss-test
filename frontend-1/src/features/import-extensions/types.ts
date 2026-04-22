@@ -44,6 +44,7 @@ export interface ToolbarActionProps {
   modelType: string;
   csvData: any[];
   selectedValues: string[];
+  selectedRowKeys?: Array<string | number>;
   lookUpData: any[];
   filedSets: any;
   relationId?: string;

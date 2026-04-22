@@ -551,6 +551,7 @@ export const CSVMapper = ({
               modelType,
               csvData,
               selectedValues,
+              selectedRowKeys,
               lookUpData,
               filedSets,
               relationId,
