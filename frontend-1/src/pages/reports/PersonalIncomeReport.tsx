@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { pdf } from "@react-pdf/renderer";
 import * as XLSX from "xlsx";
 import { useEntity } from "@/contexts/EntityContext";
+import { CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import {
   FinancialYearSelector,
   getPreviousFYOption,
@@ -263,7 +264,17 @@ export default function PersonalIncomeReport() {
                         <TableRow
                           key={row.account_id ?? i}
                           className={`border-b border-slate-100 transition-colors ${canDrillDown ? "hover:bg-blue-50 cursor-pointer" : "hover:bg-slate-50"}`}
-                          onClick={canDrillDown ? () => window.open(drillDownUrl!, '_blank') : undefined}
+                          onClick={
+                            canDrillDown
+                              ? () => {
+                                  // Ensure new tabs read the same entity context from localStorage.
+                                  if (currentEntityId) {
+                                    localStorage.setItem(CURRENT_ENTITY_STORAGE_KEY, currentEntityId);
+                                  }
+                                  window.open(drillDownUrl!, "_blank");
+                                }
+                              : undefined
+                          }
                           title={canDrillDown ? "Click to view transactions" : undefined}
                         >
                           <TableCell className="py-2 px-3">
