@@ -206,8 +206,19 @@ async function handleChangePassword(req: Request, res: Response) {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current password and new password are required' });
     }
-    if (typeof newPassword !== 'string' || newPassword.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    if (typeof newPassword !== 'string') {
+      return res.status(400).json({ error: 'New password is invalid' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ error: 'New password must contain at least one number' });
+    }
+    if (!/[^A-Za-z0-9]/.test(newPassword)) {
+      return res.status(400).json({
+        error: 'New password must contain at least one special character (non-letter, non-digit)',
+      });
     }
 
     const dbUser = await prisma.user.findUnique({

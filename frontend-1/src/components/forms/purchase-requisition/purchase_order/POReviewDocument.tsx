@@ -32,10 +32,10 @@ const POReviewDocument: React.FC<POReviewDocumentProps> = ({ form, details, tota
                     <div>
                         <h3 className="text-sm font-bold text-gray-600 mb-3 uppercase tracking-wide">Ship To / Bill To:</h3>
                         <div className="space-y-1 text-sm">
-                            <div className="font-semibold">{details?.organization?.legal_name}</div>
-                            <div> {details?.organization?.address}</div>
-                            <div> {[details?.organization?.city, details?.organization?.state, details?.organization?.zip_code].filter(Boolean).join(', ')}</div>
-                            <div> {details?.organization?.country}</div>
+                            <div className="font-semibold">{details?.legal_entity?.legal_name}</div>
+                            <div> {details?.legal_entity?.address}</div>
+                            <div> {[details?.legal_entity?.city, details?.legal_entity?.state, details?.legal_entity?.zip_code].filter(Boolean).join(', ')}</div>
+                            <div> {details?.legal_entity?.country}</div>
                             {/* <div> {details?.organization?.website}</div> */}
                             {/* <div>Website:{details?.organization?.website}</div> */}
                         </div>
@@ -141,7 +141,7 @@ const POReviewDocument: React.FC<POReviewDocumentProps> = ({ form, details, tota
                                             {/* Line Total */}
                                             <td className="p-3 text-right font-medium">
                                                 {/* ₹{item.item_total?.toLocaleString()} */}
-                                                {item.item_total ? formatCurrency(item.item_total): ""}
+                                                {item.item_total ? formatCurrency(item.item_total) : ""}
                                             </td>
                                         </tr>
                                     ))
@@ -164,7 +164,7 @@ const POReviewDocument: React.FC<POReviewDocumentProps> = ({ form, details, tota
                         <div className="space-y-2 text-sm">
                             <div className="flex justify-between py-2 border-t border-gray-300">
                                 <span className="font-bold text-lg">TOTAL AMOUNT:</span>
-                                <span className="font-bold text-lg text-primary">{details?.total_price ? formatCurrency(details.total_price): ""}</span>
+                                <span className="font-bold text-lg text-primary">{details?.total_price ? formatCurrency(details.total_price) : ""}</span>
                             </div>
                         </div>
                     </div>
