@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Copy } from 'lucide-react';
 import { viewAPI } from '@/api/api';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { constructObject } from '../../utils/helper';
@@ -60,8 +60,11 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
     onSuccess: propOnSuccess
 }) => {
     const { id: paramId, viewId: paramViewId } = useParams<{ id: string, viewId: string }>();
+    const [searchParams] = useSearchParams();
+    const duplicateOfId = searchParams.get("duplicateOf");
     const id = propId || paramId;
     const viewId = propViewId || paramViewId;
+    const isDuplicateMode = !id && !!duplicateOfId;
     const [initialValues, setInitialValues] = useState<any>();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
@@ -89,27 +92,47 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
     useEffect(() => {
         if (id) {
             fetchingDetails(id);
+        } else if (duplicateOfId) {
+            fetchingDetails(duplicateOfId, true);
         }
-    }, [id]);
+    }, [id, duplicateOfId]);
 
-    const fetchingDetails = (id: any) => {
+    const addCopySuffix = (value: string) => value ? `${value} copy` : value;
+
+    const getDuplicateValues = (source: any) => ({
+        name: addCopySuffix(source.name || ''),
+        balance: source.balance || '',
+        classification: source.classification || '',
+        type: Array.isArray(source.type) ? source.type : (source.type ? [source.type] : []),
+        code: addCopySuffix(source.code?.toString() || ''),
+        parent_account_id: source.parent_account_id?.toString() || '',
+        hq_account_id: source.hq_account_id?.toString() || '',
+        base_currency_id: source.base_currency_id?.toString() || '',
+        frequency: source.frequency?.toString() || '',
+        legal_entity_id: source.legal_entity_id?.toString() || '',
+        extraction_notes: source.extraction_notes || '',
+    });
+
+    const getEditValues = (source: any) => ({
+        name: source.name || '',
+        balance: source.balance || '',
+        classification: source.classification || '',
+        type: Array.isArray(source.type) ? source.type : (source.type ? [source.type] : []),
+        code: source.code?.toString() || '',
+        parent_account_id: source.parent_account_id?.toString() || '',
+        hq_account_id: source.hq_account_id?.toString() || '',
+        base_currency_id: source.base_currency_id?.toString() || '',
+        frequency: source.frequency?.toString() || '',
+        legal_entity_id: source.legal_entity_id?.toString() || '',
+        extraction_notes: source.extraction_notes || '',
+    });
+
+    const fetchingDetails = (id: any, duplicate = false) => {
         setIsLoading(true);
         viewAPI.getById("account", id, viewId)
             .then((res: any) => {
                 setInitialValues(res.data);
-                form.reset({
-                    name: res.data.name || '',
-                    balance: res.data.balance || '',
-                    classification: res.data.classification || '',
-                    type: Array.isArray(res.data.type) ? res.data.type : (res.data.type ? [res.data.type] : []),
-                    code: res.data.code?.toString() || '',
-                    parent_account_id: res.data.parent_account_id?.toString() || '',
-                    hq_account_id: res.data.hq_account_id?.toString() || '',
-                    base_currency_id: res.data.base_currency_id?.toString() || '',
-                    frequency: res.data.frequency?.toString() || '',
-                    legal_entity_id: res.data.legal_entity_id?.toString() || '',
-                    extraction_notes: res.data.extraction_notes || '',
-                });
+                form.reset(duplicate ? getDuplicateValues(res.data) : getEditValues(res.data));
                 setIsLoading(false);
             }).catch((err) => {
                 setIsLoading(false);
@@ -163,7 +186,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                 hq_account_id: data.hq_account_id || null
             };
 
-            if (!id) {
+            if (!id || isDuplicateMode) {
                 await viewAPI.create(
                     "account",
                     viewId,
@@ -211,6 +234,11 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleDuplicate = () => {
+        if (!id || !viewId) return;
+        window.open(`/account/view/${viewId}?duplicateOf=${id}`, "_blank");
     };
 
     const onhandleSelectChange = (
@@ -294,7 +322,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                 <Card>
                     <CardHeader>
                         <CardTitle>
-                            {initialValues ? 'Edit Account' : 'Create Account'}
+                            {isDuplicateMode ? 'Duplicate Account' : initialValues ? 'Edit Account' : 'Create Account'}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -559,6 +587,17 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                                     />
 
                                     <div className="flex justify-end space-x-2">
+                                        {!!id && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={handleDuplicate}
+                                                className="flex items-center gap-2"
+                                            >
+                                                <Copy size={14} />
+                                                Duplicate
+                                            </Button>
+                                        )}
                                         <Button
                                             type="button"
                                             variant="outline"

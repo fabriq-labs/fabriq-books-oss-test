@@ -66,6 +66,11 @@ const AccountList: React.FC = () => {
             type="account"
             view="account_view"
             displayName="Chart of Accounts"
+            duplicateActionConfig={{
+                enabled: true,
+                queryParam: "duplicateOf",
+                openInNewTab: true,
+            }}
             defaultFilters={defaultFilters}
             listConfig={{
                 importConfig: {
