@@ -29,6 +29,10 @@ export const ImportPannel = ({
   const [relationSelection, setRelationSelection] = useState<any>(null);
   const [csvContent, setCsvContent] = useState<any>("");
   const [csvFile, setCsvFile] = useState<any>("");
+  /** Original PDF name when flow came from PDF extraction (synthetic CSV file name is not shown). */
+  const [importSourceDisplayName, setImportSourceDisplayName] = useState<
+    string | null
+  >(null);
   const [isUploading, setUploading] = useState(false);
   const [api, contextHolder] = notification.useNotification();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -149,13 +153,17 @@ export const ImportPannel = ({
       // Store categorizations for passing to CSVMapper
       setPdfCategorizations(categorizations);
 
-      // Create CSV file object
+      // Create CSV file object (name is for internal use; mapper shows importSourceDisplayName)
       const csvBlob = new Blob([csvContent], { type: "text/csv" });
-      const fileAfterUpload = new File([csvBlob], "extracted-data.csv", {
+      const pdfBase = file.name.replace(/\.pdf$/i, "").trim();
+      const derivedCsvName =
+        pdfBase.length > 0 ? `${pdfBase}-extracted.csv` : "extracted-data.csv";
+      const fileAfterUpload = new File([csvBlob], derivedCsvName, {
         type: "text/csv",
       });
 
       // Set state to trigger CSV mapping flow
+      setImportSourceDisplayName(file.name);
       setCsvFile(fileAfterUpload);
       setCsvContent(csvContent);
       setUploading(false);
@@ -225,6 +233,7 @@ export const ImportPannel = ({
   };
 
   const handleCsv = (file: any) => {
+    setImportSourceDisplayName(null);
     setCsvFile(file);
   };
 
@@ -453,6 +462,10 @@ export const ImportPannel = ({
       {csvContent && csvContent.length > 0 && (
         <CSVMapper
           csvContent={csvContent}
+          importFileName={
+            importSourceDisplayName ??
+            (typeof csvFile?.name === "string" ? csvFile.name : undefined)
+          }
           filedSets={filedSets}
           // onFieldSets={!metaData && getFieldSets}
           onFieldSets={getFieldSets}

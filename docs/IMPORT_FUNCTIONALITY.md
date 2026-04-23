@@ -160,11 +160,19 @@ The main import interface that provides:
 
 **Location**: `frontend-1/src/components/import/CsvMapper.tsx`
 
-1. **Maps CSV Columns to Database Fields**: Dropdown selectors, auto-matching by display name
-2. **Data Validation**: Required field validation, lookup field validation ("Not Available" badges)
-3. **Data Management**: Row selection, bulk operations, pagination
-4. **Upload Process**: Validates required fields and lookup values, transforms data, sends to backend
-5. **Posting Categorize Action**: For posting imports, the **Categorize** toolbar action now operates on **selected rows only**. If no rows are selected, the button is disabled and shows a tooltip hint to select rows first.
+1. **Field mapping (metadata-driven)**: Only fields with `permission: "update"` participate. The mapper still produces the same structure `ImportPannel` expects: `selectedValues` is an array **parallel to `Object.keys(csvData[0])`**, where `selectedValues[i]` is the database field id mapped from CSV column *i* (or empty / unmapped). Each database field may map to **at most one** CSV column; assigning a column that was already used clears the previous field’s mapping for that column. `ImportPannel` turns this into `{ [csvHeaderName]: fieldId }` for `uploadJSON`.
+
+2. **Required vs optional update fields**: Fields with `required: true && permission: "update"` are **always** in the mapping set. Other update fields are available only after the user **adds** them to the mapper (optional column list). On initial parse, if an optional field **auto-matches** a CSV header (by field key or case-insensitive `displayName`), that optional field is **automatically included** in the visible mapping set so it can be validated and uploaded without a manual add. Removing an optional field from the mapper clears its mapping and frees the CSV column for other fields.
+
+3. **Auto-match and lookup (select) fields**: After CSV load, when a column is mapped to a field with `tableProps.columnType === "select"`, the mapper loads distinct cell values and validates them against the related instance search (same behavior as when the user changes mapping manually). Unresolvable values are marked and **block upload** until fixed.
+
+4. **Data validation**: Required-field coverage and lookup rules match [Upload Button Conditions](#upload-button-conditions); row filter **Errors only** restricts the preview to rows that still contain unresolved lookup markers.
+
+5. **Data management**: Row multi-select supports **bulk delete** of selected rows only (there is no per-row delete action in the mapper). Pagination (including page size changes) applies to the current row set and filtered set as before.
+
+6. **Upload process**: Unchanged contract — validates required mappings and no unresolved lookups, applies extension `transformDataForUpload` when relevant, then `onServerUpload` / `uploadJSON`.
+
+7. **Posting Categorize Action**: For posting imports, **Categorize** operates on **selected rows only**. If no rows are selected, the action is disabled and surfaces a hint to select rows first.
 
 ### UploadManager Component
 
@@ -347,8 +355,8 @@ The standard flow for any model via the browser UI:
 2. **Parent Record Selection** (optional): If `relation` prop is set, user can pick a parent record before uploading
 3. **File Selection**: CSV or PDF, via `UploadManager`
 4. **CSV Processing**: Parsed by `react-papaparse`, headers and rows extracted
-5. **Field Mapping**: User maps CSV columns → database fields (only `permission: "update"` fields shown)
-6. **Data Validation**: Required fields checked; lookup values validated against DB ("Not Available" badges)
+5. **Field Mapping**: User assigns each updatable field (`permission: "update"`) to at most one CSV column. Required fields are always in scope; optional update fields appear after the user adds them or when they **auto-match** a header on load (see [CSVMapper Component](#csvmapper-component)).
+6. **Data Validation**: Required fields checked; lookup values validated against DB (unresolved values block upload)
 7. **Data Transformation Pipeline**:
    - Field mapping: CSV column names → DB field names
    - Lookup resolution: display names resolved to IDs (via CSVMapper queries)
@@ -624,7 +632,7 @@ Used in `CSVMapper` during the interactive mapping flow:
 
 1. Fields with `tableProps.columnType === "select"` are identified as lookup fields
 2. Unique values from the CSV column are extracted and queried against the DB
-3. Non-matching values are marked "Not Available" (red badge)
+3. Non-matching values are marked as unresolved in row data (`isNotAvailable` / prior value preserved for correction)
 4. Upload button is disabled until all lookup values resolve
 
 **Resolution**: CSV display values (e.g., `"Cash on Hand"`) → DB IDs (e.g., `"acco_123-456"`) using `instanceLabel` from `selectProps` (typically `"name"`).
