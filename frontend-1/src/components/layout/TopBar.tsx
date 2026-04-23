@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Menu, Bell, UserRound, Settings, LogOut, MessageSquare } from "lucide-react";
+import { Menu, UserRound, LogOut, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserData } from '@/hooks/useUserData';
 import { useUserRoles } from '@/hooks/useUserRoles';
@@ -71,23 +70,6 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
 
       <div className="ml-auto flex items-center gap-2">
         <EntitySwitcher />
-        <HoverCard>
-          <HoverCardTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </Button>
-          </HoverCardTrigger>
-          <HoverCardContent className="w-64">
-            <div className="space-y-2">
-              <h4 className="font-semibold">Notifications</h4>
-              <p className="text-sm text-muted-foreground">
-                You have 3 unread notifications
-              </p>
-            </div>
-          </HoverCardContent>
-        </HoverCard>
-
         {isChatEnabled && (
           <Button
             variant="ghost"
