@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { API_URL, getAuthToken } from '@/api/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
 
-const STORAGE_KEY = 'fabriq_current_entity_id';
+export const CURRENT_ENTITY_STORAGE_KEY = 'fabriq_current_entity_id';
 
 export interface Entity {
   id: string;
@@ -82,16 +82,23 @@ async function fetchHeadquartersEntityId(): Promise<string | null> {
 }
 
 export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [entities, setEntities] = useState<Entity[]>([]);
   const [currentEntity, setCurrentEntityState] = useState<Entity | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Do not mutate entity storage while auth is still hydrating in a new tab.
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (!user) {
       setEntities([]);
       setCurrentEntityState(null);
-      localStorage.removeItem(STORAGE_KEY);
+      // Keep localStorage cleanup tied to explicit logout behavior in AuthContext.
+      localStorage.removeItem(CURRENT_ENTITY_STORAGE_KEY);
       setLoading(false);
       return;
     }
@@ -102,7 +109,7 @@ export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (cancelled) return;
       setEntities(list);
 
-      const storedId = localStorage.getItem(STORAGE_KEY);
+      const storedId = localStorage.getItem(CURRENT_ENTITY_STORAGE_KEY);
       const stored = storedId ? list.find((e) => e.id === storedId) ?? null : null;
 
       if (stored) {
@@ -122,19 +129,19 @@ export const EntityProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         hq = list[0] ?? null;
       }
       setCurrentEntityState(hq);
-      if (hq) localStorage.setItem(STORAGE_KEY, hq.id);
-      else localStorage.removeItem(STORAGE_KEY);
+      if (hq) localStorage.setItem(CURRENT_ENTITY_STORAGE_KEY, hq.id);
+      else localStorage.removeItem(CURRENT_ENTITY_STORAGE_KEY);
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
   const setCurrentEntity = (entity: Entity | null) => {
     setCurrentEntityState(entity);
     if (entity) {
-      localStorage.setItem(STORAGE_KEY, entity.id);
+      localStorage.setItem(CURRENT_ENTITY_STORAGE_KEY, entity.id);
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(CURRENT_ENTITY_STORAGE_KEY);
     }
   };
 
