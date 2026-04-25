@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FilterInputs } from "@/components/filter/FilterInputs";
+import { EditValueInput } from "@/components/filter/EditValueInput";
 import { useToast } from "@/hooks/use-toast";
 import {
   Select,
@@ -150,9 +150,10 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
                   <SelectContent>
                     {metaData &&
                       Object.entries(metaData)
-                        .filter(
-                          ([_, value]) =>
-                            value?.permission === "update" && value?.datatype !== "date"
+                        .filter(([key, value]) =>
+                            value?.permission === "update" &&
+                            value?.datatype !== "date" &&
+                            !editFields.some((f, i) => i !== index && f.field === key)
                         )
                         .map(([key, value]) => (
                           <SelectItem key={key} value={key}>
@@ -165,10 +166,9 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
                 {field.field && metaData[field.field] && (
                   <div className="flex-1 flex items-center gap-2">
                     <div className="flex-1 relative">
-                      <FilterInputs
-                        className={`flex-1 bg-[#F1F0FB] border-[#E5DEFF] ${field.clearField ? 'opacity-50 pointer-events-none' : ''
-                          }`}
-                        value={String(field.value)}
+                      <EditValueInput
+                        className={field.clearField ? 'opacity-50 pointer-events-none' : ''}
+                        value={field.value ? String(field.value) : ''}
                         onChange={(val) => updateField(index, "value", val)}
                         col={metaData[field.field]}
                       />

@@ -153,6 +153,7 @@ export default function Transactions() {
     return {
       account_id: { additionalFilters: entityFilter },
       credit_account_id: { additionalFilters: entityFilter },
+      account_id_or_credit_account_id: { additionalFilters: entityFilter },
     };
   }, [currentEntityId]);
 

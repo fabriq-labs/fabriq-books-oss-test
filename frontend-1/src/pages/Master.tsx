@@ -239,9 +239,15 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
     removeRowsFromList,
   }), [mergeRowsIntoList, removeRowsFromList]);
 
+  const [filterLabelCache, setFilterLabelCache] = useState<Record<string, string>>({});
+
   const handleApplyFilters = (filters: Record<string, any>) => {
     setAppliedFilters(filters);
     setFilterOutput(JSON.stringify(filters, null, 2));
+  };
+
+  const handleApplyFilterLabels = (labels: Record<string, string>) => {
+    setFilterLabelCache(prev => ({ ...prev, ...labels }));
   };
 
   const handleClearFilter = (field: string) => {
@@ -696,6 +702,26 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
 
   // Add table ref
   const tableRef = useRef<any>(null);
+  const modalMetaData = React.useMemo(() => {
+    const baseMetaData = masterList?.metaData || {};
+    const enhancedMetaData: Record<string, any> = { ...baseMetaData };
+
+    Object.keys(appliedFilters || {}).forEach((key) => {
+      if (!/_or_/.test(key) || enhancedMetaData[key]) return;
+      const match = key.match(/^(.+?)_or_(.+)$/);
+      if (!match) return;
+      const [, fieldA, fieldB] = match;
+      const sourceFieldMeta = baseMetaData[fieldA] || baseMetaData[fieldB];
+      if (!sourceFieldMeta) return;
+      enhancedMetaData[key] = {
+        ...sourceFieldMeta,
+        displayName: `${sourceFieldMeta.displayName || key} (OR)`,
+        isColumnShow: true,
+      };
+    });
+
+    return enhancedMetaData;
+  }, [masterList?.metaData, appliedFilters]);
 
   if (showImport) {
     // Type guard: ensure updateCSVData is a function with the correct signature
@@ -816,20 +842,18 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
           enableFilters: filterConfig?.enableFilters,
           enableSearch: filterConfig?.enableSearch,
         }}
+        metaData={modalMetaData}
+        labelCache={filterLabelCache}
       />
       <FilterModal
         isOpen={isFilterModalOpen}
-        metaData={masterList?.metaData}
+        metaData={modalMetaData}
         onClose={() => setIsFilterModalOpen(false)}
         onApplyFilters={handleApplyFilters}
-        initialFilters={Object.fromEntries(
-          // Strip virtual composite keys (fieldA_or_fieldB) — they represent OR conditions
-          // across multiple fields which the FilterModal cannot represent. They remain
-          // visible as badge chips in EnhancedFilterBadges with a label that explains
-          // the OR semantics (e.g. "Account (debit or credit): X").
-          Object.entries(appliedFilters).filter(([key]) => !/_or_/.test(key))
-        )}
+        initialFilters={appliedFilters}
         filterEnhancements={filterEnhancements}
+        initialFilterLabels={filterLabelCache}
+        onApplyFilterLabels={handleApplyFilterLabels}
         dateRangeFilter={{
           ...filterConfig?.dateRangeFilter,
           dateRange: dateRange,

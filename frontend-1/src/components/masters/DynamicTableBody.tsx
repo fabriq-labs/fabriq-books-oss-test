@@ -115,97 +115,102 @@ const DynamicTableBody: React.FC<DynamicTableBodyProps> = ({
                 const isExpanded = expandedRows.has(row.id);
                 const hasExpandableContent = enableCollapsible && expandableColumns.length > 0;
 
-                return (
-                    <React.Fragment key={row.id}>
-                        <TableRow className="hover:bg-gray-50 transition-colors">
-                            {enableMultiSelect && (
-                                <TableCell className="w-[50px] px-4 py-3">
-                                    <div className="flex justify-center">
-                                        <Checkbox
-                                            checked={selectedRows.some(r => r.id === row.id)}
-                                            onCheckedChange={(checked) => onSelectRow(row, checked as boolean)}
-                                            className="border-gray-300"
-                                        />
+                const mainRow = (
+                    <TableRow key={`${row.id}-main`} className="hover:bg-gray-50 transition-colors">
+                        {enableMultiSelect && (
+                            <TableCell className="w-[50px] px-4 py-3">
+                                <div className="flex justify-center">
+                                    <Checkbox
+                                        checked={selectedRows.some(r => r.id === row.id)}
+                                        onCheckedChange={(checked) => onSelectRow(row, checked as boolean)}
+                                        className="border-gray-300"
+                                    />
+                                </div>
+                            </TableCell>
+                        )}
+                        {enableCollapsible && (
+                            <TableCell className="w-[50px] px-4 py-3">
+                                {hasExpandableContent ? (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => onToggleExpansion?.(row.id)}
+                                        className="p-0 h-6 w-6"
+                                    >
+                                        {isExpanded ? (
+                                            <ChevronDown className="h-4 w-4" />
+                                        ) : (
+                                            <ChevronRight className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                ) : null}
+                            </TableCell>
+                        )}
+                        {visibleColumns.map((column) => {
+                            const isHighlighted = cellHighlights && cellHighlights[row.id] === column.key;
+                            return (
+                                <TableCell
+                                    key={`${row.id}-${column.key}`}
+                                    className={`px-4 py-3 ${column.align === 'right'
+                                        ? 'text-right'
+                                        : column.align === 'center'
+                                            ? 'text-center'
+                                            : 'text-left'
+                                        }${isHighlighted ? ' bg-primary/10 dark:bg-primary/20 rounded-sm transition-colors' : ''}`}
+                                >
+                                    <div className={`flex ${column.align === 'right'
+                                        ? 'justify-end'
+                                        : column.align === 'center'
+                                            ? 'justify-center'
+                                            : 'justify-start'
+                                        }`}>
+                                        {renderCellContent(column, row)}
                                     </div>
                                 </TableCell>
-                            )}
-                            {enableCollapsible && (
-                                <TableCell className="w-[50px] px-4 py-3">
-                                    {hasExpandableContent ? (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => onToggleExpansion?.(row.id)}
-                                            className="p-0 h-6 w-6"
-                                        >
-                                            {isExpanded ? (
-                                                <ChevronDown className="h-4 w-4" />
-                                            ) : (
-                                                <ChevronRight className="h-4 w-4" />
-                                            )}
-                                        </Button>
-                                    ) : null}
-                                </TableCell>
-                            )}
-                            {visibleColumns.map((column) => {
-                                const isHighlighted = cellHighlights && cellHighlights[row.id] === column.key;
-                                return (
-                                    <TableCell
-                                        key={`${row.id}-${column.key}`}
-                                        className={`px-4 py-3 ${column.align === 'right'
-                                            ? 'text-right'
-                                            : column.align === 'center'
-                                                ? 'text-center'
-                                                : 'text-left'
-                                            }${isHighlighted ? ' bg-primary/10 dark:bg-primary/20 rounded-sm transition-colors' : ''}`}
-                                    >
-                                        <div className={`flex ${column.align === 'right'
-                                            ? 'justify-end'
-                                            : column.align === 'center'
-                                                ? 'justify-center'
-                                                : 'justify-start'
-                                            }`}>
-                                            {renderCellContent(column, row)}
-                                        </div>
-                                    </TableCell>
-                                );
-                            })}
-                        </TableRow>
-                        {/* Row extra content (e.g. reconciliation suggestion button) */}
-                        {renderRowExtra && (() => {
-                            const extra = renderRowExtra(row);
-                            if (!extra) return null;
-                            return (
-                                <TableRow key={`${row.id}-extra`} className="bg-muted/30 border-t-0">
-                                    <TableCell
-                                        colSpan={
-                                            (enableMultiSelect ? 1 : 0) +
-                                            (enableCollapsible ? 1 : 0) +
-                                            visibleColumns.length
-                                        }
-                                        className="px-4 py-2"
-                                    >
-                                        {extra}
-                                    </TableCell>
-                                </TableRow>
                             );
-                        })()}
-                        {isExpanded && hasExpandableContent && (
-                            <TableRow>
+                        })}
+                    </TableRow>
+                );
+
+                const extraRow =
+                    renderRowExtra &&
+                    (() => {
+                        const extra = renderRowExtra(row);
+                        if (!extra) return null;
+                        return (
+                            <TableRow key={`${row.id}-extra`} className="bg-muted/30 border-t-0">
                                 <TableCell
                                     colSpan={
                                         (enableMultiSelect ? 1 : 0) +
                                         (enableCollapsible ? 1 : 0) +
                                         visibleColumns.length
                                     }
-                                    className="p-0"
+                                    className="px-4 py-2"
                                 >
-                                    {renderExpandableContent(row)}
+                                    {extra}
                                 </TableCell>
                             </TableRow>
-                        )}
-                    </React.Fragment>
-                );
+                        );
+                    })();
+
+                const expandedRow =
+                    isExpanded && hasExpandableContent ? (
+                        <TableRow key={`${row.id}-expanded`}>
+                            <TableCell
+                                colSpan={
+                                    (enableMultiSelect ? 1 : 0) +
+                                    (enableCollapsible ? 1 : 0) +
+                                    visibleColumns.length
+                                }
+                                className="p-0"
+                            >
+                                {renderExpandableContent(row)}
+                            </TableCell>
+                        </TableRow>
+                    ) : null;
+
+                // Array of <tr> siblings (no Fragment) — valid inside tbody and keeps row keys explicit.
+                return [mainRow, extraRow, expandedRow].filter(Boolean);
             })}
         </TableBody>
     );

@@ -256,25 +256,26 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
                             const actions = renderActions(record);
                             const rowCls = customRowRenderer.rowClassName?.(record);
                             const extraContent = renderRowExtra?.(record);
-                            return (
-                                <React.Fragment key={record.id}>
-                                    <TableRow className={rowCls}>
-                                        {customRowRenderer.renderCells(record, {
-                                            isSelected,
-                                            onSelect: (checked) => handleSelectRow(record, checked),
-                                            actions,
-                                        })}
-                                    </TableRow>
-                                    {extraContent && (
-                                        <TableRow>
+                            // Multiple <tr> siblings: use an array with per-row keys (valid inside tbody).
+                            return [
+                                <TableRow key={`${record.id}-main`} className={rowCls}>
+                                    {customRowRenderer.renderCells(record, {
+                                        isSelected,
+                                        onSelect: (checked) => handleSelectRow(record, checked),
+                                        actions,
+                                    })}
+                                </TableRow>,
+                                ...(extraContent
+                                    ? [
+                                        <TableRow key={`${record.id}-extra`}>
                                             {/* +1 for the select-all checkbox column rendered by DynamicTableHeader */}
                                             <TableCell colSpan={customRowRenderer.columns.length + 1} className="p-0">
                                                 {extraContent}
                                             </TableCell>
-                                        </TableRow>
-                                    )}
-                                </React.Fragment>
-                            );
+                                        </TableRow>,
+                                    ]
+                                    : []),
+                            ];
                         })}
                     </TableBody>
                 ) : (

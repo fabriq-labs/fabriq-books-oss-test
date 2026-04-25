@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import { viewAPI } from "@/api/api";
 
 interface EnhancedFilterBadgesProps {
@@ -11,498 +11,218 @@ interface EnhancedFilterBadgesProps {
     filterConfig: {
         enableFilters: boolean;
         enableSearch: boolean;
-    }
+    };
+    /** Column metadata from the parent list — enables generic label resolution for any select field */
+    metaData?: Record<string, any>;
+    /** Pre-resolved id→label cache carried from FilterModal via Master */
+    labelCache?: Record<string, string>;
 }
 
 interface LabelMapping {
     [key: string]: string;
 }
 
-export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filterConfig }: EnhancedFilterBadgesProps) {
-    const [labelMappings, setLabelMappings] = useState<LabelMapping>({});
-    const [isLoading, setIsLoading] = useState(false);
+const FIELD_DISPLAY_NAMES: Record<string, string> = {
+    legal_entity_id: "Legal Entity",
+    business_unit_id: "Business Unit",
+    coa_code: "COA Code",
+    coa_id: "COA",
+    budget_line_id: "Budget Line",
+    budget_period_id: "Budget Period",
+    location_id: "Location",
+    cost_center_id: "Cost Center",
+    department_id: "Department",
+    supplier_id: "Supplier",
+    supplier_name: "Supplier",
+    payment_term_id: "Payment Term",
+    shipping_term_id: "Shipping Term",
+    shipping_method_id: "Shipping Method",
+    preferred_currency_id: "Currency",
+    currency_id: "Currency",
+    base_currency_id: "Base Currency",
+    item_id: "Item",
+    account_id_or_credit_account_id: "Account (debit or credit)",
+    status: "Status",
+    description: "Description",
+    notes: "Notes",
+    amount: "Amount",
+    value_date: "Date",
+};
 
-    // Memoize the account IDs to prevent unnecessary re-renders
+function getFieldDisplayName(field: string): string {
+    return FIELD_DISPLAY_NAMES[field]
+        ?? field.replace(/_id$/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
 
-    const { legalEntityIds, businessUnitIds, coaCodeIds, coaIds, budgetLineIds, budgetPeriodIds, locationIds, costCenterIds, departmentIds, supplierIds, paymentTermIds, shippingTermIds, shippingMethodIds, currencyMasterIds, itemIds, accountOrIds } = useMemo(() => {
-        const legalEntityIds = new Set<string>();
-        const businessUnitIds = new Set<string>();
-        const coaCodeIds = new Set<string>();
-        const coaIds = new Set<string>();
-        const budgetLineIds = new Set<string>();
-        const budgetPeriodIds = new Set<string>();
-        const locationIds = new Set<string>();
-        const costCenterIds = new Set<string>();
-        const departmentIds = new Set<string>();
-        const supplierIds = new Set<string>();
-        const paymentTermIds = new Set<string>();
-        const shippingTermIds = new Set<string>();
-        const shippingMethodIds = new Set<string>();
-        const currencyMasterIds = new Set<string>();
-        const itemIds = new Set<string>();
-        // Virtual composite key: account_id_or_credit_account_id — see Master presetFilters docs.
-        const accountOrIds = new Set<string>();
+export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filterConfig, metaData, labelCache }: EnhancedFilterBadgesProps) {
+    /** Fallback label store for IDs not in labelCache — resolved generically from metaData */
+    const [resolvedLabels, setResolvedLabels] = useState<LabelMapping>({});
 
+    const extractOperatorValues = (value: any): string[] => {
+        if (!value) return [];
+        const collected: string[] = [];
+        if (value.eq != null) collected.push(String(value.eq));
+        if (value.neq != null) collected.push(String(value.neq));
+        if (Array.isArray(value.in)) value.in.forEach((v: any) => collected.push(String(v)));
+        if (Array.isArray(value.nin)) value.nin.forEach((v: any) => collected.push(String(v)));
+        if (Array.isArray(value.OR)) {
+            value.OR.forEach((condition: Record<string, any>) => {
+                const [operator, operatorValue] = Object.entries(condition)[0] || [];
+                if ((operator === "eq" || operator === "neq") && operatorValue != null) {
+                    collected.push(String(operatorValue));
+                }
+            });
+        }
+        return collected;
+    };
+
+    // Generic label resolution for any select field present in metaData.
+    // Uses a ref to deduplicate in-flight fetches across re-renders.
+    const resolvedIdsRef = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        if (!metaData) return;
+
+        const toFetch: Array<{ id: string; instanceType: string; instanceLabel: string }> = [];
         Object.entries(filters).forEach(([field, value]) => {
-            if (field === "legal_entity_id") {
-                if (value.eq) legalEntityIds.add(value.eq);
-                if (value.neq) legalEntityIds.add(value.neq);
-            }
-            if (field === "business_unit_id") {
-                if (value.eq) businessUnitIds.add(value.eq);
-                if (value.neq) businessUnitIds.add(value.neq);
-            }
-            if (field === "coa_code") {
-                if (value.eq) coaCodeIds.add(value.eq);
-                if (value.neq) coaCodeIds.add(value.neq);
-            }
-            if (field === "budget_period_id") {
-                if (value.eq) budgetPeriodIds.add(value.eq);
-                if (value.neq) budgetPeriodIds.add(value.neq);
-            }
-
-
-            if (field === "coa_id") {
-                if (value.eq) coaIds.add(value.eq);
-                if (value.neq) coaIds.add(value.neq);
-            }
-            if (field === "budget_line_id") {
-                if (value.eq) budgetLineIds.add(value.eq);
-                if (value.neq) budgetLineIds.add(value.neq);
-            }
-            if (field === "location_id") {
-                if (value.eq) locationIds.add(value.eq);
-                if (value.neq) locationIds.add(value.neq);
-            }
-            if (field === "cost_center_id") {
-                if (value.eq) costCenterIds.add(value.eq);
-                if (value.neq) costCenterIds.add(value.neq);
-            }
-            if (field === "department_id") {
-                if (value.eq) departmentIds.add(value.eq);
-                if (value.neq) departmentIds.add(value.neq);
-            }
-            if (field === "supplier_id") {
-                if (value.eq) supplierIds.add(value.eq);
-                if (value.neq) supplierIds.add(value.neq);
-            }
-            if (field === "payment_term_id") {
-                if (value.eq) paymentTermIds.add(value.eq);
-                if (value.neq) paymentTermIds.add(value.neq);
-            }
-            if (field === "shipping_term_id") {
-                if (value.eq) shippingTermIds.add(value.eq);
-                if (value.neq) shippingTermIds.add(value.neq);
-            }
-            if (field === "shipping_method_id") {
-                if (value.eq) shippingMethodIds.add(value.eq);
-                if (value.neq) shippingMethodIds.add(value.neq);
-            }
-            if (field === "preferred_currency_id" || field === "currency_id" || field === "base_currency_id") {
-                if (value.eq) currencyMasterIds.add(value.eq);
-                if (value.neq) currencyMasterIds.add(value.neq);
-            }
-            if (field === "item_id") {
-                if (value.eq) itemIds.add(value.eq);
-                if (value.neq) itemIds.add(value.neq);
-            }
-            // Virtual composite key produced by Master's presetFilters mechanism.
-            if (field === "account_id_or_credit_account_id") {
-                if (value.eq) accountOrIds.add(value.eq);
-            }
+            const sp = metaData[field]?.tableProps?.selectProps;
+            if (!sp?.instanceType || !sp?.instanceLabel) return;
+            extractOperatorValues(value).forEach(id => {
+                if (resolvedIdsRef.current.has(id) || labelCache?.[id]) return;
+                resolvedIdsRef.current.add(id);
+                toFetch.push({ id, instanceType: sp.instanceType, instanceLabel: sp.instanceLabel });
+            });
         });
+        if (toFetch.length === 0) return;
 
-        return {
-            legalEntityIds: Array.from(legalEntityIds),
-            businessUnitIds: Array.from(businessUnitIds),
-            coaCodeIds: Array.from(coaCodeIds),
-            coaIds: Array.from(coaIds),
-            budgetLineIds: Array.from(budgetLineIds),
-            budgetPeriodIds: Array.from(budgetPeriodIds),
-            locationIds: Array.from(locationIds),
-            costCenterIds: Array.from(costCenterIds),
-            departmentIds: Array.from(departmentIds),
-            supplierIds: Array.from(supplierIds),
-            paymentTermIds: Array.from(paymentTermIds),
-            shippingTermIds: Array.from(shippingTermIds),
-            shippingMethodIds: Array.from(shippingMethodIds),
-            currencyMasterIds: Array.from(currencyMasterIds),
-            itemIds: Array.from(itemIds),
-            accountOrIds: Array.from(accountOrIds),
+        let isMounted = true;
+        const load = async () => {
+            const updates: LabelMapping = {};
+            for (const { id, instanceType, instanceLabel } of toFetch) {
+                try {
+                    const r = await viewAPI.getById(instanceType, id, "default") as any;
+                    const label = r?.data?.[instanceLabel];
+                    updates[id] = label ? String(label) : id;
+                } catch {
+                    updates[id] = id;
+                }
+            }
+            if (isMounted && Object.keys(updates).length > 0) {
+                setResolvedLabels(prev => ({ ...prev, ...updates }));
+            }
         };
-    }, [filters]);
+        load();
+        return () => { isMounted = false; };
+    }, [filters, metaData, labelCache]);
 
     const filterCount = Object.keys(filters).length;
+    if (filterCount === 0) return null;
 
-    // Fetch account names for account_id filters
-    useEffect(() => {
-        let isMounted = true;
+    const lookup = (id: string) => labelCache?.[id] ?? resolvedLabels[id] ?? id;
 
-        const fetchLabels = async () => {
-            if (!isMounted) return;
-            setIsLoading(true);
+    const getFilterLabel = (field: string, value: any): string => {
+        // Root-level OR from multi-value mixed-op filters (e.g. ncontains with 2 values).
+        // value is an array of { fieldName: { op: val } } objects.
+        if (field === 'OR' && Array.isArray(value)) {
+            const firstCond = Object.entries(value[0] ?? {})[0];
+            if (!firstCond) return 'Filter';
+            const [orField] = firstCond;
+            const dispName = getFieldDisplayName(orField);
+            const parts = value.map((c: Record<string, any>) => {
+                const [, fieldOp] = Object.entries(c)[0] || [];
+                if (!fieldOp || typeof fieldOp !== 'object') return String(fieldOp ?? c);
+                const [op, v] = Object.entries(fieldOp as Record<string, any>)[0] || [];
+                if (op === 'contains' || op === 'icontains') return `Contains "${v}"`;
+                if (op === 'ncontains' || op === 'not_contains') return `Not Contains "${v}"`;
+                if (op === 'starts_with') return `Starts With "${v}"`;
+                if (op === 'ends_with') return `Ends With "${v}"`;
+                return lookup(String(v));
+            });
+            return `${dispName}: ${parts.join(' OR ')}`;
+        }
 
-            if (isMounted) {
-                setIsLoading(true);
-            }
-            const mappings: LabelMapping = {};
+        const displayName = getFieldDisplayName(field);
 
-            // helper function
-            const fetchEntity = async (ids: string[], model: string, labelKey: string = "name") => {
-                for (const id of ids) {
-                    try {
-                        const response = await viewAPI.getById(model, id, "default") as any;
-                        if (response?.data?.[labelKey] && isMounted) {
-                            mappings[id] = response.data[labelKey];
-                        }
-                    } catch (err) {
-                        console.error(`Failed to fetch ${model} ${id}:`, err);
-                        if (isMounted) {
-                            mappings[id] = id; // fallback to raw id
-                        }
-                    }
-                }
+        if (Array.isArray(value?.in)) {
+            const labels = value.in.map((v: string) => lookup(String(v))).join(" OR ");
+            return `${displayName}: ${labels}`;
+        }
+        if (Array.isArray(value?.nin)) {
+            const labels = value.nin.map((v: string) => lookup(String(v))).join(" OR ");
+            return `${displayName}: Not (${labels})`;
+        }
+        if (Array.isArray(value?.OR)) {
+            const parts = value.OR.map((condition: Record<string, any>) => {
+                const [op, condValue] = Object.entries(condition)[0] || [];
+                if (op === "is_null") return "is null";
+                if (op === "is_not_null") return "is not null";
+                const lbl = lookup(String(condValue));
+                return op === "neq" ? `Not "${lbl}"` : lbl;
+            }).join(" OR ");
+            return `${displayName}: ${parts}`;
+        }
+
+        // Date range
+        if (value.gte != null && value.lte != null && (field.includes('date') || field === 'value_date')) {
+            const fmt = (d: Date) => {
+                const dd = d.getDate().toString().padStart(2, '0');
+                const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+                return `${dd}/${mm}/${d.getFullYear()}`;
             };
-
-            try {
-                await fetchEntity(legalEntityIds, "entity", "legal_name");
-                await fetchEntity(businessUnitIds, "business_unit", "business_unit");
-                await fetchEntity(coaCodeIds, "coa", "coa_code"); // COA codes use 'coa_code' as label
-                await fetchEntity(coaIds, "coa", "coa_code"); // COA accounts use 'coa_code' as label
-                await fetchEntity(budgetLineIds, "budget_line", "budget_line"); // budget lines use 'budget_line' as label
-                await fetchEntity(budgetPeriodIds, "budget_period", "budget_period"); // budget periods use 'budget_period' as label
-                await fetchEntity(locationIds, "location", "location"); // locations use 'location' as label
-                await fetchEntity(costCenterIds, "cost_center", "cost_center"); // cost centers use 'cost_center' as label
-                await fetchEntity(departmentIds, "department", "name"); // departments use 'name' as label
-                await fetchEntity(supplierIds, "supplier", "supplier_name"); // suppliers use 'supplier_name' as label
-                await fetchEntity(paymentTermIds, "payment_terms", "payment_terms"); // payment terms use 'payment_term' as label
-                await fetchEntity(shippingTermIds, "shipping_terms", "shipping_terms"); // shipping terms use 'shipping_term' as label
-                await fetchEntity(shippingMethodIds, "shipping_method", "shipping_method"); // shipping methods use 'shipping_method' as label
-                await fetchEntity(currencyMasterIds, "currency", "code"); // modern currency model: ISO code
-                await fetchEntity(itemIds, "item_master", "item_name"); // items use 'item_name' as label
-                await fetchEntity(accountOrIds, "account", "name"); // virtual OR key: account name
-            } finally {
-                if (isMounted) {
-                    setLabelMappings(prev => ({ ...prev, ...mappings }));
-                    setIsLoading(false);
-                }
-            }
-        };
-
-        fetchLabels();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [legalEntityIds, businessUnitIds, coaCodeIds, coaIds, budgetLineIds, budgetPeriodIds, locationIds, costCenterIds, departmentIds, supplierIds, paymentTermIds, shippingTermIds, shippingMethodIds, currencyMasterIds, itemIds, accountOrIds]);
-
-    // Early return after all hooks are called
-    if (filterCount === 0) {
-        return null;
-    }
-
-    const getFilterLabel = (field: string, value: any) => {
-
-
-        // Handle account_id with name mapping
-        if (field === "legal_entity_id") {
-            if (value.eq) {
-                const legalEntityName = labelMappings[value.eq] || value.eq;
-                return `Legal Entity: ${legalEntityName}`;
-            }
-            if (value.neq) {
-                const legalEntityName = labelMappings[value.neq] || value.neq;
-                return `Legal Entity: Not "${legalEntityName}"`;
-            }
-        }
-        if (field === "business_unit_id") {
-            if (value.eq) {
-                const businessUnitName = labelMappings[value.eq] || value.eq;
-                return `Business Unit: ${businessUnitName}`;
-            }
-            if (value.neq) {
-                const businessUnitName = labelMappings[value.neq] || value.neq;
-                return `Business Unit: Not "${businessUnitName}"`;
-            }
+            return `${displayName}: ${fmt(new Date(value.gte))} - ${fmt(new Date(value.lte))}`;
         }
 
-
-        // Handle notes with better formatting
-        if (field === "notes") {
-            if (value.eq) {
-                return `Notes: ${value.eq}`;
-            }
-            if (value.neq) {
-                return `Notes: Not "${value.neq}"`;
-            }
-            if (value.contains) {
-                return `Notes: Contains "${value.contains}"`;
-            }
-            if (value.ncontains) {
-                return `Notes: Not Contains "${value.ncontains}"`;
-            }
-        }
-
-        // Handle description with better formatting
-        if (field === "description") {
-            if (value.eq) {
-                return `Description: ${value.eq}`;
-            }
-            if (value.neq) {
-                return `Description: Not "${value.neq}"`;
-            }
-            if (value.contains) {
-                return `Description: Contains "${value.contains}"`;
-            }
-            if (value.ncontains) {
-                return `Description: Not Contains "${value.ncontains}"`;
-            }
-            if (value.starts_with) {
-                return `Description: Starts With "${value.starts_with}"`;
-            }
-            if (value.not_starts_with) {
-                return `Description: Not Starts With "${value.not_starts_with}"`;
-            }
-        }
-
-        // Handle status
-        if (field === "status") {
-            return `Status: ${value.eq}`;
-        }
-
-        // Handle supplier_name
-        if (field === "supplier_name") {
-            return `Supplier: ${value.eq}`;
-        }
-
-        // Handle date ranges
-        if (field === "value_date") {
-            const startDate = new Date(value.gte);
-            const endDate = new Date(value.lte);
-
-            // Format dates as dd/mm/yyyy
-            const formatDate = (date: Date) => {
-                const day = date.getDate().toString().padStart(2, '0');
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                const year = date.getFullYear();
-                return `${day}/${month}/${year}`;
-            };
-
-            return `Date: ${formatDate(startDate)} - ${formatDate(endDate)}`;
-        }
-
-        // Handle amount ranges
+        // Amount range
         if (field === "amount") {
-            if (value.gte && value.lte) {
-                return `Amount: ${value.gte} - ${value.lte}`;
-            }
-            if (value.gte) {
-                return `Amount: ≥ ${value.gte}`;
-            }
-            if (value.lte) {
-                return `Amount: ≤ ${value.lte}`;
-            }
+            if (value.gte != null && value.lte != null) return `Amount: ${value.gte} - ${value.lte}`;
+            if (value.gte != null) return `Amount: ≥ ${value.gte}`;
+            if (value.lte != null) return `Amount: ≤ ${value.lte}`;
         }
 
-        if (field === "coa_code") {
-            if (value.eq) {
-                const coaCodeName = labelMappings[value.eq] || value.eq;
-                return `COA Code: ${coaCodeName}`;
-            }
-            if (value.neq) {
-                const coaCodeName = labelMappings[value.neq] || value.neq;
-                return `COA Code: Not "${coaCodeName}"`;
-            }
-        }
-        if (field === "budget_period_id") {
-            if (value.eq) {
-                const budgetPeriodName = labelMappings[value.eq] || value.eq;
-                return `Budget Period: ${budgetPeriodName}`;
-            }
-            if (value.neq) {
-                const budgetPeriodName = labelMappings[value.neq] || value.neq;
-                return `Budget Period: Not "${budgetPeriodName}"`;
-            }
-        }
-        if (field === "coa_id") {
-            if (value.eq) {
-                const coaName = labelMappings[value.eq] || value.eq;
-                return `COA: ${coaName}`;
-            }
-            if (value.neq) {
-                const coaName = labelMappings[value.neq] || value.neq;
-                return `COA: Not "${coaName}"`;
-            }
-        }
-        if (field === "budget_line_id") {
-            if (value.eq) {
-                const budgetLineName = labelMappings[value.eq] || value.eq;
-                return `Budget Line: ${budgetLineName}`;
-            }
-            if (value.neq) {
-                const budgetLineName = labelMappings[value.neq] || value.neq;
-                return `Budget Line: Not "${budgetLineName}"`;
-            }
-        }
-        if (field === "location_id") {
-            if (value.eq) {
-                const locationName = labelMappings[value.eq] || value.eq;
-                return `Location: ${locationName}`;
-            }
-            if (value.neq) {
-                const locationName = labelMappings[value.neq] || value.neq;
-                return `Location: Not "${locationName}"`;
-            }
-        }
-        if (field === "cost_center_id") {
-            if (value.eq) {
-                const costCenterName = labelMappings[value.eq] || value.eq;
-                return `Cost Center: ${costCenterName}`;
-            }
-            if (value.neq) {
-                const costCenterName = labelMappings[value.neq] || value.neq;
-                return `Cost Center: Not "${costCenterName}"`;
-            }
-        }
-        if (field === "department_id") {
-            if (value.eq) {
-                const departmentName = labelMappings[value.eq] || value.eq;
-                return `Department: ${departmentName}`;
-            }
-            if (value.neq) {
-                const departmentName = labelMappings[value.neq] || value.neq;
-                return `Department: Not "${departmentName}"`;
-            }
-        }
-        if (field === "supplier_id") {
-            if (value.eq) {
-                const supplierName = labelMappings[value.eq] || value.eq;
-                return `Supplier: ${supplierName}`;
-            }
-            if (value.neq) {
-                const supplierName = labelMappings[value.neq] || value.neq;
-                return `Supplier: Not "${supplierName}"`;
-            }
-        }
-        if (field === "payment_term_id") {
-            if (value.eq) {
-                const paymentTermName = labelMappings[value.eq] || value.eq;
-                return `Payment Term: ${paymentTermName}`;
-            }
-            if (value.neq) {
-                const paymentTermName = labelMappings[value.neq] || value.neq;
-                return `Payment Term: Not "${paymentTermName}"`;
-            }
-        }
-        if (field === "shipping_term_id") {
-            if (value.eq) {
-                const shippingTermName = labelMappings[value.eq] || value.eq;
-                return `Shipping Term: ${shippingTermName}`;
-            }
-            if (value.neq) {
-                const shippingTermName = labelMappings[value.neq] || value.neq;
-                return `Shipping Term: Not "${shippingTermName}"`;
-            }
-        }
-        if (field === "shipping_method_id") {
-            if (value.eq) {
-                const shippingMethodName = labelMappings[value.eq] || value.eq;
-                return `Shipping Method: ${shippingMethodName}`;
-            }
-            if (value.neq) {
-                const shippingMethodName = labelMappings[value.neq] || value.neq;
-                return `Shipping Method: Not "${shippingMethodName}"`;
-            }
-        }
-        if (
-            field === "preferred_currency_id" ||
-            field === "currency_id" ||
-            field === "base_currency_id"
-        ) {
-            const title =
-                field === "base_currency_id" ? "Base currency" : "Currency";
-            if (value.eq) {
-                const currencyName = labelMappings[value.eq] || value.eq;
-                return `${title}: ${currencyName}`;
-            }
-            if (value.neq) {
-                const currencyName = labelMappings[value.neq] || value.neq;
-                return `${title}: Not "${currencyName}"`;
-            }
-        }
-        if (field === "item_id") {
-            if (value.eq) {
-                const itemName = labelMappings[value.eq] || value.eq;
-                return `Item: ${itemName}`;
-            }
-            if (value.neq) {
-                const itemName = labelMappings[value.neq] || value.neq;
-                return `Item: Not "${itemName}"`;
-            }
-        }
+        const op = Object.keys(value)[0];
+        const v = value[op];
 
-        // Virtual composite key: account_id_or_credit_account_id
-        // Produced by Master's presetFilters drill-through mechanism. Renders as a
-        // single "Account" badge; the OR expansion happens in Master before the API call.
-        if (field === "account_id_or_credit_account_id") {
-            if (value.eq) {
-                const accountName = labelMappings[value.eq] || value.eq;
-                return `Account (debit or credit): ${accountName}`;
-            }
-        }
+        if (op === 'is_null') return `${displayName}: is null`;
+        if (op === 'is_not_null') return `${displayName}: is not null`;
+        if (op === 'eq') return `${displayName}: ${lookup(String(v))}`;
+        if (op === 'neq') return `${displayName}: Not "${lookup(String(v))}"`;
+        if (op === 'contains' || op === 'icontains') return `${displayName}: Contains "${v}"`;
+        if (op === 'ncontains' || op === 'not_contains') return `${displayName}: Not Contains "${v}"`;
+        if (op === 'starts_with') return `${displayName}: Starts With "${v}"`;
+        if (op === 'not_starts_with') return `${displayName}: Not Starts With "${v}"`;
+        if (op === 'ends_with') return `${displayName}: Ends With "${v}"`;
+        if (op === 'gt') return `${displayName}: > ${v}`;
+        if (op === 'gte') return `${displayName}: ≥ ${v}`;
+        if (op === 'lt') return `${displayName}: < ${v}`;
+        if (op === 'lte') return `${displayName}: ≤ ${v}`;
 
-        // Generic fallback for other fields
-        const operator = Object.keys(value)[0];
-        const operatorValue = value[operator];
-
-        const operatorLabels: Record<string, string> = {
-            eq: "=",
-            neq: "≠",
-            gt: ">",
-            gte: "≥",
-            lt: "<",
-            lte: "≤",
-            contains: "contains",
-            ncontains: "not contains",
-            starts_with: "starts with",
-            not_starts_with: "not starts with",
-            ends_with: "ends with",
-            is_null: "is null",
-            is_not_null: "is not null"
-        };
-
-        const operatorLabel = operatorLabels[operator] || operator;
-
-        // For null operators, don't show the value
-        if (operator === 'is_null' || operator === 'is_not_null') {
-            return `${field}: ${operatorLabel}`;
-        }
-
-        return `${field}: ${operatorLabel} ${operatorValue}`;
+        return `${displayName}: ${op} ${v}`;
     };
 
     return (
         <div className="flex flex-wrap gap-2 my-4">
-            {Object.entries(filters).map(([field, value]) => (
-                <Badge
-                    key={field}
-                    variant="secondary"
-                    className="px-4 py-2 flex items-center gap-1 !rounded-full bg-[#E5DEFF] text-[#403E43] font-semibold"
-                >
-                    {isLoading && field === "legal_entity_id" || isLoading && field === "business_unit_id" ||
-                        isLoading && field === "coa_id" || isLoading && field === "budget_line_id" || isLoading && field === "budget_period_id" || isLoading && field === "location_id"
-                        || isLoading && field === "cost_center_id" || isLoading && field === "department_id" || isLoading && field === "supplier_id" || isLoading && field === "payment_term_id"
-                        || isLoading && field === "shipping_term_id" || isLoading && field === "shipping_method_id" || isLoading && field === "preferred_currency_id" || isLoading && field === "currency_id" || isLoading && field === "base_currency_id" || isLoading && field === "item_id" || isLoading && field === "coa_code" ? (
-                        <span className="animate-pulse">Loading...</span>
-                    ) : (
-                        getFilterLabel(field, value)
-                    )}
-                    <X
-                        className="h-3 w-3 cursor-pointer ml-1 text-[#9b87f5] hover:bg-[#d6bcfa] rounded-full transition-colors"
-                        onClick={() => onClearFilter(field)}
-                    />
-                </Badge>
-            ))}
+            {Object.entries(filters).map(([field, value]) => {
+                const isOrBadge = (field === 'OR' && Array.isArray(value) && value.length > 1)
+                    || (Array.isArray(value?.in) && value.in.length > 1)
+                    || (Array.isArray(value?.nin) && value.nin.length > 1)
+                    || (Array.isArray(value?.OR) && value.OR.length > 1);
+                return (
+                    <Badge
+                        key={field}
+                        variant="secondary"
+                        className={`max-w-full px-4 py-2 flex items-center gap-1 !rounded-full font-semibold ${
+                            isOrBadge
+                                ? 'bg-[#e8d4f2] text-[#591e80]'
+                                : 'bg-[#E5DEFF] text-[#403E43]'
+                        }`}
+                    >
+                        <span className="truncate">{getFilterLabel(field, value)}</span>
+                        <X
+                            className="h-3 w-3 cursor-pointer ml-1 text-[#9b87f5] hover:bg-[#d6bcfa] rounded-full transition-colors"
+                            onClick={() => onClearFilter(field)}
+                        />
+                    </Badge>
+                );
+            })}
 
             {filterCount > 0 && (
                 <Button
@@ -516,4 +236,4 @@ export function EnhancedFilterBadges({ filters, onClearFilter, onClearAll, filte
             )}
         </div>
     );
-} 
+}

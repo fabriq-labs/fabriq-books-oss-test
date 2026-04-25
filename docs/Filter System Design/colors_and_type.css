@@ -1,0 +1,199 @@
+/**
+ * Fabriq Books Design System — Colors & Typography
+ * Source: uploads/DESIGN_SYSTEM.md + fabriq-labs/fabriq-ws-setup (demo branch)
+ *
+ * Fonts loaded from Google Fonts:
+ *   Lato: 300, 400, 700, 900
+ *   Poppins: 300, 400, 500, 600, 700
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* ─── BASE COLOR TOKENS ─────────────────────────────────────────── */
+:root {
+  /* Purple Brand Scale */
+  --color-primary-50:  #f5ebf9;
+  --color-primary-100: #e8d4f2;
+  --color-primary-200: #d1a9e4;
+  --color-primary-300: #ba7fd6;
+  --color-primary-400: #a354c9;
+  --color-primary-500: #8c2abc;
+  --color-primary-600: #7028a0;  /* PRIMARY — all interactive actions */
+  --color-primary-700: #591e80;  /* pressed / darker states */
+  --color-primary-800: #42155f;
+  --color-primary-900: #2b0c3f;
+
+  /* Neutral Grays */
+  --color-gray-50:  #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* Status / Semantic Colors */
+  --color-success-bg:   #dcfce7;
+  --color-success-text: #166534;
+  --color-warning-bg:   #fef9c3;
+  --color-warning-text: #854d0e;
+  --color-error-bg:     #fee2e2;
+  --color-error-text:   #991b1b;
+  --color-info-bg:      #dbeafe;
+  --color-info-text:    #1e40af;
+  --color-neutral-bg:   #f3f4f6;
+  --color-neutral-text: #4b5563;
+
+  /* ─── SEMANTIC SURFACE TOKENS (shadcn/radix pattern) ─── */
+  --background:             hsl(0 0% 100%);
+  --foreground:             hsl(222.2 84% 4.9%);
+  --card:                   hsl(0 0% 100%);
+  --card-foreground:        hsl(222.2 84% 4.9%);
+  --popover:                hsl(0 0% 100%);
+  --popover-foreground:     hsl(222.2 84% 4.9%);
+  --primary:                hsl(273 60% 39%);
+  --primary-foreground:     hsl(0 0% 100%);
+  --secondary:              hsl(210 40% 96.1%);
+  --secondary-foreground:   hsl(222.2 47.4% 11.2%);
+  --muted:                  hsl(210 40% 96.1%);
+  --muted-foreground:       hsl(215.4 16.3% 46.9%);
+  --accent:                 hsl(273 60% 96%);
+  --accent-foreground:      hsl(222.2 47.4% 11.2%);
+  --destructive:            hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border:                 hsl(214.3 31.8% 91.4%);
+  --input:                  hsl(214.3 31.8% 91.4%);
+  --ring:                   hsl(273 60% 39%);
+  --radius:                 0.5rem;
+
+  /* ─── SIDEBAR TOKENS ─── */
+  --sidebar-background:         hsl(273 60% 98%);
+  --sidebar-foreground:         hsl(273 30% 25%);
+  --sidebar-primary:            hsl(273 60% 39%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent:             hsl(273 30% 95%);
+  --sidebar-accent-foreground:  hsl(273 30% 25%);
+  --sidebar-border:             hsl(273 30% 90%);
+  --sidebar-ring:               hsl(273 60% 39%);
+
+  /* ─── TYPOGRAPHY TOKENS ─── */
+  --font-body:    'Lato', sans-serif;
+  --font-heading: 'Poppins', sans-serif;
+  --font-mono:    'Courier New', monospace;
+
+  /* Type scale */
+  --text-xs:   0.75rem;   /* 12px */
+  --text-sm:   0.875rem;  /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg:   1.125rem;  /* 18px */
+  --text-xl:   1.25rem;   /* 20px */
+  --text-2xl:  1.5rem;    /* 24px */
+  --text-3xl:  1.875rem;  /* 30px */
+  --text-4xl:  2.25rem;   /* 36px */
+
+  /* ─── SPACING ─── */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ─── BORDER RADIUS ─── */
+  --radius-sm:   calc(var(--radius) - 4px);   /* 4px  — tight chips */
+  --radius-md:   calc(var(--radius) - 2px);   /* 6px  — buttons, inputs */
+  --radius-lg:   var(--radius);               /* 8px  — cards, dialogs */
+  --radius-full: 9999px;                      /* pill badges, avatars */
+
+  /* ─── SHADOWS ─── */
+  --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* ─── LAYOUT ─── */
+  --topbar-height:       4rem;    /* h-16 */
+  --sidebar-width:       16.666%; /* expanded */
+  --sidebar-width-icon:  4.5rem;  /* icon-only collapsed */
+  --chat-sidebar-width:  20.666%;
+}
+
+/* ─── SEMANTIC TYPE ROLES ────────────────────────────────────────── */
+
+/* Page heading — text-3xl font-bold */
+.t-page-title {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: hsl(222.2 84% 4.9%);
+  line-height: 1.2;
+}
+
+/* Section title — text-2xl font-bold */
+.t-section-title {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: hsl(215.4 16.3% 15%);
+}
+
+/* Card title — text-xl font-semibold */
+.t-card-title {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: hsl(222.2 47.4% 20%);
+}
+
+/* Dialog/group heading — text-lg font-semibold */
+.t-dialog-title {
+  font-family: var(--font-body);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Body default */
+.t-body {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: hsl(222.2 84% 4.9%);
+}
+
+/* Secondary / helper text */
+.t-muted {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: hsl(215.4 16.3% 46.9%);
+}
+
+/* Button / strong body */
+.t-button {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* Badge / chip */
+.t-badge {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+/* Section group header — uppercase label */
+.t-group-label {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(215.4 16.3% 46.9%);
+}
