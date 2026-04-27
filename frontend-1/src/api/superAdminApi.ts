@@ -80,6 +80,24 @@ export interface SetupChartOfAccountsResponse {
   counts: { created: number; existing: number; total: number };
 }
 
+export type SeedModelName = 'payment_terms';
+export type SeedProfile = 'indian-demo';
+
+export interface SeedModelDataPayload {
+  entityId: string;
+  model: SeedModelName;
+  profile: SeedProfile;
+}
+
+export interface SeedModelDataResponse {
+  success: boolean;
+  entityId: string;
+  orgId: string;
+  model: SeedModelName;
+  profile: SeedProfile;
+  counts: { created: number; updated: number; total: number };
+}
+
 // ── Admin API ─────────────────────────────────────────────────────────────────
 
 export const adminAPI = {
@@ -102,6 +120,12 @@ export const adminAPI = {
 
   setupChartOfAccounts: (payload: SetupChartOfAccountsPayload) =>
     adminFetch<SetupChartOfAccountsResponse>('/api/admin/setup-chart-of-accounts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  seedModelData: (payload: SeedModelDataPayload) =>
+    adminFetch<SeedModelDataResponse>('/api/admin/seed-model-data', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

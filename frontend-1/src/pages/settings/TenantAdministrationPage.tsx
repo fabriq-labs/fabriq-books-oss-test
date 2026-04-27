@@ -23,7 +23,13 @@ import {
 } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useUserData } from "@/hooks/useUserData";
-import { adminAPI, type CoaTemplate, type OnboardTenantPayload } from "@/api/superAdminApi";
+import {
+  adminAPI,
+  type CoaTemplate,
+  type OnboardTenantPayload,
+  type SeedModelName,
+  type SeedProfile,
+} from "@/api/superAdminApi";
 import { viewAPI } from "@/api/metadataApi";
 import { v4 as uuidv4 } from "uuid";
 import { DemoDatabaseResetSection } from "./DemoDatabaseResetSection";
@@ -45,6 +51,15 @@ const COA_TEMPLATES: { value: CoaTemplate; label: string; currency: string }[] =
   { value: "perfin", label: "Personal Finance (USD)", currency: "USD" },
   { value: "nri-india", label: "NRI — India (INR)", currency: "INR" },
   { value: "nri-canada", label: "NRI — Canada (CAD)", currency: "CAD" },
+];
+
+// Extension path: add more models/profiles here after backend seeders are wired.
+const SEED_MODEL_OPTIONS: { value: SeedModelName; label: string }[] = [
+  { value: "payment_terms", label: "Payment Terms" },
+];
+
+const SEED_PROFILE_OPTIONS: { value: SeedProfile; label: string }[] = [
+  { value: "indian-demo", label: "Indian demo" },
 ];
 
 // ── Tenant Onboarding Wizard (lifted from TenantOnboardingPage) ───────────────
@@ -258,10 +273,21 @@ export default function TenantAdministrationPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSyncStats, setLastSyncStats] = useState<string | null>(null);
 
-  // Section 4 — Onboard New Tenant
+  // Section 4 — Targeted model seed
+  const [seedEntityId, setSeedEntityId] = useState("");
+  const [seedModel, setSeedModel] = useState<SeedModelName | "">("");
+  const [seedProfile, setSeedProfile] = useState<SeedProfile | "">("");
+  const [seedingModelData, setSeedingModelData] = useState(false);
+  const [seedModelResult, setSeedModelResult] = useState<{
+    created: number;
+    updated: number;
+    total: number;
+  } | null>(null);
+
+  // Section 5 — Onboard New Tenant
   const [onboardOpen, setOnboardOpen] = useState(false);
 
-  // Section 5 — Danger Zone
+  // Section 6 — Danger Zone
   const [dangerOpen, setDangerOpen] = useState(false);
 
   // Fetch entities for current org
@@ -338,6 +364,32 @@ export default function TenantAdministrationPage() {
   };
 
   const selectedTemplateMeta = COA_TEMPLATES.find((t) => t.value === selectedTemplate);
+
+  const handleSeedModelData = async () => {
+    if (!seedEntityId || !seedModel || !seedProfile) return;
+    setSeedingModelData(true);
+    setSeedModelResult(null);
+    try {
+      const res = await adminAPI.seedModelData({
+        entityId: seedEntityId,
+        model: seedModel,
+        profile: seedProfile,
+      });
+      setSeedModelResult(res.counts);
+      toast({
+        title: "Model data seeded",
+        description: `${res.counts.created} created, ${res.counts.updated} updated.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Failed to seed model data",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSeedingModelData(false);
+    }
+  };
 
   return (
     <div className="container max-w-2xl py-6 space-y-6">
@@ -465,7 +517,87 @@ export default function TenantAdministrationPage() {
         </CardContent>
       </Card>
 
-      {/* Section 4 — Onboard New Tenant */}
+      {/* Section 4 — Seed Model Data */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Seed model data</CardTitle>
+          <CardDescription>
+            Seed one model for a selected legal entity using a profile template. Currently supports Payment Terms with Indian demo profile.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Legal entity</Label>
+            {entitiesLoading ? (
+              <p className="text-sm text-muted-foreground">Loading entities…</p>
+            ) : entities.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No legal entities found. Create one in Masters → Organization first.
+              </p>
+            ) : (
+              <Select value={seedEntityId} onValueChange={setSeedEntityId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a legal entity…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {entities.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.organization_name || e.legal_name || e.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Model</Label>
+            <Select value={seedModel} onValueChange={(value) => setSeedModel(value as SeedModelName)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a model…" />
+              </SelectTrigger>
+              <SelectContent>
+                {SEED_MODEL_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Profile</Label>
+            <Select value={seedProfile} onValueChange={(value) => setSeedProfile(value as SeedProfile)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a profile…" />
+              </SelectTrigger>
+              <SelectContent>
+                {SEED_PROFILE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            onClick={handleSeedModelData}
+            disabled={!seedEntityId || !seedModel || !seedProfile || seedingModelData || entities.length === 0}
+          >
+            {seedingModelData ? "Seeding…" : "Load seed data"}
+          </Button>
+
+          {seedModelResult && (
+            <p className="text-sm rounded-md border bg-muted/30 p-3 font-mono text-xs">
+              {seedModelResult.created} created · {seedModelResult.updated} updated · {seedModelResult.total} total
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 5 — Onboard New Tenant */}
       <Collapsible open={onboardOpen} onOpenChange={setOnboardOpen}>
         <CollapsibleTrigger asChild>
           <Button
@@ -497,7 +629,7 @@ export default function TenantAdministrationPage() {
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Section 5 — Danger Zone */}
+      {/* Section 6 — Danger Zone */}
       <Collapsible open={dangerOpen} onOpenChange={setDangerOpen}>
         <CollapsibleTrigger asChild>
           <Button

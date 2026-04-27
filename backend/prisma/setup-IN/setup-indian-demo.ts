@@ -14,6 +14,20 @@ interface CsvRow {
   [key: string]: string;
 }
 
+interface SeedPaymentTermsFromCsvOptions {
+  prismaClient?: typeof prisma;
+  csvPath?: string;
+  orgIdOverride?: string;
+  legalEntityIdOverride?: string | null;
+  profileLabel?: string;
+}
+
+interface SeedCounts {
+  created: number;
+  updated: number;
+  total: number;
+}
+
 async function loadCsvData(filePath: string): Promise<CsvRow[]> {
   return new Promise((resolve, reject) => {
     const results: CsvRow[] = [];
@@ -23,6 +37,62 @@ async function loadCsvData(filePath: string): Promise<CsvRow[]> {
       .on('end', () => resolve(results))
       .on('error', reject);
   });
+}
+
+export async function seedPaymentTermsFromCsv(
+  options: SeedPaymentTermsFromCsvOptions = {}
+): Promise<SeedCounts> {
+  const {
+    prismaClient = prisma,
+    csvPath = path.join(__dirname, 'payment_terms.csv'),
+    orgIdOverride,
+    legalEntityIdOverride,
+    profileLabel = 'indian-demo',
+  } = options;
+
+  console.log(`📋 Loading payment terms from CSV (${profileLabel})...`);
+  const paymentTermsData = await loadCsvData(csvPath);
+  let created = 0;
+  let updated = 0;
+
+  for (const row of paymentTermsData) {
+    const existing = await prismaClient.payment_terms.findUnique({
+      where: { id: row.id },
+      select: { id: true },
+    });
+
+    const orgId = orgIdOverride ?? row.org_id;
+    const legalEntityId =
+      legalEntityIdOverride !== undefined ? legalEntityIdOverride : row.legal_entity_id || null;
+
+    await prismaClient.payment_terms.upsert({
+      where: { id: row.id },
+      update: {
+        payment_terms: row.payment_terms,
+        description: row.description,
+        no_of_days: row.no_of_days ? parseInt(row.no_of_days, 10) : null,
+        org_id: orgId,
+        legal_entity_id: legalEntityId,
+      },
+      create: {
+        id: row.id,
+        payment_terms: row.payment_terms,
+        description: row.description,
+        no_of_days: row.no_of_days ? parseInt(row.no_of_days, 10) : null,
+        org_id: orgId,
+        legal_entity_id: legalEntityId,
+      },
+    });
+
+    if (existing) {
+      updated += 1;
+    } else {
+      created += 1;
+    }
+  }
+
+  console.log(`  ✓ Loaded ${paymentTermsData.length} payment terms`);
+  return { created, updated, total: paymentTermsData.length };
 }
 
 async function setupIndianDemoData() {
@@ -288,16 +358,8 @@ async function setupIndianDemoData() {
     }
 
     // ===== 2.9. LOAD PAYMENT_TERMS FROM CSV (before customers so payment_term_id can be set) =====
-    console.log('📋 Loading payment terms from CSV...');
-    const paymentTermsData = await loadCsvData(path.join(__dirname, 'payment_terms.csv'));
-    for (const row of paymentTermsData) {
-      await prisma.payment_terms.upsert({
-        where: { id: row.id },
-        update: { payment_terms: row.payment_terms, description: row.description, no_of_days: row.no_of_days ? parseInt(row.no_of_days, 10) : null, org_id: row.org_id, legal_entity_id: row.legal_entity_id || null },
-        create: { id: row.id, payment_terms: row.payment_terms, description: row.description, no_of_days: row.no_of_days ? parseInt(row.no_of_days, 10) : null, org_id: row.org_id, legal_entity_id: row.legal_entity_id || null },
-      });
-    }
-    console.log(`  ✓ Loaded ${paymentTermsData.length} payment terms`);
+    const paymentTermsSeedCounts = await seedPaymentTermsFromCsv({ prismaClient: prisma });
+    const paymentTermsLoadedCount = paymentTermsSeedCounts.total;
 
     // ===== 3. LOAD AND INSERT CUSTOMER DATA =====
     console.log('👥 Loading customer data...');
@@ -1469,7 +1531,7 @@ async function setupIndianDemoData() {
     console.log(`   📊 Budget periods: ${budgetPeriodData.length}, Budget lines: ${budgetLineData.length}, General ledger: ${generalLedgerData.length}, Projects: ${projectMasterData.length}, Employee master: ${employeeMasterData.length}`);
     console.log(`   👤 Users: ${userData.length}`);
     console.log(`   🔗 Role Assignments: ${roleUserData.length}`);
-    console.log(`   📋 Payment terms: ${paymentTermsData.length}`);
+    console.log(`   📋 Payment terms: ${paymentTermsLoadedCount}`);
     console.log(`   📄 Sales invoices: ${invoiceData.length}, Invoice line items: ${invoiceLineItemData.length}`);
     console.log(`   💳 Payment receipts: ${paymentReceiptData.length}`);
     console.log(`   🏦 Bank postings: ${postingData.length}`);

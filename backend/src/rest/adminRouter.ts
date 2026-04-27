@@ -2,11 +2,13 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { authMiddleware } from '../auth/middleware';
 import prisma from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 import { main as syncMetadataFromJson } from '../metadata/syncMetadataFromJson';
+import { seedPaymentTermsFromCsv } from '../../prisma/setup-IN/setup-indian-demo';
 
 const adminRouter = Router();
 
@@ -95,6 +97,11 @@ function isDevOptionsApiEnabled(): boolean {
 function getBackendRootDir(): string {
   // Compiled: dist/rest/adminRouter.js -> backend root is two levels up
   return path.join(__dirname, '..', '..');
+}
+
+function modelHasField(modelName: string, fieldName: string): boolean {
+  const model = Prisma.dmmf.datamodel.models.find((m) => m.name === modelName);
+  return Boolean(model?.fields.some((f) => f.name === fieldName));
 }
 
 adminRouter.post(
@@ -428,6 +435,75 @@ function getBackendRootDir(): string {
   // dist/rest/*.js or src/rest/*.ts → backend root (two levels up)
   return path.join(__dirname, '..', '..');
 }
+
+adminRouter.post(
+  '/seed-model-data',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+
+      const body = req.body as {
+        entityId?: string;
+        model?: string;
+        profile?: string;
+      };
+
+      const entityId = typeof body.entityId === 'string' ? body.entityId.trim() : '';
+      const model = typeof body.model === 'string' ? body.model.trim() : '';
+      const profile = typeof body.profile === 'string' ? body.profile.trim() : '';
+
+      if (!entityId) {
+        return res.status(400).json({ error: 'entityId is required' });
+      }
+
+      // Future models: extend this allowlist and dispatch to model-specific seeder.
+      if (model !== 'payment_terms') {
+        return res.status(400).json({ error: 'model must be payment_terms' });
+      }
+
+      // Future profiles: expand supported values per model as more templates are extracted.
+      if (profile !== 'indian-demo') {
+        return res.status(400).json({ error: 'profile must be indian-demo' });
+      }
+
+      const entity = await prisma.entity.findUnique({ where: { id: entityId } });
+      if (!entity) {
+        return res.status(404).json({ error: `Entity not found: ${entityId}` });
+      }
+
+      const shouldApplyLegalEntity = modelHasField('payment_terms', 'legal_entity_id');
+      const counts = await seedPaymentTermsFromCsv({
+        prismaClient: prisma,
+        orgIdOverride: entity.org_id,
+        legalEntityIdOverride: shouldApplyLegalEntity ? entityId : undefined,
+        profileLabel: profile,
+      });
+
+      return res.status(200).json({
+        success: true,
+        entityId,
+        orgId: entity.org_id,
+        model,
+        profile,
+        counts,
+      });
+    } catch (err: any) {
+      logger.error('seed-model-data error', { error: err?.message, stack: err?.stack });
+      return res.status(500).json({
+        error: err?.message || 'Failed to seed model data',
+      });
+    }
+  }
+);
 
 adminRouter.post(
   '/setup-chart-of-accounts',
