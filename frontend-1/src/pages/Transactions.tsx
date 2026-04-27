@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { FileCheck, Loader2, Sparkles, XCircle } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { FileCheck, Loader2, Sparkles } from "lucide-react";
 import Master, { MasterHandle } from "@/pages/Master";
 import { agentAPI } from "@/api/api";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +11,6 @@ import ReconciliationSuggestionsModal, {
   ReconciliationData,
 } from "@/components/forms/Masters/ReconciliationSuggestionsModal";
 import type { CellHighlightMap } from "@/components/masters/DynamicTable";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { createPostingRowRenderer } from "@/components/masters/posting/PostingListRow";
 import { useEntity } from "@/contexts/EntityContext";
 import type { FilterEnhancements } from "@/types/customRowRenderer";
@@ -99,7 +98,6 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
 
 export default function Transactions() {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const masterRef = useRef<MasterHandle>(null);
   const [searchParams] = useSearchParams();
   const { currentEntityId, entities } = useEntity();
@@ -111,29 +109,16 @@ export default function Transactions() {
   );
 
   // ── URL-based filter support ──────────────────────────────────────────
-  const urlFilter = searchParams.get('filter');
   const urlAccountId = searchParams.get('account_id');
   const urlFromDate = searchParams.get('from_date');
   const urlToDate = searchParams.get('to_date');
 
   // Permanent filters applied to every query regardless of user filter state.
   const defaultFilters = useMemo(() => {
-    const baseFilter: Record<string, any> = {
+    return {
       ...(currentEntityId ? { legal_entity_id: currentEntityId } : {}),
     };
-
-    if (urlFilter === 'unreconciled') {
-      return {
-        ...baseFilter,
-        OR: [
-          { reconciliation_status: null },
-          { reconciliation_status: 'UNMATCHED' },
-        ],
-      };
-    }
-
-    return baseFilter;
-  }, [urlFilter, currentEntityId]);
+  }, [currentEntityId]);
 
   // Filters seeded into the user-controlled badge state on mount.
   // These appear as removable chips in the filter badge row.
@@ -165,31 +150,7 @@ export default function Transactions() {
     };
   }, [currentEntityId]);
 
-  // Title is always "Transactions"; segment indicates view
   const displayName = 'Transactions';
-
-  // Segmented control next to title: All | Needs reconciliation
-  const viewSegment = urlFilter === 'unreconciled' ? 'unreconciled' : 'all';
-  const titleExtra = (
-    <ToggleGroup
-      type="single"
-      value={viewSegment}
-      onValueChange={(v) => {
-        if (!v) return;
-        navigate(v === 'unreconciled' ? '/accounting/transactions?filter=unreconciled' : '/accounting/transactions');
-      }}
-      variant="outline"
-      size="sm"
-      className="ml-1"
-    >
-      <ToggleGroupItem value="all" aria-label="All transactions">
-        All
-      </ToggleGroupItem>
-      <ToggleGroupItem value="unreconciled" aria-label="Needs reconciliation">
-        Needs reconciliation
-      </ToggleGroupItem>
-    </ToggleGroup>
-  );
 
   // ── Reconciliation state ──────────────────────────────────────────────
   /** Results from the most recent reconcile call, keyed by posting id */
@@ -455,45 +416,8 @@ export default function Transactions() {
     }
   }, [toast]);
 
-  /** Statuses that mean the row no longer belongs in "unreconciled" filter (show remove instead of reconcile) */
-  const isNoLongerUnreconciled = useCallback((status: string | undefined) => {
-    return status === 'SKIPPED' || status === 'MATCHED' || status === 'CONFIRMED';
-  }, []);
-
-  const handleRemoveFromList = useCallback((id: string) => {
-    masterRef.current?.removeRowsFromList?.([id]);
-    setReconcileResults((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    setPredictedFields((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
-
-  /** Row action: Reconcile icon, or Remove icon when status changed to SKIPPED/MATCHED (unreconciled filter only) */
+  /** Row action: Reconcile icon when posting needs categorization */
   const injectRowActions = useCallback((record: any) => {
-    const entry = reconcileResults[record.id];
-    const reconStatus = entry?.reconciliation?.status;
-    const showRemove = urlFilter === 'unreconciled' && isNoLongerUnreconciled(reconStatus);
-
-    if (showRemove) {
-      return (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-          onClick={() => handleRemoveFromList(record.id)}
-          title="Remove from list"
-        >
-          <XCircle size={16} />
-        </Button>
-      );
-    }
-
     if (!!record.account_id && !!record.credit_account_id) return null;
     const isReconciling = reconcilingPostingId === record.id;
     return (
@@ -512,7 +436,7 @@ export default function Transactions() {
         )}
       </Button>
     );
-  }, [urlFilter, reconcileResults, reconcilingPostingId, handleRowReconcile, isNoLongerUnreconciled, handleRemoveFromList]);
+  }, [reconcilingPostingId, handleRowReconcile]);
 
   // ── Modal posting data ────────────────────────────────────────────────
   const modalEntry = modalPostingId ? reconcileResults[modalPostingId] : null;
@@ -561,7 +485,6 @@ export default function Transactions() {
         }}
         defaultFilters={defaultFilters}
         presetFilters={presetFilters}
-        titleExtra={titleExtra}
         bulkActions={bulkActions}
         renderRowExtra={renderRowExtra}
         injectRowActions={injectRowActions}

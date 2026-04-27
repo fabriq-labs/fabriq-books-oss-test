@@ -74,11 +74,9 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
           <Button
             variant="ghost"
             size="icon"
-            className="relative"
             onClick={toggleChat}
           >
             <MessageSquare className="h-5 w-5 text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
           </Button>
         )}
 

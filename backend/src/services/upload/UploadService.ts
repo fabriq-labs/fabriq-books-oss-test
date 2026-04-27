@@ -45,7 +45,8 @@ export class UploadService {
       return acc;
     }, {});
 
-    const mergedData = { ...mappedRecord, ...parentData, ...metaData };
+    // parentData should provide defaults; per-row mapped values must win.
+    const mergedData = { ...parentData, ...mappedRecord, ...metaData };
     return this.dataTransformer.transformRecord(modelName, mergedData, fieldsets);
   }
 

@@ -94,7 +94,7 @@ const QUICK_ACTIONS = [
   {
     icon: RefreshCw,
     title: 'Reconcile Transactions',
-    path: '/accounting/transactions?filter=unreconciled',
+    path: '/accounting/transactions',
     aiAssisted: true,
   },
   {
@@ -298,7 +298,7 @@ const AIDashboard: React.FC = () => {
               <Button
                 size="sm"
                 className="flex-1"
-                onClick={() => navigate('/accounting/transactions?filter=unreconciled')}
+                onClick={() => navigate('/accounting/transactions')}
               >
                 Reconcile Now
                 <ArrowRight className="h-4 w-4 ml-1" />
