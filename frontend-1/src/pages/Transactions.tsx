@@ -67,7 +67,12 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
       delete finalRecord[contraAccountColumn];
       return finalRecord;
     });
-    return { mapping: mappingValue, isJSON: true, data: csvData };
+    return {
+      mapping: mappingValue,
+      isJSON: true,
+      data: csvData,
+      parentData: formattedData.parentData,
+    };
   }
 
   if (relationId && !mappingValue.debit_amount && !mappingValue.credit_amount && Object.values(mappingValue).includes("amount")) {
@@ -81,12 +86,15 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
       account_id: Object.values(mappingValue).includes("credit_account_id") ? relationId : null,
       credit_account_id: Object.values(mappingValue).includes("account_id") ? relationId : null,
     }));
-    return { mapping: mappingValue, isJSON: true, data: csvData };
+    return {
+      mapping: mappingValue,
+      isJSON: true,
+      data: csvData,
+      parentData: formattedData.parentData,
+    };
   }
 
-  const finalData: any = { ...formattedData };
-  delete finalData.parentData;
-  return finalData;
+  return { ...formattedData };
 }
 
 export default function Transactions() {
@@ -202,17 +210,44 @@ export default function Transactions() {
   // ── CSV import helpers ────────────────────────────────────────────────
   const updateCSVData = useCallback(async (formattedData: any, relationId: any) => {
     const result = transformPostingCSVData(formattedData, relationId);
-    if (!effectiveEntityId || !result?.data) return result;
+    if (!result?.data) return result;
+
+    const mapping = result.mapping || {};
+    const legalEntityCsvKey = Object.keys(mapping).find((k) => mapping[k] === "legal_entity_id");
+
+    const isEmptyLegalEntityCell = (raw: unknown) =>
+      raw === null ||
+      raw === undefined ||
+      raw === "" ||
+      (typeof raw === "object" &&
+        raw !== null &&
+        (raw as { isNotAvailable?: boolean }).isNotAvailable === true);
+
+    let data = result.data;
+    if (effectiveEntityId && legalEntityCsvKey) {
+      data = result.data.map((record: any) => {
+        if (isEmptyLegalEntityCell(record[legalEntityCsvKey])) {
+          return { ...record, [legalEntityCsvKey]: effectiveEntityId };
+        }
+        return record;
+      });
+    }
+
+    const parentData: Record<string, any> = {
+      ...(result.parentData ?? formattedData.parentData ?? {}),
+      ...(effectiveEntityId && !legalEntityCsvKey ? { legal_entity_id: effectiveEntityId } : {}),
+    };
+
     return {
       ...result,
-      mapping: { ...result.mapping, legal_entity_id: 'legal_entity_id' },
-      data: result.data.map((record: any) => ({ ...record, legal_entity_id: effectiveEntityId })),
+      ...(Object.keys(parentData).length > 0 ? { parentData } : {}),
+      data,
     };
   }, [effectiveEntityId]);
 
   const additionalFields = [
-    { key: "debit_amount", mappingFiled: "account_id" },
-    { key: "credit_amount", mappingFiled: "credit_account_id" },
+    { key: "debit_amount", displayName: "Debit Amount", mappingFiled: "account_id" },
+    { key: "credit_amount", displayName: "Credit Amount", mappingFiled: "credit_account_id" },
   ];
 
   // ── Validation helpers ────────────────────────────────────────────────
@@ -326,7 +361,7 @@ export default function Transactions() {
           <span>Match found: {matchLabel} {bestMatch.reference}</span>
           <Badge variant={
             bestMatch.confidence === 'high' ? 'default' :
-            bestMatch.confidence === 'medium' ? 'secondary' : 'outline'
+              bestMatch.confidence === 'medium' ? 'secondary' : 'outline'
           } className="text-[10px] px-1 py-0">
             {bestMatch.confidence}
           </Badge>
@@ -517,7 +552,7 @@ export default function Transactions() {
         listConfig={{
           importConfig: {
             updateCSVData: updateCSVData,
-            additionalFileds: additionalFields?.map((field: any) => field.key),
+            additionalFileds: additionalFields,
             relation: "account",
             relationView: "account_view",
             relationField: "name",

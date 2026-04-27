@@ -148,7 +148,8 @@ export const CSVMapper = ({
       .filter(
         (k: string) =>
           filedSets[k]?.permission === "update" &&
-          !filedSets[k]?.required
+          !filedSets[k]?.required ||
+          additionalFileds?.some((field: any) => field.key === k)
       );
   }, [list, filedSets]);
 
@@ -489,9 +490,9 @@ export const CSVMapper = ({
                 [colKey]: lookUpSet.has(normalizedCellValue)
                   ? cellValue
                   : {
-                      isNotAvailable: true,
-                      oldValue: cellValue,
-                    },
+                    isNotAvailable: true,
+                    oldValue: cellValue,
+                  },
               };
             })
           );
