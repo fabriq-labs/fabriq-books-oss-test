@@ -8,7 +8,6 @@ import prisma from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 import { main as syncMetadataFromJson } from '../metadata/syncMetadataFromJson';
-import { seedPaymentTermsFromCsv } from '../../prisma/setup-IN/setup-indian-demo';
 
 const adminRouter = Router();
 
@@ -52,6 +51,26 @@ type DemoDataOption = (typeof DEMO_DATA_OPTIONS)[number];
 
 let demoResetInProgress = false;
 let devOptionsSyncInProgress = false;
+
+function loadRuntimeModule<T = any>(modulePath: string): T {
+  return module.require(modulePath) as T;
+}
+
+type SeedPaymentTermsFromCsvFn = (options?: {
+  prismaClient?: typeof prisma;
+  csvPath?: string;
+  orgIdOverride?: string;
+  legalEntityIdOverride?: string | null;
+  profileLabel?: string;
+}) => Promise<{ created: number; updated: number; total: number }>;
+
+type SetupChartOfAccountsFn = (
+  orgId: string,
+  legalEntityId: string,
+  templatePath?: string,
+  currency?: string,
+  prismaClient?: typeof prisma
+) => Promise<{ accounts: Map<string, unknown>; created: number; existing: number }>;
 
 /** Pipe setup-db stdout/stderr to the server process stdout (terminal / container logs). */
 function pipeSetupStreamToConsole(
@@ -480,6 +499,9 @@ adminRouter.post(
         return res.status(404).json({ error: `Entity not found: ${entityId}` });
       }
 
+      const { seedPaymentTermsFromCsv } = loadRuntimeModule<{
+        seedPaymentTermsFromCsv: SeedPaymentTermsFromCsvFn;
+      }>('../../prisma/setup-IN/setup-indian-demo');
       const shouldApplyLegalEntity = modelHasField('payment_terms', 'legal_entity_id');
       const counts = await seedPaymentTermsFromCsv({
         prismaClient: prisma,
@@ -541,7 +563,9 @@ adminRouter.post(
     }
 
     try {
-      const { setupChartOfAccounts } = await import('../../prisma/setup-chart-of-accounts');
+      const { setupChartOfAccounts } = loadRuntimeModule<{
+        setupChartOfAccounts: SetupChartOfAccountsFn;
+      }>('../../prisma/setup-chart-of-accounts');
       const result = await setupChartOfAccounts(orgId, entityId, absoluteTemplatePath, currency, prisma);
 
       return res.status(200).json({
