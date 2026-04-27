@@ -1,7 +1,22 @@
 import type { FilterFieldEnhancement } from "@/types/customRowRenderer";
 import { X } from "lucide-react";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { viewAPI } from "@/api/api";
+
+/**
+ * For select columns, the grid may search by one field (e.g. `code`) while
+ * `filterProps.recordPath` (e.g. `account.name`) describes how filtering should match
+ * the row display — use the last path segment for search + instanceLabel in the filter UI.
+ */
+function mergeSelectPropsForFilter(col: Record<string, any>) {
+    const sp = col.tableProps?.selectProps;
+    if (!sp) return undefined;
+    const path: string | undefined = col.filterProps?.recordPath;
+    if (!path) return sp;
+    const field = path.split(".").pop();
+    if (!field) return sp;
+    return { ...sp, searchParams: field, instanceLabel: field };
+}
 
 interface FilterInputsProps {
     values: string[];
@@ -210,13 +225,21 @@ export function FilterInputs({
     const { tableProps } = col;
     const [draftValue, setDraftValue] = useState('');
     const isSelectField = tableProps?.columnType === 'select';
+    const filterSelectProps = useMemo(
+        () => (isSelectField ? mergeSelectPropsForFilter(col) ?? tableProps?.selectProps : undefined),
+        [isSelectField, col, tableProps?.selectProps],
+    );
+    const tablePropsForFilter = useMemo(
+        () => (isSelectField && filterSelectProps ? { ...tableProps, selectProps: filterSelectProps } : tableProps),
+        [isSelectField, tableProps, filterSelectProps],
+    );
 
     // Fetch labels for pre-existing IDs that aren't in the cache yet.
     // Reports each resolved label up to FilterModal via onLabelResolved.
     useEffect(() => {
         if (!isSelectField || !onLabelResolved) return;
-        const instanceType = tableProps?.selectProps?.instanceType;
-        const instanceLabel = tableProps?.selectProps?.instanceLabel;
+        const instanceType = filterSelectProps?.instanceType;
+        const instanceLabel = filterSelectProps?.instanceLabel;
         if (!instanceType || !instanceLabel) return;
 
         const missingIds = values.filter(v => !selectLabels[v]);
@@ -245,7 +268,7 @@ export function FilterInputs({
         };
         load();
         return () => { isMounted = false; };
-    }, [isSelectField, tableProps?.selectProps?.instanceType, tableProps?.selectProps?.instanceLabel, values, selectLabels, onLabelResolved]);
+    }, [isSelectField, filterSelectProps?.instanceType, filterSelectProps?.instanceLabel, values, selectLabels, onLabelResolved]);
 
     if (operator === 'is_null' || operator === 'is_not_null') return null;
 
@@ -254,7 +277,7 @@ export function FilterInputs({
             <MultiSelectFilterInput
                 values={values}
                 onChange={onChange}
-                tableProps={tableProps}
+                tableProps={tablePropsForFilter}
                 filterEnhancement={filterEnhancement}
                 selectLabels={selectLabels}
                 onLabelResolved={onLabelResolved ?? (() => {})}

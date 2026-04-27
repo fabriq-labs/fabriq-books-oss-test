@@ -122,6 +122,10 @@
         "type": "text",
         "recordPath": "account.name"
       },
+      "filterProps": {
+        "type": "text",
+        "recordPath": "account.name"
+      },
       "permission": "update",
       "tableProps": {
         "width": "250",
@@ -324,6 +328,10 @@
       "datatype": "string",
       "required": false,
       "listProps": {
+        "type": "text",
+        "recordPath": "credit_account.name"
+      },
+      "filterProps": {
         "type": "text",
         "recordPath": "credit_account.name"
       },

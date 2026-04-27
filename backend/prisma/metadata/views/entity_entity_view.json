@@ -116,7 +116,7 @@
         "type": "text",
         "recordPath": "currency.code"
       },
-      "displayName": "Legal Entity",
+      "displayName": "Currency",
       "isColumnShow": false
     },
     "currency": {
