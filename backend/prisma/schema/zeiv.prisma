@@ -457,6 +457,8 @@ model budget_line {
 model item_master {
   id                    String                  @id @default(dbgenerated("concat('prod_',  gen_random_uuid())")) @db.VarChar(50)
   item_code             String?                 @unique @db.VarChar(20)
+  hsn_code              String?
+  discount              Float?
   item_name             String
   name                  String?
   item_shortname        String?

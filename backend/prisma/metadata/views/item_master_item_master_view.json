@@ -59,6 +59,13 @@
       "displayName": "Item Code",
       "isColumnShow": true
     },
+    "hsn_code": {
+      "required": false,
+      "permission": "update",
+      "orderNo": 1,
+      "displayName": "HSN Code",
+      "isColumnShow": true
+    },
     "item_name": {
       "required": true,
       "permission": "update",
@@ -119,6 +126,18 @@
         "defaultValue": ""
       },
       "displayName": "Unit Price",
+      "isColumnShow": false
+    },
+    "discount": {
+      "datatype": "float",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "float",
+        "defaultValue": ""
+      },
+      "displayName": "Discount",
       "isColumnShow": false
     },
     "item_status": {

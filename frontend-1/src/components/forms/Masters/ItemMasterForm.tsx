@@ -132,6 +132,13 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                 submissionData.unit_price = parseFloat(String(rawPrice));
             }
 
+            const rawDiscount = submissionData.discount;
+            if (rawDiscount === '' || rawDiscount === null || rawDiscount === undefined) {
+                submissionData.discount = null;
+            } else {
+                submissionData.discount = parseFloat(String(rawDiscount));
+            }
+
             // Foreign key fields in item_master (must match zeiv.prisma `item_master`, e.g. currency_id not currency_master_id)
             const foreignKeyFields = ['item_category_id', 'supplier_id', 'uom_id', 'sales_account_id', 'purchase_account_id', 'tax_master_id', 'tax_rate_intra_id', 'currency_id'];
 
@@ -150,6 +157,9 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                 });
                 if (submissionData.unit_price === null) {
                     delete submissionData.unit_price;
+                }
+                if (submissionData.discount === null) {
+                    delete submissionData.discount;
                 }
                 await viewAPI.create(
                     "item_master",
@@ -226,6 +236,16 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
         const value = e.target.value;
         if (value === '' || /^\d*\.?\d*$/.test(value)) {
             onChange(value); // ✅ tell RHF about the change
+        }
+    };
+
+    const handleDecimalInputChange = (
+        e: React.ChangeEvent<HTMLInputElement>,
+        onChange: (value: any) => void
+    ) => {
+        const value = e.target.value;
+        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+            onChange(value);
         }
     };
 
@@ -406,6 +426,20 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
 
                                                 <FormField
                                                     control={form.control}
+                                                    name="hsn_code"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <RequiredFormLabel fieldName="hsn_code" dataGraph={dataGraph}>HSN Code</RequiredFormLabel>
+                                                            <FormControl>
+                                                                <Input placeholder="Enter HSN code" {...field} />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <FormField
+                                                    control={form.control}
                                                     name="item_description"
                                                     render={({ field }) => (
                                                         <FormItem>
@@ -475,6 +509,25 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                                     placeholder="Enter unit price"
                                                                     value={field.value || ''} // keep in sync
                                                                     onChange={(e) => handleUnitPriceChange(e, field.onChange)}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <FormField
+                                                    control={form.control}
+                                                    name="discount"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <RequiredFormLabel fieldName="discount" dataGraph={dataGraph}>Discount</RequiredFormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="text"
+                                                                    placeholder="Enter discount"
+                                                                    value={field.value || ''}
+                                                                    onChange={(e) => handleDecimalInputChange(e, field.onChange)}
                                                                 />
                                                             </FormControl>
                                                             <FormMessage />
@@ -759,6 +812,20 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
 
                                         <FormField
                                             control={form.control}
+                                            name="hsn_code"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <RequiredFormLabel fieldName="hsn_code" dataGraph={dataGraph}>HSN Code</RequiredFormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="Enter HSN code" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={form.control}
                                             name="item_description"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -808,6 +875,25 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                             placeholder="Enter unit price"
                                                             value={field.value || ''}
                                                             onChange={(e) => handleUnitPriceChange(e, field.onChange)}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={form.control}
+                                            name="discount"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <RequiredFormLabel fieldName="discount" dataGraph={dataGraph}>Discount</RequiredFormLabel>
+                                                    <FormControl>
+                                                        <Input
+                                                            type="text"
+                                                            placeholder="Enter discount"
+                                                            value={field.value || ''}
+                                                            onChange={(e) => handleDecimalInputChange(e, field.onChange)}
                                                         />
                                                     </FormControl>
                                                     <FormMessage />
