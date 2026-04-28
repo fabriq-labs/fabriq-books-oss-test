@@ -173,12 +173,14 @@ function SelectCombobox({
                                     className={`flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer ${active ? 'bg-[#F5EDFB] font-semibold text-[#5b21b6]' : 'text-[#374151] hover:bg-[#f5ebf9]'}`}
                                     onMouseDown={e => { e.preventDefault(); select(item); }}
                                 >
-                                    {active && (
-                                        <svg viewBox="0 0 10 10" width="10" height="10" fill="none" className="shrink-0">
-                                            <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="#7028a0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    )}
-                                    <span className={`truncate ${active ? '' : 'ml-[14px]'}`}>{item[instanceLabel]}</span>
+                                    <span className={`shrink-0 w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${active ? 'bg-[#7028a0] border-[#7028a0]' : 'bg-white border-[#d1d5db]'}`}>
+                                        {active && (
+                                            <svg viewBox="0 0 10 10" width="9" height="9" fill="none">
+                                                <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        )}
+                                    </span>
+                                    <span className="truncate">{item[instanceLabel]}</span>
                                     {sp?.instanceSubLabel && item[sp.instanceSubLabel] && (
                                         <span className="ml-auto text-xs text-[#9ca3af] shrink-0">({item[sp.instanceSubLabel]})</span>
                                     )}

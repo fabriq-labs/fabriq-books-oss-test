@@ -6,8 +6,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { EditValueInput } from "@/components/filter/EditValueInput";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,6 +33,22 @@ interface EditField {
   value: any;
   clearField?: boolean;
 }
+
+/**
+ * For select columns, use filter recordPath (e.g. `account.name`) as search field
+ * and label in Bulk Edit to match Filter modal behavior.
+ */
+const mergeSelectPropsForBulkEdit = (col: Record<string, any>) => {
+  const selectProps = col?.tableProps?.selectProps;
+  const recordPath: string | undefined = col?.filterProps?.recordPath;
+
+  if (!selectProps || !recordPath) return selectProps;
+
+  const field = recordPath.split(".").pop();
+  if (!field) return selectProps;
+
+  return { ...selectProps, searchParams: field, instanceLabel: field };
+};
 
 export const BulkEdit: React.FC<BulkEditProps> = ({
   isOpen,
@@ -126,12 +140,12 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] rounded-lg">
+      <DialogContent className="sm:max-w-[700px] rounded-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-[#403E43]">
             Bulk Edit ({selectedRows.length} items)
           </DialogTitle>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-xs text-[#6b7280] mt-1">
             Update multiple fields at once. Use "Clear" to set fields to empty values.
           </p>
         </DialogHeader>
@@ -139,7 +153,21 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
         {metaData && (
           <div className="space-y-4 py-4">
             {editFields.map((field, index) => (
-              <div key={index} className="flex gap-3 items-center p-3 bg-gray-50 rounded-lg border">
+              <div
+                key={index}
+                className="grid grid-cols-[48px_170px_minmax(0,1fr)_90px_36px] gap-2 items-start"
+              >
+                <div className="w-12 flex justify-center pt-2">
+                  {index === 0 ? (
+                    <span className="text-[11px] text-[#9ca3af] font-semibold select-none">
+                      WHERE
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold tracking-[.06em] text-[#64748b] bg-[#f1f5f9] rounded-[3px] px-[5px] py-px select-none">
+                      AND
+                    </span>
+                  )}
+                </div>
                 <Select
                   value={field.field}
                   onValueChange={(value) => updateField(index, "field", value)}
@@ -151,9 +179,10 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
                     {metaData &&
                       Object.entries(metaData)
                         .filter(([key, value]) =>
-                            value?.permission === "update" &&
-                            value?.datatype !== "date" &&
-                            !editFields.some((f, i) => i !== index && f.field === key)
+                          value?.permission === "update" &&
+                          value?.datatype !== "date" &&
+                          value?.dataType !== "date" &&
+                          !editFields.some((f, i) => i !== index && f.field === key)
                         )
                         .map(([key, value]) => (
                           <SelectItem key={key} value={key}>
@@ -164,53 +193,71 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
                 </Select>
 
                 {field.field && metaData[field.field] && (
-                  <div className="flex-1 flex items-center gap-2">
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
                     <div className="flex-1 relative">
-                      <EditValueInput
-                        className={field.clearField ? 'opacity-50 pointer-events-none' : ''}
-                        value={field.value ? String(field.value) : ''}
-                        onChange={(val) => updateField(index, "value", val)}
-                        col={metaData[field.field]}
-                      />
+                      {(() => {
+                        const columnMeta = metaData[field.field];
+                        const mergedSelectProps = mergeSelectPropsForBulkEdit(columnMeta);
+                        const bulkEditCol =
+                          columnMeta?.tableProps?.columnType === "select" && mergedSelectProps
+                            ? {
+                              ...columnMeta,
+                              tableProps: {
+                                ...columnMeta.tableProps,
+                                selectProps: mergedSelectProps,
+                              },
+                            }
+                            : columnMeta;
+
+                        return (
+                          <EditValueInput
+                            className={field.clearField ? 'opacity-50 pointer-events-none' : ''}
+                            value={field.value ? String(field.value) : ''}
+                            onChange={(val) => updateField(index, "value", val)}
+                            col={bulkEditCol}
+                          />
+                        );
+                      })()}
                       {field.clearField && (
                         <div className="absolute inset-0 flex items-center justify-center bg-red-50 border border-red-200 rounded-md">
                           <span className="text-red-600 text-sm font-medium">Will be cleared</span>
                         </div>
                       )}
                     </div>
-                    <Button
-                      type="button"
-                      variant={field.clearField ? "destructive" : "outline"}
-                      size="sm"
-                      onClick={() => updateField(index, "clearField", !field.clearField)}
-                      className="flex items-center gap-1 min-w-[80px]"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      {field.clearField ? "Undo" : "Clear"}
-                    </Button>
                   </div>
                 )}
+                {!field.field && <div />}
+                <Button
+                  type="button"
+                  variant={field.clearField ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={() => updateField(index, "clearField", !field.clearField)}
+                  disabled={!field.field}
+                  className="flex items-center gap-1 min-w-[80px] mt-px"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  {field.clearField ? "Undo" : "Clear"}
+                </Button>
 
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => removeField(index)}
                   disabled={editFields.length === 1}
-                  className="hover:bg-[#FDE1D3]"
+                  className="hover:bg-[#FDE1D3] mt-1"
                 >
                   <X className="h-4 w-4 text-[#d946ef]" />
                 </Button>
               </div>
             ))}
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 text-[#9b87f5] border-[#9b87f5] hover:bg-[#E5DEFF] font-semibold px-4 py-2"
+            <button
+              type="button"
+              className="ml-12 inline-flex items-center gap-1.5 h-8 px-3 text-[12px] font-semibold text-[#7028a0] bg-white border border-[#d1a9e4] rounded-md hover:bg-[#f5ebf9] transition-colors"
               onClick={addField}
             >
-              <Plus className="h-4 w-4" /> Add Another Field
-            </Button>
+              <Plus className="h-3.5 w-3.5" /> Add edit row
+            </button>
           </div>
         )}
 

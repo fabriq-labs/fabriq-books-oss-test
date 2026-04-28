@@ -176,6 +176,10 @@
         "type": "text",
         "recordPath": "parent_account.name"
       },
+      "filterProps": {
+        "type": "text",
+        "recordPath": "parent_account.name"
+      },
       "permission": "update",
       "tableProps": {
         "width": "250",
