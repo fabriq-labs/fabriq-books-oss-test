@@ -72,7 +72,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
     showActions = true,
     updatingPaymentId = null
 }) => {
-    const [isTableExpanded, setIsTableExpanded] = useState(false);
+    const [isTableExpanded, setIsTableExpanded] = useState(true);
     const navigate = useNavigate();
 
     // Format currency
@@ -139,16 +139,9 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
     if (!paymentReceipts || paymentReceipts.length === 0) {
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle>Payment Receipts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-center py-8 text-gray-500">
-                        <p className="text-lg font-medium">No payment receipts found</p>
-                        {/* <p className="text-sm">
-                            {/* Payment receipts will appear here once they are recorded */}
-
-                        {/* </p> */}
+                <CardContent className="py-5">
+                    <div className="text-center text-gray-500">
+                        <p className="text-sm font-medium">No payment receipts found</p>
                     </div>
                 </CardContent>
             </Card >

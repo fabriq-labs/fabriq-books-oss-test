@@ -20,6 +20,7 @@ interface SalesInvoiceItem {
   period: string;
   quantity: number | string;
   price: number | string;
+  discount_rate?: number | string;
   tax: number | string;
   total: number;
   item_name: string;
@@ -30,6 +31,7 @@ interface SalesInvoiceItemTableProps {
   items: SalesInvoiceItem[];
   currencyCode: string;
   subTotal: number;
+  totalDiscount: number;
   totalTax: number;
   grandTotal: number;
   isAddingItem: boolean;
@@ -54,6 +56,7 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
   items,
   currencyCode,
   subTotal,
+  totalDiscount,
   totalTax,
   grandTotal,
   isAddingItem,
@@ -108,6 +111,7 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
               <TableHead className="w-[140px] text-right">
                 Price <span className="text-destructive">*</span>
               </TableHead>
+              <TableHead className="w-[110px] text-right">Discount %</TableHead>
               <TableHead className="w-[100px] text-right">Tax (%)</TableHead>
               <TableHead className="w-[180px] text-right">Total</TableHead>
               <TableHead className="w-[50px] text-right">Actions</TableHead>
@@ -117,7 +121,7 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
             {items.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={7}
                   className="text-center h-24 text-muted-foreground"
                 >
                   There are no invoice items line items for this invoice.
@@ -222,6 +226,33 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                   <TableCell className="align-top py-3 text-right">
                     <Input
                       type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      value={item.discount_rate ?? ""}
+                      onChange={(e) =>
+                        onItemChange(
+                          item.id,
+                          "discount_rate",
+                          e.target.value === ""
+                            ? ""
+                            : parseFloat(e.target.value) || 0,
+                        )
+                      }
+                      onBlur={(e) =>
+                        onItemBlur(
+                          item.id,
+                          "discount_rate",
+                          parseFloat(e.target.value) || 0,
+                        )
+                      }
+                      className="h-9 border-border/60 text-right"
+                    />
+                  </TableCell>
+
+                  <TableCell className="align-top py-3 text-right">
+                    <Input
+                      type="number"
                       max={100}
                       step="1"
                       value={item.tax}
@@ -287,6 +318,14 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-gray-200">
                       <span className="text-sm font-medium text-gray-600">
+                        Discount Amount:
+                      </span>
+                      <span className="text-sm font-semibold text-gray-800">
+                        {formatCurrency(totalDiscount, currencyCode)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="text-sm font-medium text-gray-600">
                         Total Tax:
                       </span>
                       <span className="text-sm font-semibold text-gray-800">
@@ -297,6 +336,7 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                       <span className="text-base font-bold text-violet-900">
                         Grand Total:
                       </span>
+
                       <span className="text-lg font-bold text-violet-900">
                         {formatCurrency(grandTotal, currencyCode)}
                       </span>

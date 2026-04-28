@@ -81,7 +81,7 @@
     "hq_account_id": {
       "dataType": "string",
       "permission": "update",
-      "displayName": "HQ Account ID",
+      "displayName": "HQ Account",
       "isColumnShow": false
     },
     "account_number": {

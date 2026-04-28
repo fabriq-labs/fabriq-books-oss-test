@@ -64,7 +64,7 @@ export const functionMap: Record<string, Dependency> = {
         method: calculate_invoice_total
     },
     "invoice.invoice_line_item": {
-        fields: ["invoice_qty", "rate", "tax_rate"],
+        fields: ["invoice_qty", "rate", "tax_rate", "discount_rate"],
         method: calculate_invoice_total
     },
     "purchase_order.purchase_order_item": {

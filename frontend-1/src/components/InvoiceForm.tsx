@@ -28,6 +28,8 @@ interface InvoiceItem {
   period: string;
   quantity: number | string;
   price: number | string;
+  discount_rate?: number | string;
+  discount_amount?: number;
   tax: number | string;
   total: number;
   item_name: string;
@@ -46,6 +48,7 @@ interface InvoiceFormData {
   invoice_date: any;
   items: InvoiceItem[];
   subTotal: number;
+  totalDiscount: number;
   totalTax: number;
   grandTotal: number;
   invoice_total: number;
@@ -85,6 +88,7 @@ export const InvoiceForm: React.FC = () => {
     invoice_total: null,
     items: [],
     subTotal: 0,
+    totalDiscount: 0,
     totalTax: 0,
     grandTotal: 0,
     notes: "",
@@ -127,19 +131,30 @@ export const InvoiceForm: React.FC = () => {
       return sum + quantity * price;
     }, 0);
 
+    const totalDiscount = formData.items.reduce((sum, item) => {
+      const quantity = Number(item.quantity) || 0;
+      const price = Number(item.price) || 0;
+      const discountRate = Number(item.discount_rate) || 0;
+      const itemSubtotal = quantity * price;
+      return sum + (itemSubtotal * discountRate) / 100;
+    }, 0);
+
     const totalTax = formData.items.reduce((sum, item) => {
       const quantity = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
+      const discountRate = Number(item.discount_rate) || 0;
       const tax = Number(item.tax) || 0;
       const itemSubtotal = quantity * price;
-      return sum + (itemSubtotal * tax) / 100;
+      const lineAfterDiscount = itemSubtotal - (itemSubtotal * discountRate) / 100;
+      return sum + (lineAfterDiscount * tax) / 100;
     }, 0);
 
-    const grandTotal = subTotal + totalTax;
+    const grandTotal = subTotal - totalDiscount + totalTax;
 
     setFormData((prev) => ({
       ...prev,
       subTotal,
+      totalDiscount,
       totalTax,
       grandTotal,
     }));
@@ -295,9 +310,12 @@ export const InvoiceForm: React.FC = () => {
           const quantity = Number(updatedItem.quantity) || 0;
           const price = Number(updatedItem.price) || 0;
           const tax = Number(updatedItem.tax) || 0;
+          const discountRate = Number(updatedItem.discount_rate) || 0;
           const subtotal = quantity * price;
-          const taxAmount = (subtotal * tax) / 100;
-          updatedItem.total = subtotal + taxAmount;
+          const discountAmount = (subtotal * discountRate) / 100;
+          const taxableAmount = subtotal - discountAmount;
+          const taxAmount = (taxableAmount * tax) / 100;
+          updatedItem.total = taxableAmount + taxAmount;
 
           return updatedItem;
         }
@@ -323,6 +341,8 @@ export const InvoiceForm: React.FC = () => {
         quantity: item.quantity ?? item.invoice_qty ?? "",
         price: item.rate ?? item.price ?? "",
         tax: item.tax_master?.tax_rate ?? item.tax_rate ?? item.tax ?? "",
+        discount_rate: item.discount_rate ?? "",
+        discount_amount: item.discount_amount ?? 0,
         total: item.line_total ?? item.total ?? 0,
         item_name: item.item_name || item.item_master?.item_name || "",
         item_description:
@@ -346,6 +366,7 @@ export const InvoiceForm: React.FC = () => {
           quantity: "invoice_qty",
           price: "rate",
           tax: "tax_rate",
+          discount_rate: "discount_rate",
           product: "item_master_id",
           period: "period",
           total: "total",
@@ -371,17 +392,26 @@ export const InvoiceForm: React.FC = () => {
               const price = Number(item.price) || 0;
               return sum + qty * price;
             }, 0);
+            const totalDiscount = mappedItems.reduce((sum, item) => {
+              const qty = Number(item.quantity) || 0;
+              const price = Number(item.price) || 0;
+              const discountRate = Number(item.discount_rate) || 0;
+              return sum + (qty * price * discountRate) / 100;
+            }, 0);
             const totalTax = mappedItems.reduce((sum, item) => {
               const qty = Number(item.quantity) || 0;
               const price = Number(item.price) || 0;
+              const discountRate = Number(item.discount_rate) || 0;
               const tax = Number(item.tax) || 0;
-              return sum + (qty * price * tax) / 100;
+              const lineAfterDiscount = qty * price - (qty * price * discountRate) / 100;
+              return sum + (lineAfterDiscount * tax) / 100;
             }, 0);
-            const grandTotal = res.data?.invoice_total ?? subTotal + totalTax;
+            const grandTotal = res.data?.invoice_total ?? subTotal - totalDiscount + totalTax;
             return {
               ...prev,
               items: mappedItems,
               subTotal,
+              totalDiscount,
               totalTax,
               grandTotal,
             };
@@ -424,17 +454,26 @@ export const InvoiceForm: React.FC = () => {
               const price = Number(item.price) || 0;
               return sum + qty * price;
             }, 0);
+            const totalDiscount = mappedItems.reduce((sum, item) => {
+              const qty = Number(item.quantity) || 0;
+              const price = Number(item.price) || 0;
+              const discountRate = Number(item.discount_rate) || 0;
+              return sum + (qty * price * discountRate) / 100;
+            }, 0);
             const totalTax = mappedItems.reduce((sum, item) => {
               const qty = Number(item.quantity) || 0;
               const price = Number(item.price) || 0;
+              const discountRate = Number(item.discount_rate) || 0;
               const tax = Number(item.tax) || 0;
-              return sum + (qty * price * tax) / 100;
+              const lineAfterDiscount = qty * price - (qty * price * discountRate) / 100;
+              return sum + (lineAfterDiscount * tax) / 100;
             }, 0);
-            const grandTotal = res.data?.invoice_total ?? subTotal + totalTax;
+            const grandTotal = res.data?.invoice_total ?? subTotal - totalDiscount + totalTax;
             return {
               ...prev,
               items: mappedItems,
               subTotal,
+              totalDiscount,
               totalTax,
               grandTotal,
             };
@@ -540,6 +579,8 @@ export const InvoiceForm: React.FC = () => {
         quantity: "",
         price: "",
         tax: "",
+        discount_rate: "",
+        discount_amount: 0,
         total: 0,
         item_name: "",
         item_description: "",
@@ -702,9 +743,12 @@ export const InvoiceForm: React.FC = () => {
           const quantity = Number(updatedItem.quantity) || 0;
           const price = Number(updatedItem.price) || 0;
           const tax = Number(updatedItem.tax) || 0;
+          const discountRate = Number(updatedItem.discount_rate) || 0;
           const subtotal = quantity * price;
-          const taxAmount = (subtotal * tax) / 100;
-          updatedItem.total = subtotal + taxAmount;
+          const discountAmount = (subtotal * discountRate) / 100;
+          const taxableAmount = subtotal - discountAmount;
+          const taxAmount = (taxableAmount * tax) / 100;
+          updatedItem.total = taxableAmount + taxAmount;
 
           return updatedItem;
         }
@@ -1407,6 +1451,7 @@ export const InvoiceForm: React.FC = () => {
                     items={formData.items}
                     currencyCode={invoiceCurrencyCode}
                     subTotal={formData.subTotal}
+                    totalDiscount={formData.totalDiscount}
                     totalTax={formData.totalTax}
                     grandTotal={formData.grandTotal}
                     isAddingItem={isAddingItem}

@@ -894,6 +894,8 @@ model invoice_line_item {
   modified_at              DateTime              @default(now())
   org_id                   String?
   assigned_to              String?
+  discount_rate            Float?
+  discount_amount          Float?
   purchase_order_line_item purchase_order_item?  @relation(fields: [purchase_order_item_id], references: [id])
   item_master              item_master?          @relation(fields: [item_master_id], references: [id])
   invoice                  invoice               @relation(fields: [instance_id], references: [id])

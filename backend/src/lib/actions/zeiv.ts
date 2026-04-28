@@ -40,6 +40,8 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
             rate: true,
             invoice_qty: true,
             line_total: true,
+            discount_rate: true,
+            discount_amount: true,
             tax_rate: true,
             line_tax_amount: true,
             purchase_order_line_item: {
@@ -104,15 +106,33 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
       (acc: any, item: any) => {
         const quantity = Number(item.invoice_qty || 0);
         const rate = Number(item.rate || 0);
+        const discount_rate = Number(item.discount_rate || 0);
         const tax_rate = Number(item.tax_rate || 0);
+
+        // Step 1: Base line total (quantity × rate)
         const base_line_total = roundToTwoDecimals(quantity * rate);
-        const line_tax_amount = roundToTwoDecimals(base_line_total * (tax_rate / 100));
-        const line_total = roundToTwoDecimals(base_line_total + line_tax_amount);
+
+        // Step 2: Discount amount from discount_rate (% of base)
+        let discount_amount = 0;
+        if (discount_rate > 0) {
+          discount_amount = roundToTwoDecimals(base_line_total * (discount_rate / 100));
+        }
+
+        // Step 3: Line total after discount
+        const line_total_after_discount = roundToTwoDecimals(base_line_total - discount_amount);
+
+        // Step 4: Tax amount from tax_rate (% of amount after discount)
+        const line_tax_amount = roundToTwoDecimals(line_total_after_discount * (tax_rate / 100));
+
+        // Step 5: Final line total (after discount + tax)
+        const line_total = roundToTwoDecimals(line_total_after_discount + line_tax_amount);
+
         acc.modified_items.push({
           where: { id: item.id },
           data: {
             line_total,
             line_tax_amount,
+            discount_amount,
           },
         });
 
@@ -148,9 +168,9 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
           }
         }
         return {
-          invoice_net_total: roundToTwoDecimals(acc.invoice_net_total + line_total),
+          invoice_net_total: roundToTwoDecimals(acc.invoice_net_total + line_total_after_discount),
           tax_total: roundToTwoDecimals(acc.tax_total + line_tax_amount),
-          invoice_total: roundToTwoDecimals(acc.invoice_total + (line_total + line_tax_amount)),
+          invoice_total: roundToTwoDecimals(acc.invoice_total + line_total),
           modified_items: acc.modified_items,
           modified_po_items: acc.modified_po_items,
         };

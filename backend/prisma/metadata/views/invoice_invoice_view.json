@@ -457,6 +457,8 @@
         "line_total": "read",
         "instance_id": "read",
         "invoice_qty": "read",
+        "discount_rate": "update",
+        "discount_amount": "read",
         "item_master": {
           "type": "table",
           "select": {
