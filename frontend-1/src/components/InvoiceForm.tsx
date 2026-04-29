@@ -706,17 +706,14 @@ export const InvoiceForm: React.FC = () => {
     };
 
     const lookupData = constructObject(value.item, fields);
-    // Extract item ID from sourceKey (format: "product_0" or "product_123")
+    // Extract item ID from sourceKey (format: "product_0" or "product_abcd")
     const itemIdStr = sourceKey.replace("product_", "").replace("_id", "");
-    const itemId = /^\d+$/.test(itemIdStr)
-      ? parseInt(itemIdStr, 10)
-      : itemIdStr;
     setProducts(value);
     // Update the specific item in the form data
     setFormData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
-        if (item.id === itemId) {
+        if (String(item.id) === itemIdStr) {
           const updatedItem = { ...item };
           updatedItem.product = value[key];
 
@@ -764,7 +761,10 @@ export const InvoiceForm: React.FC = () => {
       }),
     }));
     // Update via API when editing existing invoice
-    if (id && typeof itemId === "string") {
+    const matchedItem = formData.items.find(
+      (item) => String(item.id) === itemIdStr,
+    );
+    if (id && typeof matchedItem?.id === "string") {
       const payload: any = {
         item_master_id: value[key],
       };
@@ -786,7 +786,7 @@ export const InvoiceForm: React.FC = () => {
         }
       }
 
-      updateLineItemFromProduct(String(itemId), payload);
+      updateLineItemFromProduct(matchedItem.id, payload);
     }
   };
   const handleLocationSelectClear = (sourceKey: any) => {
@@ -817,26 +817,43 @@ export const InvoiceForm: React.FC = () => {
     setProducts([]);
   };
   const handleProductSelectClear = (sourceKey: any) => {
-    // Extract item ID from sourceKey
-    const itemId = parseInt(
-      sourceKey.replace("product_", "").replace("_id", ""),
-    );
+    // Extract item ID from sourceKey (works for numeric and string IDs)
+    const itemIdStr = sourceKey.replace("product_", "").replace("_id", "");
 
     // Update the specific item in the form data
     setFormData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
-        if (item.id === itemId) {
+        if (String(item.id) === itemIdStr) {
           const updatedItem = { ...item };
           updatedItem.product = "";
           updatedItem.period = "";
+          updatedItem.item_name = "";
+          updatedItem.item_description = "";
           updatedItem.price = "";
+          updatedItem.tax = "";
+          updatedItem.discount_rate = "";
           updatedItem.total = 0;
           return updatedItem;
         }
         return item;
       }),
     }));
+
+    // Persist clear for existing line items
+    const matchedItem = formData.items.find(
+      (item) => String(item.id) === itemIdStr,
+    );
+    if (id && typeof matchedItem?.id === "string") {
+      updateLineItemFromProduct(matchedItem.id, {
+        item_master_id: null,
+        item_name: null,
+        item_description: null,
+        rate: 0,
+        tax_rate: 0,
+        discount_rate: 0,
+      });
+    }
   };
 
   const handleItemSelection = (sourceKey: any, key: string, value: any) => {

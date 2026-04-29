@@ -345,7 +345,7 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                         {formatCurrency(totalTax, currencyCode)}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 py-2 border-b border-border/70">
+                    <div className="grid grid-cols-[160px_120px_auto] gap-2 items-center py-2 border-b border-border/70">
                       <Input
                         type="text"
                         value={adjustableLabel}
@@ -391,6 +391,9 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                         }}
                         className="h-9 border-border/60 text-right"
                       />
+                      <span className="text-sm font-semibold text-foreground text-right whitespace-nowrap">
+                        {formatCurrency(Number(adjustableValue) || 0, currencyCode)}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center py-3 bg-primary/5 px-3 rounded-md border border-primary/20">
                       <span className="text-base font-bold text-foreground">
