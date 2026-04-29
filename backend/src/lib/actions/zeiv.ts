@@ -35,6 +35,13 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
         adjustable_value: true,
         adjustable_label: true,
         wf_instance_id: true,
+        payment_terms_id: true,
+        payment_terms: {
+          select: {
+            id: true,
+            payment_terms: true,
+          },
+        },
         invoice_line_item: {
           select: {
             id: true,

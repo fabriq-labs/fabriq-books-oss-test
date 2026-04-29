@@ -188,6 +188,7 @@ model payment_terms {
   purchase_order  purchase_order[]
   customers       customers[]
   sales_order     sales_order[]
+  invoices        invoice[]
 }
 
 model business_unit {
@@ -795,9 +796,9 @@ model purchase_order_item {
 }
 
 model invoice {
-  id                           String    @id @default(dbgenerated("concat('invoice_',  gen_random_uuid())")) @db.VarChar(50)
+  id                           String         @id @default(dbgenerated("concat('invoice_',  gen_random_uuid())")) @db.VarChar(50)
   invoice_number               String?
-  invoice_date                 DateTime  @default(now())
+  invoice_date                 DateTime       @default(now())
   invoice_version              Int?
   invoice_status               String?
   invoice_type                 String? // 'SALES' or 'PURCHASE' (business classification)
@@ -807,7 +808,8 @@ model invoice {
   supplier_remarks             String?
   shipping_terms               String?
   shipping_method              String?
-  payment_terms                String?
+  payment_terms_id             String?
+  payment_terms                payment_terms? @relation(fields: [payment_terms_id], references: [id])
   remit_to                     String?
   wf_instance_id               String?
   bill_to                      String?
@@ -835,9 +837,9 @@ model invoice {
   name                         String?
   status                       String?
   created_by                   String?
-  created_at                   DateTime? @default(now())
+  created_at                   DateTime?      @default(now())
   modified_by                  String?
-  modified_at                  DateTime? @default(now())
+  modified_at                  DateTime?      @default(now())
   org_id                       String?
   tax_total                    Float?
   assigned_to                  String?
@@ -845,12 +847,12 @@ model invoice {
   customer_id                  String?
   terms_and_conditions         String?
   notes                        String?
-  adjustable_label             String?   @default("Adjustable")
-  adjustable_value             Float?    @default(0.00)
+  adjustable_label             String?        @default("Adjustable")
+  adjustable_value             Float?         @default(0.00)
   // Lineage fields for data integration tracking
-  source_system_id             String?   @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_system_id             String?        @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
   source_record_id             String? // Source system record ID (e.g., Zoho invoice_id)
-  source_updated_at            DateTime? @default(now()) // Last updated in source system (default: now() for internal records)
+  source_updated_at            DateTime?      @default(now()) // Last updated in source system (default: now() for internal records)
   ingest_batch_id              String? // FK to datalake.sync_batch
 
   workflow_instance   workflow_instance?   @relation(fields: [wf_instance_id], references: [id])

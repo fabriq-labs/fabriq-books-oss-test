@@ -70,13 +70,24 @@
           }
         }
       },
-      "payment_terms": {
-        "type": "table",
-        "select": {
-          "id": "read",
-          "description": "update",
-          "payment_terms": "update"
-        }
+      "payment_terms_id": {
+        "datatype": "string",
+        "permission": "update",
+        "tableProps": {
+          "columnType": "select",
+          "selectProps": {
+            "type": "invoice",
+            "limit": "10",
+            "instanceKey": "id",
+            "instanceType": "payment_terms",
+            "searchParams": "payment_terms",
+            "instanceLabel": "payment_terms",
+            "instanceSourceKey": "payment_terms_id"
+          },
+          "defaultValue": ""
+        },
+        "displayName": "Payment Terms",
+        "isColumnShow": false
       },
       "currency": {
         "type": "table",
@@ -161,10 +172,6 @@
       "permission": "update",
       "displayName": "Invoice Total",
       "isColumnShow": true
-    },
-    "payment_terms": {
-      "dataType": "string",
-      "permission": "update"
     },
     "shipping_cost": {
       "dataType": "float",
@@ -369,6 +376,16 @@
       },
       "displayName": "Legal Entity",
       "isColumnShow": true
+    },
+    "payment_terms": {
+      "dataType": "table",
+      "select": {
+        "id": "read",
+        "payment_terms": "read"
+      },
+      "permission": "update",
+      "displayName": "Payment Terms",
+      "isColumnShow": false
     },
     "payment_receipt": {
       "type": "table",

@@ -6,7 +6,7 @@ import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { Card, CardContent } from "./ui/card";
 import { DatePicker } from "antd";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { SearchDropDown } from "./search_dropdown/dropdown";
 import { constructObject } from "./utils/helper";
 import { pdf } from "@react-pdf/renderer";
@@ -15,11 +15,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { viewAPI } from "@/api/api";
 import dayjs from "dayjs";
-import { FileText } from "lucide-react";
 import { PdfViewerModal } from "./ui/pdf-viewer-modal";
 import { PaymentReceiptModal } from "./forms/Masters/PaymentReceiptModal";
 import { PaymentReceiptTable } from "./forms/Masters/PaymentReceiptTable";
 import { SalesInvoiceItemTable } from "./forms/Masters/SalesInvoiceItemTable";
+import { Attachment } from "./attachment/Attachment";
 import { formatCurrency } from "@/lib/formatters";
 import { currencyUtils } from "@/utils/currencyUtils";
 interface InvoiceItem {
@@ -44,6 +44,7 @@ interface InvoiceFormData {
   customerData: any;
   location_id: string;
   locationData: any;
+  payment_terms_id?: string;
   invoice_number: string;
   invoice_date: any;
   items: InvoiceItem[];
@@ -59,18 +60,6 @@ interface InvoiceFormData {
 }
 
 export const InvoiceForm: React.FC = () => {
-  // Function to generate auto invoice number
-  const generateInvoiceNumber = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const randomNum = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0");
-    return `INV-${year}${month}${day}-${randomNum}`;
-  };
-
   const { id, viewId } = useParams<{ id: string; viewId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -85,8 +74,9 @@ export const InvoiceForm: React.FC = () => {
     customerData: null,
     location_id: "",
     locationData: null,
-    invoice_number: generateInvoiceNumber(),
-    invoice_date: new Date().toISOString(),
+    payment_terms_id: "",
+    invoice_number: id,
+    invoice_date: id ? null : new Date().toISOString(),
     invoice_total: null,
     items: [],
     subTotal: 0,
@@ -122,8 +112,8 @@ export const InvoiceForm: React.FC = () => {
     defaultValues: {
       legal_entity_id: "",
       // location: '',
-      invoice_number: generateInvoiceNumber(),
-      invoice_date: new Date().toISOString(),
+      invoice_number: id,
+      invoice_date: id ? null : new Date().toISOString(),
     },
   });
 
@@ -166,6 +156,13 @@ export const InvoiceForm: React.FC = () => {
   }, [formData.items, formData.adjustable_value]);
   useEffect(() => {
     if (id) {
+      // Clear fields immediately to avoid showing stale values
+      // from a previously opened invoice while the API request is in-flight.
+      setFormData((prev) => ({
+        ...prev,
+        invoice_number: "",
+        invoice_date: null,
+      }));
       fetchDetails(id);
     }
   }, [id]);
@@ -1078,7 +1075,7 @@ export const InvoiceForm: React.FC = () => {
       item: selected,
     };
 
-    form.setValue("legal_entity_id", selected.id);
+    form.setValue("legal_entity_id", selected?.id as never);
     form.trigger("legal_entity_id");
 
     setFormData((prev) => ({
@@ -1238,39 +1235,25 @@ export const InvoiceForm: React.FC = () => {
   ).symbol;
 
   const getFormTitle = () =>
-    id ? "Edit Invoice" : "Create Invoice";
+    id ? "Edit Invoice" : "New Invoice";
 
 
   return (
     <>
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="space-y-6">
+      <div className="max-w-7xl mx-auto px-2 md:px-4 space-y-4">
+        <div className="space-y-4">
           {/* Header */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-wrap justify-between items-center gap-3 border-b border-border/60 pb-3">
             <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
               <FileText className="w-5 h-5" />
               {getFormTitle()}
             </h1>
-            {/* <Popover>
-            <SearchDropDown
-                        instanceType="organization"
-                        instanceSourceKey="legal_entity_id"
-                        instanceKey="id"
-                        instanceLabel="legal_name"
-                        instanceValue={initialValues?.organization}
-                        onSelectItem={handleLegalEntitySelectChange}
-                        onClear={handleLegalEntitySelectClear}
-                        limit="10"
-                        searchParams="legal_name"
-                        type="organization"
-                      /> 
-            </Popover> */}
-
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 disabled={isSubmitting}
                 onClick={handlePreviewAndExport}
+                // size="sm"
                 className="bg-primary hover:bg-primary/90"
               >
                 Export
@@ -1284,13 +1267,16 @@ export const InvoiceForm: React.FC = () => {
               <Button
                 type="button"
                 onClick={() => setShowPaymentReceiptModal(true)}
+                // size="sm"
                 className="bg-primary hover:bg-primary/90"
                 disabled={!id}
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
                 Payment Receipt
               </Button>
-              <Button variant="outline" onClick={handleCancel}>
+              <Button
+
+                variant="outline" onClick={handleCancel}>
                 Back to List
               </Button>
             </div>
@@ -1314,147 +1300,172 @@ export const InvoiceForm: React.FC = () => {
                 />
               </div>
             )}
-            <div className="mt-6">
-              <Card className="border-border/80 shadow-sm overflow-hidden">
-                <CardContent className="p-6 space-y-8">
+            <div className="mt-4">
+              <Card className="border border-border/70 shadow-sm overflow-hidden rounded-lg">
+                <CardContent className="p-5 md:p-6 space-y-7 bg-background">
                   {/* Basic Information Section */}
-                  <div className="space-y-5">
-                    <div className="space-y-1">
-                      <h2 className="text-lg font-semibold text-foreground">
-                        Basic Information
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Enter the invoice details below.
-                      </p>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="customer"
+                              className="mb-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Customer Name{" "}
+                              <span className="text-destructive">*</span>
+                            </Label>
+                            <SearchDropDown
+                              instanceType="customers"
+                              instanceSourceKey="customer_id"
+                              instanceKey="id"
+                              instanceLabel="customer_name"
+                              instanceValue={initialValues?.customers}
+                              onSelectItem={handleCustomerSelectChange}
+                              onClear={handleLegalEntitySelectClear}
+                              limit="10"
+                              searchParams="customer_name"
+                              type="customers"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="legalEntity"
+                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Legal Entity{" "}
+                              <span className="text-destructive">*</span>
+                            </Label>
+                            <SearchDropDown
+                              instanceType="entity"
+                              instanceSourceKey="legal_entity_id"
+                              instanceKey="id"
+                              instanceLabel="legal_name"
+                              instanceValue={formData.legalEntityData?.item || initialValues?.legal_entity}
+                              onSelectItem={handleLegalEntitySelectChange}
+                              onClear={handleLegalEntitySelectClear}
+                              {...(initialValues &&
+                                (initialValues?.legal_entity_id === null ||
+                                  initialValues?.legal_entity_id === undefined ||
+                                  String(initialValues?.legal_entity_id).trim() === "") && {
+                                initialCallback: handleLegalEntityInitialCallback,
+                              })}
+                              limit="10"
+                              searchParams="legal_name"
+                              type="invoice"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="location"
+                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Location <span className="text-destructive">*</span>
+                            </Label>
+                            <SearchDropDown
+                              instanceType="location"
+                              instanceSourceKey="location_id"
+                              instanceKey="id"
+                              instanceLabel="location"
+                              instanceValue={initialValues?.location}
+                              onSelectItem={handleLoctionSelectChange}
+                              onClear={handleLocationSelectClear}
+                              searchParams="location"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="payment_terms"
+                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Payment Terms{" "}
+                              <span className="text-destructive">*</span>
+                            </Label>
+                            <SearchDropDown
+                              instanceType="payment_terms"
+                              instanceSourceKey="payment_terms_id"
+                              instanceKey="id"
+                              instanceLabel="payment_terms"
+                              instanceValue={initialValues?.payment_terms || ''}
+                              onSelectItem={(sourceKey, key, value) => {
+                                form.setValue(sourceKey, value[key]);
+                                handleInputChange('payment_terms_id', value[key]);
+                                if (id) {
+                                  handleFieldUpdate('payment_terms_id', value[key]);
+                                }
+                              }}
+                              onClear={(sourceKey) => {
+                                form.setValue(sourceKey, '');
+                                handleInputChange('payment_terms_id', '');
+                                if (id) {
+                                  handleFieldUpdate('payment_terms_id', '');
+                                }
+                              }}
+                              limit="10"
+                              searchParams="payment_terms"
+                              type="payment_terms"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Invoice #
+                            </Label>
+                            <Input
+                              type="text"
+                              value={formData.invoice_number}
+                              onChange={(e) =>
+                                handleInputChange("invoice_number", e.target.value)
+                              }
+                              onBlur={(e) => {
+                                if (id) handleFieldUpdate("invoice_number", e.target.value);
+                              }}
+                              className="h-10 border-border/70"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Date
+                            </Label>
+                            <DatePicker
+                              className="w-full h-10 px-3 py-2 border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              style={{ width: "100%" }}
+                              value={
+                                formData.invoice_date
+                                  ? dayjs(formData.invoice_date)
+                                  : null
+                              }
+                              onChange={(date) => {
+                                const dateValue = date
+                                  ? date.toDate().toISOString()
+                                  : "";
+                                invoiceDateRef.current = dateValue || null;
+                                handleInputChange("invoice_date", dateValue);
+                              }}
+                              onOpenChange={(open) => {
+                                if (
+                                  !open &&
+                                  id &&
+                                  invoiceDateRef.current !== null
+                                ) {
+                                  handleFieldUpdate(
+                                    "invoice_date",
+                                    invoiceDateRef.current,
+                                  );
+                                }
+                              }}
+                              format="DD-MM-YYYY"
+                              placeholder="Invoice Date"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="invoice_number"
-                          className="text-sm font-medium text-foreground"
-                        >
-                          Invoice Number{" "}
-                          <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                          type="text"
-                          value={formData.invoice_number}
-                          onChange={(e) =>
-                            handleInputChange("invoice_number", e.target.value)
-                          }
-                          required
-                          className="bg-muted/50 border-border"
-                          readOnly
-                        />
-                      </div>
 
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="invoice_date"
-                          className="text-sm font-medium text-foreground"
-                        >
-                          Invoice Date{" "}
-                          <span className="text-destructive">*</span>
-                        </Label>
-
-                        <DatePicker
-                          className="w-full h-10 px-3 py-2 border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          style={{ width: "100%" }}
-                          value={
-                            formData.invoice_date
-                              ? dayjs(formData.invoice_date)
-                              : null
-                          }
-                          onChange={(date) => {
-                            const dateValue = date
-                              ? date.toDate().toISOString()
-                              : "";
-                            invoiceDateRef.current = dateValue || null;
-                            handleInputChange("invoice_date", dateValue);
-                          }}
-                          onOpenChange={(open) => {
-                            if (
-                              !open &&
-                              id &&
-                              invoiceDateRef.current !== null
-                            ) {
-                              handleFieldUpdate(
-                                "invoice_date",
-                                invoiceDateRef.current,
-                              );
-                            }
-                          }}
-                          format="DD-MM-YYYY"
-                          placeholder="Invoice Date"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="legalEntity"
-                          className="text-sm font-medium text-foreground"
-                        >
-                          Legal Entity{" "}
-                          <span className="text-destructive">*</span>
-                        </Label>
-                        <SearchDropDown
-                          instanceType="entity"
-                          instanceSourceKey="legal_entity_id"
-                          instanceKey="id"
-                          instanceLabel="legal_name"
-                          instanceValue={formData.legalEntityData?.item || initialValues?.legal_entity}
-                          onSelectItem={handleLegalEntitySelectChange}
-                          onClear={handleLegalEntitySelectClear}
-                          {...(initialValues &&
-                            (initialValues?.legal_entity_id === null ||
-                              initialValues?.legal_entity_id === undefined ||
-                              String(initialValues?.legal_entity_id).trim() === "") && {
-                            initialCallback: handleLegalEntityInitialCallback,
-                          })}
-                          limit="10"
-                          searchParams="legal_name"
-                          type="invoice"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="customer"
-                          className="md:col-span-1 mb-0"
-                        >
-                          Customer <span className="text-destructive">*</span>
-                        </Label>
-                        <SearchDropDown
-                          instanceType="customers"
-                          instanceSourceKey="customer_id"
-                          instanceKey="id"
-                          instanceLabel="customer_name"
-                          instanceValue={initialValues?.customers}
-                          onSelectItem={handleCustomerSelectChange}
-                          onClear={handleLegalEntitySelectClear}
-                          limit="10"
-                          searchParams="customer_name"
-                          type="customers"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="location"
-                          className="text-sm font-medium text-foreground"
-                        >
-                          Location <span className="text-destructive">*</span>
-                        </Label>
-                        <SearchDropDown
-                          instanceType="location"
-                          instanceSourceKey="location_id"
-                          instanceKey="id"
-                          instanceLabel="location"
-                          instanceValue={initialValues?.location}
-                          onSelectItem={handleLoctionSelectChange}
-                          onClear={handleLocationSelectClear}
-                          searchParams="location"
-                        />
-                      </div>
-                    </div>
                   </div>
 
                   {/* Items Section - moved to SalesInvoiceItemTable */}
@@ -1499,43 +1510,72 @@ export const InvoiceForm: React.FC = () => {
                     onProductSelectClear={handleProductSelectClear}
                   />
 
-                  {/* Notes and Terms and Conditions */}
-                  <div className="space-y-4 pt-4 border-t border-border/60">
-                    <div className="space-y-2">
-                      <Label htmlFor="notes">Notes</Label>
-                      <Textarea
-                        id="notes"
-                        placeholder="Additional notes or instructions"
-                        value={formData.notes ?? ""}
-                        onChange={(e) =>
-                          handleInputChange("notes", e.target.value)
-                        }
-                        onBlur={() => {
-                          if (id && formData.notes !== undefined) {
-                            handleFieldUpdate("notes", formData.notes);
+                  {/* Zoho-style Notes, Terms and Attachments */}
+                  <div className="pt-4 border-t border-border/60">
+                    <div className="rounded-lg border border-border/70 bg-muted/10 divide-y divide-border/60">
+                      <div className="p-4 space-y-2">
+                        <Label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="notes"
+                        >
+                          Customer Notes
+                        </Label>
+                        <Textarea
+                          id="notes"
+                          placeholder="Thanks for your business."
+                          value={formData.notes ?? ""}
+                          onChange={(e) =>
+                            handleInputChange("notes", e.target.value)
                           }
-                        }}
-                        className="min-h-[80px] border-border/60 resize-y"
-                        rows={3}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="terms_and_conditions">Terms and Conditions</Label>
-                      <Textarea
-                        id="terms_and_conditions"
-                        placeholder="Enter terms and conditions"
-                        value={formData.terms_and_conditions ?? ""}
-                        onChange={(e) =>
-                          handleInputChange("terms_and_conditions", e.target.value)
-                        }
-                        onBlur={() => {
-                          if (id && formData.terms_and_conditions !== undefined) {
-                            handleFieldUpdate("terms_and_conditions", formData.terms_and_conditions);
-                          }
-                        }}
-                        className="min-h-[80px] border-border/60 resize-y"
-                        rows={3}
-                      />
+                          onBlur={() => {
+                            if (id && formData.notes !== undefined) {
+                              handleFieldUpdate("notes", formData.notes);
+                            }
+                          }}
+                          className="min-h-[78px] border-border/70 bg-background resize-y"
+                          rows={2}
+                        />
+
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr]">
+                        <div className="p-4 space-y-2 border-b lg:border-b-0 lg:border-r border-border/60">
+                          <Label
+                            className="text-sm font-medium text-foreground"
+                            htmlFor="terms_and_conditions"
+                          >
+                            Terms &amp; Conditions
+                          </Label>
+                          <Textarea
+                            id="terms_and_conditions"
+                            placeholder="Enter the terms and conditions of your business to be displayed in your transaction."
+                            value={formData.terms_and_conditions ?? ""}
+                            onChange={(e) =>
+                              handleInputChange("terms_and_conditions", e.target.value)
+                            }
+                            onBlur={() => {
+                              if (id && formData.terms_and_conditions !== undefined) {
+                                handleFieldUpdate("terms_and_conditions", formData.terms_and_conditions);
+                              }
+                            }}
+                            className="min-h-[110px] border-border/70 bg-background resize-y"
+                            rows={4}
+                          />
+                        </div>
+                        <div className="p-4 space-y-2">
+                          <p className="text-sm font-medium text-foreground">
+                            Attach File(s) to Invoice
+                          </p>
+                          {id ? (
+                            <Attachment model="invoice" id={id} />
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Save invoice to enable attachments.
+                            </p>
+                          )}
+
+                        </div>
+                      </div>
                     </div>
                   </div>
 

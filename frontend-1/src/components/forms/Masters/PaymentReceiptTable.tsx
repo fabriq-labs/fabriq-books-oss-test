@@ -138,10 +138,10 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
 
     if (!paymentReceipts || paymentReceipts.length === 0) {
         return (
-            <Card>
+            <Card className="border-border/60">
                 <CardContent className="py-5">
-                    <div className="text-center text-gray-500">
-                        <p className="text-sm font-medium">No payment receipts found</p>
+                    <div className="text-center text-muted-foreground">
+                        <p className="text-sm font-medium">No payments recorded yet</p>
                     </div>
                 </CardContent>
             </Card >
@@ -153,7 +153,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
     const currencyCode = paymentReceipts[0]?.currency?.code || currency;
 
     return (
-        <Card>
+        <Card className="border-border/70 shadow-sm">
             <CardHeader className="py-2 px-4">
                 <div
                     className="flex items-center justify-between cursor-pointer select-none"
@@ -174,7 +174,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
                         )}
                     </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-4 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4">
                     <div className="text-center">
                         <p className="text-sm text-muted-foreground font-normal">Total Payments</p>
                         <p className="text-lg font-semibold text-foreground mt-0.5">
@@ -183,7 +183,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
                     </div>
                     <div className="text-center">
                         <p className="text-sm text-muted-foreground font-normal">Remaining Balance</p>
-                        <p className="text-lg font-semibold text-orange-600 mt-0.5">
+                        <p className="text-lg font-semibold text-amber-600 mt-0.5">
                             {formatCurrency(displayBalance, currencyCode)}
                         </p>
                     </div>
@@ -197,7 +197,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
             </CardHeader>
             <CardContent>
                 {isTableExpanded && (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto border border-border/60 rounded-md">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -228,7 +228,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
                                         </TableCell>
 
                                         <TableCell>
-                                            <span className="text-sm text-gray-600">
+                                            <span className="text-sm text-muted-foreground">
                                                 {paymentReceipt?.payment_method}
                                             </span>
                                         </TableCell>
@@ -243,7 +243,7 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <span className="text-sm text-gray-600">
+                                            <span className="text-sm text-muted-foreground">
                                                 {paymentReceipt?.payment_reference || '-'}
                                             </span>
                                         </TableCell>

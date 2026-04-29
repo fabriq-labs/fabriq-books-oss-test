@@ -79,52 +79,55 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
 }) => {
   return (
     <div className="space-y-4 pt-4 border-t border-border/60">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold text-foreground">
-            Invoice Items
+            Line Items
           </h2>
           <p className="text-sm text-muted-foreground">
-            Add products to your invoice.
+            Add line items to your invoice.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={onAddItem}
-          className="bg-primary hover:bg-primary/90"
-          disabled={isAddingItem}
-        >
-          {isAddingItem ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Adding...
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Item
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={onAddItem}
+            // size="sm"
+            className="bg-primary hover:bg-primary/90"
+            disabled={isAddingItem}
+          >
+            {isAddingItem ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add New Row
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto border border-border/60 rounded-md">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[220px]">
-                Product <span className="text-destructive">*</span>
+              <TableHead className="w-[220px] text-[11px] uppercase tracking-wide text-muted-foreground">
+                Item Details <span className="text-destructive">*</span>
               </TableHead>
-              <TableHead className="w-[100px] text-right">
+              <TableHead className="w-[100px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">
                 Quantity <span className="text-destructive">*</span>
               </TableHead>
-              <TableHead className="w-[140px] text-right">
-                Price <span className="text-destructive">*</span>
+              <TableHead className="w-[140px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">
+                Rate <span className="text-destructive">*</span>
               </TableHead>
-              <TableHead className="w-[110px] text-right">Discount %</TableHead>
-              <TableHead className="w-[100px] text-right">Tax (%)</TableHead>
-              <TableHead className="w-[180px] text-right">Total</TableHead>
-              <TableHead className="w-[50px] text-right">Actions</TableHead>
+              <TableHead className="w-[110px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">Discount (%)</TableHead>
+              <TableHead className="w-[100px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">Tax (%)</TableHead>
+              <TableHead className="w-[180px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">Amount</TableHead>
+              <TableHead className="w-[50px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -134,7 +137,7 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                   colSpan={7}
                   className="text-center h-24 text-muted-foreground"
                 >
-                  There are no invoice items line items for this invoice.
+                  Type or click to select an item.
                 </TableCell>
               </TableRow>
             ) : (
@@ -314,35 +317,35 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
             )}
           </TableBody>
           <TableFooter>
-            <TableRow className="bg-gray-50">
+            <TableRow className="bg-muted/40">
               <TableCell colSpan={7} className="p-0">
-                <div className="flex justify-end p-4 space-y-2">
-                  <div className="w-64 space-y-3">
-                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                      <span className="text-sm font-medium text-gray-600">
+                <div className="flex justify-end p-4">
+                  <div className="w-full max-w-sm space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-border/70">
+                      <span className="text-sm font-medium text-muted-foreground">
                         Sub Total:
                       </span>
-                      <span className="text-sm font-semibold text-gray-800">
+                      <span className="text-sm font-semibold text-foreground">
                         {formatCurrency(subTotal, currencyCode)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                      <span className="text-sm font-medium text-gray-600">
+                    <div className="flex justify-between items-center py-2 border-b border-border/70">
+                      <span className="text-sm font-medium text-muted-foreground">
                         Discount Amount:
                       </span>
-                      <span className="text-sm font-semibold text-gray-800">
+                      <span className="text-sm font-semibold text-foreground">
                         {formatCurrency(totalDiscount, currencyCode)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                      <span className="text-sm font-medium text-gray-600">
+                    <div className="flex justify-between items-center py-2 border-b border-border/70">
+                      <span className="text-sm font-medium text-muted-foreground">
                         Total Tax:
                       </span>
-                      <span className="text-sm font-semibold text-gray-800">
+                      <span className="text-sm font-semibold text-foreground">
                         {formatCurrency(totalTax, currencyCode)}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-200">
+                    <div className="grid grid-cols-2 gap-2 py-2 border-b border-border/70">
                       <Input
                         type="text"
                         value={adjustableLabel}
@@ -389,12 +392,12 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                         className="h-9 border-border/60 text-right"
                       />
                     </div>
-                    <div className="flex justify-between items-center py-3 bg-violet-50 px-3 rounded-lg border-2 border-violet-200">
-                      <span className="text-base font-bold text-violet-900">
+                    <div className="flex justify-between items-center py-3 bg-primary/5 px-3 rounded-md border border-primary/20">
+                      <span className="text-base font-bold text-foreground">
                         Grand Total:
                       </span>
 
-                      <span className="text-lg font-bold text-violet-900">
+                      <span className="text-lg font-bold text-foreground">
                         {formatCurrency(grandTotal, currencyCode)}
                       </span>
                     </div>

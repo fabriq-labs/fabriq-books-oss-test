@@ -10,8 +10,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { constructObject } from '../../utils/helper';
 import { SearchDropDown } from '../../search_dropdown/dropdown';
-import { useTool } from '@/contexts/ToolContext';
-
 import { Modal, Select } from 'antd';
 import { Attachment } from '@/components/attachment/Attachment';
 
@@ -245,11 +243,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
         <Modal
             title={
                 <div className="bg-primary text-white p-4 -m-6 mb-6 rounded-t-lg">
-                    <h2 className="text-lg font-semibold">Payment for {invoiceData?.invoice_number || 'Invoice'}</h2>
+                    <h2 className="text-lg font-semibold">Record Payment - {invoiceData?.invoice_number || 'Invoice'}</h2>
                 </div>
             }
             open={isOpen}
-            style={{ marginTop: "5%", marginLeft: "8%" }}
+            style={{ marginTop: "4%" }}
             // styles={{
             //     body: {
             //         padding: '2px',
@@ -258,7 +256,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
             //     }
             // }}
             onCancel={onClose}
-            width={1000}
+            width={920}
             centered
             footer={[
                 <Button
