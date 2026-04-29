@@ -1,0 +1,3 @@
+ALTER TABLE "invoice"
+ADD COLUMN IF NOT EXISTS "adjustable_label" TEXT DEFAULT 'Adjustable',
+ADD COLUMN IF NOT EXISTS "adjustable_value" DOUBLE PRECISION DEFAULT 0.00;

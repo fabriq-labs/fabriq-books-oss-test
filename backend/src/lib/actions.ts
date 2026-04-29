@@ -60,7 +60,7 @@ export const functionMap: Record<string, Dependency> = {
         method: calculate_pr_total
     },
     "invoice": {
-        fields: ["purchase_order_id"],
+        fields: ["purchase_order_id", "adjustable_value"],
         method: calculate_invoice_total
     },
     "invoice.invoice_line_item": {

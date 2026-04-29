@@ -34,6 +34,8 @@ interface SalesInvoiceItemTableProps {
   totalDiscount: number;
   totalTax: number;
   grandTotal: number;
+  adjustableLabel: string;
+  adjustableValue: number | string;
   isAddingItem: boolean;
   onAddItem: () => void;
   onItemChange: (
@@ -43,6 +45,9 @@ interface SalesInvoiceItemTableProps {
   ) => void;
   onItemBlur: (itemId: number | string, field: string, value: any) => void;
   onRemoveItem: (itemId: number | string) => void;
+  onAdjustableLabelChange: (value: string) => void;
+  onAdjustableValueChange: (value: number | string) => void;
+  onAdjustableBlur?: () => void;
   onProductSelectChange: (
     sourceKey: any,
     key: string,
@@ -59,11 +64,16 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
   totalDiscount,
   totalTax,
   grandTotal,
+  adjustableLabel,
+  adjustableValue,
   isAddingItem,
   onAddItem,
   onItemChange,
   onItemBlur,
   onRemoveItem,
+  onAdjustableLabelChange,
+  onAdjustableValueChange,
+  onAdjustableBlur,
   onProductSelectChange,
   onProductSelectClear,
 }) => {
@@ -331,6 +341,53 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                       <span className="text-sm font-semibold text-gray-800">
                         {formatCurrency(totalTax, currencyCode)}
                       </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-200">
+                      <Input
+                        type="text"
+                        value={adjustableLabel}
+                        onChange={(e) => onAdjustableLabelChange(e.target.value)}
+                        onFocus={() => {
+                          if (adjustableLabel === "Adjustable") {
+                            onAdjustableLabelChange("");
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!adjustableLabel.trim()) {
+                            onAdjustableLabelChange("Adjustable");
+                          }
+                          onAdjustableBlur?.();
+                        }}
+                        className="h-9 border-border/60"
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={adjustableValue}
+                        onChange={(e) =>
+                          onAdjustableValueChange(
+                            e.target.value === ""
+                              ? ""
+                              : parseFloat(e.target.value) || 0,
+                          )
+                        }
+                        onFocus={() => {
+                          if (Number(adjustableValue) === 0) {
+                            onAdjustableValueChange("");
+                          }
+                        }}
+                        onBlur={() => {
+                          if (
+                            adjustableValue === "" ||
+                            adjustableValue === null ||
+                            adjustableValue === undefined
+                          ) {
+                            onAdjustableValueChange(0);
+                          }
+                          onAdjustableBlur?.();
+                        }}
+                        className="h-9 border-border/60 text-right"
+                      />
                     </div>
                     <div className="flex justify-between items-center py-3 bg-violet-50 px-3 rounded-lg border-2 border-violet-200">
                       <span className="text-base font-bold text-violet-900">

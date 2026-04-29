@@ -845,6 +845,8 @@ model invoice {
   customer_id                  String?
   terms_and_conditions         String?
   notes                        String?
+  adjustable_label             String?   @default("Adjustable")
+  adjustable_value             Float?    @default(0.00)
   // Lineage fields for data integration tracking
   source_system_id             String?   @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
   source_record_id             String? // Source system record ID (e.g., Zoho invoice_id)

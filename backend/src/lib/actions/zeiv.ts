@@ -32,6 +32,8 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
         invoice_date: true,
         invoice_total: true,
         invoice_net_total: true,
+        adjustable_value: true,
+        adjustable_label: true,
         wf_instance_id: true,
         invoice_line_item: {
           select: {
@@ -199,7 +201,9 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
         id: instance_id,
       },
       data: {
-        invoice_total: invoice_calculations.invoice_total,
+        invoice_total: roundToTwoDecimals(
+          invoice_calculations.invoice_total + Number(invoice.adjustable_value || 0)
+        ),
         invoice_net_total: invoice_calculations.invoice_net_total,
         tax_total: invoice_calculations.tax_total,
         invoice_line_item: {

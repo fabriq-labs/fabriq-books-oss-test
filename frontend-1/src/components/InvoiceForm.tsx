@@ -51,6 +51,8 @@ interface InvoiceFormData {
   totalDiscount: number;
   totalTax: number;
   grandTotal: number;
+  adjustable_label?: string;
+  adjustable_value?: number | string;
   invoice_total: number;
   notes?: string;
   terms_and_conditions?: string;
@@ -91,6 +93,8 @@ export const InvoiceForm: React.FC = () => {
     totalDiscount: 0,
     totalTax: 0,
     grandTotal: 0,
+    adjustable_label: "Adjustable",
+    adjustable_value: 0,
     notes: "",
     terms_and_conditions: "",
   });
@@ -149,7 +153,8 @@ export const InvoiceForm: React.FC = () => {
       return sum + (lineAfterDiscount * tax) / 100;
     }, 0);
 
-    const grandTotal = subTotal - totalDiscount + totalTax;
+    const adjustableValue = Number(formData.adjustable_value) || 0;
+    const grandTotal = subTotal - totalDiscount + totalTax + adjustableValue;
 
     setFormData((prev) => ({
       ...prev,
@@ -158,7 +163,7 @@ export const InvoiceForm: React.FC = () => {
       totalTax,
       grandTotal,
     }));
-  }, [formData.items]);
+  }, [formData.items, formData.adjustable_value]);
   useEffect(() => {
     if (id) {
       fetchDetails(id);
@@ -209,6 +214,12 @@ export const InvoiceForm: React.FC = () => {
         invoice_number: res.data.invoice_number || prev.invoice_number,
         invoice_date: res.data.invoice_date || prev.invoice_date,
         grandTotal: res.data.invoice_total,
+        adjustable_label:
+          res.data.adjustable_label ??
+          prev.adjustable_label ??
+          "Adjustable",
+        adjustable_value:
+          Number(res.data.adjustable_value ?? prev.adjustable_value ?? 0),
         items: items,
         notes: res.data.notes ?? prev.notes ?? "",
         terms_and_conditions: res.data.terms_and_conditions ?? prev.terms_and_conditions ?? "",
@@ -1454,11 +1465,36 @@ export const InvoiceForm: React.FC = () => {
                     totalDiscount={formData.totalDiscount}
                     totalTax={formData.totalTax}
                     grandTotal={formData.grandTotal}
+                    adjustableLabel={formData.adjustable_label ?? "Adjustable"}
+                    adjustableValue={formData.adjustable_value ?? 0}
                     isAddingItem={isAddingItem}
                     onAddItem={addItem}
                     onItemChange={handleItemChange}
                     onItemBlur={handleItemBlur}
                     onRemoveItem={removeItem}
+                    onAdjustableLabelChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        adjustable_label: value,
+                      }))
+                    }
+                    onAdjustableValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        adjustable_value: value,
+                      }))
+                    }
+                    onAdjustableBlur={() => {
+                      if (!id) return;
+                      handleFieldUpdate(
+                        "adjustable_label",
+                        formData.adjustable_label ?? "Adjustable",
+                      );
+                      handleFieldUpdate(
+                        "adjustable_value",
+                        Number(formData.adjustable_value) || 0,
+                      );
+                    }}
                     onProductSelectChange={handleProductSelectChange}
                     onProductSelectClear={handleProductSelectClear}
                   />
