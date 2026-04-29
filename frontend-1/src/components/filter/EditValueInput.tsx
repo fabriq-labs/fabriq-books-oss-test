@@ -18,11 +18,13 @@ function SelectCombobox({
     onChange,
     tableProps,
     initialLabel,
+    className,
 }: {
     value: string;
     onChange: (value: string) => void;
     tableProps: any;
     initialLabel?: string;
+    className?: string;
 }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<any[]>([]);
@@ -110,25 +112,26 @@ function SelectCombobox({
         onChange('');
         setSelectedLabel('');
     };
-
     return (
-        <div ref={containerRef} className="relative w-full min-w-0" onClick={e => e.stopPropagation()}>
+        <div ref={containerRef} className={`relative w-full min-w-0 ${className ?? ''}`} onClick={e => e.stopPropagation()}>
             {/* Trigger */}
             <div
-                className={`flex items-center min-h-[36px] rounded-md border bg-[#F5EDFB] px-3 pr-8 cursor-pointer relative ${isOpen ? 'border-[#7028a0] ring-1 ring-[#7028a0]' : 'border-[#E5DEFF]'}`}
+                className={`flex items-center h-10 min-w-0 overflow-hidden rounded-md border bg-[#F5EDFB] px-3 pr-10 cursor-pointer relative ${isOpen ? 'border-[#7028a0] ring-1 ring-[#7028a0]' : 'border-[#E5DEFF]'}`}
                 onClick={openDropdown}
             >
                 {value && selectedLabel ? (
-                    <span className="text-sm text-[#374151] truncate flex-1">{selectedLabel}</span>
+                    <span className="block text-sm text-[#374151] truncate flex-1 min-w-0" title={selectedLabel}>
+                        {selectedLabel}
+                    </span>
                 ) : value && !selectedLabel ? (
-                    <span className="text-sm text-[#9ca3af] truncate flex-1 animate-pulse">···</span>
+                    <span className="block text-sm text-[#9ca3af] truncate flex-1 min-w-0 animate-pulse">···</span>
                 ) : (
-                    <span className="text-sm text-[#9ca3af] select-none flex-1">Select…</span>
+                    <span className="block text-sm text-[#9ca3af] select-none truncate flex-1 min-w-0">Select…</span>
                 )}
                 {value ? (
                     <button
                         type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#5b21b6]"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-[#9ca3af] hover:text-[#5b21b6] bg-[#F5EDFB] rounded-sm"
                         onMouseDown={clear}
                     >
                         <X className="h-3.5 w-3.5" />
@@ -136,7 +139,7 @@ function SelectCombobox({
                 ) : (
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[#9ca3af]">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     </span>
                 )}
@@ -173,12 +176,10 @@ function SelectCombobox({
                                     className={`flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer ${active ? 'bg-[#F5EDFB] font-semibold text-[#5b21b6]' : 'text-[#374151] hover:bg-[#f5ebf9]'}`}
                                     onMouseDown={e => { e.preventDefault(); select(item); }}
                                 >
-                                    <span className={`shrink-0 w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${active ? 'bg-[#7028a0] border-[#7028a0]' : 'bg-white border-[#d1d5db]'}`}>
-                                        {active && (
-                                            <svg viewBox="0 0 10 10" width="9" height="9" fill="none">
-                                                <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            </svg>
-                                        )}
+                                    <span
+                                        className={`shrink-0 w-3.5 h-3.5 rounded-full border flex items-center justify-center ${active ? 'border-[#7028a0]' : 'border-[#d1d5db]'}`}
+                                    >
+                                        {active && <span className="w-2 h-2 rounded-full bg-[#7028a0]" />}
                                     </span>
                                     <span className="truncate">{item[instanceLabel]}</span>
                                     {sp?.instanceSubLabel && item[sp.instanceSubLabel] && (
@@ -206,6 +207,7 @@ export function EditValueInput({ value, onChange, col, className, label }: EditV
                 onChange={onChange}
                 tableProps={tableProps}
                 initialLabel={label}
+                className={className}
             />
         );
     }

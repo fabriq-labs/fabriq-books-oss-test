@@ -194,7 +194,7 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
 
                 {field.field && metaData[field.field] && (
                   <div className="flex-1 flex items-center gap-2 min-w-0">
-                    <div className="flex-1 relative">
+                    <div className="flex-1 relative min-w-0">
                       {(() => {
                         const columnMeta = metaData[field.field];
                         const mergedSelectProps = mergeSelectPropsForBulkEdit(columnMeta);

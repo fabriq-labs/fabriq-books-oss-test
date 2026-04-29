@@ -17,7 +17,7 @@ import * as XLSX from "xlsx";
 import { pdf } from "@react-pdf/renderer";
 import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
-import { useEntity } from "@/contexts/EntityContext";
+import { isEntityHeadquarters, useEntity } from "@/contexts/EntityContext";
 import { IncomeStatementPDFDocument, IncomeStatementPdfProps } from "@/components/pdf_generator/IncomePDFGenerator";
 import {
   FinancialYearSelector,
@@ -120,7 +120,7 @@ const useIncomeStatement = ({
 };
 
 export default function IncomeStatement() {
-  const { currentEntity, currentEntityId, loading: entityLoading } = useEntity();
+  const { entities, currentEntity, currentEntityId, loading: entityLoading } = useEntity();
 
   const [fetchOnButtonClick, setFetchOnButtonClick] = useState(false);
   const [account, setAccount]: any = useState(null);
@@ -133,13 +133,23 @@ export default function IncomeStatement() {
   const [selectedFY, setSelectedFY] = useState<FinancialYearOption>(() => getPreviousFYOption("JAN_DEC"));
   const [selectedMonth, setSelectedMonth] = useState<MonthOption | null>(null);
 
-  // When entity changes: reset FY to previous FY for that entity's type, clear month, default currency to entity's base currency
+  const headquartersEntity = useMemo(
+    () => entities.find((entity) => isEntityHeadquarters(entity)) ?? null,
+    [entities]
+  );
+
+  const defaultCurrency = useMemo(
+    () => currentEntity?.currency ?? headquartersEntity?.currency ?? null,
+    [currentEntity, headquartersEntity]
+  );
+
+  // When entity changes: reset FY to previous FY for that entity's type, clear month, default currency
   useEffect(() => {
     const type: FinancialYearType = currentEntity?.financial_year_type ?? "JAN_DEC";
     setSelectedFY(getPreviousFYOption(type));
     setSelectedMonth(null);
-    setSelectedCurrencyId(currentEntity?.currency?.id ?? "");
-  }, [currentEntity?.id]);
+    setSelectedCurrencyId(defaultCurrency?.id ?? "");
+  }, [currentEntity?.id, defaultCurrency?.id]);
 
   const effectiveDateRange = useMemo((): [dayjs.Dayjs, dayjs.Dayjs] => {
     const from = selectedMonth?.from_date ?? selectedFY.from_date;
@@ -155,14 +165,14 @@ export default function IncomeStatement() {
       const code = row?.code?.trim().toUpperCase();
       if (code) return code;
     }
-    return currentEntity?.currency?.code?.trim().toUpperCase() ?? "INR";
-  }, [selectedCurrencyId, currencies, currentEntity]);
+    return defaultCurrency?.code?.trim().toUpperCase() ?? "INR";
+  }, [selectedCurrencyId, currencies, defaultCurrency]);
 
   const displayCurrencyCode = reportCurrencyCode;
 
   const defaultReportingCurrencyId = useMemo(
-    () => currentEntity?.currency?.id ?? "",
-    [currentEntity]
+    () => defaultCurrency?.id ?? "",
+    [defaultCurrency]
   );
 
   const effectiveReportCurrencyId = useMemo(
@@ -314,8 +324,8 @@ export default function IncomeStatement() {
   }, [sortedActiveCurrencies, selectedCurrencyId]);
 
   const orgDefaultLabel = useMemo(() => {
-    return currentEntity?.currency?.code?.trim().toUpperCase() ?? "INR";
-  }, [currentEntity]);
+    return defaultCurrency?.code?.trim().toUpperCase() ?? "INR";
+  }, [defaultCurrency]);
 
   useEffect(() => {
     if (entityLoading) return;
@@ -685,21 +695,19 @@ export default function IncomeStatement() {
           <div className="flex border-b border-slate-200 w-fit">
             <button
               onClick={() => setView("Summary")}
-              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${
-                view === "Summary"
-                  ? "text-slate-900 border-b-2 border-blue-600"
-                  : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
-              }`}
+              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${view === "Summary"
+                ? "text-slate-900 border-b-2 border-blue-600"
+                : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
+                }`}
             >
               Summary View
             </button>
             <button
               onClick={() => setView("Details")}
-              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${
-                view === "Details"
-                  ? "text-slate-900 border-b-2 border-blue-600"
-                  : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
-              }`}
+              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${view === "Details"
+                ? "text-slate-900 border-b-2 border-blue-600"
+                : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
+                }`}
             >
               Detailed View
             </button>

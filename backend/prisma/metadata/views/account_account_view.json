@@ -80,9 +80,32 @@
     },
     "hq_account_id": {
       "dataType": "string",
+      "required": false,
+      "listProps": {
+        "type": "text",
+        "recordPath": "hq_account.name"
+      },
+      "filterProps": {
+        "type": "text",
+        "recordPath": "hq_account.name"
+      },
       "permission": "update",
+      "tableProps": {
+        "width": "250",
+        "columnType": "select",
+        "selectProps": {
+          "type": "account",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "account",
+          "searchParams": "code",
+          "instanceLabel": "code",
+          "instanceSourceKey": "hq_account_id"
+        },
+        "defaultValue": ""
+      },
       "displayName": "HQ Account",
-      "isColumnShow": false
+      "isColumnShow": true
     },
     "account_number": {
       "dataType": "int",
