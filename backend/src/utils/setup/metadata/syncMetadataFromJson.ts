@@ -7,8 +7,8 @@ import { runSeedCurrenciesSql } from './seedCurrenciesSql';
 const prisma = new PrismaClient();
 
 function getBackendRootDir(): string {
-  // dist/metadata/*.js or src/metadata/*.ts → backend root
-  return path.join(__dirname, '..', '..');
+  // dist/utils/setup/metadata/*.js or src/utils/setup/metadata/*.ts → backend root
+  return path.resolve(__dirname, '..', '..', '..', '..');
 }
 
 export interface SyncMetadataCounts {
@@ -20,15 +20,14 @@ export interface SyncMetadataCounts {
 export interface SyncMetadataResult {
   views: SyncMetadataCounts;
   promptTemplates: SyncMetadataCounts;
+  currencies: {
+    seeded: boolean;
+    total: number;
+  };
   /** True after `prisma/seed-agent-templates.sql` was applied successfully. */
   agentTemplatesSeeded: boolean;
 }
 
-/**
- * Sync views and prompt templates from JSON files to local database
- *
- * @param filterType - Optional filter: 'view' | 'prompttemplate' | undefined (both)
- */
 export async function main(
   filterType?: 'view' | 'prompttemplate'
 ): Promise<SyncMetadataResult> {
@@ -41,10 +40,12 @@ export async function main(
   const result: SyncMetadataResult = {
     views: emptyCounts(),
     promptTemplates: emptyCounts(),
+    currencies: { seeded: false, total: 0 },
     agentTemplatesSeeded: false,
   };
 
   try {
+    const backendRoot = getBackendRootDir();
     const shouldSyncViews = !filterType || filterType === 'view';
     const shouldSyncTemplates = !filterType || filterType === 'prompttemplate';
 
@@ -58,10 +59,9 @@ export async function main(
     console.log('🔄 Syncing metadata from JSON files to local database...');
     console.log('');
 
-    // ===== 1. SYNC VIEWS =====
     if (shouldSyncViews) {
       console.log('📋 Syncing views...');
-      const viewsDir = path.join(__dirname, '..', '..', 'prisma', 'metadata', 'views');
+      const viewsDir = path.join(backendRoot, 'prisma', 'metadata', 'views');
 
       if (fs.existsSync(viewsDir)) {
         const files = fs.readdirSync(viewsDir).filter((file) => file.endsWith('.json'));
@@ -146,10 +146,9 @@ export async function main(
       console.log('');
     }
 
-    // ===== 2. SYNC PROMPT TEMPLATES =====
     if (shouldSyncTemplates) {
       console.log('📝 Syncing prompt templates...');
-      const templatesDir = path.join(__dirname, '..', '..', 'prisma', 'metadata', 'prompt-templates');
+      const templatesDir = path.join(backendRoot, 'prisma', 'metadata', 'prompt-templates');
 
       if (fs.existsSync(templatesDir)) {
         const files = fs.readdirSync(templatesDir).filter((file) => file.endsWith('.json'));
@@ -283,13 +282,15 @@ export async function main(
 
     console.log('💱 Seeding global currencies (prisma/seed-currencies.sql)...');
     console.log('');
-    runSeedCurrenciesSql(getBackendRootDir());
+    runSeedCurrenciesSql(backendRoot);
+    result.currencies.total = await prisma.currency.count();
+    result.currencies.seeded = true;
     console.log('✅ Currencies seed complete (seed-currencies.sql).');
     console.log('');
 
     console.log('🤖 Seeding system agent templates (prisma/seed-agent-templates.sql)...');
     console.log('');
-    runSeedAgentTemplatesSql(getBackendRootDir());
+    runSeedAgentTemplatesSql(backendRoot);
     result.agentTemplatesSeeded = true;
     console.log('✅ Agent templates seed complete (seed-agent-templates.sql).');
     console.log('');

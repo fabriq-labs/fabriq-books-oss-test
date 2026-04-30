@@ -3,9 +3,9 @@
  * (same order as setup-db after JSON metadata).
  * Usage: npm run sync-metadata
  */
-export { main, type SyncMetadataResult, type SyncMetadataCounts } from '../src/metadata/syncMetadataFromJson';
+export { main, type SyncMetadataResult, type SyncMetadataCounts } from '../src/utils/setup/metadata/syncMetadataFromJson';
 
-import { main } from '../src/metadata/syncMetadataFromJson';
+import { main } from '../src/utils/setup/metadata/syncMetadataFromJson';
 
 if (require.main === module) {
   main()

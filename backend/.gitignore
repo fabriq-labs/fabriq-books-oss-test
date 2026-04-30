@@ -37,6 +37,7 @@ npm-debug.log*
 
 # Testing
 coverage/
+src/agent/__tests__/reports/*
 
 # Prisma
 prisma/migrations/

@@ -59,8 +59,13 @@ export interface DevOptionsSyncMetadataResponse {
   stats: {
     views: SyncMetadataCounts;
     promptTemplates: SyncMetadataCounts;
+    currencies: {
+      seeded: boolean;
+      total: number;
+    };
     agentTemplatesSeeded: boolean;
   };
+  currenciesSeeded: boolean;
   agentTemplatesSeeded: boolean;
 }
 

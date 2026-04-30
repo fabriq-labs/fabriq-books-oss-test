@@ -20,7 +20,8 @@ export default function DeveloperOptionsPage() {
       const res = await adminAPI.devOptionsSyncMetadata();
       const v = res.stats.views;
       const p = res.stats.promptTemplates;
-      const summary = `Views: ${v.created} created, ${v.updated} updated, ${v.errors} errors. Prompt templates: ${p.created} created, ${p.updated} updated, ${p.errors} errors.`;
+      const c = res.stats.currencies;
+      const summary = `Views: ${v.created} created, ${v.updated} updated, ${v.errors} errors. Prompt templates: ${p.created} created, ${p.updated} updated, ${p.errors} errors. Currencies: ${res.currenciesSeeded ? "seeded" : "skipped"} (${c.total} total). Agent templates: ${res.agentTemplatesSeeded ? "seeded" : "skipped"}.`;
       setLastStats(summary);
       toast({
         title: "Metadata synced",
