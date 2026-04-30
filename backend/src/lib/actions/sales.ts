@@ -432,6 +432,8 @@ export const calculate_delivery_challan_total = async (
         id: true,
         challan_number: true,
         total_amount: true,
+        adjustable_value: true,
+        adjustable_label: true,
         delivery_challan_items: {
           select: {
             id: true,
@@ -502,10 +504,14 @@ export const calculate_delivery_challan_total = async (
       }
     );
 
+    const adjustedTotalAmount = roundToTwoDecimals(
+      challan_calculations.total_amount + Number(delivery_challan.adjustable_value || 0)
+    );
+
     const updatedChallan = await tx.delivery_challan.update({
       where: { id: instance_id },
       data: {
-        total_amount: challan_calculations.total_amount,
+        total_amount: adjustedTotalAmount,
         delivery_challan_items: {
           updateMany: challan_calculations.modified_items,
         },
@@ -516,7 +522,7 @@ export const calculate_delivery_challan_total = async (
     return {
       ...updatedChallan,
       sub_total: challan_calculations.sub_total,
-      total_amount: challan_calculations.total_amount,
+      total_amount: adjustedTotalAmount,
       total_discount_amount: challan_calculations.total_discount_amount,
       total_tax_amount: challan_calculations.total_tax_amount,
     };
@@ -710,6 +716,8 @@ export const calculate_credit_note_total = async (
         credit_note_number: true,
         credit_note_date: true,
         credit_note_total: true,
+        adjustable_value: true,
+        adjustable_label: true,
         credit_note_item: {
           select: {
             id: true,
@@ -800,13 +808,17 @@ export const calculate_credit_note_total = async (
       }
     );
 
+    const adjustedCreditNoteTotal = roundToTwoDecimals(
+      credit_note_calculations.credit_note_total + Number(credit_note.adjustable_value || 0)
+    );
+
     // Update credit note and items
     const updatedCreditNote = await tx.credit_note.update({
       where: {
         id: instance_id,
       },
       data: {
-        credit_note_total: credit_note_calculations.credit_note_total,
+        credit_note_total: adjustedCreditNoteTotal,
         credit_note_item: {
           updateMany: credit_note_calculations.modified_items,
         },
@@ -820,7 +832,7 @@ export const calculate_credit_note_total = async (
     return {
       ...updatedCreditNote,
       sub_total: credit_note_calculations.sub_total,
-      credit_note_total: credit_note_calculations.credit_note_total,
+      credit_note_total: adjustedCreditNoteTotal,
       total_discount_amount: credit_note_calculations.total_discount_amount,
       total_tax_amount: credit_note_calculations.total_tax_amount,
     };
@@ -886,6 +898,8 @@ export const calculate_quote_total = async (
         quote_number: true,
         quote_date: true,
         total_amount: true,
+        adjustable_value: true,
+        adjustable_label: true,
         quote_items: {
           select: {
             id: true,
@@ -968,13 +982,17 @@ export const calculate_quote_total = async (
       }
     );
 
+    const adjustedQuoteTotal = roundToTwoDecimals(
+      quote_calculations.total_amount + Number(quote.adjustable_value || 0)
+    );
+
     // Update quote and items
     const updatedQuote = await tx.quote.update({
       where: {
         id: instance_id,
       },
       data: {
-        total_amount: quote_calculations.total_amount,
+        total_amount: adjustedQuoteTotal,
         quote_items: {
           updateMany: quote_calculations.modified_items,
         },
@@ -988,7 +1006,7 @@ export const calculate_quote_total = async (
     return {
       ...updatedQuote,
       sub_total: quote_calculations.sub_total,
-      total_amount: quote_calculations.total_amount,
+      total_amount: adjustedQuoteTotal,
       total_discount_amount: quote_calculations.total_discount_amount,
       total_tax_amount: quote_calculations.total_tax_amount,
     };

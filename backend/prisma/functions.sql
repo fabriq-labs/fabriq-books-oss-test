@@ -66,11 +66,14 @@ END $$;
 -- Name: generate_challan_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE OR REPLACE FUNCTION public.generate_challan_number() RETURNS text
+CREATE OR REPLACE FUNCTION public.generate_challan_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  RETURN 'CH' || LPAD(nextval('challan_number_seq')::text, 3, '0');
+  IF NEW.challan_number IS NULL OR NEW.challan_number = '' THEN
+    NEW.challan_number := 'CH' || LPAD(nextval('challan_number_seq')::text, 3, '0');
+  END IF;
+  RETURN NEW;
 END;
 $$;
 
@@ -79,11 +82,14 @@ $$;
 -- Name: generate_credit_note_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE OR REPLACE FUNCTION public.generate_credit_note_number() RETURNS text
-    LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.generate_credit_note_number() RETURNS trigger
+LANGUAGE plpgsql
     AS $$
 BEGIN
-  RETURN 'CN' || LPAD(nextval('credit_note_number_seq')::text, 4, '0');
+  IF NEW.credit_note_number IS NULL OR NEW.credit_note_number = '' THEN
+    NEW.credit_note_number := 'CN' || LPAD(nextval('credit_note_number_seq')::text, 4, '0');
+  END IF;
+  RETURN NEW;
 END;
 $$;
 
@@ -261,11 +267,14 @@ $$;
 -- Name: generate_quote_number(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE OR REPLACE FUNCTION public.generate_quote_number() RETURNS text
+CREATE OR REPLACE FUNCTION public.generate_quote_number() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  RETURN 'QN' || nextval('quote_number_seq')::text;
+  IF NEW.quote_number IS NULL OR NEW.quote_number = '' THEN
+    NEW.quote_number := 'QN' || nextval('quote_number_seq')::text;
+  END IF;
+  RETURN NEW;
 END;
 $$;
 
@@ -439,6 +448,27 @@ ALTER TABLE public."source_system" ALTER COLUMN id SET DEFAULT concat('srcsys_',
 
 DROP TRIGGER IF EXISTS trg_generate_invoice_number ON public.invoice;
 CREATE TRIGGER trg_generate_invoice_number BEFORE INSERT ON public.invoice FOR EACH ROW EXECUTE FUNCTION public.generate_invoice_number();
+
+--
+-- Name: credit_note trg_generate_credit_note_number; Type: TRIGGER; Schema: public; Owner: -
+--
+
+DROP TRIGGER IF EXISTS trg_generate_credit_note_number ON public.credit_note;
+CREATE TRIGGER trg_generate_credit_note_number BEFORE INSERT ON public.credit_note FOR EACH ROW EXECUTE FUNCTION public.generate_credit_note_number();
+
+--
+-- Name: delivery_challan trg_generate_challan_number; Type: TRIGGER; Schema: public; Owner: -
+--
+
+DROP TRIGGER IF EXISTS trg_generate_challan_number ON public.delivery_challan;
+CREATE TRIGGER trg_generate_challan_number BEFORE INSERT ON public.delivery_challan FOR EACH ROW EXECUTE FUNCTION public.generate_challan_number();
+
+--
+-- Name: quote trg_generate_quote_number; Type: TRIGGER; Schema: public; Owner: -
+--
+
+DROP TRIGGER IF EXISTS trg_generate_quote_number ON public.quote;
+CREATE TRIGGER trg_generate_quote_number BEFORE INSERT ON public.quote FOR EACH ROW EXECUTE FUNCTION public.generate_quote_number();
 
 
 --

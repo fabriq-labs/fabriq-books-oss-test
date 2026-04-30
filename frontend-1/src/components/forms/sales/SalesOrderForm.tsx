@@ -42,6 +42,8 @@ const salesOrderSchema = z.object({
     payment_terms_id: z.string().optional(),
     shipping_method_id: z.string().optional(),
     shipping_terms_id: z.string().optional(),
+    adjustable_label: z.string().optional(),
+    adjustable_value: z.number().optional(),
     items: z.array(salesOrderItemSchema).min(1, { message: 'At least one item is required' }),
 });
 type SalesOrderValues = z.infer<typeof salesOrderSchema>;
@@ -166,7 +168,16 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
             .then((res: any) => {
                 const data = res?.data;
                 const sortedItems = sortItemsByCreatedAt(data?.sales_order_items ?? []);
-                setInitialValues(data ? { ...data, sales_order_items: sortedItems } : data);
+                setInitialValues(
+                    data
+                        ? {
+                            ...data,
+                            sales_order_items: sortedItems,
+                            adjustable_label: data?.adjustable_label ?? 'Adjustable',
+                            adjustable_value: Number(data?.adjustable_value ?? 0),
+                        }
+                        : data
+                );
                 setActionData(res?.workflow_context?.current_state_ref?.source_actions);
                 setWorkflowContext(res?.workflow_context)
                 setSelectedCustomerId(res.data?.customer_id || null);
@@ -494,8 +505,8 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
 
     return (
         <>
-            <div className="mx-auto w-[70%]">
-                <div className="mb-4">
+            <div className="max-w-7xl mx-auto px-2 md:px-4 space-y-4">
+                <div className="mb-4 flex justify-end">
                     <Button
                         variant="ghost"
                         className="flex items-center gap-2 text-muted-foreground"
@@ -505,7 +516,7 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                         Back to list
                     </Button>
                 </div>
-                <Card>
+                <Card className="border border-border/70 shadow-sm overflow-hidden rounded-lg">
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <CardTitle>
@@ -513,7 +524,7 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                             </CardTitle>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-5 md:p-6 space-y-7 bg-background">
                         {isLoading ? (
                             <div className="space-y-6">
                                 <div>
@@ -532,199 +543,185 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                         ) : (
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                                    {/* Sales Order Number and Date Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="so_number" className="text-sm font-semibold text-gray-700">
-                                                Sales Order Number
-                                            </Label>
-                                            <Input
-                                                type="text"
-                                                value={initialValues?.so_number}
-                                                disabled
-                                            />
+                                    {/* Sales Order Number/Date on right, editable fields on left */}
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="customer_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Customer
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="customers"
+                                                                    instanceSourceKey="customer_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="customer_name"
+                                                                    instanceValue={initialValues?.customer || ''}
+                                                                    onSelectItem={handleCustomerSelectChange}
+                                                                    onClear={handlCustomerSelectClear}
+                                                                    limit="10"
+                                                                    searchParams="customer_name"
+                                                                    type="customers"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="location_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Location
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="location"
+                                                                    instanceSourceKey="location_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="location"
+                                                                    instanceValue={initialValues?.location || ''}
+                                                                    onSelectItem={handleLocationSelectChange}
+                                                                    onClear={handleLocationSelectClear}
+                                                                    limit="10"
+                                                                    searchParams="location"
+                                                                    type="location"
+                                                                    additionalFilters={locationAdditionalFilters}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="payment_terms_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Payment Terms
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="payment_terms"
+                                                                    instanceSourceKey="payment_terms_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="payment_terms"
+                                                                    instanceValue={initialValues?.payment_terms || ''}
+                                                                    onSelectItem={(sourceKey, key, value) => {
+                                                                        form.setValue(sourceKey, value[key]);
+                                                                        handleInputChange('payment_terms_id', value[key]);
+                                                                    }}
+                                                                    onClear={(sourceKey) => {
+                                                                        form.setValue(sourceKey, '');
+                                                                        handleInputChange('payment_terms_id', '');
+                                                                    }}
+                                                                    limit="10"
+                                                                    searchParams="payment_terms"
+                                                                    type="payment_terms"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="shipping_method_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Shipping Method
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="shipping_method"
+                                                                    instanceSourceKey="shipping_method_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="shipping_method"
+                                                                    instanceValue={initialValues?.shipping_method || ''}
+                                                                    onSelectItem={(sourceKey, key, value) => {
+                                                                        form.setValue(sourceKey, value[key]);
+                                                                        handleInputChange('shipping_method_id', value[key]);
+                                                                    }}
+                                                                    onClear={(sourceKey) => {
+                                                                        form.setValue(sourceKey, '');
+                                                                        handleInputChange('shipping_method_id', '');
+                                                                    }}
+                                                                    limit="10"
+                                                                    searchParams="shipping_method"
+                                                                    type="shipping_method"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="shipping_terms_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Shipping Terms
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="shipping_terms"
+                                                                    instanceSourceKey="shipping_terms_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="shipping_terms"
+                                                                    instanceValue={initialValues?.shipping_terms || ''}
+                                                                    onSelectItem={(sourceKey, key, value) => {
+                                                                        form.setValue(sourceKey, value[key]);
+                                                                        handleInputChange('shipping_terms_id', value[key]);
+                                                                    }}
+                                                                    onClear={(sourceKey) => {
+                                                                        form.setValue(sourceKey, '');
+                                                                        handleInputChange('shipping_terms_id', '');
+                                                                    }}
+                                                                    limit="10"
+                                                                    searchParams="shipping_terms"
+                                                                    type="shipping_terms"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
                                         </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="so_date" className="text-sm font-semibold text-gray-700">
-                                                Sales Order Date
-                                            </Label>
-                                            <Input
-                                                type="text"
-                                                value={initialValues?.so_date ? dayjs(initialValues.so_date).format("DD-MM-YYYY") : ''}
-                                                disabled
-                                            />
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="so_number" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        Sales Order Number
+                                                    </Label>
+                                                    <p className="text-base text-foreground leading-6">
+                                                        {initialValues?.so_number || '--'}
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="so_date" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        Sales Order Date
+                                                    </Label>
+                                                    <p className="text-base text-foreground leading-6">
+                                                        {initialValues?.so_date ? dayjs(initialValues.so_date).format("DD-MM-YYYY") : '--'}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Customer and Location Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="customer_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Customer
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="customers"
-                                                            instanceSourceKey="customer_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="customer_name"
-                                                            instanceValue={initialValues?.customer || ''}
-                                                            onSelectItem={handleCustomerSelectChange}
-                                                            onClear={handlCustomerSelectClear}
-                                                            limit="10"
-                                                            searchParams="customer_name"
-                                                            type="customers"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="location_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Location
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="location"
-                                                            instanceSourceKey="location_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="location"
-                                                            instanceValue={initialValues?.location || ''}
-                                                            onSelectItem={handleLocationSelectChange}
-                                                            onClear={handleLocationSelectClear}
-                                                            limit="10"
-                                                            searchParams="location"
-                                                            type="location"
-                                                            additionalFilters={locationAdditionalFilters}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    {/* Status and Payment Terms Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="payment_terms_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Payment Terms
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="payment_terms"
-                                                            instanceSourceKey="payment_terms_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="payment_terms"
-                                                            instanceValue={initialValues?.payment_terms || ''}
-                                                            onSelectItem={(sourceKey, key, value) => {
-                                                                form.setValue(sourceKey, value[key]);
-                                                                handleInputChange('payment_terms_id', value[key]);
-                                                            }}
-                                                            onClear={(sourceKey) => {
-                                                                form.setValue(sourceKey, '');
-                                                                handleInputChange('payment_terms_id', '');
-                                                            }}
-                                                            limit="10"
-                                                            searchParams="payment_terms"
-                                                            type="payment_terms"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="shipping_method_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Shipping Method
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="shipping_method"
-                                                            instanceSourceKey="shipping_method_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="shipping_method"
-                                                            instanceValue={initialValues?.shipping_method || ''}
-                                                            onSelectItem={(sourceKey, key, value) => {
-                                                                form.setValue(sourceKey, value[key]);
-                                                                handleInputChange('shipping_method_id', value[key]);
-                                                            }}
-                                                            onClear={(sourceKey) => {
-                                                                form.setValue(sourceKey, '');
-                                                                handleInputChange('shipping_method_id', '');
-                                                            }}
-                                                            limit="10"
-                                                            searchParams="shipping_method"
-                                                            type="shipping_method"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="shipping_terms_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Shipping Terms
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="shipping_terms"
-                                                            instanceSourceKey="shipping_terms_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="shipping_terms"
-                                                            instanceValue={initialValues?.shipping_terms || ''}
-                                                            onSelectItem={(sourceKey, key, value) => {
-                                                                form.setValue(sourceKey, value[key]);
-                                                                handleInputChange('shipping_terms_id', value[key]);
-                                                            }}
-                                                            onClear={(sourceKey) => {
-                                                                form.setValue(sourceKey, '');
-                                                                handleInputChange('shipping_terms_id', '');
-                                                            }}
-                                                            limit="10"
-                                                            searchParams="shipping_terms"
-                                                            type="shipping_terms"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    {/* Attachments */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                            Attachments
-                                        </label>
-                                        <Attachment
-                                            model="sales_order"
-                                            id={id}
-                                        />
-                                    </div>
                                     {/* Sales Order Items Section */}
                                     {id && (
                                         <SalesOrderItems
@@ -735,39 +732,49 @@ export const SalesOrderForm: React.FC<SalesOrderFormProps> = ({
                                         />
                                     )}
 
-                                    {/* Notes and Terms and Conditions */}
-                                    <div className="space-y-4 pt-4 border-t border-border/60">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="notes">Notes</Label>
-                                            <Textarea
-                                                id="notes"
-                                                placeholder="Additional notes or instructions"
-                                                value={initialValues?.notes ?? ""}
-                                                onChange={(e) => handleInputChange("notes", e.target.value)}
-                                                onBlur={(e) => {
-                                                    if (id) {
-                                                        handleFieldUpdate("notes", e.target.value);
-                                                    }
-                                                }}
-                                                className="min-h-[80px] border-border/60 resize-y"
-                                                rows={3}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="terms_and_conditions">Terms and Conditions</Label>
-                                            <Textarea
-                                                id="terms_and_conditions"
-                                                placeholder="Enter terms and conditions"
-                                                value={initialValues?.terms_and_conditions ?? ""}
-                                                onChange={(e) => handleInputChange("terms_and_conditions", e.target.value)}
-                                                onBlur={(e) => {
-                                                    if (id) {
-                                                        handleFieldUpdate("terms_and_conditions", e.target.value);
-                                                    }
-                                                }}
-                                                className="min-h-[80px] border-border/60 resize-y"
-                                                rows={3}
-                                            />
+                                    {/* Zoho-style Notes, Terms and Attachments */}
+                                    <div className="pt-4 border-t border-border/60">
+                                        <div className="rounded-lg border border-border/70 bg-muted/10 divide-y divide-border/60">
+                                            <div className="p-4 space-y-2">
+                                                <Label htmlFor="notes" className="text-sm font-medium text-foreground">Notes</Label>
+                                                <Textarea
+                                                    id="notes"
+                                                    placeholder="Additional notes or instructions"
+                                                    value={initialValues?.notes ?? ""}
+                                                    onChange={(e) => handleInputChange("notes", e.target.value)}
+                                                    onBlur={(e) => {
+                                                        if (id) {
+                                                            handleFieldUpdate("notes", e.target.value);
+                                                        }
+                                                    }}
+                                                    className="min-h-[78px] border-border/70 bg-background resize-y"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr]">
+                                                <div className="p-4 space-y-2 border-b lg:border-b-0 lg:border-r border-border/60">
+                                                    <Label htmlFor="terms_and_conditions" className="text-sm font-medium text-foreground">Terms and Conditions</Label>
+                                                    <Textarea
+                                                        id="terms_and_conditions"
+                                                        placeholder="Enter terms and conditions"
+                                                        value={initialValues?.terms_and_conditions ?? ""}
+                                                        onChange={(e) => handleInputChange("terms_and_conditions", e.target.value)}
+                                                        onBlur={(e) => {
+                                                            if (id) {
+                                                                handleFieldUpdate("terms_and_conditions", e.target.value);
+                                                            }
+                                                        }}
+                                                        className="min-h-[110px] border-border/70 bg-background resize-y"
+                                                        rows={4}
+                                                    />
+                                                </div>
+                                                <div className="p-4 space-y-2">
+                                                    <p className="text-sm font-medium text-foreground">
+                                                        Attach File(s) to Sales Order
+                                                    </p>
+                                                    <Attachment model="sales_order" id={id} />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 

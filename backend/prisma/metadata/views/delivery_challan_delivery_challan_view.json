@@ -16,6 +16,14 @@
       "displayName": "Notes",
       "isColumnShow": false
     },
+    "adjustable_label": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "adjustable_value": {
+      "dataType": "float",
+      "permission": "update"
+    },
     "org_id": {
       "dataType": "string",
       "permission": "read",

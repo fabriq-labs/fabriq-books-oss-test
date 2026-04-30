@@ -28,6 +28,14 @@
       "displayName": "Status",
       "isColumnShow": false
     },
+    "adjustable_label": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "adjustable_value": {
+      "dataType": "float",
+      "permission": "update"
+    },
     "invoice": {
       "type": "table",
       "select": {

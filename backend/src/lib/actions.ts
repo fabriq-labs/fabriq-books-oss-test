@@ -91,6 +91,22 @@ export const functionMap: Record<string, Dependency> = {
     "quote.quote_items": {
         fields: ["quantity", "rate", "tax_rate", "discount_rate"],
         method: calculate_quote_total
+    },
+    "quote": {
+        fields: ["adjustable_value"],
+        method: calculate_quote_total
+    },
+    "credit_note": {
+        fields: ["adjustable_value"],
+        method: calculate_credit_note_total
+    },
+    "sales_order": {
+        fields: ["adjustable_value"],
+        method: calculate_sales_order_total
+    },
+    "delivery_challan": {
+        fields: ["adjustable_value"],
+        method: calculate_delivery_challan_total
     }
 };
 

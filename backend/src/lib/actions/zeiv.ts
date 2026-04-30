@@ -1152,6 +1152,7 @@ export const calculate_sales_order_total = async (
       select: {
         id: true,
         total_amount: true,
+        adjustable_value: true,
         sales_order_items: {
           select: {
             id: true,
@@ -1215,10 +1216,13 @@ export const calculate_sales_order_total = async (
         modified_items: [],
       }
     );
+    const adjustedSalesOrderTotal = roundToTwoDecimals(
+      so_calculations.total_amount + Number(sales_order.adjustable_value || 0)
+    );
     const updates = await tx.sales_order.update({
       where: { id: instance_id },
       data: {
-        total_amount: so_calculations.total_amount,
+        total_amount: adjustedSalesOrderTotal,
         sales_order_items: {
           updateMany: so_calculations.modified_items,
         },
@@ -1228,7 +1232,7 @@ export const calculate_sales_order_total = async (
     return {
       ...updates,
       sub_total: so_calculations.sub_total,
-      total_amount: so_calculations.total_amount,
+      total_amount: adjustedSalesOrderTotal,
       total_discount_amount: so_calculations.total_discount_amount,
       total_tax_amount: so_calculations.total_tax_amount,
     };

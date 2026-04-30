@@ -35,6 +35,8 @@ const creditNoteSchema = z.object({
     reason: z.string().optional(),
     notes: z.string().optional(),
     terms_and_conditions: z.string().optional(),
+    adjustable_label: z.string().optional(),
+    adjustable_value: z.number().optional(),
 });
 type CreditNoteValues = z.infer<typeof creditNoteSchema>;
 
@@ -88,7 +90,7 @@ export const CreditNoteForm: React.FC<CreditNoteFormProps> = ({
                 credit_note_number: initialValues?.credit_note_number || '',
                 credit_note_date: initialValues?.credit_note_date || '',
                 credit_note_version: initialValues?.credit_note_version,
-                credit_note_status: initialValues?.credit_note_status || '',
+                credit_note_status: initialValues?.credit_note_status || 'Draft',
                 credit_note_type: initialValues?.credit_note_type || '',
                 customer_id: initialValues?.customer_id || '',
                 location_id: initialValues?.location_id || '',
@@ -100,6 +102,8 @@ export const CreditNoteForm: React.FC<CreditNoteFormProps> = ({
                 reason: initialValues?.reason || '',
                 notes: initialValues?.notes || '',
                 terms_and_conditions: initialValues?.terms_and_conditions || '',
+                adjustable_label: initialValues?.adjustable_label || 'Adjustable',
+                adjustable_value: Number(initialValues?.adjustable_value ?? 0),
             });
         }
     }, [initialValues, form]);
@@ -108,7 +112,11 @@ export const CreditNoteForm: React.FC<CreditNoteFormProps> = ({
         setIsLoading(true);
         viewAPI.getById("credit_note", id, "credit_note_view")
             .then((res: any) => {
-                setInitialValues(res?.data);
+                setInitialValues((prev: any) => ({
+                    ...res?.data,
+                    adjustable_label: res?.data?.adjustable_label ?? 'Adjustable',
+                    adjustable_value: Number(res?.data?.adjustable_value ?? 0),
+                }));
                 setSelectedCustomerId(res.data?.customer_id || null);
                 // Set currency from the customer, default to 'USD' if not set
                 setCurrentCurrency(res.data?.customer?.currency_master?.base_currency || 'USD');
@@ -314,8 +322,8 @@ export const CreditNoteForm: React.FC<CreditNoteFormProps> = ({
 
     return (
         <>
-            <div className="mx-auto w-[70%]">
-                <div className="mb-4">
+            <div className="max-w-7xl mx-auto px-2 md:px-4 space-y-4">
+                <div className="mb-4 flex justify-end">
                     <Button
                         variant="ghost"
                         className="flex items-center gap-2 text-muted-foreground"
@@ -325,7 +333,7 @@ export const CreditNoteForm: React.FC<CreditNoteFormProps> = ({
                         Back to list
                     </Button>
                 </div>
-                <Card>
+                <Card className="border border-border/70 shadow-sm overflow-hidden rounded-lg">
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <CardTitle>
@@ -333,7 +341,7 @@ export const CreditNoteForm: React.FC<CreditNoteFormProps> = ({
                             </CardTitle>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-5 md:p-6 space-y-7 bg-background">
                         {isLoading ? (
                             <div className="space-y-6">
                                 <div>
@@ -352,212 +360,171 @@ export const CreditNoteForm: React.FC<CreditNoteFormProps> = ({
                         ) : (
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                                    {/* Credit Note Number, Date, Type, and Status Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="credit_note_number" className="text-sm font-semibold text-gray-700">
-                                                Credit Note#
-                                            </Label>
-                                            <Input
-                                                type="text"
-                                                value={initialValues?.credit_note_number || ''}
-                                                disabled
-                                            />
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* <FormField
+                                                    control={form.control}
+                                                    name="credit_note_type"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Credit Note Type
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <Select
+                                                                    value={field.value || initialValues?.credit_note_type || ''}
+                                                                    onValueChange={(value) => {
+                                                                        field.onChange(value);
+                                                                        handleInputChange('credit_note_type', value);
+                                                                    }}
+                                                                >
+                                                                    <SelectTrigger>
+                                                                        <SelectValue placeholder="Choose a credit note type" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="SALES_RETURN">SALES RETURN</SelectItem>
+                                                                        <SelectItem value="PRICE_ADJUSTMENT">PRICE ADJUSTMENT</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                /> */}
+                                                <FormField
+                                                    control={form.control}
+                                                    name="customer_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Customer
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="customers"
+                                                                    instanceSourceKey="customer_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="customer_name"
+                                                                    instanceValue={initialValues?.customers || ''}
+                                                                    onSelectItem={handleCustomerSelectChange}
+                                                                    onClear={handlCustomerSelectClear}
+                                                                    limit="10"
+                                                                    searchParams="customer_name"
+                                                                    type="customers"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="location_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Location
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="location"
+                                                                    instanceSourceKey="location_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="location"
+                                                                    instanceValue={initialValues?.location || ''}
+                                                                    onSelectItem={handleLocationSelectChange}
+                                                                    onClear={handleLocationSelectClear}
+                                                                    limit="10"
+                                                                    searchParams="location"
+                                                                    type="location"
+                                                                    additionalFilters={locationAdditionalFilters}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="account_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Account
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="account"
+                                                                    instanceSourceKey="account_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="name"
+                                                                    instanceValue={initialValues?.account || ''}
+                                                                    onSelectItem={(sourceKey, key, value) => {
+                                                                        form.setValue(sourceKey, value[key]);
+                                                                        handleInputChange('account_id', value[key]);
+                                                                    }}
+                                                                    onClear={(sourceKey) => {
+                                                                        form.setValue(sourceKey, '');
+                                                                        handleInputChange('account_id', '');
+                                                                    }}
+                                                                    limit="10"
+                                                                    searchParams="name"
+                                                                    type="account"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="reason"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Subject
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="text"
+                                                                    placeholder="Enter reason for credit note"
+                                                                    value={initialValues?.reason || ''}
+                                                                    onChange={(e) => handleInputChange('reason', e.target.value)}
+                                                                    onBlur={() => handleFieldUpdate('reason')}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" />
                                         </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="credit_note_date" className="text-sm font-semibold text-gray-700">
-                                                Credit Note Date
-                                            </Label>
-                                            <Input
-                                                type="text"
-                                                value={initialValues?.credit_note_date ? dayjs(initialValues.credit_note_date).format("DD-MM-YYYY") : ''}
-                                                disabled
-                                            />
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="credit_note_number" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        Credit Note#
+                                                    </Label>
+                                                    <p className="text-base text-foreground leading-6">
+                                                        {initialValues?.credit_note_number || '--'}
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="credit_note_date" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        Credit Note Date
+                                                    </Label>
+                                                    <p className="text-base text-foreground leading-6">
+                                                        {initialValues?.credit_note_date ? dayjs(initialValues.credit_note_date).format("DD-MM-YYYY") : '--'}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="credit_note_type"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Credit Note Type
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <Select
-                                                            value={field.value || initialValues?.credit_note_type || ''}
-                                                            onValueChange={(value) => {
-                                                                field.onChange(value);
-                                                                handleInputChange('credit_note_type', value);
-                                                            }}
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Choose a credit note type" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="SALES_RETURN">SALES RETURN</SelectItem>
-                                                                <SelectItem value="PRICE_ADJUSTMENT">PRICE ADJUSTMENT</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="credit_note_status"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Credit Note Status
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <Input
-                                                            type="text"
-                                                            placeholder="Enter credit note status"
-                                                            value={initialValues?.credit_note_status || ''}
-                                                            onChange={(e) => handleInputChange('credit_note_status', e.target.value)}
-                                                            onBlur={() => handleFieldUpdate('credit_note_status')}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    {/* Customer and Location Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="customer_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Customer
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="customers"
-                                                            instanceSourceKey="customer_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="customer_name"
-                                                            instanceValue={initialValues?.customers || ''}
-                                                            onSelectItem={handleCustomerSelectChange}
-                                                            onClear={handlCustomerSelectClear}
-                                                            limit="10"
-                                                            searchParams="customer_name"
-                                                            type="customers"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="location_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Location
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="location"
-                                                            instanceSourceKey="location_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="location"
-                                                            instanceValue={initialValues?.location || ''}
-                                                            onSelectItem={handleLocationSelectChange}
-                                                            onClear={handleLocationSelectClear}
-                                                            limit="10"
-                                                            searchParams="location"
-                                                            type="location"
-                                                            additionalFilters={locationAdditionalFilters}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    {/* Account and Reason Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="account_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Account
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="account"
-                                                            instanceSourceKey="account_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="name"
-                                                            instanceValue={initialValues?.account || ''}
-                                                            onSelectItem={(sourceKey, key, value) => {
-                                                                form.setValue(sourceKey, value[key]);
-                                                                handleInputChange('account_id', value[key]);
-                                                            }}
-                                                            onClear={(sourceKey) => {
-                                                                form.setValue(sourceKey, '');
-                                                                handleInputChange('account_id', '');
-                                                            }}
-                                                            limit="10"
-                                                            searchParams="name"
-                                                            type="account"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="reason"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Reason
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <Input
-                                                            type="text"
-                                                            placeholder="Enter reason for credit note"
-                                                            value={initialValues?.reason || ''}
-                                                            onChange={(e) => handleInputChange('reason', e.target.value)}
-                                                            onBlur={() => handleFieldUpdate('reason')}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
 
 
-
-
-                                    {/* Attachments */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                            Attach Files
-                                        </label>
-                                        <Attachment
-                                            model="credit_note"
-                                            id={id}
-                                        />
-                                    </div>
 
                                     {/* Credit Note Items Section */}
                                     {id && (
@@ -569,35 +536,45 @@ export const CreditNoteForm: React.FC<CreditNoteFormProps> = ({
                                         />
                                     )}
 
-                                    {/* Customer Notes and Terms & Conditions */}
-                                    <div className="space-y-4 pt-4 border-t border-border/60">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">
-                                                Customer Notes
-                                            </Label>
-                                            <Textarea
-                                                id="notes"
-                                                placeholder="Enter any notes to be displayed in your transaction."
-                                                value={initialValues?.notes || ''}
-                                                onChange={(e) => handleInputChange("notes", e.target.value)}
-                                                onBlur={() => handleFieldUpdate("notes")}
-                                                className="min-h-[80px] border-border/60 resize-y"
-                                                rows={3}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="terms_and_conditions" className="text-sm font-semibold text-gray-700">
-                                                Terms & Conditions
-                                            </Label>
-                                            <Textarea
-                                                id="terms_and_conditions"
-                                                placeholder="Enter the terms and conditions of your business to be displayed in your transaction."
-                                                value={initialValues?.terms_and_conditions || ''}
-                                                onChange={(e) => handleInputChange("terms_and_conditions", e.target.value)}
-                                                onBlur={() => handleFieldUpdate("terms_and_conditions")}
-                                                className="min-h-[80px] border-border/60 resize-y"
-                                                rows={3}
-                                            />
+                                    {/* Zoho-style Notes, Terms and Attachments */}
+                                    <div className="pt-4 border-t border-border/60">
+                                        <div className="rounded-lg border border-border/70 bg-muted/10 divide-y divide-border/60">
+                                            <div className="p-4 space-y-2">
+                                                <Label htmlFor="notes" className="text-sm font-medium text-foreground">
+                                                    Customer Notes
+                                                </Label>
+                                                <Textarea
+                                                    id="notes"
+                                                    placeholder="Enter any notes to be displayed in your transaction."
+                                                    value={initialValues?.notes || ''}
+                                                    onChange={(e) => handleInputChange("notes", e.target.value)}
+                                                    onBlur={() => handleFieldUpdate("notes")}
+                                                    className="min-h-[78px] border-border/70 bg-background resize-y"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr]">
+                                                <div className="p-4 space-y-2 border-b lg:border-b-0 lg:border-r border-border/60">
+                                                    <Label htmlFor="terms_and_conditions" className="text-sm font-medium text-foreground">
+                                                        Terms &amp; Conditions
+                                                    </Label>
+                                                    <Textarea
+                                                        id="terms_and_conditions"
+                                                        placeholder="Enter the terms and conditions of your business to be displayed in your transaction."
+                                                        value={initialValues?.terms_and_conditions || ''}
+                                                        onChange={(e) => handleInputChange("terms_and_conditions", e.target.value)}
+                                                        onBlur={() => handleFieldUpdate("terms_and_conditions")}
+                                                        className="min-h-[110px] border-border/70 bg-background resize-y"
+                                                        rows={4}
+                                                    />
+                                                </div>
+                                                <div className="p-4 space-y-2">
+                                                    <p className="text-sm font-medium text-foreground">
+                                                        Attach File(s) to Credit Note
+                                                    </p>
+                                                    <Attachment model="credit_note" id={id} />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 

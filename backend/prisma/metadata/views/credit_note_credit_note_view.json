@@ -28,6 +28,14 @@
       "displayName": "Reason",
       "isColumnShow": false
     },
+    "adjustable_label": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "adjustable_value": {
+      "dataType": "float",
+      "permission": "update"
+    },
     "status": {
       "dataType": "string",
       "permission": "update",
@@ -315,7 +323,7 @@
       "dataType": "string",
       "permission": "update",
       "displayName": "Credit Note Type",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "credit_note_total": {
       "dataType": "float",
@@ -337,7 +345,7 @@
       "dataType": "string",
       "permission": "update",
       "displayName": "Credit Note Status",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "credit_note_version": {
       "dataType": "int",

@@ -46,6 +46,7 @@ export const DeliveryChallanItems: React.FC<DeliveryChallanItemsProps> = ({
     const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
 
     const validCurrency = currentCurrency && currentCurrency.trim() !== '' ? currentCurrency : 'USD';
+    const adjustableLabel = details?.adjustable_label ?? 'Adjustable';
 
     const updateLineItemApi = useCallback(async (itemId: string, field: string, value: any, data?: any) => {
         setUpdatingItemId(itemId);
@@ -178,6 +179,46 @@ export const DeliveryChallanItems: React.FC<DeliveryChallanItemsProps> = ({
 
     const handleProductSelectClear = (itemId: string) => (sourceKey: any) => { };
 
+    const handleAdjustableLabelChange = (value: string) => {
+        setDetails((prev: any) => ({
+            ...prev,
+            adjustable_label: value,
+        }));
+    };
+
+    const handleAdjustableValueChange = (value: number | string) => {
+        setDetails((prev: any) => ({
+            ...prev,
+            adjustable_value: value,
+        }));
+    };
+
+    const handleAdjustableBlur = async () => {
+        try {
+            const payload = {
+                adjustable_label: (details?.adjustable_label || '').trim() || 'Adjustable',
+                adjustable_value: Number(details?.adjustable_value) || 0,
+            };
+            const res = await viewAPI.update(
+                "delivery_challan",
+                challanId,
+                "delivery_challan_view",
+                payload
+            ) as any;
+            if (res?.data) {
+                const sorted = sortDeliveryChallanItemsByCreatedAt(res.data.delivery_challan_items ?? []);
+                setDetails({ ...res.data, delivery_challan_items: sorted });
+            }
+        } catch (error) {
+            console.error("Error updating adjustable fields:", error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update adjustable fields",
+            });
+        }
+    };
+
     const items = useMemo(
         () => sortDeliveryChallanItemsByCreatedAt(details?.delivery_challan_items ?? []),
         [details?.delivery_challan_items]
@@ -185,7 +226,7 @@ export const DeliveryChallanItems: React.FC<DeliveryChallanItemsProps> = ({
 
     return (
         <div className="space-y-4 pt-4 border-t border-border/60">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap justify-between items-center gap-3">
                 <div className="space-y-1">
                     <h2 className="text-lg font-semibold text-foreground">
                         Delivery Challan Items
@@ -214,29 +255,29 @@ export const DeliveryChallanItems: React.FC<DeliveryChallanItemsProps> = ({
                 </Button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border border-border/60 rounded-md">
                 <Table className="min-w-[960px]">
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[260px]">
+                            <TableHead className="w-[260px] text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Product <span className="text-destructive">*</span>
                             </TableHead>
-                            <TableHead className="w-[100px] text-right whitespace-nowrap">
+                            <TableHead className="w-[100px] text-right whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Qty Delivered <span className="text-destructive">*</span>
                             </TableHead>
-                            <TableHead className="w-[120px] text-right whitespace-nowrap">
+                            <TableHead className="w-[120px] text-right whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Rate
                             </TableHead>
-                            <TableHead className="w-[110px] text-right whitespace-nowrap">
+                            <TableHead className="w-[110px] text-right whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Discount %
                             </TableHead>
-                            <TableHead className="w-[100px] text-right whitespace-nowrap">
+                            <TableHead className="w-[100px] text-right whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Tax %
                             </TableHead>
-                            <TableHead className="w-[150px] text-right whitespace-nowrap">
+                            <TableHead className="w-[150px] text-right whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Line Total
                             </TableHead>
-                            <TableHead className="w-[30px] text-right">
+                            <TableHead className="w-[30px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">
                                 Actions
                             </TableHead>
                         </TableRow>
@@ -412,37 +453,85 @@ export const DeliveryChallanItems: React.FC<DeliveryChallanItemsProps> = ({
                 </Table>
             </div>
 
-            <div className="flex justify-end p-4 space-y-2">
-                <div className="w-64 space-y-3 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-center py-2 border-b border-gray-200 px-3">
-                        <span className="text-sm font-medium text-gray-600">
+            <div className="flex justify-end p-4">
+                <div className="w-full max-w-sm space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-border/70">
+                        <span className="text-sm font-medium text-muted-foreground">
                             Sub Total:
                         </span>
-                        <span className="text-sm font-semibold text-gray-800">
+                        <span className="text-sm font-semibold text-foreground">
                             {formatCurrency(details?.sub_total ?? 0, validCurrency)}
                         </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-200 px-3">
-                        <span className="text-sm font-medium text-gray-600">
+                    <div className="flex justify-between items-center py-2 border-b border-border/70">
+                        <span className="text-sm font-medium text-muted-foreground">
                             Discount Amount:
                         </span>
-                        <span className="text-sm font-semibold text-gray-800">
+                        <span className="text-sm font-semibold text-foreground">
                             {formatCurrency(details?.total_discount_amount ?? 0, validCurrency)}
                         </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-200 px-3">
-                        <span className="text-sm font-medium text-gray-600">
+                    <div className="flex justify-between items-center py-2 border-b border-border/70">
+                        <span className="text-sm font-medium text-muted-foreground">
                             Tax Amount:
                         </span>
-                        <span className="text-sm font-semibold text-gray-800">
+                        <span className="text-sm font-semibold text-foreground">
                             {formatCurrency(details?.total_tax_amount ?? 0, validCurrency)}
                         </span>
                     </div>
-                    <div className="flex justify-between items-center py-3 bg-violet-50 px-3 rounded-lg border-2 border-violet-200">
-                        <span className="text-base font-bold text-violet-900">
+                    <div className="grid grid-cols-[1fr_120px_auto] gap-2 items-center py-2 border-b border-border/70">
+                        <Input
+                            type="text"
+                            value={adjustableLabel}
+                            onChange={(e) => handleAdjustableLabelChange(e.target.value)}
+                            onFocus={() => {
+                                if (adjustableLabel === "Adjustable") {
+                                    handleAdjustableLabelChange("");
+                                }
+                            }}
+                            onBlur={() => {
+                                if (!(details?.adjustable_label || '').trim()) {
+                                    handleAdjustableLabelChange("Adjustable");
+                                }
+                                handleAdjustableBlur();
+                            }}
+                            className="h-9 border-border/60"
+                        />
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={details?.adjustable_value ?? 0}
+                            onChange={(e) =>
+                                handleAdjustableValueChange(
+                                    e.target.value === '' ? '' : parseFloat(e.target.value) || 0
+                                )
+                            }
+                            onFocus={() => {
+                                if (Number(details?.adjustable_value ?? 0) === 0) {
+                                    handleAdjustableValueChange("");
+                                }
+                            }}
+                            onBlur={() => {
+                                if (
+                                    details?.adjustable_value === '' ||
+                                    details?.adjustable_value === null ||
+                                    details?.adjustable_value === undefined
+                                ) {
+                                    handleAdjustableValueChange(0);
+                                }
+                                handleAdjustableBlur();
+                            }}
+                            className="h-9 border-border/60 text-right"
+                        />
+                        <span className="text-sm font-semibold text-foreground text-right whitespace-nowrap">
+                            {formatCurrency(Number(details?.adjustable_value) || 0, validCurrency)}
+                        </span>
+                    </div>
+                    <div className="flex justify-between items-center py-3 bg-primary/5 px-3 rounded-md border border-primary/20">
+                        <span className="text-base font-bold text-foreground">
                             Grand Total:
                         </span>
-                        <span className="text-lg font-bold text-violet-900">
+                        <span className="text-lg font-bold text-foreground">
                             {formatCurrency(details?.total_amount ?? 0, validCurrency)}
                         </span>
                     </div>
