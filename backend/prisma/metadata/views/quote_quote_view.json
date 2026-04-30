@@ -22,6 +22,14 @@
       "displayName": "Status",
       "isColumnShow": false
     },
+    "adjustable_label": {
+      "dataType": "string",
+      "permission": "update"
+    },
+    "adjustable_value": {
+      "dataType": "float",
+      "permission": "update"
+    },
     "project": {
       "type": "table",
       "select": {

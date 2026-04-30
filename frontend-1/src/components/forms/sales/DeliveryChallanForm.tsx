@@ -36,6 +36,8 @@ const deliveryChallanSchema = z.object({
     notes: z.string().optional(),
     terms_and_conditions: z.string().optional(),
     partial_delivery_reason: z.string().optional(),
+    adjustable_label: z.string().optional(),
+    adjustable_value: z.number().optional(),
 });
 type DeliveryChallanValues = z.infer<typeof deliveryChallanSchema>;
 
@@ -101,6 +103,8 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                 notes: initialValues?.notes || '',
                 terms_and_conditions: initialValues?.terms_and_conditions || '',
                 partial_delivery_reason: initialValues?.partial_delivery_reason || '',
+                adjustable_label: initialValues?.adjustable_label || 'Adjustable',
+                adjustable_value: Number(initialValues?.adjustable_value ?? 0),
             });
         }
     }, [initialValues, form]);
@@ -109,7 +113,11 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
         setIsLoading(true);
         viewAPI.getById("delivery_challan", id, "delivery_challan_view")
             .then((res: any) => {
-                setInitialValues(res?.data);
+                setInitialValues({
+                    ...res?.data,
+                    adjustable_label: res?.data?.adjustable_label ?? 'Adjustable',
+                    adjustable_value: Number(res?.data?.adjustable_value ?? 0),
+                });
                 setSelectedCustomerId(res.data?.customer_id || null);
                 // Set currency from the customer, default to 'USD' if not set
                 setCurrentCurrency(res.data?.customer?.currency_master?.base_currency || 'USD');
@@ -315,8 +323,8 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
 
     return (
         <>
-            <div className="mx-auto w-[70%]">
-                <div className="mb-4">
+            <div className="max-w-7xl mx-auto px-2 md:px-4 space-y-4">
+                <div className="mb-4 flex justify-end">
                     <Button
                         variant="ghost"
                         className="flex items-center gap-2 text-muted-foreground"
@@ -326,7 +334,7 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                         Back to list
                     </Button>
                 </div>
-                <Card>
+                <Card className="border border-border/70 shadow-sm overflow-hidden rounded-lg">
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <CardTitle>
@@ -334,7 +342,7 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                             </CardTitle>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-5 md:p-6 space-y-7 bg-background">
                         {isLoading ? (
                             <div className="space-y-6">
                                 <div>
@@ -353,127 +361,159 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                         ) : (
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                                    {/* Delivery Challan Number, Date, Type, and Reference Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="challan_number" className="text-sm font-semibold text-gray-700">
-                                                Delivery Challan#
-                                            </Label>
-                                            <Input
-                                                type="text"
-                                                value={initialValues?.challan_number || ''}
-                                                disabled
-                                            />
+                                    {/* Delivery Challan Number/Date on right, editable fields on left */}
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="customer_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Customer
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="customers"
+                                                                    instanceSourceKey="customer_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="customer_name"
+                                                                    instanceValue={initialValues?.customer || ''}
+                                                                    onSelectItem={handleCustomerSelectChange}
+                                                                    onClear={handlCustomerSelectClear}
+                                                                    limit="10"
+                                                                    searchParams="customer_name"
+                                                                    type="customers"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="challan_type"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Challan Type
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <Select
+                                                                    value={field.value || initialValues?.challan_type || ''}
+                                                                    onValueChange={(value) => {
+                                                                        field.onChange(value);
+                                                                        handleInputChange('challan_type', value);
+                                                                    }}
+                                                                >
+                                                                    <SelectTrigger>
+                                                                        <SelectValue placeholder="Choose a proper challan type." />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="DELIVERY">DELIVERY</SelectItem>
+                                                                        <SelectItem value="REPLACEMENT">REPLACEMENT</SelectItem>
+                                                                        <SelectItem value="RETURN">RETURN</SelectItem>
+                                                                        <SelectItem value="JOB_WORK">JOB WORK</SelectItem>
+                                                                        <SelectItem value="STOCK_TRANSFER">STOCK TRANSFER</SelectItem>
+                                                                        <SelectItem value="SAMPLE">SAMPLE</SelectItem>
+                                                                        <SelectItem value="EXHIBITION_DEMO">EXHIBITION DEMO</SelectItem>
+                                                                        <SelectItem value="APPROVAL">APPROVAL</SelectItem>
+                                                                        <SelectItem value="CONSIGNMENT">CONSIGNMENT</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="reference_number"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Reference#
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="text"
+                                                                    placeholder="Enter reference number"
+                                                                    value={initialValues?.reference_number || ''}
+                                                                    onChange={(e) => handleInputChange('reference_number', e.target.value)}
+                                                                    onBlur={() => handleFieldUpdate('reference_number')}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="delivery_status"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Delivery Status
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <Select
+                                                                    value={field.value || initialValues?.delivery_status || ''}
+                                                                    onValueChange={(value) => {
+                                                                        field.onChange(value);
+                                                                        handleInputChange('delivery_status', value);
+                                                                    }}
+                                                                >
+                                                                    <SelectTrigger>
+                                                                        <SelectValue placeholder="Select delivery status" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="SCHEDULED">SCHEDULED</SelectItem>
+                                                                        <SelectItem value="IN_TRANSIT">IN TRANSIT</SelectItem>
+                                                                        <SelectItem value="DELIVERED">DELIVERED</SelectItem>
+                                                                        <SelectItem value="PARTIALLY_DELIVERED">PARTIALLY DELIVERED</SelectItem>
+                                                                        <SelectItem value="FAILED">FAILED</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
                                         </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="challan_date" className="text-sm font-semibold text-gray-700">
-                                                Delivery Challan Date
-                                            </Label>
-                                            <Input
-                                                type="text"
-                                                value={initialValues?.challan_date ? dayjs(initialValues.challan_date).format("DD-MM-YYYY") : ''}
-                                                disabled
-                                            />
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="challan_number" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        Delivery Challan#
+                                                    </Label>
+                                                    <p className="text-base text-foreground leading-6">
+                                                        {initialValues?.challan_number || '--'}
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="challan_date" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        Delivery Challan Date
+                                                    </Label>
+                                                    <p className="text-base text-foreground leading-6">
+                                                        {initialValues?.challan_date ? dayjs(initialValues.challan_date).format("DD-MM-YYYY") : '--'}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="challan_type"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Challan Type
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <Select
-                                                            value={field.value || initialValues?.challan_type || ''}
-                                                            onValueChange={(value) => {
-                                                                field.onChange(value);
-                                                                handleInputChange('challan_type', value);
-                                                            }}
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Choose a proper challan type." />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="DELIVERY">DELIVERY</SelectItem>
-                                                                <SelectItem value="REPLACEMENT">REPLACEMENT</SelectItem>
-                                                                <SelectItem value="RETURN">RETURN</SelectItem>
-                                                                <SelectItem value="JOB_WORK">JOB WORK</SelectItem>
-                                                                <SelectItem value="STOCK_TRANSFER">STOCK TRANSFER</SelectItem>
-                                                                <SelectItem value="SAMPLE">SAMPLE</SelectItem>
-                                                                <SelectItem value="EXHIBITION_DEMO">EXHIBITION DEMO</SelectItem>
-                                                                <SelectItem value="APPROVAL">APPROVAL</SelectItem>
-                                                                <SelectItem value="CONSIGNMENT">CONSIGNMENT</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="reference_number"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Reference#
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <Input
-                                                            type="text"
-                                                            placeholder="Enter reference number"
-                                                            value={initialValues?.reference_number || ''}
-                                                            onChange={(e) => handleInputChange('reference_number', e.target.value)}
-                                                            onBlur={() => handleFieldUpdate('reference_number')}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
                                     </div>
 
                                     {/* Customer and Location Row */}
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="customer_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Customer
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="customers"
-                                                            instanceSourceKey="customer_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="customer_name"
-                                                            instanceValue={initialValues?.customer || ''}
-                                                            onSelectItem={handleCustomerSelectChange}
-                                                            onClear={handlCustomerSelectClear}
-                                                            limit="10"
-                                                            searchParams="customer_name"
-                                                            type="customers"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
 
-                                        <FormField
+
+                                        {/* <FormField
                                             control={form.control}
                                             name="location_id"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
+                                                    <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                                         Location
                                                     </FormLabel>
                                                     <FormControl>
@@ -494,16 +534,16 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
-                                        />
+                                        /> */}
                                     </div>
                                     {/* Driver Name and Vehicle Number Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         <FormField
                                             control={form.control}
                                             name="driver_name"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
+                                                    <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                                         Driver Name
                                                     </FormLabel>
                                                     <FormControl>
@@ -524,7 +564,7 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                                             name="vehicle_number"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
+                                                    <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                                         Vehicle Number
                                                     </FormLabel>
                                                     <FormControl>
@@ -540,15 +580,15 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                                                 </FormItem>
                                             )}
                                         />
-                                    </div>
+                                    </div> */}
                                     {/* Delivery Status and Delivery Date Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         <FormField
                                             control={form.control}
                                             name="delivery_status"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
+                                                    <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                                         Delivery Status
                                                     </FormLabel>
                                                     <FormControl>
@@ -580,7 +620,7 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                                             name="delivery_date"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
+                                                    <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                                         Delivery Date
                                                     </FormLabel>
                                                     <FormControl>
@@ -606,19 +646,8 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                                                 </FormItem>
                                             )}
                                         />
-                                    </div>
+                                    </div> */}
 
-
-                                    {/* Attachments */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                            Attachments
-                                        </label>
-                                        <Attachment
-                                            model="delivery_challan"
-                                            id={id}
-                                        />
-                                    </div>
 
                                     {/* Delivery Challan Items Section */}
                                     {id && (
@@ -630,35 +659,45 @@ export const DeliveryChallanForm: React.FC<DeliveryChallanFormProps> = ({
                                         />
                                     )}
 
-                                    {/* Notes and Terms and Conditions */}
-                                    <div className="space-y-4 pt-4 border-t border-border/60">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">
-                                                Notes
-                                            </Label>
-                                            <Textarea
-                                                id="notes"
-                                                placeholder="Additional notes or instructions"
-                                                value={initialValues?.notes ?? ''}
-                                                onChange={(e) => handleInputChange("notes", e.target.value)}
-                                                onBlur={() => handleFieldUpdate("notes")}
-                                                className="min-h-[80px] border-border/60 resize-y"
-                                                rows={3}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="terms_and_conditions" className="text-sm font-semibold text-gray-700">
-                                                Terms and Conditions
-                                            </Label>
-                                            <Textarea
-                                                id="terms_and_conditions"
-                                                placeholder="Enter terms and conditions"
-                                                value={initialValues?.terms_and_conditions ?? ''}
-                                                onChange={(e) => handleInputChange("terms_and_conditions", e.target.value)}
-                                                onBlur={() => handleFieldUpdate("terms_and_conditions")}
-                                                className="min-h-[80px] border-border/60 resize-y"
-                                                rows={3}
-                                            />
+                                    {/* Zoho-style Notes, Terms and Attachments */}
+                                    <div className="pt-4 border-t border-border/60">
+                                        <div className="rounded-lg border border-border/70 bg-muted/10 divide-y divide-border/60">
+                                            <div className="p-4 space-y-2">
+                                                <Label htmlFor="notes" className="text-sm font-medium text-foreground">
+                                                    Notes
+                                                </Label>
+                                                <Textarea
+                                                    id="notes"
+                                                    placeholder="Additional notes or instructions"
+                                                    value={initialValues?.notes ?? ''}
+                                                    onChange={(e) => handleInputChange("notes", e.target.value)}
+                                                    onBlur={() => handleFieldUpdate("notes")}
+                                                    className="min-h-[78px] border-border/70 bg-background resize-y"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr]">
+                                                <div className="p-4 space-y-2 border-b lg:border-b-0 lg:border-r border-border/60">
+                                                    <Label htmlFor="terms_and_conditions" className="text-sm font-medium text-foreground">
+                                                        Terms and Conditions
+                                                    </Label>
+                                                    <Textarea
+                                                        id="terms_and_conditions"
+                                                        placeholder="Enter terms and conditions"
+                                                        value={initialValues?.terms_and_conditions ?? ''}
+                                                        onChange={(e) => handleInputChange("terms_and_conditions", e.target.value)}
+                                                        onBlur={() => handleFieldUpdate("terms_and_conditions")}
+                                                        className="min-h-[110px] border-border/70 bg-background resize-y"
+                                                        rows={4}
+                                                    />
+                                                </div>
+                                                <div className="p-4 space-y-2">
+                                                    <p className="text-sm font-medium text-foreground">
+                                                        Attach File(s) to Delivery Challan
+                                                    </p>
+                                                    <Attachment model="delivery_challan" id={id} />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 

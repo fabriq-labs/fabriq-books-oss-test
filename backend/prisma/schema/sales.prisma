@@ -1,17 +1,18 @@
 model sales_order {
-  id                 String    @id @default(dbgenerated("concat('so_', gen_random_uuid())")) @db.VarChar(50)
-  so_number          String?   @unique
-  so_date            DateTime? @default(now())
-  customer_id        String?
-  location_id        String?
-  total_amount       Float?    @default(0.00)
-  status             String?
-  notes              String?
-  wf_instance_id     String?
-  payment_terms_id   String?
-  shipping_method_id String?
-  shipping_terms_id  String?
-
+  id                   String             @id @default(dbgenerated("concat('so_', gen_random_uuid())")) @db.VarChar(50)
+  so_number            String?            @unique
+  so_date              DateTime?          @default(now())
+  customer_id          String?
+  location_id          String?
+  total_amount         Float?             @default(0.00)
+  status               String?
+  notes                String?
+  wf_instance_id       String?
+  payment_terms_id     String?
+  shipping_method_id   String?
+  shipping_terms_id    String?
+  adjustable_label     String?            @default("Adjustable")
+  adjustable_value     Float?             @default(0.00)
   created_by           String?
   created_at           DateTime?          @default(now())
   modified_by          String?
@@ -130,6 +131,8 @@ model delivery_challan {
   total_amount            Float?
   status                  String?
   // Relations
+  adjustable_label        String?                 @default("Adjustable")
+  adjustable_value        Float?                  @default(0.00)
   sales_order             sales_order?            @relation(fields: [sales_order_id], references: [id])
   customer                customers?              @relation(fields: [customer_id], references: [id])
   location                location?               @relation(fields: [location_id], references: [id])
@@ -199,6 +202,8 @@ model credit_note {
   modified_at          DateTime?          @default(now()) @updatedAt
   org_id               String?
   assigned_to          String?
+  adjustable_label     String?            @default("Adjustable")
+  adjustable_value     Float?             @default(0.00)
   // Relations
   customers            customers?         @relation(fields: [customer_id], references: [id])
   location             location?          @relation(fields: [location_id], references: [id])
@@ -265,6 +270,8 @@ model quote {
   assigned_to          String?
   name                 String?
   // Relations
+  adjustable_label     String?         @default("Adjustable")
+  adjustable_value     Float?          @default(0.00)
   customer             customers?      @relation(fields: [customer_id], references: [id])
   location             location?       @relation(fields: [location_id], references: [id])
   sales_order          sales_order?    @relation(fields: [sales_order_id], references: [id])

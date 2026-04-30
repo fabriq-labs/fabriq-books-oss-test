@@ -50,6 +50,8 @@ const quoteSchema = z.object({
     terms_and_conditions: z.string().optional(),
     total_amount: z.number().optional(),
     status: z.string().optional(),
+    adjustable_label: z.string().optional(),
+    adjustable_value: z.number().optional(),
     items: z.array(quoteItemSchema).min(1, { message: 'At least one item is required' }),
 });
 type QuoteValues = z.infer<typeof quoteSchema>;
@@ -109,7 +111,11 @@ export const QuotesForm: React.FC<QuoteFormProps> = ({
         setIsLoading(true);
         viewAPI.getById("quote", id, "quote_view")
             .then((res: any) => {
-                setInitialValues(res?.data);
+                setInitialValues({
+                    ...res?.data,
+                    adjustable_label: res?.data?.adjustable_label ?? 'Adjustable',
+                    adjustable_value: Number(res?.data?.adjustable_value ?? 0),
+                });
                 setActionData(res?.workflow_context?.current_state_ref?.source_actions);
                 setWorkflowContext(res?.workflow_context)
                 setSelectedCustomerId(res.data?.customer_id || null);
@@ -311,8 +317,8 @@ export const QuotesForm: React.FC<QuoteFormProps> = ({
 
     return (
         <>
-            <div className="mx-auto w-[70%]">
-                <div className="mb-4">
+            <div className="max-w-7xl mx-auto px-2 md:px-4 space-y-4">
+                <div className="mb-4 flex justify-end">
                     <Button
                         variant="ghost"
                         className="flex items-center gap-2 text-muted-foreground"
@@ -322,7 +328,7 @@ export const QuotesForm: React.FC<QuoteFormProps> = ({
                         Back to list
                     </Button>
                 </div>
-                <Card>
+                <Card className="border border-border/70 shadow-sm overflow-hidden rounded-lg">
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <CardTitle>
@@ -330,7 +336,7 @@ export const QuotesForm: React.FC<QuoteFormProps> = ({
                             </CardTitle>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-5 md:p-6 space-y-7 bg-background">
                         {isLoading ? (
                             <div className="space-y-6">
                                 <div>
@@ -349,188 +355,170 @@ export const QuotesForm: React.FC<QuoteFormProps> = ({
                         ) : (
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                                    {/* Quote Number, Date, Expiry Date, and Reference Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="quote_number" className="text-sm font-semibold text-gray-700">
-                                                Quote Number
-                                            </Label>
-                                            <Input
-                                                type="text"
-                                                value={initialValues?.quote_number || ''}
-                                                disabled
-                                            />
+                                    {/* Quote number/date on right, editable fields on left */}
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="expiry_date"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Expiry Date
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <DatePicker
+                                                                    className="w-full h-10 px-3 py-2 border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                    style={{ width: "100%" }}
+                                                                    value={initialValues?.expiry_date ? dayjs(initialValues.expiry_date) : null}
+                                                                    onChange={(date) => {
+                                                                        const dateValue = date ? date.toISOString() : '';
+                                                                        expiryDateRef.current = dateValue;
+                                                                        handleInputChange('expiry_date', dateValue);
+                                                                    }}
+                                                                    onOpenChange={(open) => {
+                                                                        if (!open && expiryDateRef.current !== null) {
+                                                                            handleFieldUpdate('expiry_date', expiryDateRef.current);
+                                                                        }
+                                                                    }}
+                                                                    format="DD-MM-YYYY"
+                                                                    placeholder="Select expiry date"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="reference_number"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Reference#
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="text"
+                                                                    placeholder="Enter reference number"
+                                                                    value={initialValues?.reference_number || ''}
+                                                                    onChange={(e) => handleInputChange('reference_number', e.target.value)}
+                                                                    onBlur={() => handleFieldUpdate('reference_number')}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="customer_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Customer
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="customers"
+                                                                    instanceSourceKey="customer_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="customer_name"
+                                                                    instanceValue={initialValues?.customer || ''}
+                                                                    onSelectItem={handleCustomerSelectChange}
+                                                                    onClear={handlCustomerSelectClear}
+                                                                    limit="10"
+                                                                    searchParams="customer_name"
+                                                                    type="customers"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="location_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Location
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="location"
+                                                                    instanceSourceKey="location_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="location"
+                                                                    instanceValue={initialValues?.location || ''}
+                                                                    onSelectItem={handleLocationSelectChange}
+                                                                    onClear={handleLocationSelectClear}
+                                                                    limit="10"
+                                                                    searchParams="location"
+                                                                    type="location"
+                                                                    additionalFilters={locationAdditionalFilters}
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="project_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Project
+                                                            </FormLabel>
+                                                            <FormControl>
+                                                                <SearchDropDown
+                                                                    instanceType="project_master"
+                                                                    instanceSourceKey="project_id"
+                                                                    instanceKey="id"
+                                                                    instanceLabel="project_name"
+                                                                    instanceValue={initialValues?.project || ''}
+                                                                    onSelectItem={(sourceKey, key, value) => {
+                                                                        form.setValue(sourceKey, value[key]);
+                                                                        handleInputChange('project_id', value[key]);
+                                                                    }}
+                                                                    onClear={(sourceKey) => {
+                                                                        form.setValue(sourceKey, '');
+                                                                        handleInputChange('project_id', '');
+                                                                    }}
+                                                                    limit="10"
+                                                                    searchParams="project_name"
+                                                                    type="project_master"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
                                         </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="quote_date" className="text-sm font-semibold text-gray-700">
-                                                Quote Date
-                                            </Label>
-                                            <Input
-                                                type="text"
-                                                value={initialValues?.quote_date ? dayjs(initialValues.quote_date).format("DD-MM-YYYY") : ''}
-                                                disabled
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="expiry_date"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Expiry Date
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <DatePicker
-                                                            className="w-full h-10 px-3 py-2 border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                            style={{ width: "100%" }}
-                                                            value={initialValues?.expiry_date ? dayjs(initialValues.expiry_date) : null}
-                                                            onChange={(date) => {
-                                                                const dateValue = date ? date.toISOString() : '';
-                                                                expiryDateRef.current = dateValue;
-                                                                handleInputChange('expiry_date', dateValue);
-                                                            }}
-                                                            onOpenChange={(open) => {
-                                                                // When calendar closes (open becomes false), update API
-                                                                if (!open && expiryDateRef.current !== null) {
-                                                                    handleFieldUpdate('expiry_date', expiryDateRef.current);
-                                                                }
-                                                            }}
-                                                            format="DD-MM-YYYY"
-                                                            placeholder="Select expiry date"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="reference_number"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Reference#
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <Input
-                                                            type="text"
-                                                            placeholder="Enter reference number"
-                                                            value={initialValues?.reference_number || ''}
-                                                            onChange={(e) => handleInputChange('reference_number', e.target.value)}
-                                                            onBlur={() => handleFieldUpdate('reference_number')}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    {/* Customer and Location Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="customer_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Customer
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="customers"
-                                                            instanceSourceKey="customer_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="customer_name"
-                                                            instanceValue={initialValues?.customer || ''}
-                                                            onSelectItem={handleCustomerSelectChange}
-                                                            onClear={handlCustomerSelectClear}
-                                                            limit="10"
-                                                            searchParams="customer_name"
-                                                            type="customers"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="location_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Location
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="location"
-                                                            instanceSourceKey="location_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="location"
-                                                            instanceValue={initialValues?.location || ''}
-                                                            onSelectItem={handleLocationSelectChange}
-                                                            onClear={handleLocationSelectClear}
-                                                            limit="10"
-                                                            searchParams="location"
-                                                            type="location"
-                                                            additionalFilters={locationAdditionalFilters}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                    {/* Sales Order and Project Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="project_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-sm font-semibold text-gray-700">
-                                                        Project
-                                                    </FormLabel>
-                                                    <FormControl>
-                                                        <SearchDropDown
-                                                            instanceType="project_master"
-                                                            instanceSourceKey="project_id"
-                                                            instanceKey="id"
-                                                            instanceLabel="project_name"
-                                                            instanceValue={initialValues?.project || ''}
-                                                            onSelectItem={(sourceKey, key, value) => {
-                                                                form.setValue(sourceKey, value[key]);
-                                                                handleInputChange('project_id', value[key]);
-                                                            }}
-                                                            onClear={(sourceKey) => {
-                                                                form.setValue(sourceKey, '');
-                                                                handleInputChange('project_id', '');
-                                                            }}
-                                                            limit="10"
-                                                            searchParams="project_name"
-                                                            type="project_master"
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        {/* Attachments */}
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                Attach Files
-                                            </label>
-                                            <Attachment
-                                                model="quote"
-                                                id={id}
-                                            />
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="quote_number" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        Quote Number
+                                                    </Label>
+                                                    <p className="text-base text-foreground leading-6">
+                                                        {initialValues?.quote_number || '--'}
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="quote_date" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        Quote Date
+                                                    </Label>
+                                                    <p className="text-base text-foreground leading-6">
+                                                        {initialValues?.quote_date ? dayjs(initialValues.quote_date).format("DD-MM-YYYY") : '--'}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -544,35 +532,45 @@ export const QuotesForm: React.FC<QuoteFormProps> = ({
                                         />
                                     )}
 
-                                    {/* Customer Notes and Terms & Conditions */}
-                                    <div className="space-y-4 pt-4 border-t border-border/60">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="customer_notes" className="text-sm font-semibold text-gray-700">
-                                                Customer Notes
-                                            </Label>
-                                            <Textarea
-                                                id="customer_notes"
-                                                placeholder="Enter any notes to be displayed in your transaction."
-                                                value={initialValues?.customer_notes || ''}
-                                                onChange={(e) => handleInputChange("customer_notes", e.target.value)}
-                                                onBlur={() => handleFieldUpdate("customer_notes")}
-                                                className="min-h-[80px] border-border/60 resize-y"
-                                                rows={3}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="terms_and_conditions" className="text-sm font-semibold text-gray-700">
-                                                Terms & Conditions
-                                            </Label>
-                                            <Textarea
-                                                id="terms_and_conditions"
-                                                placeholder="Enter the terms and conditions of your business to be displayed in your transaction."
-                                                value={initialValues?.terms_and_conditions || ''}
-                                                onChange={(e) => handleInputChange("terms_and_conditions", e.target.value)}
-                                                onBlur={() => handleFieldUpdate("terms_and_conditions")}
-                                                className="min-h-[80px] border-border/60 resize-y"
-                                                rows={3}
-                                            />
+                                    {/* Zoho-style Notes, Terms and Attachments */}
+                                    <div className="pt-4 border-t border-border/60">
+                                        <div className="rounded-lg border border-border/70 bg-muted/10 divide-y divide-border/60">
+                                            <div className="p-4 space-y-2">
+                                                <Label htmlFor="customer_notes" className="text-sm font-medium text-foreground">
+                                                    Customer Notes
+                                                </Label>
+                                                <Textarea
+                                                    id="customer_notes"
+                                                    placeholder="Enter any notes to be displayed in your transaction."
+                                                    value={initialValues?.customer_notes || ''}
+                                                    onChange={(e) => handleInputChange("customer_notes", e.target.value)}
+                                                    onBlur={() => handleFieldUpdate("customer_notes")}
+                                                    className="min-h-[78px] border-border/70 bg-background resize-y"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr]">
+                                                <div className="p-4 space-y-2 border-b lg:border-b-0 lg:border-r border-border/60">
+                                                    <Label htmlFor="terms_and_conditions" className="text-sm font-medium text-foreground">
+                                                        Terms &amp; Conditions
+                                                    </Label>
+                                                    <Textarea
+                                                        id="terms_and_conditions"
+                                                        placeholder="Enter the terms and conditions of your business to be displayed in your transaction."
+                                                        value={initialValues?.terms_and_conditions || ''}
+                                                        onChange={(e) => handleInputChange("terms_and_conditions", e.target.value)}
+                                                        onBlur={() => handleFieldUpdate("terms_and_conditions")}
+                                                        className="min-h-[110px] border-border/70 bg-background resize-y"
+                                                        rows={4}
+                                                    />
+                                                </div>
+                                                <div className="p-4 space-y-2">
+                                                    <p className="text-sm font-medium text-foreground">
+                                                        Attach File(s) to Quote
+                                                    </p>
+                                                    <Attachment model="quote" id={id} />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
