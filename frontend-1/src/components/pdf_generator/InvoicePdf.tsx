@@ -29,6 +29,8 @@ export const extractInvoicePDFData = (data: any): any => {
         total: item.total,
         item_name: item.item_name,
         item_description: item.item_description,
+        discount_rate: item.discount_rate,
+        discount_amount: item.discount_amount,
       }))
       : [],
     subTotal: data.subTotal,
@@ -39,6 +41,8 @@ export const extractInvoicePDFData = (data: any): any => {
     locationData: data.locationData,
     notes: data.notes,
     terms_and_conditions: data.terms_and_conditions,
+    adjustable_value: data.adjustable_value,
+    adjustable_label: data.adjustable_label,
   };
 };
 
@@ -413,6 +417,24 @@ const InvoicePDF = ({
             </View>
             <View
               style={[
+                styles.tableCell,
+                styles.colIgstPercent,
+                styles.tableHeaderCell,
+              ]}
+            >
+              <Text>Discount (%)</Text>
+            </View>
+            <View
+              style={[
+                styles.tableCell,
+                styles.colIgstAmount,
+                styles.tableHeaderCell,
+              ]}
+            >
+              <Text>Discount Amt</Text>
+            </View>
+            <View
+              style={[
                 styles.tableCellLast,
                 styles.colAmount,
                 styles.tableHeaderCell,
@@ -465,6 +487,12 @@ const InvoicePDF = ({
                   <View style={[styles.tableCell, styles.colIgstAmount]}>
                     <Text>{formatAmount(taxAmount)}</Text>
                   </View>
+                  <View style={[styles.tableCell, styles.colIgstPercent]}>
+                    <Text>{item?.discount_rate || 0}%</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.colIgstAmount]}>
+                    <Text>{formatAmount(item?.discount_amount || 0)}</Text>
+                  </View>
                   <View style={[styles.tableCellLast, styles.colAmount]}>
                     <Text>{formatAmount(itemTotal)}</Text>
                   </View>
@@ -497,6 +525,14 @@ const InvoicePDF = ({
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Tax:</Text>
               <Text style={styles.totalValue}>{formatAmount(totalTax)}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Discount:</Text>
+              <Text style={styles.totalValue}>{formatAmount(totalTax)}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>{invoice?.adjustable_label || "Adjustable"}:</Text>
+              <Text style={styles.totalValue}>{formatAmount(invoice?.adjustable_value || 0)}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total:</Text>

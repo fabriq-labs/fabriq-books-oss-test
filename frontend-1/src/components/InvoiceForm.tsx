@@ -920,6 +920,8 @@ export const InvoiceForm: React.FC = () => {
           total: Number(item.total) || 0,
           item_name: item.item_name || item.product || "",
           item_description: item.item_description || "",
+          discount_rate: Number(item.discount_rate) || 0,
+          discount_amount: Number(item.discount_amount) || 0,
         })),
         subTotal: Number(formData.subTotal) || 0,
         totalTax: Number(formData.totalTax) || 0,
@@ -929,6 +931,8 @@ export const InvoiceForm: React.FC = () => {
         locationData: { ...formData.locationData, ...formData.locationData?.item },
         terms_and_conditions: formData.terms_and_conditions,
         notes: formData.notes,
+        adjustable_label: formData.adjustable_label,
+        adjustable_value: Number(formData.adjustable_value) || 0,
       };
       const blob = await pdf(
         <InvoicePDFDocument
