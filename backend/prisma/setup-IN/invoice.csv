@@ -1,4 +1,4 @@
-id,invoice_number,customer_id,invoice_total,balance_amount,days_offset,payment_terms,status,org_id,legal_entity_id
+id,invoice_number,customer_id,invoice_total,balance_amount,days_offset,payment_terms_id,status,org_id,legal_entity_id
 inv_demo_001,INV-001,cust_tata_consultancy,100000,0,-50,Net 30,SENT,org_indian_demo,org_indian_demo
 inv_demo_002,INV-002,cust_infosys,75000,35000,-45,Net 30,SENT,org_indian_demo,org_indian_demo
 inv_demo_003,INV-003,cust_wipro,50000,50000,-55,Net 30,SENT,org_indian_demo,org_indian_demo

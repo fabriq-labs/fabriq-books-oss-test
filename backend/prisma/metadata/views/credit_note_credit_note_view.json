@@ -323,7 +323,7 @@
       "dataType": "string",
       "permission": "update",
       "displayName": "Credit Note Type",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "credit_note_total": {
       "dataType": "float",
