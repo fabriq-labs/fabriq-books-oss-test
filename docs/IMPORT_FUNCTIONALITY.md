@@ -180,12 +180,18 @@ The main import interface that provides:
 
 Modal component for file selection with optional parent record selection dropdown. When a record is selected, the full item object (including all fields like `legal_entity_id`) is passed to the parent — not just the ID.
 
-For posting PDF imports, this modal now includes an **Advanced options** toggle with a processing mode selector:
+For posting PDF imports, this modal now includes an **Advanced options** toggle with a processing mode selector and an optional chunking control:
 
 - **Extract only** — calls `POST /api/parse-document/posting`, then categorization can be run later from the CSV mapper **Categorize** button.
 - **Extract + Categorize** — calls `POST /api/parse-document/posting_with_categorization` during extraction, returning initial `categorizations[]` alongside `transactions[]`.
 
 Default mode for posting PDF uploads is **Extract + Categorize**.
+
+When **Extract + Categorize** is selected, an additional checkbox is shown:
+
+- **Enable chunking for large statements** — splits the PDF into page-range sub-documents before extraction. Each sub-document is sent to the LLM independently and the results are merged. Useful for statements that are long enough to hit LLM output token limits (typically 50+ pages). The checkbox is disabled when mode is **Extract only** since chunking requires the categorization path.
+
+Chunking is opt-in and off by default. The page chunk size is fixed at 50 pages per chunk (server-side constant `PAGE_CHUNK_SIZE`). When the document is shorter than one chunk it falls back automatically to the single-call path regardless of the toggle.
 
 ### Import Extension Hooks
 
@@ -390,12 +396,15 @@ When a PDF is uploaded through the generic `ImportPannel`:
 1. `extension.getPdfUploadOptions()` extracts options from `relationSelection`
 2. For posting imports, user can open **Advanced options** in the upload modal and choose:
    - **Extract only** → `POST /api/parse-document/posting`
-   - **Extract + Categorize** → `POST /api/parse-document/posting_with_categorization`
+   - **Extract + Categorize** → `POST /api/parse-document/posting_with_categorization` (appends `legalEntityId`, `accountId`, and optionally `enableChunking=true` to the form data)
    For non-posting imports, file is sent to `POST /api/parse-document/{modelName}`.
-3. `ModelService.parseDocument` → extractor registry → `BaseDocumentExtractor`
-4. LLM extracts transactions; response: `{ success, data: { transactions: [...] }, metaData }` (and for posting-with-categorization: `categorizations[]`)
-5. Frontend converts extracted transactions to a CSV blob → kicks off the CSV mapping flow
-6. User reviews field mappings and uploads via standard CSV path
+3. `ModelService.parseDocument` pulls `legalEntityId`, `accountId`, and `enableChunking` from the request body (whitelisted via `PostingImportExtension.getRequiredOptions()`) and forwards them to `PostingImportExtension.customExtract`.
+4. If `enableChunking=true`, `BankStatementWithCategorizationExtractor` splits the PDF into page-range sub-buffers (50 pages each via `pdf-lib`), runs one LLM call per chunk, then merges the results — deduplicating any transactions that overlap at chunk boundaries.
+5. LLM extracts transactions; response: `{ success, data: { transactions: [...] }, metaData }` (and for posting-with-categorization: `categorizations[]`)
+6. Frontend converts extracted transactions to a CSV blob → kicks off the CSV mapping flow
+7. User reviews field mappings and uploads via standard CSV path
+
+**Chunked extraction failure policy**: if any individual chunk fails, the entire extraction is hard-failed and a single error is returned. Partial results are not surfaced. The per-chunk LLM trace and error details are logged server-side with `[chunking]` prefix for diagnosis.
 
 This two-step flow (extract → review → upload) is distinct from the bank statement import pipeline, which is fully server-side and non-interactive.
 
@@ -818,9 +827,17 @@ Rent,Expense,Expenses,6100
 ### Backend — PDF Extraction
 - `backend/src/lib/extractors/base-extractor.ts`
 - `backend/src/lib/extractors/extractor-registry.ts`
-- `backend/src/lib/extractors/bank-statement-with-categorization-extractor.ts`
+- `backend/src/lib/extractors/bank-statement-with-categorization-extractor.ts` ← re-export shim; real class is in `bank-statement/`
 - `backend/src/lib/extractors/invoice-extractor.ts`
 - `backend/src/lib/import-extensions/posting/index.ts`
+
+### Backend — Chunked Bank Statement Extraction
+- `backend/src/lib/extractors/bank-statement/bank-statement-with-categorization-extractor.ts` — main extractor; overrides `extract()` to branch on `enableChunking`
+- `backend/src/lib/extractors/bank-statement/page-chunker.ts` — splits a PDF buffer into page-range sub-buffers using `pdf-lib`; `PAGE_CHUNK_SIZE = 50`
+- `backend/src/lib/extractors/bank-statement/transaction-deduplicator.ts` — removes consecutive duplicate transactions at chunk boundaries (matches on date + debit + credit + description)
+- `backend/src/lib/extractors/bank-statement/bank-statement-merger.ts` — concatenates chunk results, runs deduplication, reconciles `accountContext`, merges `categorizations[]`
+- `backend/src/lib/extractors/bank-statement/types.ts` — `ChunkExtractionMetadata` shape
+- `backend/src/lib/extractors/bank-statement/index.ts` — barrel re-exports
 
 ### Test Fixtures
 - `backend/test-data/us-ca-bank-import/sample-bank-statement.csv` — 3 rows (2 debits, 1 credit)

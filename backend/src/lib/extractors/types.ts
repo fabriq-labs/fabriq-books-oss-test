@@ -21,6 +21,8 @@ export interface DocumentExtractionRequest {
     confidenceThreshold?: number;
     customFields?: string[];
     language?: string;
+    enableChunking?: boolean;
+    [key: string]: any;
   };
 }
 

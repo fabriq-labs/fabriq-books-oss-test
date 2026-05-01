@@ -58,7 +58,12 @@ export const postingImportExtension: ImportExtension = {
   async handlePdfUpload(file: File, options: PdfUploadOptions): Promise<PdfUploadResult> {
     const shouldCategorizeInExtraction = options.categorizeInExtraction === true;
     const res: any = shouldCategorizeInExtraction
-      ? await importAPI.parseDocumentWithCategorization(file, options.legalEntityId, options.accountId)
+      ? await importAPI.parseDocumentWithCategorization(
+          file,
+          options.legalEntityId,
+          options.accountId,
+          options.enableChunking === true
+        )
       : await importAPI.parseDocument('posting', file);
 
     if (!res.success) {
