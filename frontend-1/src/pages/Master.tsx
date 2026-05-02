@@ -868,6 +868,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
         metaData={masterList?.metaData}
         type={type}
         view={view}
+        filterEnhancements={filterEnhancements}
       />
       <div className="w-full space-y-4">
         {/* Search component */}

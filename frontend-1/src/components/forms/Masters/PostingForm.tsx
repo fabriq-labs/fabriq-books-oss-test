@@ -19,6 +19,7 @@ import { useTool } from '@/contexts/ToolContext';
 import { Attachment } from '../../attachment/Attachment';
 import { SearchDropDown } from '../../search_dropdown/dropdown';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
+import { useEntity } from '@/contexts/EntityContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
 import { Badge } from '@/components/ui/badge';
 
@@ -100,6 +101,10 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
     const { latestFormToolResponse } = useTool();
     const location = useLocation();
     const { setPageContext } = useChatContext();
+    const { currentEntityId } = useEntity();
+    const accountAdditionalFilters = currentEntityId
+        ? { legal_entity_id: { eq: currentEntityId } }
+        : undefined;
 
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
@@ -711,6 +716,7 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                                                         limit="10"
                                                         searchParams="name"
                                                         type="posting"
+                                                        additionalFilters={accountAdditionalFilters}
                                                     />
                                                     <FormMessage />
                                                 </FormItem>
@@ -734,6 +740,7 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                                                         limit="10"
                                                         searchParams="name"
                                                         type="posting"
+                                                        additionalFilters={accountAdditionalFilters}
                                                     />
                                                     <FormMessage />
                                                 </FormItem>

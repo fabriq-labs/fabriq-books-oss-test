@@ -17,7 +17,7 @@ import * as XLSX from "xlsx";
 import { pdf } from "@react-pdf/renderer";
 import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
-import { isEntityHeadquarters, useEntity } from "@/contexts/EntityContext";
+import { isEntityHeadquarters, useEntity, CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import { IncomeStatementPDFDocument, IncomeStatementPdfProps } from "@/components/pdf_generator/IncomePDFGenerator";
 import {
   FinancialYearSelector,
@@ -528,30 +528,48 @@ export default function IncomeStatement() {
       );
     }
 
+    const fromDate = effectiveDateRange[0].format("YYYY-MM-DD");
+    const toDate = effectiveDateRange[1].format("YYYY-MM-DD");
+
     return (
       <>
-        {group.items.map((row, index) => (
-          <TableRow
-            key={row.account_id || `row-${index}`}
-            className="hover:bg-slate-50 transition-colors duration-150 border-b border-slate-100"
-          >
-            <TableCell className="py-2 px-3">
-              <div className="flex items-center">
-                <div style={{ marginLeft: row.level * 12 }} className="flex items-center gap-1">
-                  {row.level > 0 && <div className="w-1 h-1 rounded-full bg-slate-400"></div>}
-                  <span className={`text-xs ${row.level === 0 ? "font-semibold text-slate-800" : "text-slate-700"}`}>
-                    {row.account_name}
-                  </span>
+        {group.items.map((row, index) => {
+          const canDrillDown = !!row.account_id;
+          const drillDownUrl = canDrillDown
+            ? `/accounting/transactions?account_id=${row.account_id}&from_date=${fromDate}&to_date=${toDate}`
+            : null;
+          return (
+            <TableRow
+              key={row.account_id || `row-${index}`}
+              className={`transition-colors duration-150 border-b border-slate-100 ${canDrillDown ? "hover:bg-blue-50 cursor-pointer" : "hover:bg-slate-50"}`}
+              onClick={
+                canDrillDown
+                  ? () => {
+                      if (currentEntityId) {
+                        localStorage.setItem(CURRENT_ENTITY_STORAGE_KEY, currentEntityId);
+                      }
+                      window.open(drillDownUrl!, "_blank");
+                    }
+                  : undefined
+              }
+              title={canDrillDown ? "Click to view transactions" : undefined}
+            >
+              <TableCell className="py-2 px-3">
+                <div className="flex items-center">
+                  <div style={{ marginLeft: row.level * 12 }} className="flex items-center gap-1">
+                    {row.level > 0 && <div className="w-1 h-1 rounded-full bg-slate-400"></div>}
+                    <span className={`text-xs ${row.level === 0 ? "font-semibold text-slate-800" : "text-slate-700"}`}>
+                      {row.account_name}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </TableCell>
-            <TableCell className="text-right py-2 px-3 font-mono text-xs">
-              <span className="text-slate-900 font-bold">
+              </TableCell>
+              <TableCell className={`text-right py-2 px-3 font-mono text-xs font-bold ${canDrillDown ? "text-blue-700" : "text-slate-900"}`}>
                 {formatCurrency(displayPlAmount(Number(row.total_amount || 0), group.classification), displayCurrencyCode)}
-              </span>
-            </TableCell>
-          </TableRow>
-        ))}
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </>
     );
   };

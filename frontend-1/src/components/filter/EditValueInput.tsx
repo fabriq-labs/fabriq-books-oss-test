@@ -10,6 +10,8 @@ interface EditValueInputProps {
     className?: string;
     /** Known label for the current value (avoids a fetch on first render) */
     label?: string;
+    /** Extra filters merged into every search call (e.g. entity scoping). */
+    additionalFilters?: Record<string, any>;
 }
 
 // ── Single-select combobox ────────────────────────────────────────────────────
@@ -19,12 +21,14 @@ function SelectCombobox({
     tableProps,
     initialLabel,
     className,
+    additionalFilters,
 }: {
     value: string;
     onChange: (value: string) => void;
     tableProps: any;
     initialLabel?: string;
     className?: string;
+    additionalFilters?: Record<string, any>;
 }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<any[]>([]);
@@ -62,7 +66,7 @@ function SelectCombobox({
         if (!instanceType) return;
         setIsSearching(true);
         try {
-            const filters: Record<string, any> = {};
+            const filters: Record<string, any> = { ...(additionalFilters ?? {}) };
             if (q && sp?.searchParams) filters[sp.searchParams] = { contains: q };
             const res = await viewAPI.search(
                 instanceType, `${instanceType}_view`, 1, limit, q || undefined, filters, {}
@@ -73,7 +77,7 @@ function SelectCombobox({
         } finally {
             setIsSearching(false);
         }
-    }, [instanceType, sp?.searchParams, limit]);
+    }, [instanceType, sp?.searchParams, limit, additionalFilters]);
 
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -196,7 +200,7 @@ function SelectCombobox({
 }
 
 // ── Main EditValueInput ───────────────────────────────────────────────────────
-export function EditValueInput({ value, onChange, col, className, label }: EditValueInputProps) {
+export function EditValueInput({ value, onChange, col, className, label, additionalFilters }: EditValueInputProps) {
     const { tableProps } = col;
     const isSelectField = tableProps?.columnType === 'select';
 
@@ -208,6 +212,7 @@ export function EditValueInput({ value, onChange, col, className, label }: EditV
                 tableProps={tableProps}
                 initialLabel={label}
                 className={className}
+                additionalFilters={additionalFilters}
             />
         );
     }

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { X, Plus, Trash2 } from "lucide-react";
 import { bulkEditAPI } from "@/api/api";
+import type { FilterEnhancements } from "@/types/customRowRenderer";
 
 interface BulkEditProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ interface BulkEditProps {
   metaData: Record<string, any>;
   type: string;
   view: string;
+  filterEnhancements?: FilterEnhancements;
 }
 
 interface EditField {
@@ -58,6 +60,7 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
   metaData,
   type,
   view,
+  filterEnhancements,
 }) => {
   const [editFields, setEditFields] = React.useState<EditField[]>([
     { field: "", value: "", clearField: false },
@@ -215,6 +218,7 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
                             value={field.value ? String(field.value) : ''}
                             onChange={(val) => updateField(index, "value", val)}
                             col={bulkEditCol}
+                            additionalFilters={filterEnhancements?.[field.field]?.additionalFilters}
                           />
                         );
                       })()}
