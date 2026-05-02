@@ -31,11 +31,17 @@ export const importAPI = {
   /**
    * Parse PDF document with AI-powered extraction AND categorization in a single LLM call.
    */
-  parseDocumentWithCategorization: async (file: File, legalEntityId?: string, accountId?: string) => {
+  parseDocumentWithCategorization: async (
+    file: File,
+    legalEntityId?: string,
+    accountId?: string,
+    enableChunking?: boolean
+  ) => {
     const formData = new FormData();
     formData.append('file', file);
     if (legalEntityId) formData.append('legalEntityId', legalEntityId);
     if (accountId) formData.append('accountId', accountId);
+    if (enableChunking) formData.append('enableChunking', 'true');
     return uploadAPI(`/api/parse-document/posting_with_categorization`, { method: "POST", body: formData });
   },
 

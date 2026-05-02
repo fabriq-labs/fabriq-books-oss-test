@@ -1,5 +1,6 @@
 import {
   Button,
+  Checkbox,
   Form,
   Radio,
   Select,
@@ -29,6 +30,8 @@ export const UploadManager = ({
   showPdfCategorizationToggle,
   pdfCategorizationMode,
   onPdfCategorizationModeChange,
+  enableChunking,
+  onEnableChunkingChange,
 }: any) => {
   const [form] = Form.useForm();
   const { readString } = usePapaParse();
@@ -62,6 +65,7 @@ export const UploadManager = ({
     if (type === "pdf") {
       uploadPdf(file, {
         categorizeInExtraction: pdfCategorizationMode === "extract_and_categorize",
+        enableChunking: enableChunking === true,
       });
       return;
     }
@@ -216,6 +220,18 @@ export const UploadManager = ({
                     </Radio.Group>
                     <p className="text-xs text-gray-500 mt-2 mb-0">
                       You can always run Categorize later from the CSV Mapper.
+                    </p>
+                  </Form.Item>
+                  <Form.Item className="mb-0 mt-3">
+                    <Checkbox
+                      checked={enableChunking === true}
+                      disabled={pdfCategorizationMode !== "extract_and_categorize"}
+                      onChange={(e) => onEnableChunkingChange?.(e.target.checked)}
+                    >
+                      Enable chunking for large statements
+                    </Checkbox>
+                    <p className="text-xs text-gray-500 mt-1 mb-0">
+                      Use for statements with many pages. Requires Extract + Categorize.
                     </p>
                   </Form.Item>
                 </Form>

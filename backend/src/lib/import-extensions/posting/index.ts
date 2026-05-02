@@ -16,7 +16,7 @@ import {
   ExtensionProcessResult,
 } from '../types';
 import prisma from '../../../lib/prisma';
-import { BankStatementWithCategorizationExtractor } from '../../extractors/bank-statement-with-categorization-extractor';
+import { BankStatementWithCategorizationExtractor } from '../../extractors/bank-statement/bank-statement-with-categorization-extractor';
 import logger from '../../../utils/logger';
 
 export class PostingImportExtension implements ImportExtension {
@@ -40,7 +40,7 @@ export class PostingImportExtension implements ImportExtension {
    * Required options for extraction
    */
   getRequiredOptions(): string[] {
-    return ['legalEntityId', 'accountId'];
+    return ['legalEntityId', 'accountId', 'enableChunking'];
   }
 
   /**
@@ -60,6 +60,7 @@ export class PostingImportExtension implements ImportExtension {
         orgId: context.user.org_id,
         legalEntityId: options.legalEntityId,
         bufferSize: buffer.length,
+        enableChunking: options.enableChunking === true || options.enableChunking === 'true',
       });
 
       // Fetch extraction_notes from the bank account if accountId was provided
@@ -74,12 +75,23 @@ export class PostingImportExtension implements ImportExtension {
         extractionNotes: extractionNotes ?? undefined,
       });
 
+      const enableChunking =
+        options.enableChunking === true || options.enableChunking === 'true';
+
+      logger.debug('PostingImportExtension: resolved options before extract', {
+        rawEnableChunking: options.enableChunking,
+        resolvedEnableChunking: enableChunking,
+        legalEntityId: options.legalEntityId,
+        accountId: options.accountId,
+      });
+
       // Use extractor framework for combined extraction + categorization
       const result = await this.extractor.extract(
         { user: context.user, permissions: context.permissions },
         {
           documentType: 'posting_with_categorization',
           documentContent: buffer,
+          options: { enableChunking },
         }
       );
 

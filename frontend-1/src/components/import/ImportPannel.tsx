@@ -52,6 +52,7 @@ export const ImportPannel = ({
   // Store categorizations from PDF extraction (managed by extension)
   const [pdfCategorizations, setPdfCategorizations] = useState<any[]>([]);
   const [pdfCategorizationMode, setPdfCategorizationMode] = useState<"extract_only" | "extract_and_categorize">("extract_and_categorize");
+  const [enableChunking, setEnableChunking] = useState(false);
 
   // Get import extension for this model type (if any)
   const extension = importExtensionRegistry.getForModel(modelType);
@@ -89,7 +90,7 @@ export const ImportPannel = ({
    */
   const uploadPdf = async (
     file: any,
-    uploadOptions?: { categorizeInExtraction?: boolean }
+    uploadOptions?: { categorizeInExtraction?: boolean; enableChunking?: boolean }
   ) => {
     try {
       let csvContent: string;
@@ -108,6 +109,7 @@ export const ImportPannel = ({
         const result = await extension.handlePdfUpload(file, {
           ...pdfOptions,
           categorizeInExtraction: uploadOptions?.categorizeInExtraction === true,
+          enableChunking: uploadOptions?.enableChunking === true,
         });
 
         csvContent = result.csvContent;
@@ -457,6 +459,8 @@ export const ImportPannel = ({
           showPdfCategorizationToggle={modelType === "posting"}
           pdfCategorizationMode={pdfCategorizationMode}
           onPdfCategorizationModeChange={setPdfCategorizationMode}
+          enableChunking={enableChunking}
+          onEnableChunkingChange={setEnableChunking}
         />
       )}
       {csvContent && csvContent.length > 0 && (
