@@ -121,6 +121,16 @@ export const CSVMapper = ({
   useEffect(() => {
     selectedValuesRef.current = selectedValues;
   }, [selectedValues]);
+  /**
+   * Stable reference to the latest `handleDropDownValue` so the lookup-priming
+   * effect can call it without listing it as a dependency. Listing it would
+   * cause the effect to re-run (and tear down the in-flight loop) every time
+   * `handleDropDownValue` mutates `csvData` mid-priming, which would skip
+   * subsequent select columns (e.g. Parent Account after Currency).
+   */
+  const handleDropDownValueRef = useRef<
+    (value: any, index: number) => Promise<void>
+  >(async () => { });
 
   const [extensionState, setExtensionState] = useState<ImportExtensionState>({
     isActive: false,
@@ -513,6 +523,10 @@ export const CSVMapper = ({
   );
 
   useEffect(() => {
+    handleDropDownValueRef.current = handleDropDownValue;
+  }, [handleDropDownValue]);
+
+  useEffect(() => {
     if (!csvData.length) {
       lookupPrimedForCsvRef.current = "";
       return;
@@ -523,21 +537,31 @@ export const CSVMapper = ({
     lookupPrimedForCsvRef.current = fileKey;
     const sv = selectedValuesRef.current;
     if (sv.length !== headers.length) return;
-    let cancelled = false;
+
+    // Collect every select-type column that needs priming UP-FRONT, before any
+    // `setCsvData` side-effect runs. Holding the list in a local closure keeps
+    // the loop alive even though the priming itself mutates `csvData` (which
+    // re-renders this effect — the fileKey guard catches the re-run).
+    const tasks: Array<{ fieldKey: string; index: number }> = [];
+    for (let i = 0; i < sv.length; i++) {
+      const fk = sv[i];
+      if (!isTruthyField(fk)) continue;
+      const fs = filedSets[String(fk)];
+      if (fs?.tableProps?.columnType !== "select") continue;
+      tasks.push({ fieldKey: String(fk), index: i });
+    }
+
     void (async () => {
-      for (let i = 0; i < sv.length; i++) {
-        if (cancelled) return;
-        const fk = sv[i];
-        if (!isTruthyField(fk)) continue;
-        const fs = filedSets[String(fk)];
-        if (fs?.tableProps?.columnType !== "select") continue;
-        await handleDropDownValue(fk, i);
+      for (const { fieldKey, index } of tasks) {
+        try {
+          await handleDropDownValueRef.current(fieldKey, index);
+        } catch {
+          // handleDropDownValue already swallows search errors; keep priming
+          // remaining columns even if one lookup fails.
+        }
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [csvData, filedSets, handleDropDownValue]);
+  }, [csvData, filedSets]);
 
   const clearFieldMapping = useCallback(
     (fieldKey: string) => {
