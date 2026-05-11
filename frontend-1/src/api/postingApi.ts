@@ -45,6 +45,12 @@ export const importAPI = {
     return uploadAPI(`/api/parse-document/posting_with_categorization`, { method: "POST", body: formData });
   },
 
+  discardImportRun: async (importId: string, reason = 'user_discarded_in_mapper') =>
+    fetchAPI(`/api/import_run/${importId}/discard`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+
   // Legacy method — kept for backward compatibility
   uploadPDF: (type: string, view: string, data: any) =>
     fetchAPI(`/api/${type}/view/${view}/extract`, { method: "POST", body: JSON.stringify(data) })

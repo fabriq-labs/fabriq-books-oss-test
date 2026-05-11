@@ -128,6 +128,16 @@ export class StorageAdapter {
     return;
   }
 
+  resolveFullPath(relativePath: string): string {
+    if (this.storageType === 'gcs') {
+      const normalized = relativePath.replace(/\\/g, '/');
+      return `gs://${this.bucketName}/${normalized}`;
+    }
+    return path.resolve(this.localRootDir, relativePath);
+  }
+
+
+
   async delete_file(filePath: string): Promise<void> {
     if (this.storageType === 'gcs') {
       const bucket = this.storage!.bucket(this.bucketName);

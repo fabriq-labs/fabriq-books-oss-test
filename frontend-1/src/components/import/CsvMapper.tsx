@@ -22,6 +22,7 @@ import {
 import { Badge } from "../ui/badge";
 import { cn } from "@/lib/utils";
 import { viewAPI } from "@/api/api";
+import { importAPI } from "@/api/postingApi";
 import { importExtensionRegistry, ImportExtensionState } from "@/features/import-extensions";
 import {
   AlertTriangle,
@@ -100,6 +101,7 @@ export const CSVMapper = ({
   relationId,
   relationSelection,
   initialCategorizations = [],
+  importId,
 }: any) => {
   const extension = importExtensionRegistry.getForModel(modelType);
   const { readString } = usePapaParse();
@@ -115,6 +117,7 @@ export const CSVMapper = ({
   const [optionalIds, setOptionalIds] = useState<string[]>([]);
   const [mappingPopoverField, setMappingPopoverField] = useState<string | null>(null);
   const [addColumnOpen, setAddColumnOpen] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
 
   const lookupPrimedForCsvRef = useRef<string>("");
   const selectedValuesRef = useRef<(string | number | null)[]>([]);

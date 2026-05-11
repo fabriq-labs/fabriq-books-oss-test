@@ -7,6 +7,7 @@ import { RelationshipResolverService } from '../RelationshipResolverService';
 import { buildPostingImportFieldMapping } from '../../lib/import/bankStatementImportClient';
 import { ValidationError } from '../../rest/errors/ApiError';
 import logger from '../../utils/logger';
+import { ImportAuditService } from '../import/ImportAuditService';
 
 // ── Debit / Credit Convention ─────────────────────────────────────────────────
 //
@@ -100,6 +101,7 @@ export interface ImportBankStatementOptions {
 export interface ImportBankStatementResult {
   success: boolean;
   count?: number;
+  import_id?: string;
   /** Populated when dryRun=true — the mapped transactions without DB insert */
   transactions?: Record<string, any>[];
   error?: string;
@@ -155,8 +157,22 @@ export class PostingImportService {
     } = options;
 
     const emit = makeEmitter(onProgress);
+    const auditService = ImportAuditService.getInstance();
+    let importId: string | undefined;
 
     try {
+      importId = await auditService.createRun({
+        context,
+        targetModel: 'posting',
+        targetView: viewId,
+        importChannel: 'custom_posting_bank_statement',
+        fileName,
+        mimeType,
+        fileSizeBytes: fileSize,
+        isDryRun: dryRun,
+        sourceFileBuffer: fileBuffer,
+      });
+      await auditService.markProcessing(importId);
       // ── Step 1: Extract (with optional categorisation) ────────────────────
       if (categorize) {
         emit({ step: 'extracting', message: 'Extracting transactions and categorising…' });
@@ -188,8 +204,9 @@ export class PostingImportService {
 
       if (!parseResult.success) {
         const msg = parseResult.error ?? 'PDF extraction failed';
+        if (importId) await auditService.markFailure(importId, msg);
         emit({ step: 'error', message: msg, error: msg });
-        return { success: false, error: msg };
+        return { success: false, error: msg, import_id: importId };
       }
 
       const rawTransactionsAll: Record<string, any>[] = parseResult.data?.transactions ?? [];
@@ -229,15 +246,24 @@ export class PostingImportService {
       });
 
       if (dryRun) {
+        if (importId) {
+          await auditService.markSuccess(importId, {
+            records_total: mapped.length,
+            records_success: 0,
+            records_failed: 0,
+          });
+        }
         emit({ step: 'complete', message: `Dry run — ${mapped.length} transaction(s) parsed, nothing inserted.`, count: mapped.length });
-        return { success: true, count: mapped.length, transactions: mapped };
+        return { success: true, count: mapped.length, transactions: mapped, import_id: importId };
       }
 
       // ── Step 4: Bulk insert ───────────────────────────────────────────────
-      return await this.bulkInsert(mapped, viewId, context, emit, fileName);
+      return await this.bulkInsert(mapped, viewId, context, emit, fileName, importId);
 
     } catch (error: any) {
-      return handleError(error, fileName, emit, logger);
+      if (importId) await auditService.markFailure(importId, error);
+      const result = handleError(error, fileName, emit, logger);
+      return { ...result, import_id: importId };
     }
   }
 
@@ -254,8 +280,22 @@ export class PostingImportService {
     } = options;
 
     const emit = makeEmitter(onProgress);
+    const auditService = ImportAuditService.getInstance();
+    let importId: string | undefined;
 
     try {
+      importId = await auditService.createRun({
+        context,
+        targetModel: 'posting',
+        targetView: viewId,
+        importChannel: 'custom_posting_bank_statement',
+        fileName,
+        mimeType: 'text/csv',
+        fileSizeBytes: fileBuffer.length,
+        isDryRun: dryRun,
+        sourceFileBuffer: fileBuffer,
+      });
+      await auditService.markProcessing(importId);
       // ── Validate columnMapping ─────────────────────────────────────────────
       if (!columnMapping || Object.keys(columnMapping).length === 0) {
         throw new ValidationError('column_mapping is required for CSV imports');
@@ -306,15 +346,24 @@ export class PostingImportService {
       const mapped = resolvedRows.map((row) => mapCsvRow(row, accountId));
 
       if (dryRun) {
+        if (importId) {
+          await auditService.markSuccess(importId, {
+            records_total: mapped.length,
+            records_success: 0,
+            records_failed: 0,
+          });
+        }
         emit({ step: 'complete', message: `Dry run — ${mapped.length} row(s) parsed, nothing inserted.`, count: mapped.length });
-        return { success: true, count: mapped.length, transactions: mapped };
+        return { success: true, count: mapped.length, transactions: mapped, import_id: importId };
       }
 
       // ── Step 5: Bulk insert ────────────────────────────────────────────────
-      return await this.bulkInsert(mapped, viewId, context, emit, fileName);
+      return await this.bulkInsert(mapped, viewId, context, emit, fileName, importId);
 
     } catch (error: any) {
-      return handleError(error, fileName, emit, logger);
+      if (importId) await auditService.markFailure(importId, error);
+      const result = handleError(error, fileName, emit, logger);
+      return { ...result, import_id: importId };
     }
   }
 
@@ -325,19 +374,20 @@ export class PostingImportService {
     viewId: string,
     context: AuthContext,
     emit: ReturnType<typeof makeEmitter>,
-    fileName: string
+    fileName: string,
+    importId?: string
   ): Promise<ImportBankStatementResult> {
     emit({ step: 'importing', message: `Importing ${rows.length} transaction(s)…`, count: rows.length });
 
     const mapping = buildPostingImportFieldMapping(rows);
     const uploadResult = await UploadService.getInstance().uploadCSV(
-      'posting', context, { data: rows, mapping }, viewId
+      'posting', context, { data: rows, mapping, importMeta: importId ? { import_id: importId } : undefined }, viewId
     );
 
     if (!uploadResult.success) {
       const msg = uploadResult.error ?? 'Upload failed';
       emit({ step: 'error', message: msg, error: msg });
-      return { success: false, error: msg };
+      return { success: false, error: msg, import_id: importId };
     }
 
     const count = uploadResult.data?.count ?? 0;
@@ -347,7 +397,7 @@ export class PostingImportService {
       fileName, count, userId: context.user?.id,
     });
 
-    return { success: true, count };
+    return { success: true, count, import_id: importId };
   }
 }
 

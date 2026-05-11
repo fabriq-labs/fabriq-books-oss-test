@@ -369,6 +369,48 @@ model ai_activity_log {
   @@map("ai_activity_log")
 }
 
+enum import_run_status {
+  RECEIVED
+  PROCESSING
+  SUCCESS
+  FAILED
+  PARTIAL_SUCCESS
+  ABANDONED
+}
+
+model import_run {
+  id                     String            @id @default(dbgenerated("'impr_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by             String?
+  modified_by            String?
+  created_at             DateTime          @default(now())
+  modified_at            DateTime          @updatedAt
+  org_id                 String
+  target_model           String
+  target_view            String?
+  import_channel         String
+  source_file_name       String
+  source_mime_type       String?
+  source_file_size_bytes Int?
+  storage_path           String?
+  status                 import_run_status
+  started_at             DateTime
+  completed_at           DateTime?
+  is_dry_run             Boolean           @default(false)
+  records_total          Int?
+  records_success        Int?
+  records_failed         Int?
+  error_summary          String?           @db.Text
+  error_details          Json?
+  request_context        Json?
+  source_sha256          String?
+  discard_reason         String?
+
+  @@index([org_id, created_at])
+  @@index([org_id, status])
+  @@index([target_model, created_at])
+  @@map("import_run")
+}
+
 // LLM Observability - logs every agent request for prompt improvement
 model llm_trace {
   id          String   @id @default(dbgenerated("'llmt_' || gen_random_uuid()")) @db.VarChar(50)

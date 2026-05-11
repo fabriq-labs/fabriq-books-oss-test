@@ -220,6 +220,7 @@ export const setupRestRoutes = (router: Router) => {
     router.post(
       `${basePath}/view/:viewId/upload`,
       authMiddleware,
+      upload.single('file'),
       (req, res, next) => {
         req.params.modelName = model;
         next();
@@ -300,6 +301,13 @@ export const setupRestRoutes = (router: Router) => {
       });
       return res.status(result.httpStatus).json(result.body);
     }
+  );
+
+  // Import run discard endpoint (must be before generic /:model/:id/:relation routes)
+  router.post(
+    '/import_run/:id/discard',
+    authMiddleware,
+    restService.discardImportRun.bind(restService)
   );
 
   // Setup routes for each model

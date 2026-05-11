@@ -107,6 +107,7 @@ export const postingImportExtension: ImportExtension = {
 
     return {
       csvContent,
+      import_id: res?.metaData?.import_id ?? res?.import_id ?? res?.data?.import_id,
       categorizations,
     };
   },

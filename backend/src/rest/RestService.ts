@@ -20,6 +20,7 @@ import { AuthContext } from '../auth/types';
 import { SearchQueryBuilder } from '../services/query/SearchQueryBuilder';
 import { run_report } from '../lib/reports';
 import { ModelService } from '../services/core/ModelService';
+import { ImportAuditService } from '../services/import/ImportAuditService';
 
 export interface AuthRequest extends Request {
   context?: any;
@@ -440,12 +441,25 @@ export class RestService {
       const context = this.getAuthContext(req);
       const modelName = req.params.modelName;
       const viewId = req.params.viewId || (req.query.view as string);
+      const parsedBody =
+        typeof req.body?.payload === 'string'
+          ? JSON.parse(req.body.payload)
+          : req.body;
 
       logger.info('Uploading CSV data', { modelName, user: context.user?.id });
 
       // dataGraph is fetched once inside UploadService and returned in result.metaData
       const uploadService = UploadService.getInstance();
-      const result = await uploadService.uploadCSV(modelName, context, req.body, viewId);
+      const sourceFile =
+        req.file && req.file.buffer
+          ? {
+            buffer: Buffer.isBuffer(req.file.buffer) ? req.file.buffer : Buffer.from(req.file.buffer),
+            fileName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            fileSizeBytes: req.file.size,
+          }
+          : undefined;
+      const result = await uploadService.uploadCSV(modelName, context, parsedBody, viewId, sourceFile);
 
       if (!result.success) {
         throw mapServiceMessageToApiError(result.error);
@@ -567,20 +581,36 @@ export class RestService {
    * 'legalEntityId' which is extracted from form data.
    */
   public async parseDocument(req: AuthRequest, res: Response) {
+    let importId: string | undefined;
     try {
       const context = this.getAuthContext(req);
       const modelName = req.params.modelName;
-
       if (!modelName) {
         throw new ValidationError('Model name is required');
       }
       if (!req.file) {
         throw new ValidationError('PDF file is required');
       }
-
       const pdfBuffer = Buffer.isBuffer(req.file.buffer)
         ? req.file.buffer
         : Buffer.from(req.file.buffer);
+      const auditService = ImportAuditService.getInstance();
+      const orgId = context.user?.org_id ?? context.user?.metadata?.fabriq_org_id;
+      importId = await auditService.createRun({
+        context,
+        targetModel: modelName,
+        targetView: undefined,
+        importChannel: 'parse_document_two_pass',
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        fileSizeBytes: req.file.size,
+        isDryRun: true,
+        sourceFileBuffer: pdfBuffer,
+      });
+      if (orgId) {
+        await auditService.storeSourceFile(importId, orgId, req.file.originalname, pdfBuffer);
+      }
+      await auditService.markProcessing(importId);
 
       // Validation, extension option extraction, and metaData shaping are
       // handled inside ModelService.parseDocument
@@ -598,6 +628,7 @@ export class RestService {
       );
 
       if (!result.success) {
+        await auditService.markFailure(importId, result.error ?? 'Failed to parse PDF document');
         throw mapServiceMessageToApiError(result.error);
       }
 
@@ -608,15 +639,39 @@ export class RestService {
         user: context.user?.id,
       });
 
-      res.json(result);
+      res.json({
+        ...result,
+        metaData: {
+          ...(result.metaData || {}),
+          import_id: importId,
+        },
+      });
 
     } catch (error: unknown) {
+      if (importId) {
+        await ImportAuditService.getInstance().markFailure(importId, error);
+      }
       handleRestControllerError(error, req, res, 'parseDocument', 'Failed to parse PDF document', {
         logExtras: {
           modelName: req.params.modelName,
           fileName: req.file?.originalname
         }
       });
+    }
+  }
+
+  public async discardImportRun(req: AuthRequest, res: Response) {
+    try {
+      const context = this.getAuthContext(req);
+      if (!context.user) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+      const importId = req.params.importId || req.params.id;
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason : 'user_discarded_in_mapper';
+      await ImportAuditService.getInstance().markAbandoned(importId, reason);
+      res.json({ success: true, data: { id: importId, status: 'ABANDONED' } });
+    } catch (error: unknown) {
+      handleRestControllerError(error, req, res, 'discardImportRun', 'Failed to discard import run');
     }
   }
 

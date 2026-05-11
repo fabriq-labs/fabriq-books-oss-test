@@ -53,6 +53,7 @@ export const ImportPannel = ({
   const [pdfCategorizations, setPdfCategorizations] = useState<any[]>([]);
   const [pdfCategorizationMode, setPdfCategorizationMode] = useState<"extract_only" | "extract_and_categorize">("extract_and_categorize");
   const [enableChunking, setEnableChunking] = useState(false);
+  const [currentImportId, setCurrentImportId] = useState<string | null>(null);
 
   // Get import extension for this model type (if any)
   const extension = importExtensionRegistry.getForModel(modelType);
@@ -114,6 +115,7 @@ export const ImportPannel = ({
 
         csvContent = result.csvContent;
         categorizations = result.categorizations || [];
+        setCurrentImportId(result?.import_id || null);
       } else {
         // Generic PDF parsing for models without extensions
         const res: any = await importAPI.parseDocument(modelType, file);
@@ -123,6 +125,9 @@ export const ImportPannel = ({
         }
 
         const transactions = res.data?.transactions || [];
+        setCurrentImportId(
+          res?.metaData?.import_id || res?.import_id || res?.data?.import_id || null
+        );
         if (transactions.length === 0) {
           throw new Error('No transactions found in the PDF');
         }
@@ -237,6 +242,25 @@ export const ImportPannel = ({
   const handleCsv = (file: any) => {
     setImportSourceDisplayName(null);
     setCsvFile(file);
+    setCurrentImportId(null);
+  };
+
+  const handleDiscardImport = async () => {
+    if (currentImportId) {
+      try {
+        await importAPI.discardImportRun(currentImportId);
+      } catch {
+        toast({
+          title: "Discard failed",
+          description: "Unable to discard import run. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    clearImport();
+    setCurrentImportId(null);
+    onDiscard?.();
   };
 
   const bulkDelete = (setCsvData: any) => {
@@ -245,6 +269,8 @@ export const ImportPannel = ({
     );
     setSelectedRowKeys([]);
   };
+
+
 
   const handleOnServerUpload = async (obj: {
     selectedValues: string[];
@@ -263,18 +289,55 @@ export const ImportPannel = ({
         ? (await buildDataWithLookupFields(obj.csvData, obj.lookUpData, filedSets)) as Record<string, unknown>[]
         : obj.csvData;
 
+    const browserFileMeta =
+      csvFile && typeof csvFile === "object"
+        ? {
+          source_file_name: importSourceDisplayName || csvFile?.name,
+          source_mime_type: csvFile?.type,
+          source_file_size_bytes:
+            typeof csvFile?.size === "number" ? csvFile.size : undefined,
+        }
+        : undefined;
+
+    const importMetaForUpload =
+      currentImportId
+        ? { import_id: currentImportId }
+        : browserFileMeta;
+
     let formattedData: any = {
       ...(relationFieldId && { parentData: { [relationFieldId]: relationId } }),
       mapping: newObj,
       isJSON: true,
       data: csvData,
+      ...(importMetaForUpload && {
+        importMeta: {
+          ...importMetaForUpload,
+        },
+      }),
     };
     if (updateCSVData) {
       formattedData = await updateCSVData(formattedData, relationId);
     }
+    if (currentImportId) {
+      formattedData = {
+        ...formattedData,
+        importMeta: {
+          ...(formattedData?.importMeta || {}),
+          import_id: currentImportId,
+        },
+      };
+    }
 
     try {
-      const res: any = await importAPI.uploadJSON(modelType, modelView, formattedData);
+      const uploadFormData = new FormData();
+      uploadFormData.append("payload", JSON.stringify(formattedData));
+      // For PDF flow, binary was already uploaded in parseDocument.
+      // On mapper submit, send only mapped data + import_id (no second file upload).
+      const shouldAttachBinaryFile = !currentImportId;
+      if (shouldAttachBinaryFile && csvFile && typeof File !== "undefined" && csvFile instanceof File) {
+        uploadFormData.append("file", csvFile);
+      }
+      const res: any = await importAPI.uploadData(modelType, modelView, uploadFormData);
       const { message } = res;
 
       if (message) {
@@ -287,13 +350,16 @@ export const ImportPannel = ({
           description: "Upload completed successfully",
         });
         clearImport()
+
         onUploadComplete(res);
         onList();
       }
     } catch {
+
       setUploading(false);
       setSubmitLoader(false);
       setTableLoader(false);
+
     }
   };
   const handleBulkEditChange = (filteredData: any, bulkOriginalData: any) => {
@@ -492,12 +558,13 @@ export const ImportPannel = ({
           handleRefreshList={handleRefreshList}
           modelType={modelType}
           modelView={modelView}
-          onDiscard={clearImport}
+          onDiscard={handleDiscardImport}
           onUploadComplete={onUploadComplete}
           additionalFileds={additionalFileds}
           onList={onList}
           relationId={relationId}
           relationSelection={relationSelection}
+          importId={currentImportId}
           // Pass AI categorizations from PDF extraction (empty for CSV uploads)
           initialCategorizations={pdfCategorizations}
         />

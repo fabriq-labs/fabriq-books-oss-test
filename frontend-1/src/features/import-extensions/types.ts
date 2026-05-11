@@ -68,6 +68,7 @@ export interface ColumnRenderProps {
  */
 export interface PdfUploadResult {
   csvContent: string;
+  import_id?: string;
   categorizations?: Array<{
     transaction_index: number;
     predicted_account_id: string;
