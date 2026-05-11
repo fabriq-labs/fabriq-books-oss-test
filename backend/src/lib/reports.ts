@@ -53,10 +53,13 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
     return { success: true, assets, liabilities };
   }
   else if (report_id === "financial_ratios") {
+    const entityId = filters.legal_entity_id;
+    const entityIds = filters.legal_entity_ids ?? (entityId ? [entityId] : undefined);
     return await getFinancialRatios(
       filters.from_date,
       filters.to_date,
-      context.user.org_id
+      context.user.org_id,
+      entityIds
     );
   }
   else if (report_id === "my_feed") {
@@ -109,9 +112,14 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
     if (!classification) {
       throw new Error("Classification is required for classification_breakdown report");
     }
+    const entityId = filters.legal_entity_id;
+    const entityIds = filters.legal_entity_ids ?? (entityId ? [entityId] : undefined);
     const breakdown = await getClassificationBreakdown(
       context.user.org_id,
-      classification
+      classification,
+      filters.from_date,
+      filters.to_date,
+      entityIds
     );
     return { breakdown };
   }

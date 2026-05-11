@@ -9,6 +9,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { AuthContext } from '../../auth/types';
+import prisma from '../../lib/prisma';
 import {
   getAgentSession,
   updateAgentSession,
@@ -307,6 +308,34 @@ export function queueActionsTool(sessionId: string, auth: AuthContext) {
           executedCount++;
         } else {
           toQueue.push(action);
+        }
+      }
+
+      // Enrich categorize_transaction payloads with account_name for inbox display
+      if (params.action_type === 'categorize_transaction' && toQueue.length > 0) {
+        const postingIds = toQueue.map(a => a.payload?.posting_id).filter((id): id is string => !!id);
+        if (postingIds.length > 0) {
+          const postings = await prisma.posting.findMany({
+            where: { id: { in: postingIds }, org_id: auth.user.org_id },
+            select: {
+              id: true,
+              account: { select: { id: true, name: true, type: true } },
+              credit_account: { select: { id: true, name: true, type: true } },
+            },
+          });
+          const postingMap = new Map(postings.map(p => [p.id, p]));
+          for (const action of toQueue) {
+            if (action.payload?.account_name) continue;
+            const posting = postingMap.get(action.payload?.posting_id);
+            if (!posting) continue;
+            const acct = posting.account as any;
+            const crAcct = posting.credit_account as any;
+            const bankAcct =
+              acct?.type?.includes('BANK') || acct?.type?.includes('CREDIT_CARD') ? acct :
+              crAcct?.type?.includes('BANK') || crAcct?.type?.includes('CREDIT_CARD') ? crAcct :
+              (acct ?? crAcct);
+            if (bankAcct?.name) (action.payload as any).account_name = bankAcct.name;
+          }
         }
       }
 

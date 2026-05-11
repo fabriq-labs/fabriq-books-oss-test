@@ -15,6 +15,7 @@ model account {
   type                  String[]
   frequency             String?
   balance               Decimal?                @db.Decimal(19, 4)
+  credit_limit          Decimal?                @db.Decimal(19, 4)
   base_currency_id      String?
   currency              currency?               @relation(fields: [base_currency_id], references: [id])
   is_active             Boolean                 @default(true)

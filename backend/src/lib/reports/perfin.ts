@@ -688,12 +688,13 @@ export const getSavingRatio = async (
 export const getFinancialRatios = async (
   startDate: string,
   endDate: string,
-  orgId: string
+  orgId: string,
+  legalEntityIds?: string[]
 ): Promise<FinancialRatioResult[]> => {
   const results = await prisma.$queryRaw<FinancialRatioResult[]>`
-    WITH 
+    WITH
       rolled_up_balances AS (
-        SELECT 
+        SELECT
           ah.id AS account_id,
           ah.classification AS classification,
           ah.path AS account_path,
@@ -712,10 +713,11 @@ export const getFinancialRatios = async (
               0
           END AS balance
         FROM account_hierarchy ah
-        LEFT JOIN account_balances ab 
-          ON ah.id = ab.account_id 
+        LEFT JOIN account_balances ab
+          ON ah.id = ab.account_id
           AND ab.value_date BETWEEN ${startDate}::date AND ${endDate}::date
-        WHERE ah.org_id = ${orgId}  
+        WHERE ah.org_id = ${orgId}
+          ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
         GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id
       ),
 
@@ -1103,7 +1105,6 @@ export async function getLiabilitiesTotal(startDate: string, endDate: string, or
         FROM rolled_up_balances rb
         LEFT JOIN parent_totals pt ON rb.account_id = pt.id
         WHERE rb.classification = 'Expense'
-          AND rb.parent_account_id = 'acco_2939b1cb-99e0-4ca5-a3bb-f5c9a4d6dac5'
       ),
       
       total_income AS (
@@ -1378,7 +1379,10 @@ export async function getIncomeByType(startDate: string, endDate: string, orgId:
 
 export async function getClassificationBreakdown(
   orgId: string,
-  classification: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense'
+  classification: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense',
+  startDate?: string,
+  endDate?: string,
+  legalEntityIds?: string[]
 ): Promise<ClassificationBreakdownItem[]> {
   const categoryMappings = {
     Asset: [
@@ -1447,10 +1451,13 @@ export async function getClassificationBreakdown(
         )), 0) as amount
       FROM account_hierarchy ah
       LEFT JOIN posting p ON (p.account_id = ah.id OR p.credit_account_id = ah.id)
+        AND (CAST(${startDate ?? null} AS DATE) IS NULL OR p.value_date >= CAST(${startDate ?? null} AS DATE))
+        AND (CAST(${endDate ?? null} AS DATE) IS NULL OR p.value_date <= CAST(${endDate ?? null} AS DATE))
       WHERE ah.org_id = ${orgId}
-      AND ah.classification = ${classification}
-      GROUP BY 
-        CASE 
+      AND ah.classification = ${Prisma.raw(`'${classification}'::account_classification`)}
+      ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
+      GROUP BY
+        CASE
           ${Prisma.raw(patternCases)}
           ELSE 'Other'
         END

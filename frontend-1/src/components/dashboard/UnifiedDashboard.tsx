@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import RequesterDashboard from '@/pages/RequestDashboard';
 import ProcurementApproverDashboard from '@/pages/ProcurementDashboardApproval';
-import AIDashboard from '@/pages/AIDashboard';
+import FabriqDashboard from './FabriqDashboard';
 import { appName, sidebarFallbackName } from '@/config/brand';
 
 const UnifiedDashboard: React.FC = () => {
@@ -19,9 +19,9 @@ const UnifiedDashboard: React.FC = () => {
         }
     }, [isFinanceTeam, isBuyer]);
 
-    // Show AI dashboard for users in Finance Team role
+    // Show entity-branching dashboard for Finance Team users
     if (isFinanceTeam()) {
-        return <AIDashboard />;
+        return <FabriqDashboard />;
     }
 
     // If user is a buyer, show procurement approver dashboard
