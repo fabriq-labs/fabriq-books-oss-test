@@ -58,7 +58,7 @@ const ACCOUNTS = {
   retainedEarnings:    'acco_org_indian_demo_3102', // Equity   code=3102
 };
 
-const OBC_ACCOUNT_ID = `acco_${ORG_ID}_${LEGAL_ENTITY_ID}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
+const OBC_ACCOUNT_ID = `acco_${LEGAL_ENTITY_ID}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
 
 const CSV_BY_CODE_FIXTURE = path.join(
   __dirname, '../../../test-data/migration-journal/trial-balance-by-code.csv'
@@ -129,7 +129,7 @@ describe('Tier 1 — Pure logic (no DB)', () => {
   });
 
   it('OBC account id derivation is deterministic', () => {
-    const expected = `acco_${ORG_ID}_${LEGAL_ENTITY_ID}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const expected = `acco_${LEGAL_ENTITY_ID}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
     expect(OBC_ACCOUNT_ID).toBe(expected);
   });
 });

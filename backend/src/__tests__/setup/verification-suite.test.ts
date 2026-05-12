@@ -70,7 +70,7 @@ const ACCOUNTS = {
   depreciation:        'acco_org_indian_demo_5212',
 };
 
-const OBC_ACCOUNT_ID = `acco_${ORG_ID}_${LEGAL_ENTITY_ID}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
+const OBC_ACCOUNT_ID = `acco_${LEGAL_ENTITY_ID}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
 
 const STABLE_POSTING_IDS = Array.from({ length: 20 }, (_, i) => `post_vs_${String(i + 1).padStart(3, '0')}`);
 
@@ -125,7 +125,7 @@ describe('Tier 1 — Pure logic (no DB)', () => {
   });
 
   it('OBC account ID derivation is deterministic', () => {
-    const expected = `acco_${ORG_ID}_${LEGAL_ENTITY_ID}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const expected = `acco_${LEGAL_ENTITY_ID}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
     expect(OBC_ACCOUNT_ID).toBe(expected);
   });
 

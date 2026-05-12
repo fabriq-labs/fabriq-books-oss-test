@@ -63,7 +63,7 @@ export async function createMigrationJournal(
   }
 
   // ── 3. Upsert "Opening Balance Clearing" account ──────────────────────────
-  const obcId = `acco_${sdl.orgId}_${legal_entity_id}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
+  const obcId = `acco_${legal_entity_id}_obc`.replace(/[^a-zA-Z0-9_]/g, '_');
 
   await sdl.upsert('account', {
     where: { id: obcId },
