@@ -48,6 +48,7 @@ import ConnectionDetailPage from "./pages/settings/ConnectionDetailPage";
 import TenantOnboardingPage from "./pages/settings/TenantOnboardingPage";
 import DeveloperOptionsPage from "./pages/settings/DeveloperOptionsPage";
 import TenantAdministrationPage from "./pages/settings/TenantAdministrationPage";
+import OpeningBalances from "./pages/accounting/OpeningBalances";
 import { SuperAdminGuard } from "./components/layout/SuperAdminGuard";
 import { PromptTemplateForm } from "./components/forms/Masters/PromptTemplateForm";
 import { AgentTemplateForm } from "./components/forms/Masters/AgentTemplateForm";
@@ -84,6 +85,7 @@ import CashFlow from "./pages/reports/CashFlow";
 import PostingList from "./pages/reports/PostingList";
 import BankTransactions from "./pages/reports/BankTransactions";
 import PersonalIncomeReport from "./pages/reports/PersonalIncomeReport";
+import MonthlyTrialBalance from "./pages/reports/MonthlyTrialBalance";
 import Transactions from "./pages/Transactions";
 import { ReportControllerProvider } from "./contexts/ReportControllerContext";
 import { PaymentReceiptForm } from "./components/forms/Masters/PaymentReceiptForm";
@@ -159,6 +161,7 @@ const AppRoutes: React.FC = () => {
                 <Route path="reports/cash-flow" element={<CashFlow />} />
                 <Route path="reports/posting-list" element={<PostingList />} />
                 <Route path="reports/personal-income" element={<PersonalIncomeReport />} />
+                <Route path="reports/monthly-trial-balance" element={<MonthlyTrialBalance />} />
 
                 {/* Sales Routes */}
                 <Route path="sales/customers" element={<Master type="customers" view="customers_view" displayName="Customers" />} />
@@ -423,6 +426,8 @@ const AppRoutes: React.FC = () => {
                     <LLMTraceDetailPage />
                   </SuperAdminGuard>
                 } />
+
+                <Route path="accounting/opening-balances" element={<OpeningBalances />} />
 
                 <Route path="settings/tenant-admin" element={
                   <SuperAdminGuard>

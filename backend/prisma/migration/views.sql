@@ -390,6 +390,47 @@ AS WITH RECURSIVE hierarchy AS (
    FROM hierarchy;
 
 
+-- public.v_posting_legs source
+-- Flattens each double-entry posting into individual account DR/CR rows.
+-- Used by v_account_monthly and getMonthlyTrialBalance in perfin.ts.
+
+CREATE OR REPLACE VIEW public.v_posting_legs AS
+  SELECT
+    org_id, legal_entity_id, posting_type,
+    posting_date, value_date,
+    account_id        AS account_id,
+    amount            AS debit_amount,
+    0::numeric        AS credit_amount
+  FROM posting
+  WHERE account_id IS NOT NULL
+  UNION ALL
+  SELECT
+    org_id, legal_entity_id, posting_type,
+    posting_date, value_date,
+    credit_account_id AS account_id,
+    0::numeric        AS debit_amount,
+    amount            AS credit_amount
+  FROM posting
+  WHERE credit_account_id IS NOT NULL;
+
+
+-- public.v_account_monthly source
+-- Monthly aggregation of non-OPENING_BALANCE activity per account.
+-- Drives the monthly trial balance report.
+
+CREATE OR REPLACE VIEW public.v_account_monthly AS
+  SELECT
+    org_id,
+    legal_entity_id,
+    account_id,
+    DATE_TRUNC('month', value_date)::date AS period_month,
+    SUM(debit_amount)  AS period_debits,
+    SUM(credit_amount) AS period_credits
+  FROM v_posting_legs
+  WHERE posting_type IS DISTINCT FROM 'OPENING_BALANCE'
+  GROUP BY org_id, legal_entity_id, account_id, DATE_TRUNC('month', value_date);
+
+
    -- public.posting_account_view source
 
 CREATE OR REPLACE VIEW public.posting_account_view

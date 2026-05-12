@@ -35,9 +35,21 @@ interface MasterNavItem {
 
 const directNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: BarChart3, label: 'Reports', path: '/reports' },
   { icon: Bot, label: 'Workbench', path: '/workbench' },
 ];
+
+const reportsNavItem: MasterNavItem = {
+  icon: BarChart3,
+  label: 'Reports',
+  subNav: [
+    { label: 'Overview', path: '/reports' },
+    { label: 'Balance Sheet', path: '/reports/balance-sheet' },
+    { label: 'Monthly Trial Balance', path: '/reports/monthly-trial-balance' },
+    { label: 'Income Statement', path: '/reports/income-statement' },
+    { label: 'Cash Flow', path: '/reports/cash-flow' },
+    { label: 'Posting List', path: '/reports/posting-list' },
+  ],
+};
 
 const topLevelNavItems: MasterNavItem[] = [
   {
@@ -70,6 +82,7 @@ const topLevelNavItems: MasterNavItem[] = [
       { label: 'Transactions', path: '/accounting/transactions' },
       { label: 'Bank Transactions', path: '/accounting/bank-transactions' },
       { label: 'Chart of Accounts', path: '/accounting/accounts' },
+      { label: 'Opening Balances', path: '/accounting/opening-balances' },
       { label: 'Tax Master', path: '/accounting/tax' },
       { label: 'Payment Terms', path: '/accounting/payment-terms' },
       { label: 'Budget Periods', path: '/accounting/budget-periods' },
@@ -193,6 +206,14 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ collapsed 
             active={isActive(path)}
           />
         ))}
+        <NavItem
+          key="Reports"
+          icon={reportsNavItem.icon}
+          label={reportsNavItem.label}
+          collapsed={collapsed}
+          subNav={reportsNavItem.subNav}
+          active={isActive(undefined, reportsNavItem.subNav)}
+        />
       </div>
 
       {/* Top-level navigation groups */}

@@ -317,7 +317,9 @@ export const getTrialBalance = async (
         ORDER BY er.from_currency_id, er.effective_date DESC
       ),
 
-      -- Opening balance from prior-year closing postings (both legs; normal-balance sign per classification)
+      -- Opening balance: most recent OPENING_BALANCE journal before the report period.
+      -- Uses posting_date < startDate so any month selection within a FY works correctly
+      -- (the year-window approach broke for Jan-Mar months of APR_MAR entities).
       previous_year_closing AS (
         SELECT
           closing_legs.account_id,
@@ -333,8 +335,8 @@ export const getTrialBalance = async (
             END AS opening_balance_orig
           FROM posting p
           INNER JOIN account_hierarchy ah ON ah.id = p.account_id AND ah.org_id = p.org_id
-          WHERE p.name LIKE 'Closing Balance%'
-            AND p.posting_date BETWEEN ${prevYearStart}::date AND ${prevYearEnd}::date
+          WHERE p.posting_type = 'OPENING_BALANCE'
+            AND p.posting_date < ${startDate}::date
             AND p.org_id = ${orgId}
             AND p.account_id IS NOT NULL
           UNION ALL
@@ -348,8 +350,8 @@ export const getTrialBalance = async (
             END AS opening_balance_orig
           FROM posting p
           INNER JOIN account_hierarchy ah ON ah.id = p.credit_account_id AND ah.org_id = p.org_id
-          WHERE p.name LIKE 'Closing Balance%'
-            AND p.posting_date BETWEEN ${prevYearStart}::date AND ${prevYearEnd}::date
+          WHERE p.posting_type = 'OPENING_BALANCE'
+            AND p.posting_date < ${startDate}::date
             AND p.org_id = ${orgId}
             AND p.credit_account_id IS NOT NULL
         ) closing_legs
@@ -521,6 +523,126 @@ export const getTrialBalance = async (
       ORDER BY display_ah.path`;
 
   return trialBalance;
+};
+
+// ── Monthly trial balance ─────────────────────────────────────────────────────
+
+export interface MonthlyTrialBalanceRow {
+  account_id: string;
+  account_name: string;
+  account_path: string;
+  classification: string;
+  account_type: string;
+  level: number;
+  parent_account_id: string;
+  fy_opening: number;         // signed balance from OPENING_BALANCE postings before from_date
+  period_month: string;       // ISO date string for first day of the month (e.g. '2025-04-01')
+  period_debits: number;      // raw debits for this month
+  period_credits: number;     // raw credits for this month
+  net_movement: number;       // classification-aware net (positive = normal balance direction)
+  cumulative_balance: number; // fy_opening + running net through this month
+}
+
+export const getMonthlyTrialBalance = async (
+  fromDate: string,      // FY start date — opening balance is from OPENING_BALANCE postings before this
+  toDate: string,        // end of selected month — returns one row per account per month from fromDate through toDate
+  orgId: string,
+  legalEntityIds?: string[]
+): Promise<MonthlyTrialBalanceRow[]> => {
+  const rows = await prisma.$queryRaw<MonthlyTrialBalanceRow[]>`
+    WITH
+    -- FY opening: signed balance from OPENING_BALANCE postings before the report start
+    fy_opening AS (
+      SELECT
+        vpl.account_id,
+        SUM(
+          CASE
+            WHEN ah.classification IN ('Assets', 'Expense')
+              THEN vpl.debit_amount - vpl.credit_amount
+            ELSE
+              vpl.credit_amount - vpl.debit_amount
+          END
+        ) AS fy_opening
+      FROM v_posting_legs vpl
+      INNER JOIN account_hierarchy ah
+        ON ah.id = vpl.account_id AND ah.org_id = vpl.org_id
+      WHERE vpl.posting_type = 'OPENING_BALANCE'
+        AND vpl.posting_date < ${fromDate}::date
+        AND vpl.org_id = ${orgId}
+      GROUP BY vpl.account_id
+    ),
+
+    -- Monthly activity from v_account_monthly, joined with classification
+    monthly_activity AS (
+      SELECT
+        vam.account_id,
+        vam.period_month,
+        vam.period_debits,
+        vam.period_credits,
+        CASE
+          WHEN ah.classification IN ('Assets', 'Expense')
+            THEN vam.period_debits - vam.period_credits
+          ELSE
+            vam.period_credits - vam.period_debits
+        END AS net_movement
+      FROM v_account_monthly vam
+      INNER JOIN account_hierarchy ah
+        ON ah.id = vam.account_id AND ah.org_id = vam.org_id
+      WHERE vam.org_id = ${orgId}
+        AND vam.period_month >= DATE_TRUNC('month', ${fromDate}::date)
+        AND vam.period_month <= DATE_TRUNC('month', ${toDate}::date)
+        ${legalEntityIds?.length ? Prisma.sql`AND vam.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
+    ),
+
+    -- Running cumulative balance = fy_opening + sum of net_movement month by month
+    with_cumulative AS (
+      SELECT
+        ma.*,
+        COALESCE(fo.fy_opening, 0)
+          + SUM(ma.net_movement) OVER (
+              PARTITION BY ma.account_id
+              ORDER BY ma.period_month
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS cumulative_balance,
+        COALESCE(fo.fy_opening, 0) AS fy_opening
+      FROM monthly_activity ma
+      LEFT JOIN fy_opening fo ON fo.account_id = ma.account_id
+    )
+
+    SELECT
+      ah.id              AS account_id,
+      ah.name            AS account_name,
+      ah.path            AS account_path,
+      ah.classification,
+      ah.type            AS account_type,
+      ah.level,
+      ah.parent_account_id,
+      COALESCE(fo.fy_opening, 0) AS fy_opening,
+      wc.period_month,
+      wc.period_debits,
+      wc.period_credits,
+      wc.net_movement,
+      wc.cumulative_balance
+    FROM account_hierarchy ah
+    INNER JOIN with_cumulative wc ON wc.account_id = ah.id
+    LEFT JOIN fy_opening fo ON fo.account_id = ah.id
+    WHERE ah.org_id = ${orgId}
+      ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
+    ORDER BY ah.classification, ah.level, ah.path, wc.period_month
+  `;
+
+  return rows.map((r) => ({
+    ...r,
+    fy_opening: Number(r.fy_opening),
+    period_debits: Number(r.period_debits),
+    period_credits: Number(r.period_credits),
+    net_movement: Number(r.net_movement),
+    cumulative_balance: Number(r.cumulative_balance),
+    level: Number(r.level),
+    period_month: (r.period_month as any) instanceof Date
+      ? (r.period_month as any).toISOString().split('T')[0]
+      : String(r.period_month),
+  }));
 };
 
 export const getNetworthForAssets = async (

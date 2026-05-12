@@ -1,7 +1,7 @@
 import { AuthContext } from "../auth/types";
 import logger from '../utils/logger';
 import { get_my_feed } from './reports/zeiv';
-import { getIncomeStatement, getTrialBalance, getNetworthForAssets, getNetworthForLiabilities, getSavingRatio, getFinancialRatios, getAssetsTotal, getClassificationBreakdown, getIncomeByType, getIncomeTotal, getLiabilitiesBreakdown, getLiabilitiesTotal, getAssetsBreakdown } from './reports/perfin';
+import { getIncomeStatement, getTrialBalance, getMonthlyTrialBalance, getNetworthForAssets, getNetworthForLiabilities, getSavingRatio, getFinancialRatios, getAssetsTotal, getClassificationBreakdown, getIncomeByType, getIncomeTotal, getLiabilitiesBreakdown, getLiabilitiesTotal, getAssetsBreakdown } from './reports/perfin';
 
 export const run_report = async (context: AuthContext, report_id: any, filters: any) => {
   logger.debug(`Running report ${report_id} with filters: ${JSON.stringify(filters)}`, context.user);
@@ -15,6 +15,14 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
       context.user.org_id,
       filters.account_id,
       filters.currency_id ?? filters.currency,
+      filters.legal_entity_ids
+    );
+  }
+  else if (report_id === "monthly_trial_balance") {
+    return await getMonthlyTrialBalance(
+      filters.from_date,
+      filters.to_date,
+      context.user.org_id,
       filters.legal_entity_ids
     );
   } else if (report_id === "income_statement") {
