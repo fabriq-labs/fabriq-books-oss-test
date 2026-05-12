@@ -29,7 +29,9 @@
     "bill_to": {
       "dataType": "string",
       "required": true,
-      "permission": "update"
+      "permission": "update",
+      "displayName": "Bill To",
+      "isColumnShow": false
     },
     "location": {
       "type": "table",
@@ -116,7 +118,9 @@
     "deliver_to": {
       "dataType": "string",
       "required": true,
-      "permission": "update"
+      "permission": "update",
+      "displayName": "Deliver To",
+      "isColumnShow": false
     },
     "customer_id": {
       "datatype": "string",
@@ -165,7 +169,9 @@
     "invoice_type": {
       "dataType": "string",
       "required": true,
-      "permission": "update"
+      "permission": "update",
+      "displayName": "Invoice Type",
+      "isColumnShow": false
     },
     "invoice_total": {
       "dataType": "float",
@@ -175,7 +181,9 @@
     },
     "shipping_cost": {
       "dataType": "float",
-      "permission": "update"
+      "permission": "update",
+      "displayName": "Shipping Cost",
+      "isColumnShow": false
     },
     "supplier_name": {
       "dataType": "string",
@@ -343,7 +351,9 @@
     "requester_name": {
       "dataType": "string",
       "required": true,
-      "permission": "update"
+      "permission": "update",
+    "displayName": "Requester Name",
+      "isColumnShow": false
     },
     "shipping_terms": {
       "dataType": "string",
@@ -588,7 +598,9 @@
     "terms_and_conditions": {
       "dataType": "string",
       "required": true,
-      "permission": "update"
+      "permission": "update",
+      "displayName": "Terms and Conditions",
+      "isColumnShow": false
     },
     "notes": {
       "dataType": "string",

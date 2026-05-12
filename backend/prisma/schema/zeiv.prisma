@@ -308,21 +308,21 @@ model supplier {
   city                      String
   state                     String
   name                      String?
-  country                   String
-  zip_code                  String
-  primary_phone             String?
+  country                   String?
+  zip_code                  String?
+  primary_phone             String
   alternative_phone         String?
   primary_email             String
   secondary_email           String?
   po_email                  String?
-  status                    String
-  industry                  String
+  status                    String?
+  industry                  String?
   website                   String?
   employee_count            Int?
-  legal_name                String
+  legal_name                String?
   legal_registration_number String?
-  business_classification   String
-  buyer_review_added        String
+  business_classification   String?
+  buyer_review_added        String?
   onboarded_date            DateTime
   created_by                String?
   modified_by               String?

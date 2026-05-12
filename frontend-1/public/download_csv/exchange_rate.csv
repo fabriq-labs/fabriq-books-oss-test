@@ -1,0 +1,6 @@
+Rate,Source,Rate Type,To Currency,From Currency,Effective Date
+83.25,Manual,SPOT,INR,USD,2026-05-01
+0.012,Manual,SPOT,USD,INR,2026-05-01
+1.085,Manual,SPOT,EUR,USD,2026-05-01
+58.10,Manual,SPOT,PHP,USD,2026-05-01
+0.79,Manual,SPOT,GBP,USD,2026-05-01

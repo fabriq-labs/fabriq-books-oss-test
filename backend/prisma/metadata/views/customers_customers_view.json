@@ -154,7 +154,7 @@
         "recordPath": "payment_terms.payment_terms"
       },
       "displayName": "Payment Terms",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "customer_address": {
       "required": true,

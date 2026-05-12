@@ -1,0 +1,6 @@
+Customer Name,Customer Address,City,State,Country,Zip Code,Primary Phone,Primary Email,Industry,Website,Payment Terms,Currency
+Tata Consultancy Services Ltd,"Nirmal Building Nariman Point",Mumbai,Maharashtra,India,400021,+91-22-6778-9999,procurement@tcs.co.in,Information Technology,https://www.tcs.com,Net 30,INR
+Infosys Limited,"Electronics City Phase 1",Bangalore,Karnataka,India,560100,+91-80-2852-0261,purchase@infosys.com,Information Technology,https://www.infosys.com,Net 15,INR
+Wipro Limited,"Sarjapur Road Doddakannelli",Bangalore,Karnataka,India,560035,+91-80-2844-0011,procurement@wipro.com,Information Technology,https://www.wipro.com,Due on Receipt,INR
+Reliance Industries Ltd,"Maker Chambers IV Nariman Point",Mumbai,Maharashtra,India,400021,+91-22-2278-5000,purchase@ril.com,Energy,https://www.ril.com,Net 45,INR
+HDFC Bank Ltd,"HDFC Bank House Senapati Bapat Marg",Mumbai,Maharashtra,India,400013,+91-22-3075-3333,procurement@hdfcbank.com,Banking,https://www.hdfcbank.com,2/10 Net 30,INR

@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import { Card, notification } from "antd";
 import { importAPI, viewAPI } from "@/api/api";
 import { buildDataWithLookupFields, fetchColumns } from "./utils/upload";
+import {
+  buildImportSampleCsvUrl,
+  responseBodyLooksLikeCsv,
+} from "./utils/importSampleCsv";
 import { CSVMapper } from "./CsvMapper";
 import { UploadManager } from "./UploadManager";
 import { ChevronLeft, FileText, Upload, Download } from "lucide-react";
@@ -371,22 +375,17 @@ export const ImportPannel = ({
     setSelectedRowKeys([]);
   };
 
-  const generateSampleCSV = () => {
-    if (!filedSets) return;
+  const buildSampleCsvFromMetadata = (): string | null => {
+    if (!filedSets) return null;
 
-    // Filter fields that have isColumnShow true and permission update
     const availableFields = Object.entries(filedSets)
       .filter(([_, value]: any) => {
-        // Include fields that are either:
-        // 1. Directly marked as isColumnShow true and have update permission
-        // 2. Have a select relationship with update permission
         return (
-          (value?.permission === "update") ||
+          value?.permission === "update" ||
           (value?.select && Object.values(value.select).includes("update"))
         );
       })
       .map(([key, value]: any) => {
-        // If this is a select field, get the display field from select object
         const displayField = value?.select
           ? Object.entries(value.select).find(([_, perm]) => perm === "update")?.[0]
           : null;
@@ -398,60 +397,93 @@ export const ImportPannel = ({
           required: value.required,
           isSelect: !!value.select,
           displayField,
-          tableProps: value.tableProps
+          tableProps: value.tableProps,
         };
       });
 
-    // Remove duplicates based on displayName
     const uniqueFields = availableFields.reduce((acc: any[], current) => {
-      const exists = acc.find(item => item.displayName === current.displayName);
-      if (!exists) {
-        acc.push(current);
-      }
+      const exists = acc.find((item) => item.displayName === current.displayName);
+      if (!exists) acc.push(current);
       return acc;
     }, []);
 
-    // Generate headers
-    const headers = uniqueFields.map(field => field.displayName).join(",");
+    const headers = uniqueFields.map((field) => field.displayName).join(",");
 
-    // Generate sample data row with appropriate data types
-    const sampleData = uniqueFields.map(field => {
-      if (field.isSelect) {
-        // For select fields, use the display field name as sample
-        return `Sample ${field.displayField || field.displayName}`;
-      }
+    const sampleData = uniqueFields
+      .map((field) => {
+        if (field.isSelect) {
+          return `Sample ${field.displayField || field.displayName}`;
+        }
+        switch (field.datatype?.toLowerCase()) {
+          case "number":
+          case "decimal":
+          case "currency":
+          case "float":
+            return "0.00";
+          case "date":
+          case "datetime":
+            return new Date().toISOString().split("T")[0];
+          case "boolean":
+            return "false";
+          case "string":
+          default:
+            return `Sample ${field.displayName}`;
+        }
+      })
+      .join(",");
 
-      // Handle different data types
-      switch (field.datatype?.toLowerCase()) {
-        case "number":
-        case "decimal":
-        case "currency":
-        case "float":
-          return "0.00";
-        case "date":
-        case "datetime":
-          return new Date().toISOString().split('T')[0];
-        case "boolean":
-          return "false";
-        case "string":
-        default:
-          return `Sample ${field.displayName}`;
-      }
-    }).join(",");
+    return `${headers}\n${sampleData}`;
+  };
 
-    // Create CSV content
-    const csvContent = `${headers}\n${sampleData}`;
-
-    // Create and download file
+  const triggerCsvDownload = (csvContent: string, filename: string) => {
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${modelType}_sample.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  };
+
+  /** Prefer `public/download_csv/{modelType}.csv`; otherwise one row from view metadata. */
+  const downloadSampleCsv = async () => {
+    try {
+      const res = await fetch(buildImportSampleCsvUrl(modelType));
+      if (res.ok) {
+        const text = await res.text();
+        const ct = res.headers.get("content-type");
+        if (responseBodyLooksLikeCsv(text, ct)) {
+          triggerCsvDownload(text, `${modelType}_sample.csv`);
+          toast({
+            title: "Sample downloaded",
+            description: `Loaded from download_csv/${modelType}.csv`,
+          });
+          return;
+        }
+      }
+    } catch {
+      /* fall back */
+    }
+
+    const fromMeta = buildSampleCsvFromMetadata();
+    if (fromMeta) {
+      triggerCsvDownload(fromMeta, `${modelType}_sample.csv`);
+      toast({
+        title: "Sample downloaded",
+        description:
+          "No file at public/download_csv for this model; generated from import columns.",
+      });
+      return;
+    }
+
+    toast({
+      title: "No sample available",
+      description:
+        "Add public/download_csv/{modelType}.csv or open import after metadata loads.",
+      variant: "destructive",
+    });
   };
 
 
@@ -498,7 +530,7 @@ export const ImportPannel = ({
 
             <Button
               variant="outline"
-              onClick={generateSampleCSV}
+              onClick={() => void downloadSampleCsv()}
               className="group flex items-center gap-2 text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
             >
               <Download className="h-4 w-4" />

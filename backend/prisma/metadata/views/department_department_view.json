@@ -62,6 +62,7 @@
       "isColumnShow": true
     },
     "business_unit_id": {
+      "required": true,
       "datatype": "string",
       "permission": "update",
       "tableProps": {

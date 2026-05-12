@@ -156,7 +156,7 @@
         "columnType": "text",
         "defaultValue": ""
       },
-      "displayName": "SupplierName",
+      "displayName": "Supplier Name",
       "searchProps": {
         "isSearch": true,
         "operation": "startswith"
@@ -237,7 +237,7 @@
         "recordPath": "payment_terms.payment_terms"
       },
       "displayName": "Payment Terms",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "secondary_email": {
       "required": false,
@@ -287,7 +287,7 @@
         "recordPath": "shipping_terms.shipping_terms"
       },
       "displayName": "Shipping Terms",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "supplier_address": {
       "required": true,
@@ -344,7 +344,7 @@
         "recordPath": "shipping_method.shipping_method"
       },
       "displayName": "Shipping Method",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "preferred_currency_id": {
       "datatype": "string",
@@ -368,7 +368,7 @@
         "recordPath": "currency.code"
       },
       "displayName": "Currency Master",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "business_classification": {
       "required": false,

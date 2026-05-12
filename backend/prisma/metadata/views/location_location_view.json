@@ -86,14 +86,14 @@
       "isColumnShow": true
     },
     "customers": {
-      "required": true,
-      "permission": "update",
+      "required": false,
+      "permission": "read",
       "tableProps": {
         "width": "500",
         "columnType": "text",
         "defaultValue": ""
       },
-      "displayName": "Customers",
+      "displayName": "Customer",
       "isColumnShow": false
     },
     "customer_id": {

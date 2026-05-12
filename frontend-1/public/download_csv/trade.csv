@@ -1,0 +1,6 @@
+Tax,Type,Price,Quantity,Brokerage,Value Date,Total,Name,ISIN,Instrument
+0,BUY,2500,10,25,2025-05-12,25025,Buy RELIANCE — CSV sample,INE002A01018,Reliance Industries Ltd
+0,BUY,1520,5,20,2025-05-13,7620,Buy INFY — CSV sample,INE009A01021,Infosys Ltd
+0,BUY,612,15,18,2025-05-14,9198,Buy SBIN — CSV sample,INE062A01020,State Bank of India
+0,BUY,246.5,100,12,2025-05-15,24662,Buy NIFTYBEES — CSV sample,INF204K014E5,Nippon India ETF Nifty Bees
+0,SELL,188.2,200,22,2025-05-16,37662,Sell LIC MF Gold ETF — CSV sample,INF767K01CX8,LIC MF Gold ETF

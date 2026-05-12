@@ -16,7 +16,8 @@
         "name": "read"
       },
       "dataType": "table",
-      "displayName": "Account"
+      "displayName": "Account",
+      "isColumnShow": false
     },
     "account_id": {
       "datatype": "string",
@@ -39,7 +40,7 @@
         "recordPath": "account.name"
       },
       "displayName": "Charts of Date",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "budget_line": {
       "type": "table",
@@ -118,7 +119,7 @@
         "recordPath": "budget_line.budget_line"
       },
       "displayName": "Budget Line",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "legal_entity_id": {
       "datatype": "string",
@@ -142,7 +143,7 @@
         "recordPath": "legal_entity.legal_name"
       },
       "displayName": "Legal Entity",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "available_budget": {
       "datatype": "float",
