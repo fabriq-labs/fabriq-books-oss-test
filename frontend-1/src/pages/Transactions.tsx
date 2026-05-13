@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FileCheck, Loader2, Sparkles } from "lucide-react";
+import { FileCheck, GitMerge, Loader2, Sparkles } from "lucide-react";
 import Master, { MasterHandle } from "@/pages/Master";
 import { agentAPI } from "@/api/api";
 import { useToast } from "@/hooks/use-toast";
@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import ReconciliationSuggestionsModal, {
   ReconciliationData,
 } from "@/components/forms/Masters/ReconciliationSuggestionsModal";
+import MergePostingsModal, {
+  PostingRowLike,
+} from "@/components/forms/Masters/MergePostingsModal";
 import type { CellHighlightMap } from "@/components/masters/DynamicTable";
 import { createPostingRowRenderer } from "@/components/masters/posting/PostingListRow";
 import { useEntity } from "@/contexts/EntityContext";
@@ -117,6 +120,7 @@ export default function Transactions() {
   const defaultFilters = useMemo(() => {
     return {
       ...(currentEntityId ? { legal_entity_id: currentEntityId } : {}),
+      posting_type: { not: 'DUPLICATE' },
     };
   }, [currentEntityId]);
 
@@ -159,6 +163,7 @@ export default function Transactions() {
   const [predictedFields, setPredictedFields] = useState<CellHighlightMap>({});
   /** Modal state */
   const [modalPostingId, setModalPostingId] = useState<string | null>(null);
+  const [mergePair, setMergePair] = useState<[PostingRowLike, PostingRowLike] | null>(null);
   /** Row-level reconcile loading (single posting id) */
   const [reconcilingPostingId, setReconcilingPostingId] = useState<string | null>(null);
 
@@ -444,6 +449,16 @@ export default function Transactions() {
   // ── Bulk actions ──────────────────────────────────────────────────────
   const bulkActions: BulkAction[] = [
     {
+      id: 'merge',
+      label: 'Merge',
+      icon: <GitMerge size={16} />,
+      variant: 'outline',
+      isVisible: (rows) => rows.length === 2,
+      onClick: async (rows) => {
+        setMergePair([rows[0] as PostingRowLike, rows[1] as PostingRowLike]);
+      },
+    },
+    {
       id: 'reconcile',
       label: 'Reconcile',
       icon: <Sparkles size={16} />,
@@ -502,6 +517,18 @@ export default function Transactions() {
           postingAmount={modalEntry.posting.amount != null ? Number(modalEntry.posting.amount) : undefined}
           reconciliation={modalEntry.reconciliation}
           onConfirmed={handleModalConfirmed}
+        />
+      )}
+
+      {mergePair && (
+        <MergePostingsModal
+          open={true}
+          rows={mergePair}
+          onClose={() => setMergePair(null)}
+          onMerged={(primary, duplicate) => {
+            masterRef.current?.updateRowsInList([primary as MergeRow]);
+            masterRef.current?.removeRowsFromList([duplicate.id]);
+          }}
         />
       )}
     </>

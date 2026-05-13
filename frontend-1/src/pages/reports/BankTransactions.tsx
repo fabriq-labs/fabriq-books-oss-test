@@ -14,7 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Master from "@/pages/Master";
+import Master, { MasterHandle } from "@/pages/Master";
 import { createBankTransactionRowRenderer } from "@/components/masters/posting/BankTransactionRow";
 import { formatDate } from "@/lib/formatters";
 import dayjs from "dayjs";
@@ -33,11 +33,15 @@ import {
     CartesianGrid,
     Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { GitMerge, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat as useChatContext } from "@/contexts/ChatContext";
 import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
 import { useLocation } from "react-router-dom";
+import { BulkAction, MergeRow } from "@/types/bulkActions";
+import MergePostingsModal, {
+    PostingRowLike,
+} from "@/components/forms/Masters/MergePostingsModal";
 
 interface SimpleTransaction {
     id: string;
@@ -124,6 +128,7 @@ export default function BankTransactions() {
     const { entities, currentEntityId } = useEntity();
     const location = useLocation();
     const { setPageContext } = useChatContext();
+    const masterRef = useRef<MasterHandle>(null);
 
     const fyType = useMemo(() => resolveEntityFYType(entities, currentEntityId), [entities, currentEntityId]);
 
@@ -137,6 +142,7 @@ export default function BankTransactions() {
     const fyDateRange = useMemo(() => [dayjs(selectedFY.from_date), dayjs(selectedFY.to_date)] as const, [selectedFY]);
 
     const [account, setAccount] = useState<any>(null);
+    const [mergePair, setMergePair] = useState<[PostingRowLike, PostingRowLike] | null>(null);
     const [accountDropdownKey, setAccountDropdownKey] = useState(0);
     const [transactions, setTransactions] = useState<SimpleTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -265,6 +271,7 @@ export default function BankTransactions() {
         "description": {
             "ncontains": "Closing"
         },
+        "posting_type": { "not": "DUPLICATE" },
         ...(account && {
             OR: [
                 { account_id: { eq: account.id } },
@@ -276,6 +283,19 @@ export default function BankTransactions() {
             { "value_date": { "lte": fyDateRange[1].endOf('day').toISOString() } },
         ]
     }), [account, fyDateRange]);
+
+    const bulkActions: BulkAction[] = useMemo(() => [
+        {
+            id: 'merge',
+            label: 'Merge',
+            icon: <GitMerge size={16} />,
+            variant: 'outline',
+            isVisible: (rows) => rows.length === 2,
+            onClick: async (rows) => {
+                setMergePair([rows[0] as PostingRowLike, rows[1] as PostingRowLike]);
+            },
+        },
+    ], []);
 
     const fetchTransactions = useCallback(async () => {
         if (!account) {
@@ -345,6 +365,7 @@ export default function BankTransactions() {
     const masterDefaultFilters = useMemo(() => {
         const base: Record<string, any> = {
             description: { ncontains: 'Closing' },
+            posting_type: { not: 'DUPLICATE' },
             ...(currentEntityId ? { legal_entity_id: currentEntityId } : {}),
         };
         if (account) {
@@ -418,12 +439,14 @@ export default function BankTransactions() {
                             ) : (
                                 <Master
                                     key={`${currentEntityId ?? 'all'}-${account?.id ?? 'none'}-${selectedFY.value}`}
+                                    ref={masterRef}
                                     type="posting"
                                     view="posting_simple_view"
                                     displayName="Transactions"
                                     defaultFilters={masterDefaultFilters}
                                     defaultSortOption={{ field: 'value_date', direction: 'desc' }}
                                     filterConfig={{ enableFilters: false, enableSearch: true }}
+                                    bulkActions={bulkActions}
                                     customRowRenderer={simpleRowRenderer}
                                     isCreate={false}
                                     isImport={false}
@@ -618,6 +641,18 @@ export default function BankTransactions() {
                     </Tabs>
                 </Card>
             </div>
+
+            {mergePair && (
+                <MergePostingsModal
+                    open={true}
+                    rows={mergePair}
+                    onClose={() => setMergePair(null)}
+                    onMerged={(primary, duplicate) => {
+                        masterRef.current?.updateRowsInList([primary as MergeRow]);
+                        masterRef.current?.removeRowsFromList([duplicate.id]);
+                    }}
+                />
+            )}
         </div>
     );
 }

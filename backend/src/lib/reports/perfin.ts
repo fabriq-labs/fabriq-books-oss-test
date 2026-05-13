@@ -158,6 +158,9 @@ export const getIncomeStatement = async (
     LEFT JOIN posting p ON 
       (p.account_id = ah.id OR p.credit_account_id = ah.id)
       AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+      AND p.reversal_of_posting_id IS NULL
+      AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
     WHERE ah.org_id = ${orgId} ${accountId ? Prisma.sql`AND ah.id = ${accountId}` : Prisma.empty}
       ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
     GROUP BY ah.id, ah.path, ah.name, ah.classification, ah.type, ah.level, ah.parent_account_id, ah.org_id, ah.currency
@@ -339,6 +342,9 @@ export const getTrialBalance = async (
             AND p.posting_date < ${startDate}::date
             AND p.org_id = ${orgId}
             AND p.account_id IS NOT NULL
+            AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+            AND p.reversal_of_posting_id IS NULL
+            AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
           UNION ALL
           SELECT
             p.credit_account_id AS account_id,
@@ -354,6 +360,9 @@ export const getTrialBalance = async (
             AND p.posting_date < ${startDate}::date
             AND p.org_id = ${orgId}
             AND p.credit_account_id IS NOT NULL
+            AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+            AND p.reversal_of_posting_id IS NULL
+            AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
         ) closing_legs
         WHERE closing_legs.account_id IS NOT NULL
         GROUP BY closing_legs.account_id
@@ -669,6 +678,9 @@ export const getNetworthForAssets = async (
      ), 0) as balance
     FROM account_hierarchy ah
     LEFT JOIN posting p ON (p.account_id = ah.id OR p.credit_account_id = ah.id) AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+      AND p.reversal_of_posting_id IS NULL
+      AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
     WHERE ah.org_id = ${orgId}
     -- AND ah.classification IN ('Assets')   
     GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id
@@ -723,6 +735,9 @@ export const getNetworthForLiabilities = async (
      ), 0) as balance
     FROM account_hierarchy ah
     LEFT JOIN posting p ON (p.account_id = ah.id OR p.credit_account_id = ah.id) AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+      AND p.reversal_of_posting_id IS NULL
+      AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
     WHERE ah.org_id = ${orgId}
     AND ah.classification IN ('Liabilities')    
     GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id
@@ -773,6 +788,9 @@ export const getSavingRatio = async (
       LEFT JOIN posting p ON (p.account_id = ah.id OR p.credit_account_id = ah.id)
       WHERE ah.org_id = ${orgId}
       AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+      AND p.reversal_of_posting_id IS NULL
+      AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
       AND ah.classification = 'Income'
     ),
     expense_total AS (
@@ -787,6 +805,9 @@ export const getSavingRatio = async (
       LEFT JOIN posting p ON (p.account_id = ah.id OR p.credit_account_id = ah.id)
       WHERE ah.org_id = ${orgId}
       AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+      AND p.reversal_of_posting_id IS NULL
+      AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
       AND ah.classification = 'Expense'
     )
     SELECT 
@@ -1385,6 +1406,9 @@ export async function getIncomeTotal(startDate: string, endDate: string, orgId: 
       FROM account_hierarchy ah
       LEFT JOIN posting p ON (p.account_id = ah.id OR p.credit_account_id = ah.id)
         AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+        AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+        AND p.reversal_of_posting_id IS NULL
+        AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
       WHERE ah.org_id = ${orgId}
       AND ah.classification = 'Income'
       GROUP BY 
@@ -1463,6 +1487,9 @@ export async function getIncomeByType(startDate: string, endDate: string, orgId:
       FROM account_hierarchy ah
       LEFT JOIN posting p ON (p.account_id = ah.id OR p.credit_account_id = ah.id)
         AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+        AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+        AND p.reversal_of_posting_id IS NULL
+        AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
       WHERE ah.org_id = ${orgId}
       AND ah.classification = 'Income'
       GROUP BY 
@@ -1575,6 +1602,9 @@ export async function getClassificationBreakdown(
       LEFT JOIN posting p ON (p.account_id = ah.id OR p.credit_account_id = ah.id)
         AND (CAST(${startDate ?? null} AS DATE) IS NULL OR p.value_date >= CAST(${startDate ?? null} AS DATE))
         AND (CAST(${endDate ?? null} AS DATE) IS NULL OR p.value_date <= CAST(${endDate ?? null} AS DATE))
+        AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+        AND p.reversal_of_posting_id IS NULL
+        AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
       WHERE ah.org_id = ${orgId}
       AND ah.classification = ${Prisma.raw(`'${classification}'::account_classification`)}
       ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}

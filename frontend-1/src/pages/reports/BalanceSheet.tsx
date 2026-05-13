@@ -18,7 +18,7 @@ import { pdf } from "@react-pdf/renderer";
 import { TrialBalancePDFDocument } from "@/components/pdf_generator/TrialBalancePdf";
 import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
-import { isEntityHeadquarters, useEntity } from "@/contexts/EntityContext";
+import { isEntityHeadquarters, useEntity, CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import { aggregateTrialBalanceSectionRows } from "@/lib/aggregateTrialBalanceSectionRows";
 import {
   FinancialYearSelector,
@@ -495,16 +495,38 @@ export default function BalanceSheet() {
       );
     }
 
+    const fromDate = effectiveDateRange[0].format("YYYY-MM-DD");
+    const toDate = effectiveDateRange[1].format("YYYY-MM-DD");
+
     return (
       <>
-        {group.items.map((row) => {
+        {group.items.map((row, index) => {
           const openingBalance = Number(row.opening_balance || 0);
           const debits = Number(row.total_debits);
           const credits = Number(row.total_credits);
           const totalBalance = Number(row.total_balance || 0);
+          const accountId = String(row.account_id ?? "").trim();
+          const canDrillDown = !!accountId;
+          const drillDownUrl = canDrillDown
+            ? `/accounting/transactions?account_id=${encodeURIComponent(accountId)}&from_date=${fromDate}&to_date=${toDate}`
+            : null;
 
           return (
-            <TableRow key={row.account_id} className="hover:bg-slate-50 transition-colors duration-150 border-b border-slate-100">
+            <TableRow
+              key={row.account_id || `row-${index}`}
+              className={`transition-colors duration-150 border-b border-slate-100 ${canDrillDown ? "hover:bg-blue-50 cursor-pointer" : "hover:bg-slate-50"}`}
+              onClick={
+                canDrillDown
+                  ? () => {
+                      if (currentEntityId) {
+                        localStorage.setItem(CURRENT_ENTITY_STORAGE_KEY, currentEntityId);
+                      }
+                      window.open(drillDownUrl!, "_blank");
+                    }
+                  : undefined
+              }
+              title={canDrillDown ? "Click to view transactions" : undefined}
+            >
               <TableCell className="py-2 px-3">
                 <div className="flex items-center">
                   <div style={{ marginLeft: row.level * 12 }} className="flex items-center gap-1">
@@ -524,8 +546,10 @@ export default function BalanceSheet() {
               <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
                 <span className="text-slate-600">{formatCurrency(credits, displayCurrencyCode)}</span>
               </TableCell>
-              <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
-                <span className="text-slate-900 font-bold">{formatCurrency(totalBalance, displayCurrencyCode)}</span>
+              <TableCell
+                className={`text-right w-[140px] py-2 px-3 font-mono text-xs font-bold ${canDrillDown ? "text-blue-700" : "text-slate-900"}`}
+              >
+                {formatCurrency(totalBalance, displayCurrencyCode)}
               </TableCell>
             </TableRow>
           );

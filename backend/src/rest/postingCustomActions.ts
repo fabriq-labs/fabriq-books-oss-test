@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { customActionRegistry } from './customActionRegistry';
 import { PostingImportService, ImportProgress } from '../services/posting/PostingImportService';
+import { mergePostings, MergeValidationError } from '../services/posting/PostingMergeService';
 import logger from '../utils/logger';
 
 /**
@@ -115,4 +116,60 @@ customActionRegistry.register('posting', 'import-bank-statement', async (req: Re
   }
 
   res.end();
+});
+
+/**
+ * POST /api/posting/custom/merge
+ *
+ * Marks one posting as a duplicate of another (manual merge, Wave-style).
+ * The duplicate row is soft-deleted with posting_type='DUPLICATE',
+ * status='DUPLICATE', reversal_of_posting_id=<primary.id>, reversed_at=now().
+ *
+ * The route is dispatched by `router.all('/:model/custom/:action', ...)` in
+ * `rest/routes.ts`, which is registered BEFORE the auto-generated model loops,
+ * so the metadata CRUD handlers cannot shadow this endpoint.
+ *
+ * Body:
+ *   primary_id    (required) — posting to keep
+ *   duplicate_id  (required) — posting to mark as DUPLICATE
+ *   merge_notes   (optional, default false) — append duplicate's description/
+ *                 notes onto the primary's `notes` field
+ *
+ * Response: { success: true, data: { primary, duplicate } }
+ */
+customActionRegistry.register('posting', 'merge', async (req: Request, res: Response) => {
+  const context = (req as any).context?.auth;
+  if (!context?.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const { primary_id, duplicate_id, merge_notes } = req.body ?? {};
+  if (!primary_id || !duplicate_id) {
+    res.status(400).json({ error: 'primary_id and duplicate_id are required' });
+    return;
+  }
+
+  try {
+    const result = await mergePostings({
+      primaryId: primary_id,
+      duplicateId: duplicate_id,
+      mergeNotes: merge_notes === true || merge_notes === 'true',
+      orgId: context.user.org_id,
+      userId: context.user.id,
+    });
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    if (err instanceof MergeValidationError) {
+      const status = err.code === 'NOT_FOUND' ? 404 : 422;
+      logger.warn('posting/merge validation failed', {
+        code: err.code,
+        message: err.message,
+      });
+      res.status(status).json({ error: err.message, code: err.code });
+      return;
+    }
+    logger.error('posting/merge error', { error: err?.message });
+    res.status(500).json({ error: err?.message ?? 'Unexpected error' });
+  }
 });
