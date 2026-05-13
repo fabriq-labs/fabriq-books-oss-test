@@ -4,6 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
 import type { CustomRowRenderer } from '@/types/customRowRenderer';
+import { formatCurrency } from '@/lib/formatters';
 
 export function createBankTransactionRowRenderer(
   selectedAccountId: string | undefined,
@@ -15,6 +16,7 @@ export function createBankTransactionRowRenderer(
       { key: 'description', title: 'Description', sortKey: 'description' },
       { key: 'category', title: 'Category' },
       { key: 'amount', title: 'Amount', align: 'right', width: '160px', sortKey: 'amount' },
+      { key: 'balance', title: 'Balance', align: 'right', width: '160px' },
       { key: 'actions', title: '', width: '60px' },
     ],
 
@@ -80,6 +82,17 @@ export function createBankTransactionRowRenderer(
                 ? amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })
                 : '—'}
             </span>
+          </TableCell>
+
+          {/* Running balance (ledger order); _runningBalance set by BankTransactions transform */}
+          <TableCell className="text-right">
+            {record._runningBalance != null && Number.isFinite(Number(record._runningBalance)) ? (
+              <span className="font-mono text-sm text-muted-foreground">
+                {formatCurrency(Number(record._runningBalance), displayCurrency)}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">—</span>
+            )}
           </TableCell>
 
           {/* Actions */}

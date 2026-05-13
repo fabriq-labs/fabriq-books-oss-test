@@ -18,7 +18,7 @@ import { pdf } from "@react-pdf/renderer";
 import { TrialBalancePDFDocument } from "@/components/pdf_generator/TrialBalancePdf";
 import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
-import { isEntityHeadquarters, useEntity } from "@/contexts/EntityContext";
+import { isEntityHeadquarters, useEntity, CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import { aggregateTrialBalanceSectionRows } from "@/lib/aggregateTrialBalanceSectionRows";
 import {
   FinancialYearSelector,
@@ -390,14 +390,15 @@ export default function BalanceSheet() {
       const fromDate = effectiveDateRange[0].format("YYYY-MM-DD");
       const toDate = effectiveDateRange[1].format("YYYY-MM-DD");
 
-      const rows: string[][] = [["Account", "Debits", "Credits", "Total"]];
+      const rows: string[][] = [["Account", "Opening Balance", "Debits", "Credits", "Closing Balance"]];
 
       for (const group of groups) {
-        rows.push([group.classification, "", "", ""]);
+        rows.push([group.classification, "", "", "", ""]);
         for (const row of group.items) {
           const indent = row.level > 0 ? "  ".repeat(row.level) : "";
           rows.push([
             `${indent}${row.account_name}`,
+            formatCurrency(Number(row.opening_balance || 0), displayCurrencyCode),
             formatCurrency(Number(row.total_debits || 0), displayCurrencyCode),
             formatCurrency(Number(row.total_credits || 0), displayCurrencyCode),
             formatCurrency(Number(row.total_balance || 0), displayCurrencyCode),
@@ -406,6 +407,7 @@ export default function BalanceSheet() {
         const totals = aggregateTrialBalanceSectionRows(group.items);
         rows.push([
           `${group.classification} Total`,
+          formatCurrency(totals.opening_balance, displayCurrencyCode),
           formatCurrency(totals.total_debits, displayCurrencyCode),
           formatCurrency(totals.total_credits, displayCurrencyCode),
           formatCurrency(totals.total_balance, displayCurrencyCode),
@@ -414,7 +416,7 @@ export default function BalanceSheet() {
       }
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = [{ wch: 40 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
+      ws["!cols"] = [{ wch: 40 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Balance Sheet");
@@ -445,7 +447,7 @@ export default function BalanceSheet() {
     if (reportLoading) {
       return (
         <TableRow>
-          <TableCell colSpan={4} className="text-center">
+          <TableCell colSpan={5} className="text-center">
             <LoadingContent />
           </TableCell>
         </TableRow>
@@ -455,7 +457,7 @@ export default function BalanceSheet() {
     if (error) {
       return (
         <TableRow>
-          <TableCell colSpan={4} className="text-center py-4">
+          <TableCell colSpan={5} className="text-center py-4">
             <div className="flex flex-col items-center justify-center">
               <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mb-2">
                 <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
@@ -481,7 +483,7 @@ export default function BalanceSheet() {
     if (group.items.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={4} className="text-center py-4">
+          <TableCell colSpan={5} className="text-center py-4">
             <div className="flex flex-col items-center justify-center">
               <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center mb-1">
                 <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
@@ -493,15 +495,38 @@ export default function BalanceSheet() {
       );
     }
 
+    const fromDate = effectiveDateRange[0].format("YYYY-MM-DD");
+    const toDate = effectiveDateRange[1].format("YYYY-MM-DD");
+
     return (
       <>
-        {group.items.map((row) => {
+        {group.items.map((row, index) => {
+          const openingBalance = Number(row.opening_balance || 0);
           const debits = Number(row.total_debits);
           const credits = Number(row.total_credits);
           const totalBalance = Number(row.total_balance || 0);
+          const accountId = String(row.account_id ?? "").trim();
+          const canDrillDown = !!accountId;
+          const drillDownUrl = canDrillDown
+            ? `/accounting/transactions?account_id=${encodeURIComponent(accountId)}&from_date=${fromDate}&to_date=${toDate}`
+            : null;
 
           return (
-            <TableRow key={row.account_id} className="hover:bg-slate-50 transition-colors duration-150 border-b border-slate-100">
+            <TableRow
+              key={row.account_id || `row-${index}`}
+              className={`transition-colors duration-150 border-b border-slate-100 ${canDrillDown ? "hover:bg-blue-50 cursor-pointer" : "hover:bg-slate-50"}`}
+              onClick={
+                canDrillDown
+                  ? () => {
+                      if (currentEntityId) {
+                        localStorage.setItem(CURRENT_ENTITY_STORAGE_KEY, currentEntityId);
+                      }
+                      window.open(drillDownUrl!, "_blank");
+                    }
+                  : undefined
+              }
+              title={canDrillDown ? "Click to view transactions" : undefined}
+            >
               <TableCell className="py-2 px-3">
                 <div className="flex items-center">
                   <div style={{ marginLeft: row.level * 12 }} className="flex items-center gap-1">
@@ -513,13 +538,18 @@ export default function BalanceSheet() {
                 </div>
               </TableCell>
               <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
+                <span className="text-slate-600">{formatCurrency(openingBalance, displayCurrencyCode)}</span>
+              </TableCell>
+              <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
                 <span className="text-slate-600">{formatCurrency(debits, displayCurrencyCode)}</span>
               </TableCell>
               <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
                 <span className="text-slate-600">{formatCurrency(credits, displayCurrencyCode)}</span>
               </TableCell>
-              <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
-                <span className="text-slate-900 font-bold">{formatCurrency(totalBalance, displayCurrencyCode)}</span>
+              <TableCell
+                className={`text-right w-[140px] py-2 px-3 font-mono text-xs font-bold ${canDrillDown ? "text-blue-700" : "text-slate-900"}`}
+              >
+                {formatCurrency(totalBalance, displayCurrencyCode)}
               </TableCell>
             </TableRow>
           );
@@ -533,11 +563,14 @@ export default function BalanceSheet() {
     const totals = aggregateTrialBalanceSectionRows(pageData);
     return (
       <TableRow className="font-bold bg-gradient-to-r from-slate-100 to-blue-50 border-t-2 border-slate-300">
-        <TableCell className="text-left w-[140px] py-2 px-3 text-slate-800">
+        <TableCell className="text-left py-2 px-3 text-slate-800">
           <div className="flex items-center justify-start gap-1">
             <div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div>
             <span className="text-xs font-bold">Total</span>
           </div>
+        </TableCell>
+        <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
+          <span className="text-slate-700 font-bold">{formatCurrency(totals.opening_balance, displayCurrencyCode)}</span>
         </TableCell>
         <TableCell className="text-right w-[140px] py-2 px-3 font-mono text-xs">
           <span className="text-slate-700 font-bold">{formatCurrency(totals.total_debits, displayCurrencyCode)}</span>
@@ -754,9 +787,10 @@ export default function BalanceSheet() {
                           <TableHeader>
                             <TableRow className="bg-slate-100 border-b border-slate-300">
                               <TableHead className="font-semibold text-slate-700 py-2 px-3 text-xs">Account</TableHead>
+                              <TableHead className="text-right w-[140px] font-semibold text-slate-700 py-2 px-3 text-xs">Opening Balance</TableHead>
                               <TableHead className="text-right w-[140px] font-semibold text-slate-700 py-2 px-3 text-xs">Debits</TableHead>
                               <TableHead className="text-right w-[140px] font-semibold text-slate-700 py-2 px-3 text-xs">Credits</TableHead>
-                              <TableHead className="text-right w-[140px] font-semibold text-slate-800 py-2 px-3 text-xs">Total</TableHead>
+                              <TableHead className="text-right w-[140px] font-semibold text-slate-800 py-2 px-3 text-xs">Closing Balance</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>{renderTableContent(group)}</TableBody>

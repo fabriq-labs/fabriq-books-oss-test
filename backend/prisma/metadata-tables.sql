@@ -259,6 +259,9 @@ AS WITH all_balances AS (
             0 AS credit_amount
            FROM public.account_hierarchy ah
              LEFT JOIN public.posting p ON ah.id::text = p.account_id AND p.org_id = ah.org_id
+                AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+                AND p.reversal_of_posting_id IS NULL
+                AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
           GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id, p.value_date, p.name, ah.org_id
         UNION ALL
          SELECT ah.id AS account_id,
@@ -275,6 +278,9 @@ AS WITH all_balances AS (
             sum(COALESCE(p.amount, 0::numeric)) AS credit_amount
            FROM public.account_hierarchy ah
              LEFT JOIN public.posting p ON ah.id::text = p.credit_account_id AND p.org_id = ah.org_id
+                AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+                AND p.reversal_of_posting_id IS NULL
+                AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
           GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id, p.value_date, p.name, ah.org_id
         )
  SELECT account_id,

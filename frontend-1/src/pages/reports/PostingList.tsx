@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
-import Master from "@/pages/Master";
+import { useState, useMemo, useRef } from "react";
+import { GitMerge } from "lucide-react";
+import Master, { MasterHandle } from "@/pages/Master";
 import dayjs from "dayjs";
 import { ReportControls } from "@/components/Reports/ReportControls";
 import { Card } from "@/components/ui/card";
@@ -20,6 +21,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { BulkAction, MergeRow } from "@/types/bulkActions";
+import MergePostingsModal, {
+    PostingRowLike,
+} from "@/components/forms/Masters/MergePostingsModal";
 
 export default function PostingList() {
     const [account, setAccount]: any = useState(null);
@@ -28,6 +33,9 @@ export default function PostingList() {
         totalCredit: number;
         closingBalance: number;
     } | null>(null);
+
+    const masterRef = useRef<MasterHandle>(null);
+    const [mergePair, setMergePair] = useState<[PostingRowLike, PostingRowLike] | null>(null);
 
     const { currentEntity } = useEntity();
 
@@ -133,6 +141,7 @@ export default function PostingList() {
 
     const filter = useMemo(() => ({
         "description": { "ncontains": "Closing" },
+        "posting_type": { "not": "DUPLICATE" },
         ...(account && {
             OR: [
                 { account_id: account.id },
@@ -144,6 +153,19 @@ export default function PostingList() {
             { "value_date": { "lte": effectiveDateRange[1].endOf("day").toISOString() } },
         ],
     }), [account, effectiveDateRange]);
+
+    const bulkActions: BulkAction[] = useMemo(() => [
+        {
+            id: 'merge',
+            label: 'Merge',
+            icon: <GitMerge size={16} />,
+            variant: 'outline',
+            isVisible: (rows) => rows.length === 2,
+            onClick: async (rows) => {
+                setMergePair([rows[0] as PostingRowLike, rows[1] as PostingRowLike]);
+            },
+        },
+    ], []);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -196,6 +218,7 @@ export default function PostingList() {
                     </div>
                     {summaryContent}
                     <Master
+                        ref={masterRef}
                         type="posting"
                         view="posting_view"
                         displayName="Posting"
@@ -211,9 +234,22 @@ export default function PostingList() {
                             enableCreate: false,
                         }}
                         defaultFilters={filter}
+                        bulkActions={bulkActions}
                     />
                 </Card>
             </div>
+
+            {mergePair && (
+                <MergePostingsModal
+                    open={true}
+                    rows={mergePair}
+                    onClose={() => setMergePair(null)}
+                    onMerged={(primary, duplicate) => {
+                        masterRef.current?.updateRowsInList([primary as MergeRow]);
+                        masterRef.current?.removeRowsFromList([duplicate.id]);
+                    }}
+                />
+            )}
         </div>
     );
 }

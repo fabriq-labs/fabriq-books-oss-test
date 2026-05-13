@@ -16,6 +16,9 @@ AS WITH all_balances AS (
             0 AS credit_amount
            FROM account_hierarchy ah
              LEFT JOIN posting p ON ah.id::text = p.account_id AND p.org_id = ah.org_id
+                AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+                AND p.reversal_of_posting_id IS NULL
+                AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
           GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id, p.value_date, p.name, ah.org_id
         UNION ALL
          SELECT ah.id AS account_id,
@@ -32,6 +35,9 @@ AS WITH all_balances AS (
             sum(COALESCE(p.amount, 0::numeric)) AS credit_amount
            FROM account_hierarchy ah
              LEFT JOIN posting p ON ah.id::text = p.credit_account_id AND p.org_id = ah.org_id
+                AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+                AND p.reversal_of_posting_id IS NULL
+                AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
           GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id, p.value_date, p.name, ah.org_id
         )
  SELECT account_id,
@@ -65,7 +71,10 @@ AS WITH all_accounts AS (
            FROM account_hierarchy ah
              CROSS JOIN ( SELECT DISTINCT posting.value_date
                    FROM posting
-                  WHERE posting.value_date IS NOT NULL) p
+                  WHERE posting.value_date IS NOT NULL
+                    AND COALESCE(posting.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+                    AND posting.reversal_of_posting_id IS NULL
+                    AND COALESCE(posting.posting_type, '') <> 'DUPLICATE') p
         ), account_postings AS (
          SELECT ah.id AS account_id,
             ah.classification,
@@ -97,6 +106,9 @@ AS WITH all_accounts AS (
                 END), 0::numeric) AS net_balance
            FROM account_hierarchy ah
              LEFT JOIN posting p ON (p.account_id = ah.id::text OR p.credit_account_id = ah.id::text) AND (p.name !~~ 'Clos%'::text OR p.name IS NULL)
+                AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+                AND p.reversal_of_posting_id IS NULL
+                AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
           GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id, ah.org_id, p.value_date
         ), account_balances_combined AS (
          SELECT aa.account_id,
@@ -202,7 +214,10 @@ AS WITH account_totals AS (
                     ELSE 0::numeric
                 END), 0::numeric) AS net_balance
            FROM account_hierarchy ah
-             LEFT JOIN posting p ON p.account_id = ah.id::text OR p.credit_account_id = ah.id::text
+             LEFT JOIN posting p ON (p.account_id = ah.id::text OR p.credit_account_id = ah.id::text)
+                AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+                AND p.reversal_of_posting_id IS NULL
+                AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
           WHERE p.name !~~ 'Clos%'::text OR p.name IS NULL
           GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id, ah.org_id
         ), rolled_up_balances AS (
@@ -282,7 +297,10 @@ AS WITH account_totals_by_date AS (
                     ELSE 0::numeric
                 END), 0::numeric) AS net_balance
            FROM account_hierarchy ah
-             LEFT JOIN posting p ON p.account_id = ah.id::text OR p.credit_account_id = ah.id::text
+             LEFT JOIN posting p ON (p.account_id = ah.id::text OR p.credit_account_id = ah.id::text)
+                AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+                AND p.reversal_of_posting_id IS NULL
+                AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
           WHERE p.name !~~ 'Clos%'::text OR p.name IS NULL
           GROUP BY ah.id, ah.classification, ah.path, ah.name, ah.type, ah.level, ah.parent_account_id, ah.org_id, p.value_date
         ), account_balances_with_running AS (
@@ -390,6 +408,53 @@ AS WITH RECURSIVE hierarchy AS (
    FROM hierarchy;
 
 
+-- public.v_posting_legs source
+-- Flattens each double-entry posting into individual account DR/CR rows.
+-- Used by v_account_monthly and getMonthlyTrialBalance in perfin.ts.
+
+CREATE OR REPLACE VIEW public.v_posting_legs AS
+  SELECT
+    org_id, legal_entity_id, posting_type,
+    posting_date, value_date,
+    account_id        AS account_id,
+    amount            AS debit_amount,
+    0::numeric        AS credit_amount
+  FROM posting
+  WHERE account_id IS NOT NULL
+    AND COALESCE(status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+    AND reversal_of_posting_id IS NULL
+    AND COALESCE(posting_type, '') <> 'DUPLICATE'
+  UNION ALL
+  SELECT
+    org_id, legal_entity_id, posting_type,
+    posting_date, value_date,
+    credit_account_id AS account_id,
+    0::numeric        AS debit_amount,
+    amount            AS credit_amount
+  FROM posting
+  WHERE credit_account_id IS NOT NULL
+    AND COALESCE(status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+    AND reversal_of_posting_id IS NULL
+    AND COALESCE(posting_type, '') <> 'DUPLICATE';
+
+
+-- public.v_account_monthly source
+-- Monthly aggregation of non-OPENING_BALANCE activity per account.
+-- Drives the monthly trial balance report.
+
+CREATE OR REPLACE VIEW public.v_account_monthly AS
+  SELECT
+    org_id,
+    legal_entity_id,
+    account_id,
+    DATE_TRUNC('month', value_date)::date AS period_month,
+    SUM(debit_amount)  AS period_debits,
+    SUM(credit_amount) AS period_credits
+  FROM v_posting_legs
+  WHERE posting_type IS DISTINCT FROM 'OPENING_BALANCE'
+  GROUP BY org_id, legal_entity_id, account_id, DATE_TRUNC('month', value_date);
+
+
    -- public.posting_account_view source
 
 CREATE OR REPLACE VIEW public.posting_account_view
@@ -408,7 +473,9 @@ AS SELECT p.id,
     p.org_id,
     p.name,
     p.assigned_to,
-    a.sub_type,
+    a.sub_type
    FROM posting p
      LEFT JOIN account a ON p.account_id = a.id::text
-     
+  WHERE COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+    AND p.reversal_of_posting_id IS NULL
+    AND COALESCE(p.posting_type, '') <> 'DUPLICATE';

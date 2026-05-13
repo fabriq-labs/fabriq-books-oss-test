@@ -65,3 +65,29 @@ export const reportAPI = {
     return fetchAPI(`/api/report/${report_id}`, { method: 'POST', body: JSON.stringify(payload) });
   },
 };
+
+// ── Posting custom actions ───────────────────────────────────────────────────
+
+export interface MergePostingsResponse {
+  success: boolean;
+  data: {
+    primary: Record<string, any>;
+    duplicate: Record<string, any>;
+  };
+}
+
+export const postingAPI = {
+  /**
+   * Manually merge two postings by marking one as a duplicate of the other.
+   * Backend: POST /api/posting/custom/merge
+   */
+  merge: (primaryId: string, duplicateId: string, mergeNotes = false) =>
+    fetchAPI<MergePostingsResponse>(`/api/posting/custom/merge`, {
+      method: 'POST',
+      body: JSON.stringify({
+        primary_id: primaryId,
+        duplicate_id: duplicateId,
+        merge_notes: mergeNotes,
+      }),
+    }),
+};

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Copy } from 'lucide-react';
+import { ArrowLeft, Copy, CalendarDays } from 'lucide-react';
 import { viewAPI } from '@/api/api';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
@@ -16,6 +16,8 @@ import { constructObject } from '../../utils/helper';
 import { Select } from 'antd';
 import { useTool } from '@/contexts/ToolContext';
 import { SearchDropDown } from '../../search_dropdown/dropdown';
+import { formatCurrency } from '@/lib/formatters';
+import dayjs from 'dayjs';
 
 enum AccountClassification {
     Assets = "Assets",
@@ -71,6 +73,27 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const { latestFormToolResponse } = useTool();
+
+    // Opening balance from OPENING_BALANCE posting (read-only display)
+    const [openingPosting, setOpeningPosting] = useState<{ amount: number; posting_date: string; account_id: string; credit_account_id: string } | null>(null);
+
+    useEffect(() => {
+        if (!id) return;
+        viewAPI.search('posting', 'posting_view', 1, 1, undefined, {
+            OR: [{ account_id: id }, { credit_account_id: id }],
+            posting_type: 'OPENING_BALANCE',
+        } as any).then((res: any) => {
+            const row = Array.isArray(res?.data) ? res.data[0] : null;
+            if (row) {
+                setOpeningPosting({
+                    amount: Number(row.amount),
+                    posting_date: row.value_date ?? row.posting_date ?? '',
+                    account_id: row.account_id ?? '',
+                    credit_account_id: row.credit_account_id ?? '',
+                });
+            }
+        }).catch(() => { /* non-critical — silently ignore */ });
+    }, [id]);
 
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
@@ -326,6 +349,31 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
+                        {/* Opening balance banner — shown in edit mode only when a migration posting exists */}
+                        {id && openingPosting && (() => {
+                            const classification = form.watch('classification') || initialValues?.classification || '';
+                            const onDebitLeg = openingPosting.account_id === id;
+                            const debitNormal = ['Assets', 'Expense'].includes(classification);
+                            const displayBalance = (onDebitLeg === debitNormal)
+                                ? openingPosting.amount
+                                : -openingPosting.amount;
+                            const dateLabel = openingPosting.posting_date
+                                ? dayjs(openingPosting.posting_date).format('DD MMM YYYY')
+                                : '';
+                            return (
+                                <div className="mb-6 flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+                                    <CalendarDays className="h-4 w-4 text-blue-600 shrink-0" />
+                                    <span className="text-blue-800">
+                                        <span className="font-medium">Opening Balance</span>
+                                        {dateLabel && <span className="text-blue-600 ml-1">as of {dateLabel}</span>}
+                                        <span className="mx-2 text-blue-300">·</span>
+                                        <span className="font-semibold font-mono">{formatCurrency(displayBalance)}</span>
+                                        <span className="ml-2 text-blue-500 text-xs">{onDebitLeg ? 'Dr' : 'Cr'}</span>
+                                    </span>
+                                </div>
+                            );
+                        })()}
+
                         {isLoading ? (
                             <div className="space-y-6">
                                 <div>
@@ -352,24 +400,6 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                                                 <FormLabel>Name</FormLabel>
                                                 <FormControl>
                                                     <Input placeholder="Enter name" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="balance"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Balance</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        placeholder="Enter Balance"
-                                                        {...field}
-                                                        onChange={handleUnitPriceChange}
-                                                    />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

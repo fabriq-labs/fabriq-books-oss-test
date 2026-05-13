@@ -4,19 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatters";
 import { ReportControls } from "@/components/Reports/ReportControls";
 import { FinancialYearSelector, getPreviousFYOption, type FinancialYearOption, type FinancialYearType } from "@/components/Reports/FinancialYearSelector";
-import { viewAPI } from "@/api/api";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
+import { viewAPI, reportAPI, bulkEditAPI } from "@/api/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Master from "@/pages/Master";
+import DynamicTable from "@/components/masters/DynamicTable";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Modal } from "antd";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import { createBankTransactionRowRenderer } from "@/components/masters/posting/BankTransactionRow";
-import { formatDate } from "@/lib/formatters";
 import dayjs from "dayjs";
 import {
     PieChart,
@@ -33,11 +29,13 @@ import {
     CartesianGrid,
     Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { GitMerge, TrendingUp, TrendingDown, DollarSign, Edit, Trash2 } from "lucide-react";
 import { useChat as useChatContext } from "@/contexts/ChatContext";
 import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
-import { useLocation } from "react-router-dom";
+import { BulkAction } from "@/types/bulkActions";
+import MergePostingsModal, {
+    PostingRowLike,
+} from "@/components/forms/Masters/MergePostingsModal";
 
 interface SimpleTransaction {
     id: string;
@@ -50,9 +48,32 @@ interface SimpleTransaction {
     currency: string;
 }
 
+/** Exclude DUPLICATE / OPENING_BALANCE; allow null posting_type (plain NOT IN drops NULL in SQL). */
+const postingTypeExcludeClause = {
+    OR: [
+        { posting_type: null },
+        { posting_type: { nin: ["DUPLICATE", "OPENING_BALANCE"] } },
+    ],
+};
+
 // Chart colors
 const EXPENSE_COLORS = ['#E74A3B', '#F6C23E', '#36B9CC', '#4E73DF', '#858796', '#1CC88A', '#6f42c1', '#fd7e14'];
 const INCOME_COLORS = ['#1CC88A', '#36B9CC', '#4E73DF', '#F6C23E', '#858796', '#6f42c1'];
+
+/** Single search page size for full FY register + insights aggregates. */
+const BANK_TX_FULL_PAGE = 25_000;
+
+function comparePostingLedgerAsc(a: any, b: any): number {
+    const ta = dayjs(a.value_date ?? a.posting_date).valueOf();
+    const tb = dayjs(b.value_date ?? b.posting_date).valueOf();
+    if (ta !== tb) return ta - tb;
+    return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+}
+
+function ledgerOpeningNumeric(opening: number | null): number {
+    if (opening == null || Number.isNaN(opening)) return 0;
+    return opening;
+}
 
 // Check if account is Bank or Credit Card based on type array (case-insensitive)
 const isBankOrCreditCard = (account: any): boolean => {
@@ -123,7 +144,11 @@ function resolveEntityFYType(entities: { id: string; is_it_headquartres?: boolea
 export default function BankTransactions() {
     const { entities, currentEntityId } = useEntity();
     const location = useLocation();
+    const navigate = useNavigate();
+    const { toast } = useToast();
     const { setPageContext } = useChatContext();
+    const ledgerTableRef = useRef<any>(null);
+    const rawLedgerRef = useRef<any[]>([]);
 
     const fyType = useMemo(() => resolveEntityFYType(entities, currentEntityId), [entities, currentEntityId]);
 
@@ -137,13 +162,37 @@ export default function BankTransactions() {
     const fyDateRange = useMemo(() => [dayjs(selectedFY.from_date), dayjs(selectedFY.to_date)] as const, [selectedFY]);
 
     const [account, setAccount] = useState<any>(null);
+    const [mergePair, setMergePair] = useState<[PostingRowLike, PostingRowLike] | null>(null);
     const [accountDropdownKey, setAccountDropdownKey] = useState(0);
     const [transactions, setTransactions] = useState<SimpleTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(50);
-    const [total, setTotal] = useState(0);
     const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+    const [openingBalance, setOpeningBalance] = useState<number | null>(null);
+    const [openingLoading, setOpeningLoading] = useState(false);
+
+    const [ledgerList, setLedgerList] = useState<{ data?: any[]; metaData?: any; total?: number }>({});
+    const [ledgerLoading, setLedgerLoading] = useState(false);
+    const [selectedLedgerRows, setSelectedLedgerRows] = useState<any[]>([]);
+    const [ledgerSearchInput, setLedgerSearchInput] = useState("");
+    const [ledgerSearchTerm, setLedgerSearchTerm] = useState<string | undefined>(undefined);
+
+    const masterDefaultFilters = useMemo(() => {
+        const base: Record<string, any> = {
+            ...(currentEntityId ? { legal_entity_id: currentEntityId } : {}),
+        };
+        if (account) {
+            base.OR = [
+                { account_id: { eq: account.id } },
+                { credit_account_id: { eq: account.id } },
+            ];
+        }
+        base.AND = [
+            postingTypeExcludeClause,
+            { value_date: { gte: fyDateRange[0].startOf("day").toISOString() } },
+            { value_date: { lte: fyDateRange[1].endOf("day").toISOString() } },
+        ];
+        return base;
+    }, [account, fyDateRange, currentEntityId]);
 
     useEffect(() => {
         const modelName = 'posting';
@@ -177,7 +226,6 @@ export default function BankTransactions() {
     useEffect(() => {
         if (!isMountedEntity.current) { isMountedEntity.current = true; return; }
         setAccount(null);
-        setPage(1);
         setAccountDropdownKey(k => k + 1);
     }, [currentEntityId]);
 
@@ -262,25 +310,143 @@ export default function BankTransactions() {
     }, [transactions]);
 
     const filter = useMemo(() => ({
-        "description": {
-            "ncontains": "Closing"
-        },
         ...(account && {
             OR: [
                 { account_id: { eq: account.id } },
                 { credit_account_id: { eq: account.id } },
             ],
         }),
-        "AND": [
-            { "value_date": { "gte": fyDateRange[0].startOf('day').toISOString() } },
-            { "value_date": { "lte": fyDateRange[1].endOf('day').toISOString() } },
-        ]
+        AND: [
+            postingTypeExcludeClause,
+            { value_date: { gte: fyDateRange[0].startOf("day").toISOString() } },
+            { value_date: { lte: fyDateRange[1].endOf("day").toISOString() } },
+        ],
     }), [account, fyDateRange]);
+
+    const displayCurrency = useMemo(() => {
+        if (account?.currency?.code) return account.currency.code;
+        return transactions[0]?.currency || "INR";
+    }, [account, transactions]);
+
+    const fetchOpeningBalance = useCallback(async () => {
+        if (!account?.id || !currentEntityId) {
+            setOpeningBalance(null);
+            setOpeningLoading(false);
+            return;
+        }
+        setOpeningLoading(true);
+        try {
+            const filters: Record<string, string | string[]> = {
+                from_date: dayjs(selectedFY.from_date).format("YYYY-MM-DD"),
+                to_date: dayjs(selectedFY.to_date).format("YYYY-MM-DD"),
+                account_id: account.id,
+                legal_entity_ids: [currentEntityId],
+            };
+            if (account.currency?.id) {
+                filters.currency_id = String(account.currency.id);
+            }
+            const result = (await reportAPI.getReport("trial_balance", filters)) as {
+                data?: { account_id?: string; opening_balance?: unknown }[];
+            };
+            const rows = Array.isArray(result?.data) ? result.data : [];
+            const row = rows.find((r) => r.account_id === account.id);
+            const ob = row != null ? Number(row.opening_balance ?? 0) : 0;
+            setOpeningBalance(Number.isFinite(ob) ? ob : null);
+        } catch {
+            setOpeningBalance(null);
+        } finally {
+            setOpeningLoading(false);
+        }
+    }, [account, selectedFY.from_date, selectedFY.to_date, currentEntityId]);
+
+    useEffect(() => {
+        if (!account?.id) {
+            setOpeningBalance(null);
+            return;
+        }
+        void fetchOpeningBalance();
+    }, [account?.id, selectedFY.from_date, selectedFY.to_date, currentEntityId, fetchOpeningBalance]);
+
+    const applyRunningBalance = useCallback(
+        (rows: any[]) => {
+            if (!account?.id) return rows;
+            const open = ledgerOpeningNumeric(openingBalance);
+            const sorted = [...rows].sort(comparePostingLedgerAsc);
+            let running = open;
+            return sorted.map((r) => {
+                const amt = Number(r.amount) || 0;
+                const isDebit = r.account_id === account.id;
+                running += isDebit ? amt : -amt;
+                return { ...r, _runningBalance: running };
+            });
+        },
+        [account?.id, openingBalance],
+    );
+
+    const fetchLedger = useCallback(async () => {
+        if (!account?.id) {
+            rawLedgerRef.current = [];
+            setLedgerList({});
+            return;
+        }
+        setLedgerLoading(true);
+        try {
+            const sortOption = { value_date: "asc" as const };
+            const res: any = await viewAPI.search(
+                "posting",
+                "posting_simple_view",
+                1,
+                BANK_TX_FULL_PAGE,
+                ledgerSearchTerm,
+                masterDefaultFilters,
+                sortOption,
+            );
+            const raw = Array.isArray(res?.data) ? res.data : [];
+            rawLedgerRef.current = raw;
+            const data = applyRunningBalance(raw);
+            setLedgerList({ ...res, data });
+        } catch (e) {
+            console.error("Error loading bank ledger:", e);
+            rawLedgerRef.current = [];
+            setLedgerList({});
+        } finally {
+            setLedgerLoading(false);
+        }
+    }, [account?.id, ledgerSearchTerm, masterDefaultFilters, applyRunningBalance]);
+
+    useEffect(() => {
+        if (!account?.id) {
+            rawLedgerRef.current = [];
+            setLedgerList({});
+            return;
+        }
+        void fetchLedger();
+    }, [account?.id, fetchLedger]);
+
+    useEffect(() => {
+        if (rawLedgerRef.current.length === 0) return;
+        setLedgerList((prev) => ({
+            ...prev,
+            data: applyRunningBalance([...rawLedgerRef.current]),
+        }));
+    }, [openingBalance, applyRunningBalance]);
+
+    const bulkActions: BulkAction[] = useMemo(() => [
+        {
+            id: 'merge',
+            label: 'Merge',
+            icon: <GitMerge size={16} />,
+            variant: 'outline',
+            isVisible: (rows) => rows.length === 2,
+            onClick: async (rows) => {
+                setMergePair([rows[0] as PostingRowLike, rows[1] as PostingRowLike]);
+            },
+        },
+    ], []);
 
     const fetchTransactions = useCallback(async () => {
         if (!account) {
             setTransactions([]);
-            setTotal(0);
             return;
         }
         setIsLoading(true);
@@ -289,8 +455,8 @@ export default function BankTransactions() {
             const response = await viewAPI.search(
                 'posting',
                 'posting_simple_view',
-                page,
-                pageSize,
+                1,
+                BANK_TX_FULL_PAGE,
                 undefined,
                 filter,
                 sortOption
@@ -299,66 +465,127 @@ export default function BankTransactions() {
             if (response?.data) {
                 const transformed = transformPostingData(response.data, account.id);
                 setTransactions(transformed);
-                setTotal(response.total || 0);
             }
         } catch (error) {
             console.error("Error fetching transactions:", error);
         } finally {
             setIsLoading(false);
         }
-    }, [account, page, pageSize, filter]);
+    }, [account, filter]);
 
     useEffect(() => {
         if (account) {
             fetchTransactions();
         } else {
             setTransactions([]);
-            setTotal(0);
         }
     }, [account, fetchTransactions]);
 
     const handleAccountChange = (value: any) => {
         setAccount(value);
-        setPage(1);
     };
 
     const handleAccountClear = () => {
         setAccount(null);
-        setPage(1);
     };
 
-    const handleRefresh = () => {
+    const handleRefresh = useCallback(() => {
+        void fetchOpeningBalance();
         fetchTransactions();
-    };
-
-    const displayCurrency = useMemo(() => {
-        if (account?.currency?.code) return account.currency.code;
-        return transactions[0]?.currency || "INR";
-    }, [account, transactions]);
+        void fetchLedger();
+    }, [fetchOpeningBalance, fetchTransactions, fetchLedger]);
 
     const simpleRowRenderer = useMemo(
         () => createBankTransactionRowRenderer(account?.id, displayCurrency),
         [account?.id, displayCurrency]
     );
 
-    // defaultFilters for Master — account OR/AND date range + global entity context
-    const masterDefaultFilters = useMemo(() => {
-        const base: Record<string, any> = {
-            description: { ncontains: 'Closing' },
-            ...(currentEntityId ? { legal_entity_id: currentEntityId } : {}),
-        };
-        if (account) {
-            base.OR = [
-                { account_id: { eq: account.id } },
-                { credit_account_id: { eq: account.id } },
-            ];
-        }
-        base.AND = [
-            { value_date: { gte: fyDateRange[0].startOf('day').toISOString() } },
-            { value_date: { lte: fyDateRange[1].endOf('day').toISOString() } },
-        ];
-        return base;
-    }, [account, fyDateRange, currentEntityId]);
+    const handleLedgerDelete = useCallback(
+        (id: string) => {
+            Modal.confirm({
+                title: "Are you sure you want to delete this item?",
+                content: "This action cannot be undone.",
+                okText: "Yes, Delete",
+                okType: "danger",
+                cancelText: "Cancel",
+                onOk: async () => {
+                    try {
+                        await viewAPI.delete("posting", id, "posting_simple_view");
+                        toast({ title: "Success", description: "Item deleted successfully" });
+                        setSelectedLedgerRows([]);
+                        ledgerTableRef.current?.clearSelection?.();
+                        await fetchLedger();
+                        fetchTransactions();
+                        void fetchOpeningBalance();
+                    } catch {
+                        toast({
+                            title: "Error",
+                            description: "Failed to delete item",
+                            variant: "destructive",
+                        });
+                    }
+                },
+            });
+        },
+        [fetchLedger, fetchTransactions, fetchOpeningBalance, toast],
+    );
+
+    const handleLedgerBulkDelete = useCallback(
+        (ids: string[]) => {
+            if (!ids?.length) return;
+            Modal.confirm({
+                title: "Are you sure you want to delete the selected items?",
+                content: `This will delete ${ids.length} items.`,
+                okText: "Yes, Delete",
+                okType: "danger",
+                cancelText: "Cancel",
+                onOk: async () => {
+                    try {
+                        await bulkEditAPI.bulkDelete("posting", "posting_simple_view", ids);
+                        toast({
+                            title: "Success",
+                            description: `${ids.length} items deleted successfully`,
+                        });
+                        setSelectedLedgerRows([]);
+                        ledgerTableRef.current?.clearSelection?.();
+                        await fetchLedger();
+                        fetchTransactions();
+                        void fetchOpeningBalance();
+                    } catch {
+                        toast({
+                            title: "Bulk delete",
+                            description: "Failed to delete items",
+                            variant: "destructive",
+                        });
+                    }
+                },
+            });
+        },
+        [fetchLedger, fetchTransactions, fetchOpeningBalance, toast],
+    );
+
+    const renderLedgerActions = useCallback(
+        (record: any) => (
+            <div className="flex items-center gap-2">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/posting/${record.id}/view/posting_simple_view`)}
+                >
+                    <Edit size={16} />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-500 hover:text-red-600"
+                    onClick={() => handleLedgerDelete(record.id)}
+                >
+                    <Trash2 size={16} />
+                </Button>
+            </div>
+        ),
+        [navigate, handleLedgerDelete],
+    );
 
     const accountAdditionalFilters = useMemo(
         () =>
@@ -394,7 +621,7 @@ export default function BankTransactions() {
                             onAccountChange={handleAccountChange}
                             onAccountClear={handleAccountClear}
                             onRefresh={handleRefresh}
-                            loading={isLoading}
+                            loading={isLoading || ledgerLoading}
                             showAccountFilter={true}
                             showRefreshButton={true}
                             accountAdditionalFilters={accountAdditionalFilters}
@@ -416,18 +643,94 @@ export default function BankTransactions() {
                                     Select an account to view transactions.
                                 </div>
                             ) : (
-                                <Master
-                                    key={`${currentEntityId ?? 'all'}-${account?.id ?? 'none'}-${selectedFY.value}`}
-                                    type="posting"
-                                    view="posting_simple_view"
-                                    displayName="Transactions"
-                                    defaultFilters={masterDefaultFilters}
-                                    defaultSortOption={{ field: 'value_date', direction: 'desc' }}
-                                    filterConfig={{ enableFilters: false, enableSearch: true }}
-                                    customRowRenderer={simpleRowRenderer}
-                                    isCreate={false}
-                                    isImport={false}
-                                />
+                                <>
+                                    <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                                        <span className="font-medium text-foreground">Opening balance</span>
+                                        <span className="text-muted-foreground">
+                                            at {dayjs(selectedFY.from_date).format("DD MMM YYYY")}
+                                        </span>
+                                        <span className="font-mono font-medium">
+                                            {openingLoading
+                                                ? "…"
+                                                : formatCurrency(Number(openingBalance ?? 0), displayCurrency)}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">(trial balance)</span>
+                                    </div>
+                                    <p className="mb-3 text-xs text-muted-foreground">
+                                        Transactions are sorted oldest first with a running balance. Up to{" "}
+                                        {BANK_TX_FULL_PAGE.toLocaleString()} rows for this financial year.
+                                    </p>
+                                    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex max-w-md flex-1 items-center gap-2">
+                                            <Input
+                                                placeholder="Search…"
+                                                value={ledgerSearchInput}
+                                                onChange={(e) => setLedgerSearchInput(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        setLedgerSearchTerm(ledgerSearchInput.trim() || undefined);
+                                                    }
+                                                }}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setLedgerSearchTerm(ledgerSearchInput.trim() || undefined)
+                                                }
+                                            >
+                                                Search
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    {!ledgerLoading && selectedLedgerRows.length > 1 && (
+                                        <div className="mb-4 flex items-center justify-between rounded-md bg-[#F1F0FB] p-3">
+                                            <div className="flex items-center gap-3">
+                                                {bulkActions.map((action) => {
+                                                    if (action.isVisible && !action.isVisible(selectedLedgerRows)) {
+                                                        return null;
+                                                    }
+                                                    return (
+                                                        <Button
+                                                            key={action.id}
+                                                            variant={action.variant || "outline"}
+                                                            size="sm"
+                                                            className="flex items-center gap-1 text-[#9b87f5] border-[#9b87f5] hover:bg-[#E5DEFF]"
+                                                            onClick={() => void action.onClick(selectedLedgerRows)}
+                                                        >
+                                                            {action.icon}
+                                                            <span>{action.label}</span>
+                                                        </Button>
+                                                    );
+                                                })}
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="flex items-center gap-1 border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600"
+                                                    onClick={() =>
+                                                        handleLedgerBulkDelete(selectedLedgerRows.map((r) => r.id))
+                                                    }
+                                                >
+                                                    <Trash2 size={16} />
+                                                    <span>Delete</span>
+                                                </Button>
+                                            </div>
+                                            <div className="text-sm font-medium text-[#403E43]">
+                                                {selectedLedgerRows.length} items selected
+                                            </div>
+                                        </div>
+                                    )}
+                                    <DynamicTable
+                                        ref={ledgerTableRef}
+                                        data={ledgerList}
+                                        isLoading={ledgerLoading}
+                                        renderActions={renderLedgerActions}
+                                        enableMultiSelect
+                                        onSelectionChange={setSelectedLedgerRows}
+                                        customRowRenderer={simpleRowRenderer}
+                                    />
+                                </>
                             )}
                         </TabsContent>
 
@@ -618,6 +921,22 @@ export default function BankTransactions() {
                     </Tabs>
                 </Card>
             </div>
+
+            {mergePair && (
+                <MergePostingsModal
+                    open={true}
+                    rows={mergePair}
+                    onClose={() => setMergePair(null)}
+                    onMerged={() => {
+                        setMergePair(null);
+                        setSelectedLedgerRows([]);
+                        ledgerTableRef.current?.clearSelection?.();
+                        void fetchOpeningBalance();
+                        fetchTransactions();
+                        void fetchLedger();
+                    }}
+                />
+            )}
         </div>
     );
 }

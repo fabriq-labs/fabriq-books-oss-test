@@ -4,6 +4,7 @@ import { PermissionService } from '../permissions/PermissionService';
 import { AuthContext } from '../../auth/types';
 import logger from '../../utils/logger';
 import prisma from '../../lib/prisma';
+import { buildCreateManyErrorLogPayload } from '../../utils/formatPrismaError';
 import { execute_Action } from '../../lib/actions';
 import { PrismaSchemaParser } from '../../utils/PrismaSchemaParser';
 import { EntityDefinition, RelationshipDefinition } from '../../models/ModelRegistry';
@@ -882,6 +883,7 @@ export class DataAccessLayer {
       user: context.user?.id
     });
 
+    let filteredData: Record<string, unknown>[] = [];
     try {
       // Require authentication for all non-introspection queries
       if (!context.user) {
@@ -901,7 +903,7 @@ export class DataAccessLayer {
       }
 
       // Filter input data based on permissions and add metadata
-      const filteredData = data.map(item => {
+      filteredData = data.map((item) => {
         const filtered = PermissionService.filterFieldsByPermission(item, permissions);
         return {
           ...filtered,
@@ -921,17 +923,22 @@ export class DataAccessLayer {
         count: result.count
       });
 
-      console.log('result', result);
       return {
         success: true,
         data: { count: result.count } as T
       };
     } catch (error) {
-      logger.error('Error in createMany', {
-        model: modelName,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        dataCount: data.length
-      });
+      const batchForLog = filteredData.length > 0 ? filteredData : data;
+      logger.error(
+        'Error in createMany',
+        await buildCreateManyErrorLogPayload({
+          prisma: this.prisma,
+          modelName,
+          orgId: context.user?.org_id,
+          error,
+          batchRecords: batchForLog
+        })
+      );
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
