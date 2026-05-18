@@ -26,8 +26,8 @@ import { Badge } from '@/components/ui/badge';
 const itemMasterSchema = z.object({
     account_name: z.string().optional(),
     category_name: z.string().optional(),
-    notes: z.string().min(1, { message: 'Notes is required' }),
-    description: z.string().optional(),
+    notes:z.string().optional(),
+    description: z.string().min(1, { message: 'Description is required' }),
     posting_type: z.string().optional(),
     account_id: z.string().min(1, { message: 'Account is required' }),
     amount: z.string().min(1, { message: 'Amount is required' }).refine(
