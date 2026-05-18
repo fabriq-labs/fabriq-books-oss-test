@@ -47,6 +47,7 @@ export const SalesOrderItems: React.FC<SalesOrderItemsProps> = ({ orderId, detai
 
     const validCurrency = currentCurrency && currentCurrency.trim() !== '' ? currentCurrency : 'USD';
     const adjustableLabel = details?.adjustable_label ?? 'Adjustable';
+    const showDiscount = Number(details?.total_discount_amount) !== 0;
 
     const updateLineItemApi = useCallback(async (itemId: string, field: string, value: any, data?: any) => {
         setUpdatingItemId(itemId);
@@ -457,14 +458,16 @@ export const SalesOrderItems: React.FC<SalesOrderItemsProps> = ({ orderId, detai
                             {formatCurrency(details?.sub_total, validCurrency)}
                         </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-border/70">
-                        <span className="text-sm font-medium text-muted-foreground">
-                            Discount Amount:
-                        </span>
-                        <span className="text-sm font-semibold text-foreground">
-                            {formatCurrency(details?.total_discount_amount, validCurrency)}
-                        </span>
-                    </div>
+                    {showDiscount ? (
+                        <div className="flex justify-between items-center py-2 border-b border-border/70">
+                            <span className="text-sm font-medium text-muted-foreground">
+                                Discount Amount:
+                            </span>
+                            <span className="text-sm font-semibold text-foreground">
+                                {formatCurrency(details?.total_discount_amount, validCurrency)}
+                            </span>
+                        </div>
+                    ) : null}
                     <div className="flex justify-between items-center py-2 border-b border-border/70">
                         <span className="text-sm font-medium text-muted-foreground">
                             Tax Amount:

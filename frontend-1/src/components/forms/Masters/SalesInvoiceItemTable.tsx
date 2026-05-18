@@ -77,6 +77,8 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
   onProductSelectChange,
   onProductSelectClear,
 }) => {
+  const showDiscount = Number(totalDiscount) !== 0;
+
   return (
     <div className="space-y-4 pt-4 border-t border-border/60">
       <div className="flex flex-wrap justify-between items-center gap-3">
@@ -329,14 +331,16 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                         {formatCurrency(subTotal, currencyCode)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-border/70">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Discount Amount:
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">
-                        {formatCurrency(totalDiscount, currencyCode)}
-                      </span>
-                    </div>
+                    {showDiscount ? (
+                      <div className="flex justify-between items-center py-2 border-b border-border/70">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          Discount Amount:
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {formatCurrency(totalDiscount, currencyCode)}
+                        </span>
+                      </div>
+                    ) : null}
                     <div className="flex justify-between items-center py-2 border-b border-border/70">
                       <span className="text-sm font-medium text-muted-foreground">
                         Total Tax:

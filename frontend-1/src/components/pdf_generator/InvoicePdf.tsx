@@ -34,6 +34,7 @@ export const extractInvoicePDFData = (data: any): any => {
       }))
       : [],
     subTotal: data.subTotal,
+    totalDiscount: data.totalDiscount,
     totalTax: data.totalTax,
     grandTotal: data.grandTotal,
     legalEntityData: data.legalEntityData,
@@ -43,6 +44,7 @@ export const extractInvoicePDFData = (data: any): any => {
     terms_and_conditions: data.terms_and_conditions,
     adjustable_value: data.adjustable_value,
     adjustable_label: data.adjustable_label,
+    bill_to: data.bill_to,
   };
 };
 
@@ -281,8 +283,23 @@ const InvoicePDF = ({
   const invoice = extractInvoicePDFData(invoiceData);
   const items = Array.isArray(invoice?.items) ? invoice.items : [];
   const subtotal = Number(invoice?.subTotal) || 0;
+  const totalDiscount = Number(invoice?.totalDiscount) || 0;
   const totalTax = Number(invoice?.totalTax) || 0;
+  const adjustableValue = Number(invoice?.adjustable_value) || 0;
   const grandTotal = Number(invoice?.grandTotal) || 0;
+  const showDiscount =
+    totalDiscount !== 0 ||
+    items.some(
+      (item: any) =>
+        Number(item?.discount_rate) !== 0 || Number(item?.discount_amount) !== 0,
+    );
+  const showAdjustment = adjustableValue !== 0;
+
+  const customerAddress =
+    invoice?.bill_to ||
+    customer?.item?.customer_address ||
+    invoice?.customerData?.customer_address ||
+    customer?.customer_address;
 
   // Use actual tax percentage from form data
   const getTaxPercentage = (item: any) => {
@@ -336,7 +353,9 @@ const InvoicePDF = ({
             <Text style={styles.sectionText}>
               {invoice?.customerData?.customer_name}
             </Text>
-            <Text style={styles.sectionText}>{customer?.item?.customer_address}</Text>
+            {customerAddress ? (
+              <Text style={styles.sectionText}>{customerAddress}</Text>
+            ) : null}
             <Text style={styles.sectionText}>
               {[
                 customer?.item?.city,
@@ -415,24 +434,28 @@ const InvoicePDF = ({
             >
               <Text>IGST Amt</Text>
             </View>
-            <View
-              style={[
-                styles.tableCell,
-                styles.colIgstPercent,
-                styles.tableHeaderCell,
-              ]}
-            >
-              <Text>Discount (%)</Text>
-            </View>
-            <View
-              style={[
-                styles.tableCell,
-                styles.colIgstAmount,
-                styles.tableHeaderCell,
-              ]}
-            >
-              <Text>Discount Amt</Text>
-            </View>
+            {showDiscount ? (
+              <>
+                <View
+                  style={[
+                    styles.tableCell,
+                    styles.colIgstPercent,
+                    styles.tableHeaderCell,
+                  ]}
+                >
+                  <Text>Discount (%)</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCell,
+                    styles.colIgstAmount,
+                    styles.tableHeaderCell,
+                  ]}
+                >
+                  <Text>Discount Amt</Text>
+                </View>
+              </>
+            ) : null}
             <View
               style={[
                 styles.tableCellLast,
@@ -487,12 +510,16 @@ const InvoicePDF = ({
                   <View style={[styles.tableCell, styles.colIgstAmount]}>
                     <Text>{formatAmount(taxAmount)}</Text>
                   </View>
-                  <View style={[styles.tableCell, styles.colIgstPercent]}>
-                    <Text>{item?.discount_rate || 0}%</Text>
-                  </View>
-                  <View style={[styles.tableCell, styles.colIgstAmount]}>
-                    <Text>{formatAmount(item?.discount_amount || 0)}</Text>
-                  </View>
+                  {showDiscount ? (
+                    <>
+                      <View style={[styles.tableCell, styles.colIgstPercent]}>
+                        <Text>{item?.discount_rate || 0}%</Text>
+                      </View>
+                      <View style={[styles.tableCell, styles.colIgstAmount]}>
+                        <Text>{formatAmount(item?.discount_amount || 0)}</Text>
+                      </View>
+                    </>
+                  ) : null}
                   <View style={[styles.tableCellLast, styles.colAmount]}>
                     <Text>{formatAmount(itemTotal)}</Text>
                   </View>
@@ -526,14 +553,20 @@ const InvoicePDF = ({
               <Text style={styles.totalLabel}>Tax:</Text>
               <Text style={styles.totalValue}>{formatAmount(totalTax)}</Text>
             </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Discount:</Text>
-              <Text style={styles.totalValue}>{formatAmount(totalTax)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>{invoice?.adjustable_label || "Adjustable"}:</Text>
-              <Text style={styles.totalValue}>{formatAmount(invoice?.adjustable_value || 0)}</Text>
-            </View>
+            {showDiscount ? (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Discount:</Text>
+                <Text style={styles.totalValue}>{formatAmount(totalDiscount)}</Text>
+              </View>
+            ) : null}
+            {showAdjustment ? (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>
+                  {invoice?.adjustable_label || "Adjustable"}:
+                </Text>
+                <Text style={styles.totalValue}>{formatAmount(adjustableValue)}</Text>
+              </View>
+            ) : null}
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total:</Text>
               <Text style={styles.totalLabel}>{formatAmount(grandTotal)}</Text>

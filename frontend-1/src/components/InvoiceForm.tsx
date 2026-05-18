@@ -37,13 +37,25 @@ interface InvoiceItem {
   item_number?: string;
 }
 
+const formatLocationAddress = (location?: {
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string;
+} | null): string => {
+  if (!location) return "";
+  return `${location.address || ""}\n${location.city || ""}, ${location.state || ""} ${location.zip_code || ""}\n${location.country || ""}`.trim();
+};
+
 interface InvoiceFormData {
   legal_entity_id: string;
   legalEntityData: any;
   customer_id?: string;
   customerData: any;
-  location_id: string;
+  location_id: string | null;
   locationData: any;
+  bill_to?: string;
   payment_terms_id?: string;
   invoice_number: string;
   invoice_date: any;
@@ -72,8 +84,9 @@ export const InvoiceForm: React.FC = () => {
     legal_entity_id: "",
     legalEntityData: null,
     customerData: null,
-    location_id: "",
+    location_id: null,
     locationData: null,
+    bill_to: "",
     payment_terms_id: "",
     invoice_number: id,
     invoice_date: id ? null : new Date().toISOString(),
@@ -191,6 +204,9 @@ export const InvoiceForm: React.FC = () => {
           customer_name: res.data.customers.customer_name,
         }
         : null;
+      if (customerData) {
+        setCustomer(customerData);
+      }
       const locationData = res.data.location
         ? {
           item: res.data.location,
@@ -200,6 +216,11 @@ export const InvoiceForm: React.FC = () => {
             res.data.location.city,
         }
         : null;
+      if (locationData) {
+        setLocations(locationData);
+      }
+      const billTo =
+        res.data.bill_to || formatLocationAddress(res.data.location) || "";
       setFormData((prev) => ({
         ...prev,
         legal_entity_id: res.data.legal_entity_id,
@@ -208,6 +229,7 @@ export const InvoiceForm: React.FC = () => {
         legalEntityData: legalEntityData || prev.legalEntityData,
         customerData: customerData || prev.customerData,
         locationData: locationData || prev.locationData,
+        bill_to: billTo || prev.bill_to,
         invoice_number: res.data.invoice_number || prev.invoice_number,
         invoice_date: res.data.invoice_date || prev.invoice_date,
         grandTotal: res.data.invoice_total,
@@ -671,7 +693,7 @@ export const InvoiceForm: React.FC = () => {
     value: any,
     fields: any,
   ) => {
-    const lookupData = constructObject(value.item, fields);
+    const billTo = formatLocationAddress(value.item);
     // Update form state
     form.setValue(sourceKey, value[key]);
     form.trigger(sourceKey);
@@ -681,10 +703,12 @@ export const InvoiceForm: React.FC = () => {
       ...prev,
       [sourceKey]: value[key],
       locationData: value,
+      bill_to: billTo,
     }));
     setLocations(value);
     if (id) {
       handleFieldUpdate("location_id", value[key]);
+      handleFieldUpdate("bill_to", billTo);
     }
   };
 
@@ -789,16 +813,38 @@ export const InvoiceForm: React.FC = () => {
       updateLineItemFromProduct(matchedItem.id, payload);
     }
   };
-  const handleLocationSelectClear = (sourceKey: any) => {
-    form.setValue(sourceKey, "");
+  const handleLocationSelectClear = async (sourceKey: any) => {
+    form.setValue(sourceKey, null as never);
     form.trigger(sourceKey);
     setFormData((prev) => ({
       ...prev,
-      [sourceKey]: "",
+      location_id: null,
       locationData: null,
+      bill_to: "",
     }));
-    setLocations([]);
-    setProducts([]);
+    setLocations(null);
+    setInitialValues((prev: any) =>
+      prev
+        ? { ...prev, location: null, location_id: null, bill_to: "" }
+        : prev,
+    );
+    if (!id) return;
+    try {
+      const res = (await viewAPI.update("invoice", id, "invoice_view", {
+        location_id: null,
+        bill_to: "",
+      })) as any;
+      if (res?.data) {
+        setInitialValues(res.data);
+      }
+    } catch (err: any) {
+      console.error("Error clearing location:", err?.message);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err?.message || "Failed to clear location",
+      });
+    }
   };
   const handleLegalEntitySelectClear = (sourceKey: any) => {
     form.setValue(sourceKey, "");
@@ -924,15 +970,26 @@ export const InvoiceForm: React.FC = () => {
           discount_amount: Number(item.discount_amount) || 0,
         })),
         subTotal: Number(formData.subTotal) || 0,
+        totalDiscount: Number(formData.totalDiscount) || 0,
         totalTax: Number(formData.totalTax) || 0,
         grandTotal: Number(formData.grandTotal) || 0,
         legalEntityData: { ...formData.legalEntityData, ...formData?.legalEntityData?.item },
         customerData: { ...formData.customerData, ...formData?.customerData?.item },
-        locationData: { ...formData.locationData, ...formData.locationData?.item },
+        locationData: formData.locationData
+          ? {
+              ...formData.locationData,
+              ...(formData.locationData.item || {}),
+            }
+          : undefined,
         terms_and_conditions: formData.terms_and_conditions,
         notes: formData.notes,
         adjustable_label: formData.adjustable_label,
         adjustable_value: Number(formData.adjustable_value) || 0,
+        bill_to:
+          formData.bill_to ||
+          formatLocationAddress(
+            formData.locationData?.item || initialValues?.location,
+          ),
       };
       const blob = await pdf(
         <InvoicePDFDocument
@@ -1342,7 +1399,10 @@ export const InvoiceForm: React.FC = () => {
                               instanceSourceKey="customer_id"
                               instanceKey="id"
                               instanceLabel="customer_name"
-                              instanceValue={initialValues?.customers}
+                              instanceValue={
+                                formData.customerData?.item ||
+                                initialValues?.customers
+                              }
                               onSelectItem={handleCustomerSelectChange}
                               onClear={handleLegalEntitySelectClear}
                               limit="10"
@@ -1379,24 +1439,6 @@ export const InvoiceForm: React.FC = () => {
                           </div>
                           <div className="space-y-2">
                             <Label
-                              htmlFor="location"
-                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                            >
-                              Location <span className="text-destructive">*</span>
-                            </Label>
-                            <SearchDropDown
-                              instanceType="location"
-                              instanceSourceKey="location_id"
-                              instanceKey="id"
-                              instanceLabel="location"
-                              instanceValue={initialValues?.location}
-                              onSelectItem={handleLoctionSelectChange}
-                              onClear={handleLocationSelectClear}
-                              searchParams="location"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label
                               htmlFor="payment_terms"
                               className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                             >
@@ -1428,6 +1470,50 @@ export const InvoiceForm: React.FC = () => {
                               type="payment_terms"
                             />
                           </div>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="location"
+                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Location <span className="text-destructive">*</span>
+                            </Label>
+                            <SearchDropDown
+                              instanceType="location"
+                              instanceSourceKey="location_id"
+                              instanceKey="id"
+                              instanceLabel="location"
+                              instanceValue={
+                                formData.location_id
+                                  ? formData.locationData?.item ||
+                                    initialValues?.location
+                                  : undefined
+                              }
+                              onSelectItem={handleLoctionSelectChange}
+                              onClear={handleLocationSelectClear}
+                              searchParams="location"
+                            />
+                          </div>
+                          <div className="space-y-2 md:col-span-2">
+                            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              Customer Address
+                            </Label>
+                            <Textarea
+                              readOnly
+                              value={
+                                formData.location_id
+                                  ? formData.bill_to ||
+                                    formatLocationAddress(
+                                      formData.locationData?.item ||
+                                        initialValues?.location,
+                                    )
+                                  : ""
+                              }
+                              placeholder="Select a location to view address"
+                              className="min-h-[72px] border-border/70 bg-muted/30 resize-none"
+                              rows={3}
+                            />
+                          </div>
+                         
                         </div>
                       </div>
                       <div className="space-y-4">

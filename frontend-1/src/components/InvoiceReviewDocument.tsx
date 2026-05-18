@@ -96,11 +96,11 @@ const InvoiceReviewDocument: React.FC<InvoiceReviewDocumentProps> = ({
               </div>
               {formData.customerData?.item && (
                 <div className="text-gray-600 mt-1 space-y-0.5">
-                  {(formData.customerData.item.address ||
+                  {(formData.customerData.item.customer_address ||
                     formData.customerData.item.city) && (
                     <div>
                       {[
-                        formData.customerData.item.address,
+                        formData.customerData.item.customer_address,
                         formData.customerData.item.city,
                         formData.customerData.item.state,
                         formData.customerData.item.zip_code,
