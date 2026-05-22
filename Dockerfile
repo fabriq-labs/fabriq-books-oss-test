@@ -43,7 +43,8 @@ COPY backend/ ./
 RUN sed -i '/provider = "prisma-client-js"/a\
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]' prisma/schema/schema.prisma
 
-RUN npx tsc && cp -r src/config dist/config 2>/dev/null || true
+# tsc does not emit JSON under src/config; copy is required at runtime (ModelRegistry).
+RUN npm run build
 RUN npx prisma generate
 # Do not prune: OpenTelemetry/Langfuse deps are in devDependencies but required at runtime
 
