@@ -13,7 +13,7 @@
     "generate:sample-bank-pdf": "ts-node --transpile-only scripts/generate-us-ca-sample-bank-pdf.ts",
     "generate-types": "ts-node scripts/generateTypes.ts",
     "slides": "slidev --open src/agent/slides.md",
-    "apply-views": "ts-node prisma/apply-database-views.ts",
+    "apply-views": "ts-node src/utils/setup/applyDatabaseViews.ts",
     "sync-metadata": "ts-node prisma/sync-metadata.ts",
     "pull-metadata": "ts-node prisma/pull-metadata.ts",
     "pull": "ts-node prisma/pull-metadata-interactive.ts",

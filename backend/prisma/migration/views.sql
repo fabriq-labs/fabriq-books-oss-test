@@ -1,5 +1,5 @@
 -- Database views for reporting (trial balance, account rollups).
--- Apply via: npx ts-node prisma/apply-database-views.ts
+-- Apply via: npm run apply-views  (src/utils/setup/applyDatabaseViews.ts)
 -- Order matters: account_hierarchy must be created before views that reference it.
 
 -- public.account_hierarchy source

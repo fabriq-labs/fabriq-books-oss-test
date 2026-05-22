@@ -197,5 +197,5 @@ INSERT INTO public.role_view (id, role_id, view_id, created_at, updated_at, crea
 
 
 -- Reporting views (account_hierarchy, account_balances, v_posting_legs, ...)
--- are applied from prisma/migration/views.sql via apply-database-views.ts
+-- are applied from prisma/migration/views.sql via src/utils/setup/applyDatabaseViews.ts
 -- (setup-metadata.ts, setup-db.js, and server startup).

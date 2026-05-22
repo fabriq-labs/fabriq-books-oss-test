@@ -7,7 +7,7 @@ import {
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
-import { applyDatabaseViews } from './apply-database-views';
+import { applyDatabaseViews } from '../src/utils/setup/applyDatabaseViews';
 
 const prisma = new PrismaClient();
 

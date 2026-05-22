@@ -1,26 +1,32 @@
 /**
  * Applies SQL views from prisma/migration/views.sql (account_hierarchy, account_balances, etc.).
  *
- * Run standalone:
- *   npx ts-node prisma/apply-database-views.ts
- *
- * Also invoked from setup-metadata.ts, setup-db.js, and server startup (ensureDatabaseViews).
+ * Run standalone: npm run apply-views
  */
 import { execSync } from 'child_process';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
-const backendRoot = join(__dirname, '..');
-const viewsSqlPath = join(__dirname, 'migration', 'views.sql');
-const schemaPath = join(__dirname, 'schema');
+function getBackendRoot(): string {
+  return resolve(__dirname, '..', '..', '..');
+}
+
+function getPrismaDir(): string {
+  return join(getBackendRoot(), 'prisma');
+}
 
 export function applyDatabaseViews(): void {
+  const backendRoot = getBackendRoot();
+  const prismaDir = getPrismaDir();
+  const viewsSqlPath = join(prismaDir, 'migration', 'views.sql');
+  const schemaPath = join(prismaDir, 'schema');
+
   if (!existsSync(viewsSqlPath)) {
     throw new Error(`views.sql not found at ${viewsSqlPath}`);
   }
 
   const command = `npx prisma db execute --schema "${schemaPath}" --file "${viewsSqlPath}"`;
-  console.log(`📐 Applying database views from migration/views.sql...`);
+  console.log('📐 Applying database views from migration/views.sql...');
   console.log(`   Command: ${command}`);
 
   execSync(command, {

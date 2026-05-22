@@ -296,9 +296,9 @@ async function main() {
 
       // Step 2.5: Reporting views (account_hierarchy, account_balances, trial balance helpers)
       console.log("📐 Step 2.5: Applying database reporting views...");
-      console.log("Command: npx ts-node prisma/apply-database-views.ts");
+      console.log("Command: npx ts-node src/utils/setup/applyDatabaseViews.ts");
       try {
-        execSync("npx ts-node prisma/apply-database-views.ts", {
+        execSync("npx ts-node src/utils/setup/applyDatabaseViews.ts", {
           stdio: "inherit",
           cwd: __dirname,
         });
@@ -377,7 +377,7 @@ async function main() {
       // Ensure reporting views exist (no-op if already present)
       console.log("📐 Ensuring database reporting views...");
       try {
-        execSync("npx ts-node prisma/apply-database-views.ts", {
+        execSync("npx ts-node src/utils/setup/applyDatabaseViews.ts", {
           stdio: "inherit",
           cwd: __dirname,
         });

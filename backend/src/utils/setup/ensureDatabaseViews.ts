@@ -1,5 +1,5 @@
-import prisma from '../lib/prisma';
-import { applyDatabaseViews } from '../../prisma/apply-database-views';
+import prisma from '../../lib/prisma';
+import { applyDatabaseViews } from './applyDatabaseViews';
 
 let viewsEnsured = false;
 
