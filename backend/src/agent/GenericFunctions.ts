@@ -78,13 +78,22 @@ export function getCreateRecordSchema(toolContext?: { modelName?: string }) {
 export const searchRecordsSchema = z.object({
   modelName: z.string().describe('Name of the model to search in'),
   search: z
-    .array(
-      z.object({
-        field: z.string().describe('Field name to search on. For user queries, use created_by, updated_by, or assigned_to. For time-based queries, use created_at.'),
-        operator: z.string().describe('Operator (eq, neq, gt, gte, lt, lte, in, nin, contains, icontains, startsWith, endsWith). For date ranges, use gt/gte/lt/lte with ISO dates. For case-insensitive text search, use icontains.'),
-        value: z.union([z.string(), z.number(), z.boolean(), z.null()]).describe('Value to compare against. For user fields, use the current user\'s ID. For date fields, use ISO-8601 format (YYYY-MM-DDThh:mm:ss.sssZ). For current user queries, automatically use the user\'s ID from auth context.'),
-      })
-    )
+    .union([
+      z.array(
+        z.object({
+          field: z.string().describe('Field name to search on'),
+          operator: z
+            .string()
+            .describe(
+              'Operator: eq, neq, gt, gte, lt, lte, in, nin, contains, icontains (NOT ilike — use icontains), startsWith, endsWith'
+            ),
+          value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+        })
+      ),
+      z
+        .record(z.any())
+        .describe('Legacy object format — prefer array format'),
+    ])
     .optional(),
   page: z.number().int().min(1).describe('Page number (starts from 1)').optional(),
   pageSize: z.number().int().min(1).describe('Number of records per page').optional(),

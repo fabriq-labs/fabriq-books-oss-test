@@ -17,9 +17,12 @@ import {
     getContextSuggestions,
     getInputPlaceholder,
     getInputPaddingClasses,
+    formatCurrencyInMessage,
+    getChatCurrencyCode,
     type UserMessage,
     type MessagePart
 } from './chatUtils';
+import { useUserData } from '@/hooks/useUserData';
 import Cookies from 'js-cookie';
 
 interface ChatMessage {
@@ -42,7 +45,13 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
     const [isDragging, setIsDragging] = useState(false);
     const { addToolData } = useTool();
     const { pageContext, messagesAi, setMessagesAi, clearMessages } = useChatContext();
+    const { getBaseCurrencyCode } = useUserData();
     const token = Cookies.get("__session");
+
+    const chatCurrencyCode = useMemo(
+        () => getChatCurrencyCode(pageContext, getBaseCurrencyCode()),
+        [pageContext, getBaseCurrencyCode]
+    );
 
     const {
         messages,
@@ -172,10 +181,17 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         };
     }, [setInput]);
 
+    const formatAssistantText = (content: string) =>
+        formatCurrencyInMessage(content, chatCurrencyCode);
+
     // Render message content (text only, files are rendered separately)
     const renderMessageContent = (msg: ChatMessage, isLastMessage: boolean = false) => {
         const hasToolInvocations = msg.toolInvocations && Array.isArray(msg.toolInvocations);
         const hasTextContent = msg.content && msg.content.trim().length > 0;
+        const displayContent =
+            msg.role === 'assistant' && hasTextContent
+                ? formatAssistantText(msg.content)
+                : msg.content;
 
         if (hasToolInvocations) {
             const willShowToolResponses = (!isLoading || !isLastMessage);
@@ -189,7 +205,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
                 <div className="space-y-3">
                     {hasTextContent && (
                         <div className="mb-3">
-                            {msg.content}
+                            {displayContent}
                         </div>
                     )}
                     {/* Only show tool responses after loading completes */}
@@ -214,7 +230,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
             );
         }
 
-        return hasTextContent ? <div>{msg.content}</div> : null;
+        return hasTextContent ? <div>{displayContent}</div> : null;
     };
 
     // Handle new chat

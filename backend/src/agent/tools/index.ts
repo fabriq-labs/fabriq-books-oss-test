@@ -20,3 +20,4 @@ export {
   queueActionBatchTool,
 } from './sessionTools';
 export { categorizePostingsTool } from './categorizePostings';
+export { runFinancialReportTool, runFinancialReportSchema } from './runFinancialReport';

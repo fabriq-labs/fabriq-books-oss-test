@@ -31,6 +31,7 @@ import {
     queueActionsTool,
     requestClarificationTool,
     categorizePostingsTool,
+    runFinancialReportTool,
 } from './tools';
 import { QueryClassification } from './utils/questionClassifier';
 import logger from '../utils/logger';
@@ -134,6 +135,17 @@ export class ToolManager {
                 advancedSqlQuery: advancedSqlQueryTool(auth),
                 suggestReconciliationMatches: suggestReconciliationMatchesTool(auth),
                 categorizePostings: categorizePostingsTool(auth),
+            };
+        }
+
+        // Account model — chart of accounts + canonical trial balance reports
+        if (modelName === 'account') {
+            return {
+                searchRecords: searchRecordsTool(auth),
+                createRecord: createRecordTool(auth, toolContext),
+                updateRecord: updateRecordTool(auth, toolContext),
+                advancedSqlQuery: advancedSqlQueryTool(auth),
+                runFinancialReport: runFinancialReportTool(auth, toolContext),
             };
         }
 

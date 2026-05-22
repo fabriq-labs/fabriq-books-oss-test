@@ -132,7 +132,7 @@ export class DynamicPromptManager {
         try {
             // Get prompt templates directly using view relationship
             const templates = await this.getPromptTemplates();
-
+          
             if (templates.length === 0) {
                 const viewName = this.viewName || `${this.modelName}_view`;
                 throw new Error(`No prompt templates found for model: ${this.modelName}, view: ${viewName}`);
@@ -326,14 +326,14 @@ export class DynamicPromptManager {
      */
     private async getPromptTemplatesFromDatabase(): Promise<PromptTemplate[]> {
         const viewName = this.viewName || `${this.modelName}_view`;
-
+       
         const whereClause: any = {
             view: {
                 model_name: this.modelName,
                 name: viewName
             }
         };
-
+       
         // Handle prompt type filtering
         if (this.promptTypes && this.promptTypes.length > 0) {
             // If specific prompt types are requested, use IN operator to find all matching types
@@ -423,7 +423,7 @@ export class DynamicPromptManager {
 
         return sortedTemplates[0].prompt_text;
     }
-
+    
     /**
      * Get accessible models for the user, optionally filtered by focusModels
      */
@@ -464,6 +464,38 @@ export class DynamicPromptManager {
       Examples: ${m.examples.join(', ')}
       Common terms: ${m.synonyms.join(', ')}`;
         }).join('\n');
+    }
+
+    /**
+     * Expand {{#if context.modelContext.KEY}}...{{/if}} for any modelContext key.
+     */
+    private processModelContextConditionals(prompt: string): string {
+        const modelContext = this.context.modelContext || {};
+        let result = prompt;
+        const keysInPrompt = [...result.matchAll(/\{\{#if context\.modelContext\.(\w+)\}\}/g)].map((m) => m[1]);
+        const keys = [...new Set([...Object.keys(modelContext), ...keysInPrompt])];
+
+        for (let pass = 0; pass < 5; pass++) {
+            let changed = false;
+            for (const key of keys) {
+                const value = modelContext[key];
+                const hasValue =
+                    value !== null && value !== undefined && String(value).trim() !== '';
+                const pattern = new RegExp(
+                    `\\{\\{#if context\\.modelContext\\.${key}\\}\\}([\\s\\S]*?)\\{\\{/if\\}\\}`,
+                    'g'
+                );
+                const next = hasValue
+                    ? result.replace(pattern, '$1')
+                    : result.replace(pattern, '');
+                if (next !== result) {
+                    changed = true;
+                    result = next;
+                }
+            }
+            if (!changed) break;
+        }
+        return result;
     }
 
     /**
@@ -508,6 +540,8 @@ export class DynamicPromptManager {
                 }
             }
         }
+
+        processedPrompt = this.processModelContextConditionals(processedPrompt);
 
         // Handle conditional blocks for recordId
         if (this.context.recordId) {

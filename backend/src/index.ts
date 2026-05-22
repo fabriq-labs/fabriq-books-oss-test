@@ -14,6 +14,7 @@ import { setupRestRoutes } from './rest/routes';
 import { errorHandler } from './rest/middleware/errorHandler';
 import agentModule from './agent';
 import { GracefulShutdown } from './utils/gracefulShutdown';
+import { ensureDatabaseViews } from './utils/ensureDatabaseViews';
 import { initializeImportExtensions } from './lib/import-extensions';
 import './rest/postingCustomActions'; // registers posting/import-bank-statement custom action
 import './services/book-keeping/migration-journal'; // registers setup/migration-journal custom actions
@@ -24,6 +25,8 @@ let httpServer: Server | null = null;
 
 async function startServer(): Promise<void> {
   try {
+    await ensureDatabaseViews();
+
     // Initialize import extensions (model-specific import behaviors)
     initializeImportExtensions();
 

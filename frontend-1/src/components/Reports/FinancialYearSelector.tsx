@@ -82,6 +82,12 @@ export function getPreviousFYOption(fyType: FinancialYearType): FinancialYearOpt
   return options[options.length - 2];
 }
 
+/** Current in-progress financial year (last entry from buildFYOptions). */
+export function getCurrentFYOption(fyType: FinancialYearType): FinancialYearOption {
+  const options = buildFYOptions(fyType, 5);
+  return options[options.length - 1];
+}
+
 interface FinancialYearSelectorProps {
   fyType?: FinancialYearType | null;
   value: string;

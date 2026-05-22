@@ -1,0 +1,10 @@
+{
+  "view_id": "view_35b26fd1-7b8b-4aa8-a622-5bbf7906714d",
+  "prompt_type": "default",
+  "is_default": true,
+  "version": 1,
+  "priority": 0,
+  "context": "Account master form — chart of accounts",
+  "org_id": "52",
+  "app_name": "fabriq_books"
+}

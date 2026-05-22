@@ -23,6 +23,7 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
       filters.from_date,
       filters.to_date,
       context.user.org_id,
+      filters.account_id,
       filters.legal_entity_ids
     );
   } else if (report_id === "income_statement") {

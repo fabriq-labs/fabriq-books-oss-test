@@ -130,6 +130,19 @@ export function updateRecordTool(auth: AuthContext, toolContext?: { modelName?: 
   });
 }
 
+function normalizeSearchParam(search: unknown): unknown {
+  if (search == null) return search;
+  // LLM sometimes sends a single filter object instead of an array
+  if (!Array.isArray(search) && typeof search === 'object') {
+    const obj = search as Record<string, unknown>;
+    if (Array.isArray(obj.filters)) return obj.filters;
+    if (typeof obj.field === 'string' && typeof obj.operator === 'string') {
+      return [obj];
+    }
+  }
+  return search;
+}
+
 export function searchRecordsTool(auth: AuthContext) {
   return tool({
     parameters: searchRecordsSchema,
@@ -138,7 +151,11 @@ export function searchRecordsTool(auth: AuthContext) {
       params: { modelName: string; search?: any; page?: number; pageSize?: number },
       _options
     ) => {
-      const result = await modelService.search(params.modelName, auth, params);
+      const normalized = {
+        ...params,
+        search: normalizeSearchParam(params.search),
+      };
+      const result = await modelService.search(normalized.modelName, auth, normalized);
       const enrichedResult = enrichSearchResult(result, params.modelName);
       const safeResult = JSON.parse(JSON.stringify(enrichedResult));
       return safeResult;

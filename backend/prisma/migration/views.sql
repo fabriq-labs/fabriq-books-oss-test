@@ -1,3 +1,53 @@
+-- Database views for reporting (trial balance, account rollups).
+-- Apply via: npx ts-node prisma/apply-database-views.ts
+-- Order matters: account_hierarchy must be created before views that reference it.
+
+-- public.account_hierarchy source
+
+CREATE OR REPLACE VIEW public.account_hierarchy
+AS WITH RECURSIVE hierarchy AS (
+         SELECT account.id,
+            account.code,
+            account.classification,
+            account.name,
+            account.type,
+            account.parent_account_id,
+            account.name::character varying(1000) AS path,
+            0 AS level,
+            account.org_id,
+            account.base_currency_id AS currency,
+            account.legal_entity_id
+           FROM account
+          WHERE account.parent_account_id = ''::text OR account.parent_account_id IS NULL
+        UNION ALL
+         SELECT a.id,
+            a.code,
+            a.classification,
+            a.name,
+            a.type,
+            a.parent_account_id,
+            (((ah.path::text || ' -> '::text) || a.name))::character varying(1000) AS "varchar",
+            ah.level + 1,
+            a.org_id,
+            a.base_currency_id AS currency,
+            a.legal_entity_id
+           FROM account a
+             JOIN hierarchy ah ON a.parent_account_id = ah.id::text
+        )
+ SELECT id,
+    code,
+    classification,
+    name,
+    type,
+    parent_account_id,
+    path,
+    level,
+    org_id,
+    currency,
+    legal_entity_id
+   FROM hierarchy;
+
+
 -- public.account_balances source
 
 CREATE OR REPLACE VIEW public.account_balances
@@ -359,53 +409,6 @@ AS WITH account_totals_by_date AS (
     total_running_balance
    FROM rolled_up_balances_by_date
   ORDER BY account_name, value_date;
-
-
-
-  -- public.account_hierarchy source
-
-CREATE OR REPLACE VIEW public.account_hierarchy
-AS WITH RECURSIVE hierarchy AS (
-         SELECT account.id,
-            account.code,
-            account.classification,
-            account.name,
-            account.type,
-            account.parent_account_id,
-            account.name::character varying(1000) AS path,
-            0 AS level,
-            account.org_id,
-            account.base_currency_id AS currency,
-            account.legal_entity_id
-           FROM account
-          WHERE account.parent_account_id = ''::text OR account.parent_account_id IS NULL
-        UNION ALL
-         SELECT a.id,
-            a.code,
-            a.classification,
-            a.name,
-            a.type,
-            a.parent_account_id,
-            (((ah.path::text || ' -> '::text) || a.name))::character varying(1000) AS "varchar",
-            ah.level + 1,
-            a.org_id,
-            a.base_currency_id AS currency,
-            a.legal_entity_id
-           FROM account a
-             JOIN hierarchy ah ON a.parent_account_id = ah.id::text
-        )
- SELECT id,
-    code,
-    classification,
-    name,
-    type,
-    parent_account_id,
-    path,
-    level,
-    org_id,
-    currency,
-    legal_entity_id
-   FROM hierarchy;
 
 
 -- public.v_posting_legs source

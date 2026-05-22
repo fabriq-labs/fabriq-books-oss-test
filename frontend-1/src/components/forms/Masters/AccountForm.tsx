@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Copy, CalendarDays } from 'lucide-react';
 import { viewAPI } from '@/api/api';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { constructObject } from '../../utils/helper';
 import { Select } from 'antd';
 import { useTool } from '@/contexts/ToolContext';
+import { useChat as useChatContext } from '@/contexts/ChatContext';
+import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
 import { SearchDropDown } from '../../search_dropdown/dropdown';
 import { formatCurrency } from '@/lib/formatters';
 import dayjs from 'dayjs';
@@ -62,6 +64,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
     onSuccess: propOnSuccess
 }) => {
     const { id: paramId, viewId: paramViewId } = useParams<{ id: string, viewId: string }>();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const duplicateOfId = searchParams.get("duplicateOf");
     const id = propId || paramId;
@@ -73,6 +76,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const { latestFormToolResponse } = useTool();
+    const { setPageContext } = useChatContext();
 
     // Opening balance from OPENING_BALANCE posting (read-only display)
     const [openingPosting, setOpeningPosting] = useState<{ amount: number; posting_date: string; account_id: string; credit_account_id: string } | null>(null);
@@ -119,6 +123,51 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
             fetchingDetails(duplicateOfId, true);
         }
     }, [id, duplicateOfId]);
+
+    const watchedName = form.watch('name');
+    const watchedCode = form.watch('code');
+    const watchedLegalEntityId = form.watch('legal_entity_id');
+
+    useEffect(() => {
+        const modelName = 'account';
+        const accountName = watchedName || initialValues?.name;
+        const accountCode = watchedCode || initialValues?.code;
+        const legalEntityId =
+            watchedLegalEntityId ||
+            initialValues?.legal_entity_id?.toString() ||
+            undefined;
+        setPageContext({
+            modelName,
+            viewName: getViewName(modelName),
+            recordId: id || null,
+            stateId: null,
+            viewId: viewId || null,
+            modelDisplayName: getModelDisplayName(modelName),
+            currentPath: location.pathname,
+            modelContext: {
+                accountName: accountName || undefined,
+                accountCode: accountCode || undefined,
+                legal_entity_id: legalEntityId,
+                currencyCode: initialValues?.currency?.code || undefined,
+            },
+        });
+
+        return () => {
+            setPageContext(null);
+        };
+    }, [
+        id,
+        viewId,
+        location.pathname,
+        setPageContext,
+        initialValues?.name,
+        initialValues?.code,
+        initialValues?.legal_entity_id,
+        initialValues?.currency?.code,
+        watchedName,
+        watchedCode,
+        watchedLegalEntityId,
+    ]);
 
     const addCopySuffix = (value: string) => value ? `${value} copy` : value;
 

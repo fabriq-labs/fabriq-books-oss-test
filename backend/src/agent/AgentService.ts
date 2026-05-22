@@ -537,6 +537,7 @@ export class AgentService {
       contextModelName: context?.modelName,
       hasContext: !!context,
       contextKeys: context ? Object.keys(context) : [],
+
     });
 
     // Pass context directly - it contains recordId, stateId, viewId, modelContext

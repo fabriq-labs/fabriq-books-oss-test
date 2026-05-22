@@ -556,6 +556,7 @@ export const getMonthlyTrialBalance = async (
   fromDate: string,      // FY start date — opening balance is from OPENING_BALANCE postings before this
   toDate: string,        // end of selected month — returns one row per account per month from fromDate through toDate
   orgId: string,
+  accountId?: string,
   legalEntityIds?: string[]
 ): Promise<MonthlyTrialBalanceRow[]> => {
   const rows = await prisma.$queryRaw<MonthlyTrialBalanceRow[]>`
@@ -578,6 +579,7 @@ export const getMonthlyTrialBalance = async (
       WHERE vpl.posting_type = 'OPENING_BALANCE'
         AND vpl.posting_date < ${fromDate}::date
         AND vpl.org_id = ${orgId}
+        ${accountId ? Prisma.sql`AND vpl.account_id = ${accountId}` : Prisma.empty}
       GROUP BY vpl.account_id
     ),
 
@@ -600,6 +602,7 @@ export const getMonthlyTrialBalance = async (
       WHERE vam.org_id = ${orgId}
         AND vam.period_month >= DATE_TRUNC('month', ${fromDate}::date)
         AND vam.period_month <= DATE_TRUNC('month', ${toDate}::date)
+        ${accountId ? Prisma.sql`AND vam.account_id = ${accountId}` : Prisma.empty}
         ${legalEntityIds?.length ? Prisma.sql`AND vam.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
     ),
 
@@ -636,6 +639,7 @@ export const getMonthlyTrialBalance = async (
     INNER JOIN with_cumulative wc ON wc.account_id = ah.id
     LEFT JOIN fy_opening fo ON fo.account_id = ah.id
     WHERE ah.org_id = ${orgId}
+      ${accountId ? Prisma.sql`AND ah.id = ${accountId}` : Prisma.empty}
       ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
     ORDER BY ah.classification, ah.level, ah.path, wc.period_month
   `;

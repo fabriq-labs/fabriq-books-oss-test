@@ -294,6 +294,21 @@ async function main() {
       console.log("✅ Metadata setup complete");
       console.log("");
 
+      // Step 2.5: Reporting views (account_hierarchy, account_balances, trial balance helpers)
+      console.log("📐 Step 2.5: Applying database reporting views...");
+      console.log("Command: npx ts-node prisma/apply-database-views.ts");
+      try {
+        execSync("npx ts-node prisma/apply-database-views.ts", {
+          stdio: "inherit",
+          cwd: __dirname,
+        });
+        console.log("✅ Database views applied");
+      } catch (error) {
+        console.error("⚠️  Error applying database views:", error.message);
+        console.log("   Continuing setup...");
+      }
+      console.log("");
+
       // Step 3: Setup workflows
       console.log("🔄 Step 3: Setting up workflows...");
       console.log("Command: npx ts-node prisma/setup-workflows.ts");
@@ -357,6 +372,20 @@ async function main() {
       });
 
       console.log("✅ Prisma Client generated successfully");
+      console.log("");
+
+      // Ensure reporting views exist (no-op if already present)
+      console.log("📐 Ensuring database reporting views...");
+      try {
+        execSync("npx ts-node prisma/apply-database-views.ts", {
+          stdio: "inherit",
+          cwd: __dirname,
+        });
+        console.log("✅ Database views ready");
+      } catch (error) {
+        console.error("⚠️  Error applying database views:", error.message);
+        console.log("   Continuing...");
+      }
       console.log("");
     }
 

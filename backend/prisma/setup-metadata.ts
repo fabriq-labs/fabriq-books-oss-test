@@ -7,6 +7,7 @@ import {
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { applyDatabaseViews } from './apply-database-views';
 
 const prisma = new PrismaClient();
 
@@ -51,7 +52,10 @@ async function main() {
       throw error;
     }
 
-
+    // Reporting views (account_hierarchy, account_balances, v_posting_legs, ...)
+    console.log('');
+    console.log('📐 Applying database reporting views...');
+    applyDatabaseViews();
 
     // Get the roles we need for creating the admin user
     const superAdminRole = await prisma.role.findUnique({ where: { name: 'Super Admin' } });

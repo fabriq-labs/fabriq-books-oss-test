@@ -62,7 +62,8 @@ export class SearchQueryBuilder {
           }
         }
       } catch (error) {
-        throw new Error('Invalid search format');
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(`Invalid search format: ${detail}`);
       }
     }
 
@@ -217,7 +218,14 @@ export class SearchQueryBuilder {
           break;
         case 'contains':
         case 'icontains':
-          where[field] = { contains: value, mode: 'insensitive' };
+        case 'ilike':
+        case 'iLike':
+        case 'like':
+          // LLMs often use SQL-style ILIKE/LIKE; normalize to Prisma icontains
+          where[field] = {
+            contains: typeof value === 'string' ? value.replace(/^%|%$/g, '') : value,
+            mode: 'insensitive',
+          };
           break;
         case 'ncontains':
         case 'not_contains':

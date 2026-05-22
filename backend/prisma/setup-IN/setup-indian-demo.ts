@@ -26,6 +26,118 @@ async function loadCsvData(filePath: string): Promise<CsvRow[]> {
   });
 }
 
+const postingCsvStr = (v?: string) => (v != null && String(v).trim() !== '' ? String(v).trim() : '');
+const postingCsvOpt = (v?: string) => {
+  const s = postingCsvStr(v);
+  return s === '' ? undefined : s;
+};
+const postingCsvDate = (v?: string): Date | undefined => {
+  const s = postingCsvStr(v);
+  if (!s) return undefined;
+  const d = new Date(s.includes('T') ? s : `${s}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+};
+
+/** Map a posting.csv row (full schema) to Prisma create/update fields. */
+function postingCsvRowToPrismaData(row: CsvRow, defaultOrgId: string): Record<string, unknown> {
+  const valueDate = postingCsvDate(row.value_date) ?? postingCsvDate(row.posting_date);
+  const postingDate = postingCsvDate(row.posting_date) ?? valueDate;
+  if (!valueDate || !postingDate) {
+    throw new Error(`Posting ${row.id}: missing value_date/posting_date`);
+  }
+
+  const data: Record<string, unknown> = {
+    value_date: valueDate,
+    posting_date: postingDate,
+    amount: parseFloat(row.amount),
+    org_id: postingCsvStr(row.org_id) || defaultOrgId,
+    name: postingCsvOpt(row.name) ?? (postingCsvStr(row.description).slice(0, 50) || undefined),
+    account_id: postingCsvOpt(row.account_id) ?? null,
+    credit_account_id: postingCsvOpt(row.credit_account_id) ?? null,
+    description: postingCsvOpt(row.description),
+    posting_type: postingCsvOpt(row.posting_type),
+    status: postingCsvOpt(row.status),
+    notes: postingCsvOpt(row.notes),
+    legal_entity_id: postingCsvOpt(row.legal_entity_id),
+    created_by: postingCsvOpt(row.created_by),
+    modified_by: postingCsvOpt(row.modified_by),
+    assigned_to: postingCsvOpt(row.assigned_to),
+    account_name: postingCsvOpt(row.account_name),
+    category_name: postingCsvOpt(row.category_name),
+    invoice_id: postingCsvOpt(row.invoice_id),
+    reversal_of_posting_id: postingCsvOpt(row.reversal_of_posting_id),
+    trade_id: postingCsvOpt(row.trade_id),
+    holding_id: postingCsvOpt(row.holding_id),
+    reconciliation_status: postingCsvOpt(row.reconciliation_status),
+    matched_reference: postingCsvOpt(row.matched_reference),
+    payment_receipt_id: postingCsvOpt(row.payment_receipt_id),
+  };
+
+  const incomeType = postingCsvOpt(row.income_type);
+  const incomeSource = postingCsvOpt(row.income_source);
+  if (incomeType) data.income_type = incomeType;
+  if (incomeSource) data.income_source = incomeSource;
+
+  const aiScore = postingCsvOpt(row.ai_cat_score);
+  if (aiScore) data.ai_cat_score = parseFloat(aiScore);
+
+  const aiCatAt = postingCsvDate(row.ai_categorized_at);
+  if (aiCatAt) data.ai_categorized_at = aiCatAt;
+
+  const reversedAt = postingCsvDate(row.reversed_at);
+  if (reversedAt) data.reversed_at = reversedAt;
+
+  return data;
+}
+
+const POSTING_CSV_FILES = [
+  'posting-demo-india.csv',
+  'posting-demo-usa.csv',
+  'posting-demo-mumbai.csv',
+  'posting-demo-bangalore.csv',
+];
+
+async function upsertPostingsFromCsvFile(csvFileName: string, demoOrgId: string): Promise<number> {
+  const filePath = path.join(__dirname, csvFileName);
+  if (!fs.existsSync(filePath)) {
+    console.warn(`  ⚠ Skipping ${csvFileName} (file not found)`);
+    return 0;
+  }
+  const postingData = await loadCsvData(filePath);
+  for (const row of postingData) {
+    const payload = postingCsvRowToPrismaData(row, demoOrgId);
+    await prisma.posting.upsert({
+      where: { id: row.id },
+      update: payload as any,
+      create: { id: row.id, ...payload } as any,
+    });
+  }
+  return postingData.length;
+}
+
+async function upsertAllPostingsFromCsv(demoOrgId: string): Promise<number> {
+  let total = 0;
+  for (const file of POSTING_CSV_FILES) {
+    const count = await upsertPostingsFromCsvFile(file, demoOrgId);
+    if (count > 0) {
+      console.log(`  ✓ Loaded ${count} postings from ${file}`);
+    }
+    total += count;
+  }
+  return total;
+}
+
+async function loadPostingIdsFromCsv(): Promise<string[]> {
+  const ids: string[] = [];
+  for (const file of POSTING_CSV_FILES) {
+    const filePath = path.join(__dirname, file);
+    if (!fs.existsSync(filePath)) continue;
+    const rows = await loadCsvData(filePath);
+    ids.push(...rows.map((r) => r.id).filter((id) => id && String(id).trim() !== ''));
+  }
+  return ids;
+}
+
 async function setupIndianDemoData() {
   console.log('🇮🇳 Setting up Indian Demo Data...');
   console.log('');
@@ -92,6 +204,7 @@ async function setupIndianDemoData() {
         is_it_a_groupcompany: org.is_it_a_groupcompany,
         group_company_name: org.group_company_name,
         org_id: org.org_id,
+        financial_year_type: org.financial_year_type,
       };
 
       const createData: any = {
@@ -108,6 +221,7 @@ async function setupIndianDemoData() {
         is_it_a_groupcompany: org.is_it_a_groupcompany,
         group_company_name: org.group_company_name,
         org_id: org.org_id,
+        financial_year_type: org.financial_year_type,
       };
 
       // Only set basecurrency_id when present (must reference existing currency.id)
@@ -125,11 +239,15 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Loaded ${organizationData.length} business organizations`);
 
-    // ===== 2.5. SETUP CHART OF ACCOUNTS FOR EACH ORGANIZATION (Indian template) =====
+    // ===== 2.5. SETUP CHART OF ACCOUNTS FOR EACH ORGANIZATION =====
     console.log('💰 Setting up chart of accounts for organizations...');
-    const coaTemplatePath = path.join(__dirname, 'chart-of-accounts.json');
+    const coaTemplateIn = path.join(__dirname, 'chart-of-accounts.json');
+    const coaTemplateUs = path.join(__dirname, '..', 'setup-US_CA', 'chart-of-accounts.json');
     for (const org of organizationData) {
-      await setupChartOfAccounts('org_indian_demo', org.id, coaTemplatePath, 'INR');
+      const isUsd = org.basecurrency_id?.trim() === 'curr_usd';
+      const currency = isUsd ? 'USD' : 'INR';
+      const templatePath = isUsd ? coaTemplateUs : coaTemplateIn;
+      await setupChartOfAccounts('org_indian_demo', org.id, templatePath, currency);
     }
     console.log(`  ✓ Set up chart of accounts for ${organizationData.length} organizations`);
 
@@ -1407,38 +1525,9 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Loaded ${paymentReceiptData.length} payment receipts`);
 
-    console.log('🏦 Loading bank postings from CSV...');
-    const postingData = await loadCsvData(path.join(__dirname, 'posting.csv'));
-    for (const row of postingData) {
-      const daysOffset = parseInt(row.days_offset, 10) || 0;
-      const valueDate = new Date(baseDate);
-      valueDate.setDate(valueDate.getDate() + daysOffset);
-      const isCredit = row.is_credit === 'true' || row.is_credit === '1';
-      const updateData: any = {
-        value_date: valueDate,
-        posting_date: valueDate,
-        amount: parseFloat(row.amount),
-        description: row.description,
-        org_id: row.org_id || demoOrgId,
-        name: (row.description || '').slice(0, 50),
-        account_id: isCredit ? bankAccount.id : null,
-        credit_account_id: isCredit ? null : bankAccount.id,
-      };
-      if (row.payment_receipt_id && String(row.payment_receipt_id).trim() !== '') {
-        updateData.payment_receipt_id = row.payment_receipt_id;
-        updateData.reconciliation_status = row.reconciliation_status || 'MATCHED';
-        updateData.matched_reference = row.matched_reference || null;
-      }
-      await prisma.posting.upsert({
-        where: { id: row.id },
-        update: updateData,
-        create: {
-          id: row.id,
-          ...updateData,
-        },
-      });
-    }
-    console.log(`  ✓ Loaded ${postingData.length} bank postings`);
+    console.log('📒 Loading journal postings from CSV (India + USA)...');
+    const postingCount = await upsertAllPostingsFromCsv(demoOrgId);
+    console.log(`  ✓ Loaded ${postingCount} journal postings total (double-entry)`);
 
     // ===== 10. SUMMARY =====
     console.log('');
@@ -1464,7 +1553,7 @@ async function setupIndianDemoData() {
     console.log(`   📋 Payment terms: ${paymentTermsLoadedCount}`);
     console.log(`   📄 Sales invoices: ${invoiceData.length}, Invoice line items: ${invoiceLineItemData.length}`);
     console.log(`   💳 Payment receipts: ${paymentReceiptData.length}`);
-    console.log(`   🏦 Bank postings: ${postingData.length}`);
+    console.log(`   📒 Journal postings: ${postingCount}`);
     console.log(
       `   🧾 Sales pipeline: SO ${indianDemoSeedRowCounts.salesOrders} (+${indianDemoSeedRowCounts.salesOrderItems} lines), quotes ${indianDemoSeedRowCounts.quotes} (+${indianDemoSeedRowCounts.quoteItems} lines), DC ${indianDemoSeedRowCounts.deliveryChallans} (+${indianDemoSeedRowCounts.deliveryChallanItems} lines), credit notes ${indianDemoSeedRowCounts.creditNotes} (+${indianDemoSeedRowCounts.creditNoteItems} lines)`
     );
@@ -1490,15 +1579,6 @@ async function setupIndianDemoData() {
   }
 }
 
-/** Demo posting IDs created by setup (reconciliation demo). */
-const DEMO_POSTING_IDS = [
-  'post_demo_01', 'post_demo_02', 'post_demo_03', 'post_demo_04', 'post_demo_05',
-  'post_demo_06', 'post_demo_07', 'post_demo_08', 'post_demo_09', 'post_demo_10',
-  'post_demo_11', 'post_demo_12', 'post_demo_13', 'post_demo_14', 'post_demo_15',
-  'post_demo_16', 'post_demo_17', 'post_demo_18', 'post_demo_19', 'post_demo_20',
-  'post_demo_21', 'post_demo_22', 'post_demo_23', 'post_demo_24',
-];
-
 /** Payment receipt IDs seeded by setup (keep these; only delete receipts created by confirming). */
 const SEED_RECEIPT_IDS = [
   'payr_demo_001',
@@ -1510,56 +1590,19 @@ const SEED_RECEIPT_IDS = [
   'payr_demo_007',
 ];
 
-type PostingRow = { id: string; isCredit: boolean; amount: number; description: string; daysOffset: number };
-
-const DEMO_POSTING_ROWS: PostingRow[] = [
-  { id: 'post_demo_01', isCredit: true, amount: 100000, description: 'DEMO: ACH CREDIT - Payment from Tata Consultancy INV-001', daysOffset: -45 },
-  { id: 'post_demo_02', isCredit: true, amount: 40000, description: 'DEMO: NEFT - Infosys partial payment INV-002', daysOffset: -40 },
-  { id: 'post_demo_03', isCredit: true, amount: 120000, description: 'DEMO: RTGS - Reliance Industries INV-004', daysOffset: -35 },
-  { id: 'post_demo_04', isCredit: true, amount: 30000, description: 'DEMO: IMPS - HDFC partial INV-005', daysOffset: -30 },
-  { id: 'post_demo_05', isCredit: true, amount: 90000, description: 'DEMO: NEFT - Wipro payment INV-008', daysOffset: -20 },
-  { id: 'post_demo_06', isCredit: true, amount: 15000, description: 'DEMO: Unidentified credit - to be matched', daysOffset: -18 },
-  { id: 'post_demo_07', isCredit: false, amount: 2500, description: 'DEMO: Bank charges', daysOffset: -15 },
-  { id: 'post_demo_08', isCredit: true, amount: 22000, description: 'DEMO: Unmatched deposit', daysOffset: -12 },
-  { id: 'post_demo_09', isCredit: false, amount: 50000, description: 'DEMO: CHECK 1001 - Vendor payment', daysOffset: -10 },
-  { id: 'post_demo_10', isCredit: true, amount: 25000, description: 'DEMO: Advance from Wipro - unapplied', daysOffset: -5 },
-  { id: 'post_demo_11', isCredit: false, amount: 12000, description: 'DEMO: UPI transfer out', daysOffset: -4 },
-  { id: 'post_demo_12', isCredit: true, amount: 18000, description: 'DEMO: Unmatched NEFT credit', daysOffset: -3 },
-  { id: 'post_demo_13', isCredit: false, amount: 3500, description: 'DEMO: Fee deduction', daysOffset: -2 },
-  { id: 'post_demo_14', isCredit: true, amount: 75000, description: 'DEMO: RTGS - Customer payment', daysOffset: -1 },
-  { id: 'post_demo_15', isCredit: false, amount: 20000, description: 'DEMO: NEFT debit', daysOffset: 0 },
-  { id: 'post_demo_16', isCredit: true, amount: 45000, description: 'DEMO: IMPS credit', daysOffset: 1 },
-  { id: 'post_demo_17', isCredit: false, amount: 8000, description: 'DEMO: Standing instruction', daysOffset: 2 },
-  { id: 'post_demo_18', isCredit: true, amount: 32000, description: 'DEMO: Unmatched deposit', daysOffset: 3 },
-  { id: 'post_demo_19', isCredit: false, amount: 1500, description: 'DEMO: SMS charges', daysOffset: 4 },
-  { id: 'post_demo_20', isCredit: true, amount: 60000, description: 'DEMO: ACH CREDIT - Customer', daysOffset: 5 },
-  { id: 'post_demo_21', isCredit: true, amount: 60000, description: 'DEMO: NEFT credit - INV-006 payment', daysOffset: 6 },
-  { id: 'post_demo_22', isCredit: true, amount: 50000, description: 'DEMO: RTGS from customer - INV-003', daysOffset: 7 },
-  { id: 'post_demo_23', isCredit: true, amount: 25000, description: 'DEMO: IMPS REC-DEMO-006 advance', daysOffset: 8 },
-  { id: 'post_demo_24', isCredit: true, amount: 45000, description: 'DEMO: ACH CREDIT - INV-007 payment', daysOffset: 9 },
-];
-
-const MATCHED_POSTINGS = [
-  { postingId: 'post_demo_01', receiptId: 'payr_demo_001', receiptNumber: 'REC-DEMO-001' },
-  { postingId: 'post_demo_02', receiptId: 'payr_demo_002', receiptNumber: 'REC-DEMO-002' },
-  { postingId: 'post_demo_03', receiptId: 'payr_demo_003', receiptNumber: 'REC-DEMO-003' },
-  { postingId: 'post_demo_04', receiptId: 'payr_demo_004', receiptNumber: 'REC-DEMO-004' },
-  { postingId: 'post_demo_05', receiptId: 'payr_demo_005', receiptNumber: 'REC-DEMO-005' },
-];
-
 /**
- * Drop only the demo postings (and any payment receipts created by confirming),
- * then recreate the demo postings and re-link the 5 to seeded receipts.
- * Use this to reset reconciliation demo without resetting the entire database.
+ * Drop postings listed in posting.csv (and any payment receipts created by confirming),
+ * then reload from posting.csv. Reconciliation links in the CSV are preserved on reload.
  */
 async function resetDemoPostingsAndReceipts() {
   const demoOrgId = 'org_indian_demo';
-  const demoLegalEntityId = 'org_indian_demo';
 
-  console.log('🔄 Resetting demo postings and receipts created by confirming...');
+  console.log('🔄 Resetting demo postings from posting.csv...');
+
+  const postingIds = await loadPostingIdsFromCsv();
 
   const existingPostings = await prisma.posting.findMany({
-    where: { id: { in: DEMO_POSTING_IDS }, org_id: demoOrgId },
+    where: { id: { in: postingIds }, org_id: demoOrgId },
     select: { id: true, payment_receipt_id: true },
   });
 
@@ -1572,108 +1615,59 @@ async function resetDemoPostingsAndReceipts() {
     console.log(`  ✓ Deleted ${receiptIdsToDelete.length} payment receipt(s) created by confirming`);
   }
 
-  await prisma.posting.updateMany({
-    where: { id: { in: DEMO_POSTING_IDS }, org_id: demoOrgId },
-    data: { payment_receipt_id: null, matched_reference: null, reconciliation_status: null },
-  });
-
   const deleted = await prisma.posting.deleteMany({
-    where: { id: { in: DEMO_POSTING_IDS }, org_id: demoOrgId },
+    where: { id: { in: postingIds }, org_id: demoOrgId },
   });
   console.log(`  ✓ Deleted ${deleted.count} demo postings`);
 
-  const bankAccount = await prisma.account.findFirst({
-    where: { org_id: demoOrgId, legal_entity_id: demoLegalEntityId, code: '1102' },
-  });
-  if (!bankAccount) {
-    throw new Error('Chart of accounts missing Checking (1102). Run full Indian demo setup first.');
-  }
-
-  const baseDate = new Date();
-  baseDate.setMonth(baseDate.getMonth() - 2);
-
-  for (const row of DEMO_POSTING_ROWS) {
-    const valueDate = new Date(baseDate);
-    valueDate.setDate(valueDate.getDate() + row.daysOffset);
-    await prisma.posting.create({
-      data: {
-        id: row.id,
-        value_date: valueDate,
-        posting_date: valueDate,
-        amount: row.amount,
-        description: row.description,
-        org_id: demoOrgId,
-        name: row.description.slice(0, 50),
-        account_id: row.isCredit ? bankAccount.id : undefined,
-        credit_account_id: row.isCredit ? undefined : bankAccount.id,
-      },
-    });
-  }
-  console.log(`  ✓ Created ${DEMO_POSTING_ROWS.length} demo postings`);
-
-  for (const { postingId, receiptId, receiptNumber } of MATCHED_POSTINGS) {
-    await prisma.posting.update({
-      where: { id: postingId },
-      data: {
-        reconciliation_status: 'MATCHED',
-        matched_reference: `payment_receipt:${receiptId}:${receiptNumber}`,
-        payment_receipt_id: receiptId,
-      },
-    });
-  }
-  console.log('  ✓ Linked 5 postings to payment receipts (MATCHED)');
+  const count = await upsertAllPostingsFromCsv(demoOrgId);
+  console.log(`  ✓ Reloaded ${count} journal postings from CSV`);
   console.log('✅ Demo postings reset complete.');
   await prisma.$disconnect();
 }
 
 /**
- * Drop ALL postings for the Indian demo org and re-create them from posting.csv.
- * Postings are created with only the bank-account side set — contra account is null,
- * so every posting is uncategorized and unreconciled. Use this before re-running
- * the categorise-expenses agent test.
+ * Drop ALL postings for the Indian demo org and re-create them from posting.csv
+ * (full double-entry journal entries as defined in the CSV).
  */
 async function resetAllPostingsFromCSV() {
   const demoOrgId = 'org_indian_demo';
-  const demoLegalEntityId = 'org_indian_demo';
 
   console.log('🔄 Dropping all postings and re-creating from CSV...');
 
   const deleted = await prisma.posting.deleteMany({ where: { org_id: demoOrgId } });
   console.log(`  ✓ Deleted ${deleted.count} postings`);
 
-  const bankAccount = await prisma.account.findFirst({
-    where: { org_id: demoOrgId, legal_entity_id: demoLegalEntityId, code: '1102' },
-  });
-  if (!bankAccount) {
-    throw new Error('Chart of accounts missing Checking (1102). Run full Indian demo setup first.');
-  }
-
-  const baseDate = new Date();
-  baseDate.setMonth(baseDate.getMonth() - 2);
-
-  const postingData = await loadCsvData(path.join(__dirname, 'posting.csv'));
-  for (const row of postingData) {
-    const daysOffset = parseInt(row.days_offset, 10) || 0;
-    const valueDate = new Date(baseDate);
-    valueDate.setDate(valueDate.getDate() + daysOffset);
-    const isCredit = row.is_credit === 'true' || row.is_credit === '1';
-    // Only set the bank side — leave contra account null (= uncategorized)
-    await prisma.posting.create({
-      data: {
-        id: row.id,
-        value_date: valueDate,
-        posting_date: valueDate,
-        amount: parseFloat(row.amount),
-        description: row.description,
-        org_id: row.org_id || demoOrgId,
-        name: (row.description || '').slice(0, 50),
-        account_id: isCredit ? bankAccount.id : null,
-        credit_account_id: isCredit ? null : bankAccount.id,
-      },
-    });
-  }
-  console.log(`  ✓ Created ${postingData.length} fresh uncategorized postings`);
+  const count = await upsertAllPostingsFromCsv(demoOrgId);
+  console.log(`  ✓ Created ${count} journal postings from CSV`);
   console.log('✅ Posting reset complete.');
+  await prisma.$disconnect();
+}
+
+const US_LEGAL_ENTITY_ID = 'org_us_office';
+const INDIAN_DEMO_ORG_ID = 'org_indian_demo';
+
+/**
+ * Create chart of accounts for Demo Tech Solutions USA Inc (org_us_office).
+ * Safe to re-run — uses deterministic account IDs (upsert).
+ */
+async function setupUsOfficeChartOfAccounts() {
+  const entity = await prisma.entity.findUnique({ where: { id: US_LEGAL_ENTITY_ID } });
+  if (!entity) {
+    throw new Error(
+      `Legal entity ${US_LEGAL_ENTITY_ID} not found. Run full Indian demo setup first (organization.csv).`
+    );
+  }
+
+  console.log('🇺🇸 Setting up Chart of Accounts for Demo Tech Solutions USA Inc...');
+  const coaTemplateUs = path.join(__dirname, '..', 'setup-US_CA', 'chart-of-accounts.json');
+  const result = await setupChartOfAccounts(
+    INDIAN_DEMO_ORG_ID,
+    US_LEGAL_ENTITY_ID,
+    coaTemplateUs,
+    'USD'
+  );
+  console.log(`  ✓ USA COA ready: ${result.accounts.size} accounts (created: ${result.created}, existing: ${result.existing})`);
   await prisma.$disconnect();
 }
 
@@ -1681,14 +1675,23 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const resetOnly = args.includes('--reset-postings');
   const resetFull = args.includes('--reset-postings-full');
+  const setupUsCoa = args.includes('--setup-us-coa');
 
   const run = resetFull
     ? resetAllPostingsFromCSV()
     : resetOnly
       ? resetDemoPostingsAndReceipts()
-      : setupIndianDemoData();
+      : setupUsCoa
+        ? setupUsOfficeChartOfAccounts()
+        : setupIndianDemoData();
 
-  const label = resetFull ? 'Posting full reset' : resetOnly ? 'Demo postings reset' : 'Indian demo data setup';
+  const label = resetFull
+    ? 'Posting full reset'
+    : resetOnly
+      ? 'Demo postings reset'
+      : setupUsCoa
+        ? 'USA chart of accounts setup'
+        : 'Indian demo data setup';
 
   run
     .then(() => {
@@ -1701,4 +1704,9 @@ if (require.main === module) {
     });
 }
 
-export { setupIndianDemoData, resetDemoPostingsAndReceipts, resetAllPostingsFromCSV };
+export {
+  setupIndianDemoData,
+  setupUsOfficeChartOfAccounts,
+  resetDemoPostingsAndReceipts,
+  resetAllPostingsFromCSV,
+};
