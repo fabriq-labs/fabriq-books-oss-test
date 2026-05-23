@@ -30,6 +30,7 @@ import {
 } from './services/PendingActionService';
 import { getSessionTrace } from './services/SessionTraceService';
 import { sessionEventBus } from './services/SessionEventBus';
+import { formatAgentHttpError } from './utils/streamErrorMessage';
 // Removing ai/express import since it appears to be causing issues
 // import { createStreamDataHandler } from 'ai/express';
 
@@ -121,10 +122,7 @@ export function createAgentRouter() {
       });
     } catch (error: any) {
       logger.error('Error in chat request:', error);
-      res.status(500).json({
-        error: error.message || 'Failed to process chat request',
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      res.status(500).json(formatAgentHttpError(error));
     }
   });
 
@@ -229,15 +227,14 @@ export function createAgentRouter() {
         } catch { /* best-effort */ }
       }
 
+      const httpError = formatAgentHttpError(error);
+
       // If headers haven't been sent yet, send error as JSON
       if (!res.headersSent) {
-        res.status(500).json({
-          error: error.message || 'Failed to process streaming chat request',
-          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        res.status(500).json(httpError);
       } else {
         // If headers were sent, send error as SSE
-        res.write(`data: ${JSON.stringify({ error: error.message || 'Failed to process streaming chat request' })}\n\n`);
+        res.write(`data: ${JSON.stringify(httpError)}\n\n`);
         res.end();
       }
     }

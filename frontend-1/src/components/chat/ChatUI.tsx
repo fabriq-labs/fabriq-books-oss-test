@@ -101,9 +101,25 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
 
             return preparedBody;
         },
-        onResponse: (response) => {
+        onResponse: async (response) => {
             if (!response.ok) {
-                throw new Error('Failed to send message');
+                let detail = `Chat request failed (${response.status})`;
+                try {
+                    const body = await response.clone().json() as {
+                        error?: string;
+                        message?: string;
+                        stack?: string;
+                    };
+                    if (body?.error) {
+                        detail = body.stack ? `${body.error}\n\n${body.stack}` : body.error;
+                    } else if (body?.message) detail = body.message;
+                } catch {
+                    try {
+                        const text = await response.clone().text();
+                        if (text) detail = text.slice(0, 500);
+                    } catch { /* ignore */ }
+                }
+                throw new Error(detail);
             }
         },
         onFinish: (message) => {
@@ -124,7 +140,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
             });
         },
         onError: (error) => {
+            // Stream errors arrive as useChat error state; message comes from backend getErrorMessage
             console.error('Chat error:', error);
+            if (error instanceof Error && error.cause) {
+                console.error('Chat error cause:', error.cause);
+            }
         }
     });
 

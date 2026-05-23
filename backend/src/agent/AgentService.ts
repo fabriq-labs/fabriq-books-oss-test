@@ -20,6 +20,7 @@ import {
 import { buildSessionContextBlock, shouldAutoContinue } from './prompt/constants';
 import { sessionEventBus } from './services/SessionEventBus';
 import { sessionTimeoutService } from './services/SessionTimeoutService';
+import { getAgentStreamErrorMessage } from './utils/streamErrorMessage';
 import prisma from '../lib/prisma';
 
 // Default max steps for the agent loop
@@ -719,6 +720,15 @@ export class AgentService {
         tools,
         maxSteps,  // Configurable via AGENT_MAX_STEPS env
 
+        onError: ({ error }) => {
+          logger.error('streamText error during agent chat', {
+            error: getAgentStreamErrorMessage(error),
+            userId: auth.user?.id,
+            sessionId,
+            modelName: context?.modelName,
+          });
+        },
+
         onStepFinish: async ({ text, toolCalls }) => {
           if (!sessionId) return;
           try {
@@ -835,8 +845,10 @@ export class AgentService {
         },
       });
 
-      // Get the stream response
-      const streamResponse = result.toDataStreamResponse();
+      // Forward LLM/provider errors to the client (default SDK masking → "An error occurred.")
+      const streamResponse = result.toDataStreamResponse({
+        getErrorMessage: getAgentStreamErrorMessage,
+      });
       if (!streamResponse.body) {
         throw new Error('Failed to get stream response body');
       }
