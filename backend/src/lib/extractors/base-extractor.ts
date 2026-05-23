@@ -1,5 +1,6 @@
 import { DocumentExtractor, DocumentExtractionRequest, DocumentExtractionResult, ExtractionContext } from './types';
 import { LLMService } from '../llm';
+import { getModelId } from '../ai/modelProvider';
 import logger from '../../utils/logger';
 import { aiActivityLogger } from '../../agent/utils/aiActivityLogger';
 import { llmTraceLogger } from '../llm-trace-logger';
@@ -123,7 +124,7 @@ export abstract class BaseDocumentExtractor implements DocumentExtractor {
     const basePrompt = this.getExtractionPrompt();
     const baseSchema = this.getExpectedSchema();
     const targetModel = this.getTargetModel();
-    const llmModel = process.env.LLM_MODEL || (Buffer.isBuffer(documentContent) ? 'gemini-2.5-flash' : 'gemini-2.0-flash-001');
+    const llmModel = getModelId('extraction');
 
     // Allow subclasses to augment with additional context
     const prompt = this.augmentPromptWithContext(basePrompt, options);
@@ -174,7 +175,6 @@ ${documentContent}`;
         const result = await this.llmService.generateContentWithUsage({
           systemInstruction,
           userData,
-          model: 'gemini-2.0-flash-001'
         });
         response = result.text;
         promptTokens = result.usage?.promptTokens;

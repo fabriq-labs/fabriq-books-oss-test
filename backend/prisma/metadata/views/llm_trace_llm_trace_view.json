@@ -5,41 +5,40 @@
   "description": "LLM Trace",
   "data_graph": {
     "id": {
-      "datatype": "string",
+      "dataType": "string",
       "required": false,
       "permission": "read",
       "displayName": "Id",
       "isColumnShow": false
     },
-    "question": {
-      "orderNo": 1,
-      "datatype": "string",
-      "required": false,
-      "permission": "read",
-      "tableProps": {
-        "width": "350",
-        "columnType": "text",
-        "defaultValue": ""
+    "steps": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "status": "read",
+        "tool_calls": "read",
+        "duration_ms": "read",
+        "sql_queries": "read",
+        "step_number": "read",
+        "tool_results": "read",
+        "error_message": "read",
+        "prompt_tokens": "read",
+        "response_text": "read",
+        "completion_tokens": "read"
       },
-      "displayName": "Question",
-      "isColumnShow": true
+      "dataType": "table",
+      "displayName": "Steps"
     },
-    "query_type": {
-      "orderNo": 2,
-      "datatype": "string",
+    "org_id": {
+      "dataType": "string",
       "required": false,
       "permission": "read",
-      "tableProps": {
-        "width": "130",
-        "columnType": "text",
-        "defaultValue": ""
-      },
-      "displayName": "Query Type",
-      "isColumnShow": true
+      "displayName": "Org",
+      "isColumnShow": false
     },
     "status": {
       "orderNo": 3,
-      "datatype": "string",
+      "dataType": "string",
       "required": false,
       "permission": "read",
       "tableProps": {
@@ -50,9 +49,48 @@
       "displayName": "Status",
       "isColumnShow": true
     },
+    "user_id": {
+      "orderNo": 12,
+      "dataType": "string",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "150",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "User",
+      "isColumnShow": false
+    },
+    "feedback": {
+      "orderNo": 9,
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Feedback",
+      "isColumnShow": false
+    },
+    "question": {
+      "orderNo": 1,
+      "dataType": "string",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "350",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Question",
+      "isColumnShow": true
+    },
     "llm_model": {
       "orderNo": 4,
-      "datatype": "string",
+      "dataType": "string",
       "required": false,
       "permission": "read",
       "tableProps": {
@@ -63,74 +101,16 @@
       "displayName": "LLM Model",
       "isColumnShow": true
     },
-    "duration_ms": {
-      "orderNo": 5,
-      "datatype": "number",
+    "record_id": {
+      "dataType": "string",
       "required": false,
       "permission": "read",
-      "tableProps": {
-        "width": "120",
-        "columnType": "number",
-        "defaultValue": ""
-      },
-      "displayName": "Duration (ms)",
-      "isColumnShow": true
-    },
-    "total_tokens": {
-      "orderNo": 6,
-      "datatype": "number",
-      "required": false,
-      "permission": "read",
-      "tableProps": {
-        "width": "120",
-        "columnType": "number",
-        "defaultValue": ""
-      },
-      "displayName": "Total Tokens",
-      "isColumnShow": true
-    },
-    "steps_count": {
-      "orderNo": 7,
-      "datatype": "number",
-      "required": false,
-      "permission": "read",
-      "tableProps": {
-        "width": "100",
-        "columnType": "number",
-        "defaultValue": ""
-      },
-      "displayName": "Steps",
-      "isColumnShow": true
-    },
-    "tools_called": {
-      "orderNo": 8,
-      "datatype": "string",
-      "required": false,
-      "permission": "read",
-      "tableProps": {
-        "width": "200",
-        "columnType": "text",
-        "defaultValue": ""
-      },
-      "displayName": "Tools Called",
-      "isColumnShow": true
-    },
-    "feedback": {
-      "orderNo": 9,
-      "datatype": "string",
-      "required": false,
-      "permission": "update",
-      "tableProps": {
-        "width": "200",
-        "columnType": "text",
-        "defaultValue": ""
-      },
-      "displayName": "Feedback",
-      "isColumnShow": true
+      "displayName": "Record ID",
+      "isColumnShow": false
     },
     "created_at": {
       "orderNo": 10,
-      "datatype": "date",
+      "dataType": "datetime",
       "required": false,
       "permission": "read",
       "tableProps": {
@@ -139,11 +119,11 @@
         "defaultValue": ""
       },
       "displayName": "Created At",
-      "isColumnShow": true
+      "isColumnShow": false
     },
     "model_name": {
       "orderNo": 11,
-      "datatype": "string",
+      "dataType": "string",
       "required": false,
       "permission": "read",
       "tableProps": {
@@ -154,85 +134,105 @@
       "displayName": "Model",
       "isColumnShow": true
     },
-    "user_id": {
-      "orderNo": 12,
-      "datatype": "string",
+    "query_type": {
+      "orderNo": 2,
+      "dataType": "string",
       "required": false,
       "permission": "read",
       "tableProps": {
-        "width": "150",
+        "width": "130",
         "columnType": "text",
         "defaultValue": ""
       },
-      "displayName": "User",
-      "isColumnShow": true
+      "displayName": "Query Type",
+      "isColumnShow": false
     },
-    "response_text": {
-      "datatype": "string",
+    "session_id": {
+      "dataType": "string",
       "required": false,
       "permission": "read",
-      "displayName": "Response",
+      "displayName": "Session",
+      "isColumnShow": false
+    },
+    "duration_ms": {
+      "orderNo": 5,
+      "dataType": "int",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "120",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Duration (ms)",
+      "isColumnShow": true
+    },
+    "steps_count": {
+      "orderNo": 7,
+      "dataType": "int",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "100",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Steps",
+      "isColumnShow": false
+    },
+    "tools_called": {
+      "orderNo": 8,
+      "dataType": "string",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Tools Called",
+      "isColumnShow": true
+    },
+    "total_tokens": {
+      "orderNo": 6,
+      "dataType": "int",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "120",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Total Tokens",
       "isColumnShow": false
     },
     "error_message": {
-      "datatype": "string",
+      "dataType": "string",
       "required": false,
       "permission": "read",
       "displayName": "Error Message",
       "isColumnShow": false
     },
     "prompt_tokens": {
-      "datatype": "number",
+      "dataType": "int",
       "required": false,
       "permission": "read",
-      "displayName": "Prompt Tokens",
+      "displayName": "Input Tokens",
+      "isColumnShow": true
+    },
+    "response_text": {
+      "dataType": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Response",
       "isColumnShow": false
     },
     "completion_tokens": {
-      "datatype": "number",
+      "dataType": "int",
       "required": false,
       "permission": "read",
-      "displayName": "Completion Tokens",
-      "isColumnShow": false
-    },
-    "session_id": {
-      "datatype": "string",
-      "required": false,
-      "permission": "read",
-      "displayName": "Session",
-      "isColumnShow": false
-    },
-    "record_id": {
-      "datatype": "string",
-      "required": false,
-      "permission": "read",
-      "displayName": "Record ID",
-      "isColumnShow": false
-    },
-    "org_id": {
-      "datatype": "string",
-      "required": false,
-      "permission": "read",
-      "displayName": "Org",
-      "isColumnShow": false
-    },
-    "steps": {
-      "type": "table",
-      "select": {
-        "id": "read",
-        "step_number": "read",
-        "prompt_tokens": "read",
-        "completion_tokens": "read",
-        "duration_ms": "read",
-        "tool_calls": "read",
-        "tool_results": "read",
-        "sql_queries": "read",
-        "response_text": "read",
-        "status": "read",
-        "error_message": "read"
-      },
-      "dataType": "table",
-      "displayName": "Steps"
+      "displayName": "Output Tokens",
+      "isColumnShow": true
     }
   },
   "org_id": "1",
