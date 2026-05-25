@@ -101,6 +101,13 @@ export const getContextSuggestions = (context: PageContext | null): string[] => 
             'Explain the latest transaction'
         ];
     }
+    if (context && context.modelName === 'posting') {
+        return [
+            'Create a posting to record a transaction',
+            'How much did I spend on office supplies last month?',
+            'List recent postings'
+        ];
+    }
     if (context && context.modelName === 'account' && context.recordId) {
         return [
             'What is the current balance for this account?',

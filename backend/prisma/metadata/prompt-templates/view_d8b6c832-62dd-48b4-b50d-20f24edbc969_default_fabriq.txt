@@ -1,22 +1,65 @@
 ## POSTING SCHEMA REFERENCE
 
 Tables and key columns:
-- **posting**: id, org_id, amount, posting_date, value_date, description, notes, account_id (debit side), credit_account_id (credit side), reconciliation_status
-- **account**: id, org_id, name, code, type (text array — e.g. `'{BANK,CHECKING}'`), classification (Assets / Liabilities / Equity / Income / Expense)
+- **posting**: id, org_id, amount, posting_date, value_date, description, notes, account_id, credit_account_id, reconciliation_status
+- **account**: id, org_id, name, code, classification (Assets / Liabilities / Equity / Income / Expense)
 
-Schema rules:
-- Always filter by `org_id` on every query (posting.org_id, account.org_id)
-- `account.type` is a **text array** — never use `=` or `ILIKE` on it; use containment: `account.type @> ARRAY['BANK']::text[]`
-- The counter/contra account is the non-bank side of a double-entry posting
+### UI labels ↔ createRecord `data` fields
 
-{{#if context.modelContext.selectedAccountId}}
-Selected account: **{{context.modelContext.selectedAccountName}}** (id: `{{context.modelContext.selectedAccountId}}`)
-{{/if}}
-{{#if context.recordId}}
-Current record id: `{{context.recordId}}`
+| UI label | createRecord `data` field |
+|----------|---------------------------|
+| Debit Account | **account_id** (name or `acco_…` id) |
+| Credit Account | **credit_account_id** (name or `acco_…` id) |
+| Description | **description** |
+| Amount | **amount** |
+| Posting Date | **posting_date** (DD-MM-YYYY, e.g. 01-01-2026) |
+| Value Date | **value_date** (DD-MM-YYYY) |
+
+{{#if context.modelContext.legalEntityId}}
+Legal entity (app header): **{{context.modelContext.legalEntityName}}** (`{{context.modelContext.legalEntityId}}`)
 {{/if}}
 
 Available models:
 {{accessibleModels}}
 
 Current date: {{currentDate}}
+
+---
+
+## CREATE POSTING — use **createRecord** only (like purchase requisition)
+
+When the user wants to create a posting, call **createRecord** with `modelName: "posting"`. No other create tool exists for posting.
+
+### DIRECT CREATION (same pattern as PR)
+
+- All six fields in one message → call **createRecord** immediately.
+- Do not use **searchRecords** to create — only to list/lookup.
+- Dates: **DD-MM-YYYY** when asking or in `data`.
+
+Numbered list: **1** Debit → `account_id`, **2** Credit → `credit_account_id`, **3** description, **4** amount, **5** posting_date, **6** value_date.
+
+### createRecord example
+
+```json
+{
+  "modelName": "posting",
+  "data": {
+    "account_id": "Miscellaneous",
+    "credit_account_id": "Office Supplies",
+    "description": "Test Chat ai",
+    "amount": 100,
+    "posting_date": "01-01-2026",
+    "value_date": "01-01-2026"
+  }
+}
+```
+
+### If fields are missing
+
+Ask once for the six fields (dates as DD-MM-YYYY), then **createRecord**.
+
+### Restrictions
+
+- NEVER create a posting with searchRecords only
+- NEVER skip **createRecord** when all fields are provided
+- Analytics/reports: use **analyticsQuery**, not createRecord

@@ -23,6 +23,7 @@ import {
     type MessagePart
 } from './chatUtils';
 import { useUserData } from '@/hooks/useUserData';
+import { useEntity } from '@/contexts/EntityContext';
 import Cookies from 'js-cookie';
 
 interface ChatMessage {
@@ -46,6 +47,24 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
     const { addToolData } = useTool();
     const { pageContext, messagesAi, setMessagesAi, clearMessages } = useChatContext();
     const { getBaseCurrencyCode } = useUserData();
+    const { currentEntityId, currentEntity } = useEntity();
+
+    const chatContext = useMemo(() => {
+        if (!pageContext) return undefined;
+        if (pageContext.modelName !== 'posting') return pageContext;
+        return {
+            ...pageContext,
+            modelContext: {
+                ...pageContext.modelContext,
+                legalEntityId:
+                    pageContext.modelContext?.legalEntityId ?? currentEntityId ?? null,
+                legalEntityName:
+                    pageContext.modelContext?.legalEntityName ??
+                    currentEntity?.legal_name ??
+                    null,
+            },
+        };
+    }, [pageContext, currentEntityId, currentEntity?.legal_name]);
     const token = Cookies.get("__session");
 
     const chatCurrencyCode = useMemo(
@@ -73,7 +92,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         },
         body: {
             stream: true,
-            context: pageContext || undefined
+            context: chatContext || undefined
         },
         experimental_prepareRequestBody: ({ id, messages, requestBody }) => {
             const transformedMessages = messages.map(message => {
@@ -87,16 +106,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
                 id: string;
                 stream: boolean;
                 messages: typeof transformedMessages;
-                context?: typeof pageContext;
+                context?: typeof chatContext;
             } = {
                 id,
                 stream: true,
                 messages: transformedMessages
             };
 
-            // Explicitly include context if pageContext exists
-            if (pageContext) {
-                preparedBody.context = pageContext;
+            if (chatContext) {
+                preparedBody.context = chatContext;
             }
 
             return preparedBody;

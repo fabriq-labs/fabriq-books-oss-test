@@ -25,6 +25,7 @@ import prisma from '../lib/prisma';
 import { ERPConnector } from '../lib/integrations/connectors/types';
 import { getHandler, getAllMethodNames } from './handlers/erp/registry';
 import { matchExtractedLineItemsToPO } from './invoiceMatching';
+import { preparePostingCreatePayload } from './postingCreateHelpers';
 
 const modelService = ModelService.getInstance();
 
@@ -66,10 +67,24 @@ function enrichRecordResult(result: any, modelName: string, tool: 'createRecord'
   };
 }
 
-export function createRecordTool(auth: AuthContext, toolContext?: { modelName?: string }) {
+const POSTING_CREATE_RECORD_DESCRIPTION =
+  'Create a new posting. Use modelName "posting" (defaults from page context). ' +
+  'In data: account_id = debit account name or id, credit_account_id = credit account name or id, ' +
+  'description, amount, posting_date and value_date as DD-MM-YYYY (e.g. 01-01-2026). ' +
+  'Same as createRecord for purchase_requisition — saves via DataAccessLayer.create. Do not use searchRecords to create.';
+
+export function createRecordTool(
+  auth: AuthContext,
+  toolContext?: { modelName?: string; modelContext?: Record<string, any> }
+) {
+  const description =
+    toolContext?.modelName === 'posting'
+      ? POSTING_CREATE_RECORD_DESCRIPTION
+      : getDescription('createRecord');
+
   return tool({
     parameters: getCreateRecordSchema(toolContext),
-    description: getDescription('createRecord'),
+    description,
     execute: async (
       { modelName, data }: { modelName: string; data?: any },
       _options
@@ -95,6 +110,10 @@ export function createRecordTool(auth: AuthContext, toolContext?: { modelName?: 
             userId: auth.user?.id
           });
         }
+      }
+
+      if (finalModelName === 'posting') {
+        await preparePostingCreatePayload(auth, data, toolContext);
       }
 
       const result = await modelService.create(finalModelName, auth, data);

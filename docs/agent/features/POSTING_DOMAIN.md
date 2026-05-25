@@ -160,12 +160,27 @@ AND p.value_date >= '2025-01-01' AND p.value_date < '2026-01-01';
 
 ---
 
+## Creating Postings via Chat
+
+Conversational chat on posting pages uses **`createRecord`** (same tool as purchase requisition creation), not the workbench `create_posting` pending-action flow.
+
+**Minimum fields**: `description`, `amount`, `posting_date` (required — agent must ask if omitted), plus both sides of the entry (`account_id`, `credit_account_id`) resolved via `searchRecords` on `account`.
+
+**Expense paid from bank** (e.g. office supplies paid from ICICI): debit expense account, credit bank account.
+
+Prompt text: `backend/prisma/metadata/prompt-templates/view_d8b6c832-62dd-48b4-b50d-20f24edbc969_default_fabriq.txt`. After editing, sync: `cd backend && npx ts-node prisma/sync-prompt-templates.ts`.
+
+Harness: `npm run test:posting-prompt` (includes create-posting cases) or single question:
+`npm run test:posting-prompt -- -q "Create a posting to record office stationary purchase which was paid from icici account"`.
+
+---
+
 ## Prompt Template Setup
 
 For posting-specific prompts:
 
 1. **View**: `view.model_name = 'posting'`, `view.name = 'posting_view'`
-2. **Default prompt** (`prompt_type = 'default'`): explains double-entry, contra-account-as-category, tool usage
+2. **Default prompt** (`prompt_type = 'default'`): explains double-entry, contra-account-as-category, createRecord workflow, tool usage
 3. **Analytics prompt** (`prompt_type = 'analytics'`): SQL patterns, table names, which fields to use
 
 See [PROMPT_SYSTEM.md](../PROMPT_SYSTEM.md) for how prompts are loaded.

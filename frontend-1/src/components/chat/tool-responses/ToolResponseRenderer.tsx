@@ -40,7 +40,7 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
         }
 
         const createRecordTool = toolInvocations.find(
-            tool => tool.toolName === 'createRecord' &&
+            tool => (tool.toolName === 'createRecord' || tool.toolName === 'createPosting') &&
                 tool.state === 'result' &&
                 tool.result &&
                 !tool.result.error &&
