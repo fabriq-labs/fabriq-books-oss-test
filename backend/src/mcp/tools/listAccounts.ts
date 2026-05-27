@@ -22,7 +22,9 @@ export interface AccountResult {
   type: string[];
   sub_type: string | null;
   classification: string | null;
-  currency: string | null;
+  currency: unknown;
+  legal_entity_id: string | null;
+  legal_entity_name: string | null;
   is_active: boolean;
 }
 
@@ -55,6 +57,14 @@ export function listAccountsHandler(auth: AuthContext) {
         sub_type: true,
         classification: true,
         currency: true,
+        legal_entity_id: true,
+        legal_entity: {
+          select: {
+            legal_name: true,
+            organization_name: true,
+            name: true,
+          },
+        },
         is_active: true,
       },
       orderBy: [{ code: 'asc' }, { name: 'asc' }],
@@ -62,7 +72,22 @@ export function listAccountsHandler(auth: AuthContext) {
     });
 
     return {
-      accounts: accounts as AccountResult[],
+      accounts: accounts.map((account) => ({
+        id: account.id,
+        code: account.code,
+        name: account.name,
+        type: account.type,
+        sub_type: account.sub_type,
+        classification: account.classification,
+        currency: account.currency,
+        legal_entity_id: account.legal_entity_id,
+        legal_entity_name:
+          account.legal_entity?.legal_name ??
+          account.legal_entity?.organization_name ??
+          account.legal_entity?.name ??
+          null,
+        is_active: account.is_active,
+      })),
       total: accounts.length,
     };
   };

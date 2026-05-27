@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { AuthContext } from '../auth/types';
 import { listAccountsHandler } from './tools/listAccounts';
+import { getTrialBalanceHandler, getTrialBalanceSchema } from './tools/getTrialBalance';
 
 /**
  * Creates a new McpServer with all tools registered for the given auth context.
@@ -29,6 +30,26 @@ export function createMcpServer(auth: AuthContext): McpServer {
     },
     async (params: { name?: string; code?: string }) => {
       const result = await listAccountsHandler(auth)(params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
+    }
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (server as any).registerTool(
+    'get_trial_balance',
+    {
+      description:
+        'Generate a trial balance report for a date range. Use list_accounts first to resolve account names, bank names, or informal terms like ICICI into account_id.',
+      inputSchema: getTrialBalanceSchema,
+    },
+    async (params: {
+      start_date?: string;
+      end_date?: string;
+      account_id?: string;
+      currency_id?: string;
+      legal_entity_id?: string;
+    }) => {
+      const result = await getTrialBalanceHandler(auth)(params);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     }
   );
