@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle, us
 import { viewAPI, bulkEditAPI, workflowAPI } from "@/api/api";
 import DynamicTable from "@/components/masters/DynamicTable";
 import { Button } from "@/components/ui/button";
-import { Building, Import, Plus, Search, Edit, Trash2, Copy } from "lucide-react";
+import { Building, Import, Plus, Search, Edit, Trash2, Copy, Download } from "lucide-react";
 import { Pagination, Modal } from "antd";
 import { ActionButtons } from "@/components/ui/action-buttons";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
 import { BulkAction, MergeRow } from "@/types/bulkActions";
 import type { CellHighlightMap } from "@/components/masters/DynamicTable";
 import type { CustomRowRenderer, FilterEnhancements } from "@/types/customRowRenderer";
+import ExportModal from "@/components/masters/ExportModal";
 
 /**
  * Handle exposed to parent components via ref.
@@ -104,6 +105,8 @@ interface MasterProps {
   isCreate?: boolean;
   /** When `false`, hides the Import button. Omitted or `true` shows it (default: show). */
   isImport?: boolean;
+  /** When `true`, shows the Export button and enables CSV export. Default: false (hidden). */
+  enableExport?: boolean;
   /** When provided, replaces metadata-generated columns and body rendering in DynamicTable */
   customRowRenderer?: CustomRowRenderer;
   /** Optional per-field filter enhancements (e.g. extra search filters for specific dropdowns) */
@@ -138,6 +141,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   injectRowActions,
   isCreate,
   isImport,
+  enableExport,
   customRowRenderer,
   filterEnhancements,
   duplicateActionConfig,
@@ -170,6 +174,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   const [searchTerm, setSearchTerm] = useState<string | undefined>(undefined);
   const [searchParam, setSearchParam] = useState<string | undefined>(undefined);
   const [showImport, setShowImport] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   // Seeded from presetFilters on mount so drill-through filters appear as removable badges.
@@ -392,6 +397,15 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
 
     return result;
   };
+
+  const computedFilters = React.useMemo(() => {
+    const rawUserFilters = {
+      ...JSON.parse(filterOutput || "{}"),
+      ...filterSearchOutput,
+    };
+    const userFilters = expandVirtualFilters(rawUserFilters);
+    return mergeFiltersWithAnd(userFilters, defaultFilters || {});
+  }, [filterOutput, filterSearchOutput, defaultFilters]);
 
   const fetchModelData = () => {
     setIsLoading(true);
@@ -785,6 +799,15 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
                   <span>Import</span>
                 </Button>
               )}
+              {enableExport && (
+                <Button
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Download size={16} />
+                  <span>Export</span>
+                </Button>
+              )}
             </div>
           </div>
         ) : (
@@ -819,6 +842,15 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
                 <Button onClick={handleImport} className="flex items-center gap-2">
                   <Import size={16} />
                   <span>Import</span>
+                </Button>
+              )}
+              {enableExport && (
+                <Button
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Download size={16} />
+                  <span>Export</span>
                 </Button>
               )}
             </div>
@@ -870,6 +902,18 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
         view={view}
         filterEnhancements={filterEnhancements}
       />
+      {enableExport && (
+        <ExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          metaData={masterList?.metaData || {}}
+          type={type}
+          view={view}
+          currentFilters={computedFilters}
+          displayName={displayName}
+          sortOption={defaultSortOption ? { [defaultSortOption.field]: defaultSortOption.direction } : {}}
+        />
+      )}
       <div className="w-full space-y-4">
         {/* Search component */}
         {/* {searchableFields.length > 0 && (

@@ -498,6 +498,8 @@ export default function Transactions() {
             relationFieldId: "account_id",
           },
         }}
+        enableExport={true}
+        defaultSortOption={{ field: "value_date", direction: "desc" }}
         defaultFilters={defaultFilters}
         presetFilters={presetFilters}
         bulkActions={bulkActions}
