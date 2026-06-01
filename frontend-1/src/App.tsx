@@ -317,6 +317,16 @@ const AppRoutes: React.FC = () => {
                 <Route path="employee_master/:id/view/:viewId" element={<EmployeeMasterForm />} />
                 <Route path="employee_master/view/:viewId" element={<EmployeeMasterForm />} />
 
+                <Route path="settings/import-runs" element={
+                  <Master
+                    type="import_run"
+                    view="import_run_view"
+                    displayName="Import Runs"
+                    defaultSortOption={{ field: 'created_at', direction: 'desc' }}
+                    listConfig={{ enableCreate: false, enableImport: false, enableBulkEdit: false }}
+                  />
+                } />
+
                 <Route path="settings/roles" element={
                   <SuperAdminGuard>
                     <Master type="role" view="role_view" displayName="Roles" />

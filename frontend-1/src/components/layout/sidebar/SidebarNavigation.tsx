@@ -143,6 +143,7 @@ const settingsNavItems: MasterNavItem[] = [
       { label: 'Users', path: '/settings/users' },
       { label: 'Employees', path: '/settings/employees' },
       { label: 'Connections', path: '/settings/connections' },
+      { label: 'Import Runs', path: '/settings/import-runs' },
     ],
   },
 ];
