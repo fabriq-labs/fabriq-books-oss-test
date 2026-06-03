@@ -148,8 +148,12 @@ Examples:
 {{/if}}
 
 FOR POSTING-LEVEL DETAIL (optional):
-- Use analyticsQuery only to list individual postings (descriptions, dates, amounts)
-- Join posting to account; filter org_id; use value_date or posting_date for the period
+- For "list recent postings on this account" / transaction lines: use **searchRecords** on `posting` with OR on debit/credit:
+  * `search`: `[{ "field": "or", "operator": "or", "value": [{ "account_id": { "eq": "<account_id>" } }, { "credit_account_id": { "eq": "<account_id>" } }] }, { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" }]`
+  * Use `context.recordId` as `<account_id>` when viewing one account.
+  * "Recent" → `value_date` **gte** `{{recentFromDate}}` (same day last month), **lte** `{{currentDate}}` (today); show **Value Date** to the user; `pageSize` 20.
+- Use **analyticsQuery** when you need JOINs (account names in SQL) or complex filters in one query.
+- Join posting to account; filter org_id; use value_date or posting_date for the period.
 - Do NOT sum postings manually to answer "what is the closing balance" — use runFinancialReport
 
 REMEMBER:

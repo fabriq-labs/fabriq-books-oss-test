@@ -2,6 +2,12 @@
 
 Use SQL analytics tools for aggregate questions: totals, breakdowns by category (contra account), or time-period summaries.
 
+### SIMPLE LISTS (e.g. "List recent postings")
+- Prefer **searchRecords** on `posting` — faster and matches the list UI filters (`posting_type` neq DUPLICATE, description ncontains Closing).
+- **Show Value Date** (`value_date`) to the user; filter "recent" with `value_date` gte `{{recentFromDate}}` and lte `{{currentDate}}` (previous-month same day through today, e.g. 3 May–3 Jun when today is 3 Jun). Do not hardcode a month unless the user named it.
+- Use **analyticsQuery** for lists only when you need JOINs (account names in one query) or the user asked for SQL-style drill-down.
+- If `context.modelContext.legalEntityId` is set and SQL returns 0 rows, retry without `legal_entity_id` filter.
+
 ### KEY SCHEMA NOTE
 - `account.type` is a **text array** column (e.g. `'{BANK,CHECKING}'`).
 - **NEVER** use `= 'bank'`, `IN ('bank', 'asset')`, or `ILIKE` on `account.type` — PostgreSQL will throw a malformed array error.

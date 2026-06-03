@@ -505,8 +505,17 @@ export class DynamicPromptManager {
         let processedPrompt = prompt;
 
         // Replace basic placeholders
-        const currentDate = new Date().toISOString();
+        const now = new Date();
+        const currentDate = now.toISOString();
         processedPrompt = processedPrompt.replace(/\{\{currentDate\}\}/g, currentDate);
+        // Same calendar day in the previous month (e.g. today 3 Jun → from 3 May) — "recent postings" window
+        const recentFrom = new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth() - 1,
+            now.getUTCDate(),
+            0, 0, 0, 0
+        ));
+        processedPrompt = processedPrompt.replace(/\{\{recentFromDate\}\}/g, recentFrom.toISOString());
         processedPrompt = processedPrompt.replace(/\{\{userId\}\}/g, this.user_id);
         processedPrompt = processedPrompt.replace(/\{\{modelName\}\}/g, this.modelName);
         const viewName = this.viewName || `${this.modelName}_views`;
