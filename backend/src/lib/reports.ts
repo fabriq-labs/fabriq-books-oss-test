@@ -1,7 +1,7 @@
 import { AuthContext } from "../auth/types";
 import logger from '../utils/logger';
 import { get_my_feed } from './reports/zeiv';
-import { getIncomeStatement, getTrialBalance, getMonthlyTrialBalance, getNetworthForAssets, getNetworthForLiabilities, getSavingRatio, getFinancialRatios, getAssetsTotal, getClassificationBreakdown, getIncomeByType, getIncomeTotal, getLiabilitiesBreakdown, getLiabilitiesTotal, getAssetsBreakdown } from './reports/perfin';
+import { getIncomeStatement, getTrialBalance, getMonthlyTrialBalance, getNetworthForAssets, getNetworthForLiabilities, getSavingRatio, getFinancialRatios, getAssetsTotal, getClassificationBreakdown, getIncomeByType, getIncomeTotal, getLiabilitiesBreakdown, getLiabilitiesTotal, getAssetsBreakdown, getCashFlowStatement } from './reports/perfin';
 
 export const run_report = async (context: AuthContext, report_id: any, filters: any) => {
   logger.debug(`Running report ${report_id} with filters: ${JSON.stringify(filters)}`, context.user);
@@ -36,6 +36,16 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
       filters.legal_entity_ids,
       filters.currency_id ?? filters.currency
     );
+  } else if (report_id === "cash_flow") {
+    const result = await getCashFlowStatement(
+      filters.from_date,
+      filters.to_date,
+      context.user.org_id,
+      filters.account_id,
+      filters.legal_entity_ids,
+      filters.currency_id ?? filters.currency
+    );
+    return { success: true, summary: result.summary, data: result.rows };
   } else if (report_id === "personal_income") {
     const entityId = filters.legal_entity_id;
     return await getIncomeStatement(

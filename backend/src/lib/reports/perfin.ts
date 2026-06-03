@@ -1648,3 +1648,257 @@ export async function getClassificationBreakdown(
 
   return finalResults;
 }
+
+export type CashFlowActivity = 'Operating' | 'Investing' | 'Financing';
+
+export interface CashFlowRow {
+  activity: CashFlowActivity;
+  account_id: string;
+  account_name: string;
+  account_path: string;
+  level: number;
+  net_cash: number;
+}
+
+export interface CashFlowSummary {
+  opening_cash: number;
+  closing_cash: number;
+  net_change: number;
+  operating_total: number;
+  investing_total: number;
+  financing_total: number;
+}
+
+export interface CashFlowStatementResult {
+  summary: CashFlowSummary;
+  rows: CashFlowRow[];
+}
+
+const CASH_ACCOUNT_TYPES = ['BANK', 'CHECKING', 'SAVINGS', 'CASH', 'CLEARING', 'BANK_CASH'] as const;
+
+function accountTypeTokens(accountType: unknown): string[] {
+  if (Array.isArray(accountType)) {
+    return accountType.map((value) => String(value).trim().toUpperCase()).filter(Boolean);
+  }
+  if (typeof accountType === 'string') {
+    const trimmed = accountType.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      return trimmed
+        .slice(1, -1)
+        .split(',')
+        .map((part) => part.trim().replace(/^"|"$/g, '').toUpperCase())
+        .filter(Boolean);
+    }
+    return [trimmed.toUpperCase()];
+  }
+  return [];
+}
+
+export function isCashAccount(accountType: unknown, accountPath?: string | null): boolean {
+  const types = accountTypeTokens(accountType);
+  if (types.some((type) => CASH_ACCOUNT_TYPES.includes(type as (typeof CASH_ACCOUNT_TYPES)[number]))) {
+    return true;
+  }
+  const path = String(accountPath ?? '').toLowerCase();
+  return (
+    path.includes('cash on hand') ||
+    path.includes('checking account') ||
+    path.includes('savings account') ||
+    path.includes('undeposited funds') ||
+    path.includes('cash & bank') ||
+    path.includes('bank and cash') ||
+    path.includes('liquid and equivalents')
+  );
+}
+
+export const getCashFlowStatement = async (
+  startDate: string,
+  endDate: string,
+  orgId: string,
+  accountId?: string,
+  legalEntityIds?: string[],
+  reportCurrency?: string
+): Promise<CashFlowStatementResult> => {
+  const currencyParam = reportCurrency || null;
+
+  const movementRows = await prisma.$queryRaw<
+    Array<{
+      activity: CashFlowActivity;
+      account_id: string;
+      account_name: string;
+      account_path: string;
+      net_cash: number | string | null;
+    }>
+  >`
+    WITH org_base AS (
+      SELECT
+        COALESCE(c_param.id, c_org.id, c_legacy.id, c_inr.id) AS base_currency_id,
+        COALESCE(c_param.code, c_org.code, c_legacy.code, c_inr.code, NULLIF(TRIM(o.base_currency::text), ''), 'INR') AS base_currency
+      FROM organizations o
+      LEFT JOIN currency c_param
+        ON (${currencyParam}::text IS NOT NULL)
+        AND (
+          c_param.id::text = ${currencyParam}::text
+          OR UPPER(TRIM(c_param.code)) = UPPER(TRIM(${currencyParam}::text))
+        )
+      LEFT JOIN currency c_org ON c_org.id = o.basecurrency_id
+      LEFT JOIN currency c_legacy
+        ON c_legacy.org_id = o.id
+        AND o.basecurrency_id IS NULL
+        AND o.base_currency IS NOT NULL
+        AND TRIM(o.base_currency::text) <> ''
+        AND UPPER(TRIM(c_legacy.code)) = UPPER(TRIM(o.base_currency::text))
+      LEFT JOIN currency c_inr ON c_inr.org_id = o.id AND c_inr.code = 'INR'
+      WHERE o.id = ${orgId}
+    ),
+    period_avg_rates AS (
+      SELECT DISTINCT ON (er.from_currency_id)
+        er.from_currency_id,
+        er.rate
+      FROM exchange_rate er
+      CROSS JOIN org_base ob
+      WHERE er.org_id = ${orgId}
+        AND ob.base_currency_id IS NOT NULL
+        AND er.to_currency_id = ob.base_currency_id
+        AND er.rate_type = 'AVERAGE'
+        AND er.effective_date <= ${endDate}::date
+      ORDER BY er.from_currency_id, er.effective_date DESC
+    ),
+    cash_accounts AS (
+      SELECT ah.id, ah.currency AS account_currency
+      FROM account_hierarchy ah
+      WHERE ah.org_id = ${orgId}
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM unnest(COALESCE(ah.type, ARRAY[]::text[])) AS account_type(value)
+            WHERE UPPER(account_type.value) = ANY(ARRAY['BANK','CHECKING','SAVINGS','CASH','CLEARING','BANK_CASH'])
+          )
+          OR ah.path ILIKE '%Cash on Hand%'
+          OR ah.path ILIKE '%Checking Account%'
+          OR ah.path ILIKE '%Savings Account%'
+          OR ah.path ILIKE '%Undeposited Funds%'
+          OR ah.path ILIKE '%Cash & Bank%'
+          OR ah.path ILIKE '%Bank and Cash%'
+          OR ah.path ILIKE '%Liquid and Equivalents%'
+        )
+        ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
+    ),
+    movements AS (
+      SELECT
+        contra.id AS contra_account_id,
+        contra.name AS contra_account_name,
+        contra.path AS contra_account_path,
+        contra.classification AS contra_classification,
+        contra.type AS contra_type,
+        (
+          CASE
+            WHEN p.account_id = ca.id THEN p.amount
+            WHEN p.credit_account_id = ca.id THEN -p.amount
+            ELSE 0
+          END
+          * CASE
+            WHEN ca.account_currency IS NULL
+              OR ca.account_currency = (SELECT base_currency_id FROM org_base)
+            THEN 1::numeric
+            ELSE COALESCE(par.rate, 1)
+          END
+        ) AS cash_amount
+      FROM posting p
+      INNER JOIN cash_accounts ca
+        ON p.account_id = ca.id OR p.credit_account_id = ca.id
+      LEFT JOIN period_avg_rates par ON ca.account_currency = par.from_currency_id
+      INNER JOIN account_hierarchy contra
+        ON contra.id = CASE
+          WHEN p.account_id = ca.id THEN p.credit_account_id
+          ELSE p.account_id
+        END
+        AND contra.org_id = p.org_id
+      WHERE p.org_id = ${orgId}
+        AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+        AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+        AND p.reversal_of_posting_id IS NULL
+        AND COALESCE(p.posting_type, '') NOT IN ('OPENING_BALANCE', 'DUPLICATE')
+        AND contra.id NOT IN (SELECT id FROM cash_accounts)
+        ${accountId ? Prisma.sql`AND (ca.id = ${accountId} OR contra.id = ${accountId})` : Prisma.empty}
+    ),
+    classified AS (
+      SELECT
+        contra_account_id,
+        contra_account_name,
+        contra_account_path,
+        cash_amount,
+        CASE
+          WHEN contra_classification = 'Equity' THEN 'Financing'
+          WHEN contra_type && ARRAY['CAPITAL','LOAN','DIVIDEND','EQUITY','DEBT']::text[] THEN 'Financing'
+          WHEN contra_account_path ILIKE '%Equity%'
+            OR contra_account_path ILIKE '%Loan%'
+            OR contra_account_path ILIKE '%Capital%'
+            OR contra_account_path ILIKE '%Borrowing%' THEN 'Financing'
+          WHEN contra_type && ARRAY['FIXED_ASSET','INVESTMENT','ACCUM_DEPR','DEPOSIT']::text[] THEN 'Investing'
+          WHEN contra_account_path ILIKE '%Fixed Asset%'
+            OR contra_account_path ILIKE '%Non-current%'
+            OR contra_account_path ILIKE '%Investment%'
+            OR contra_account_path ILIKE '%Property%'
+            OR contra_account_path ILIKE '%Equipment%' THEN 'Investing'
+          ELSE 'Operating'
+        END AS activity
+      FROM movements
+    )
+    SELECT
+      activity,
+      contra_account_id AS account_id,
+      contra_account_name AS account_name,
+      contra_account_path AS account_path,
+      SUM(cash_amount)::float AS net_cash
+    FROM classified
+    GROUP BY activity, contra_account_id, contra_account_name, contra_account_path
+    HAVING SUM(cash_amount) <> 0
+    ORDER BY activity, contra_account_name
+  `;
+
+  const rows: CashFlowRow[] = movementRows.map((row) => ({
+    activity: row.activity,
+    account_id: row.account_id,
+    account_name: row.account_name,
+    account_path: row.account_path,
+    level: 0,
+    net_cash: Number(row.net_cash ?? 0),
+  }));
+
+  const activityTotals = rows.reduce(
+    (acc, row) => {
+      acc[row.activity] += row.net_cash;
+      return acc;
+    },
+    { Operating: 0, Investing: 0, Financing: 0 } as Record<CashFlowActivity, number>
+  );
+
+  const trialBalanceRows = await getTrialBalance(
+    startDate,
+    endDate,
+    orgId,
+    accountId,
+    reportCurrency,
+    legalEntityIds
+  );
+  const cashBalanceRows = trialBalanceRows.filter((row) =>
+    isCashAccount(row.account_type, row.account_path)
+  );
+  const opening_cash = cashBalanceRows.reduce((sum, row) => sum + Number(row.opening_balance ?? 0), 0);
+  const closing_cash = cashBalanceRows.reduce((sum, row) => sum + Number(row.total_balance ?? 0), 0);
+  const net_change = activityTotals.Operating + activityTotals.Investing + activityTotals.Financing;
+
+  return {
+    summary: {
+      opening_cash,
+      closing_cash,
+      net_change,
+      operating_total: activityTotals.Operating,
+      investing_total: activityTotals.Investing,
+      financing_total: activityTotals.Financing,
+    },
+    rows,
+  };
+};

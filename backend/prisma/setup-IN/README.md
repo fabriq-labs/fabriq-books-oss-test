@@ -114,7 +114,7 @@ npx ts-node setup-indian-demo.ts
 ### User Hierarchy
 
 ```
-Sanjay Gupta (Super Admin)
+Sanjay Gupta (Super Admin, Finance Team)
 ├── Vikram Joshi (Admin)
 │   ├── Kavya Nair (Finance)
 │   ├── Rohit Kumar (Delivery)
@@ -134,15 +134,16 @@ Sanjay Gupta (Super Admin)
 
 All users have the same password: `Metalimits@123`
 
-#### Super Admin Access
+#### Super Admin + Finance
 - **Email**: `sanjay.gupta@demo-india.com`
-- **Roles**: Super Admin, Employee
+- **Roles**: Super Admin, Finance Team, Employee
 
 #### Admin Access
 - **Vikram Joshi**: `vikram.joshi@demo-india.com`
 - **Karan Bhatia**: `karan.bhatia@demo-india.com`
 
 #### Finance Team
+- **Sanjay Gupta**: `sanjay.gupta@demo-india.com` (also Super Admin)
 - **Priya Patel**: `priya.patel@demo-india.com`
 - **Kavya Nair**: `kavya.nair@demo-india.com`
 - **Divya Menon**: `divya.menon@demo-india.com`
@@ -292,8 +293,10 @@ curl -X POST http://localhost:4000/api/auth/login \
 ### Reconciliation + AR Demo (included)
 - **Payment terms**: Net 15, Net 30; first 5 customers linked.
 - **Invoices**: INV-001 … INV-012 (SALES), mix of balance = 0 and balance &gt; 0, some overdue.
-- **Payment receipts**: REC-DEMO-001 … REC-DEMO-006; five applied to invoices, one unapplied (advance) for cash-application demo.
-- **Bank postings**: 20 lines on Checking Account (1102); descriptions prefixed with `DEMO:`; subset matchable to receipts for reconciliation demo, 3–5 unmatched.
+- **Payment receipts**: REC-DEMO-001 … REC-DEMO-007; five applied to invoices, one unapplied (advance) for cash-application demo.
+- **FY journal postings**: `posting-demo-*.csv` (~300 lines per legal entity; full double-entry).
+- **Reconciliation bank lines**: `posting.csv` — 24 one-sided lines on HQ Checking (1102); `DEMO:` descriptions; `post_demo_01`–`05` pre-matched to receipts; `post_demo_21`–`24` for invoice/receipt matching in UI/agent.
+- **Reset reconciliation only**: `npx ts-node setup-indian-demo.ts --reset-postings` (does not touch FY journals).
 
 ### Planned Additions
 1. **Invoice Templates**: Indian GST-compliant invoice formats

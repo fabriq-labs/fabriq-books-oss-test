@@ -18,6 +18,7 @@ import { ensureDatabaseViews } from './utils/setup/ensureDatabaseViews';
 import { initializeImportExtensions } from './lib/import-extensions';
 import './rest/postingCustomActions'; // registers posting/import-bank-statement custom action
 import './services/book-keeping/migration-journal'; // registers setup/migration-journal custom actions
+import { mcpRouter } from './mcp/McpRouter';
 
 const app: Express = express();
 const port: number = parseInt(process.env.BACKEND_PORT || process.env.PORT || '4000', 10);
@@ -69,6 +70,9 @@ async function startServer(): Promise<void> {
 
     // Setup Agent routes
     app.use('/api/agent', agentModule.createAgentRouter());
+
+    // MCP endpoint
+    app.use('/api/mcp', mcpRouter);
 
     // GraphQL endpoint with authentication
     app.use(

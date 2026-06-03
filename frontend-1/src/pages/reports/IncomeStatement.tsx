@@ -17,6 +17,15 @@ import * as XLSX from "xlsx";
 import { pdf } from "@react-pdf/renderer";
 import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
+import { LegalEntityMultiSelect } from "@/components/Reports/LegalEntityMultiSelect";
+import {
+  ReportAdvancedField,
+  ReportAdvancedFilters,
+  ReportAdvancedSummaryChip,
+} from "@/components/Reports/ReportAdvancedFilters";
+import { ReportAccountFilter } from "@/components/Reports/ReportAccountFilter";
+import { ReportCurrencySelect } from "@/components/Reports/ReportCurrencySelect";
+import { useReportLegalEntitySelection } from "@/components/Reports/useReportLegalEntitySelection";
 import { isEntityHeadquarters, useEntity, CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import { IncomeStatementPDFDocument, IncomeStatementPdfProps } from "@/components/pdf_generator/IncomePDFGenerator";
 import {
@@ -180,19 +189,20 @@ export default function IncomeStatement() {
     [selectedCurrencyId, defaultReportingCurrencyId]
   );
 
-  const legalEntityIds = useMemo(
-    () => currentEntityId ? [currentEntityId] : [],
-    [currentEntityId]
-  );
+  const {
+    selectedLegalEntityIds,
+    setSelectedLegalEntityIds,
+    selectionReady,
+  } = useReportLegalEntitySelection(currentEntityId, entityLoading);
 
   const { data, loading, error, fetchIncomeStatement } = useIncomeStatement({
     dateRange: effectiveDateRange,
     currencyId: effectiveReportCurrencyId,
     currencyCode: reportCurrencyCode,
-    legalEntityIds,
+    legalEntityIds: selectedLegalEntityIds,
   });
 
-  const reportLoading = loading || entityLoading;
+  const reportLoading = loading || entityLoading || !selectionReady;
 
   const ADD_BACK_TYPES = ["D&A", "Interest & Tax", "EBITDA Adjustments"];
   const hasAddBackType = (row: IncomeStatementRow) =>
@@ -327,17 +337,29 @@ export default function IncomeStatement() {
     return defaultCurrency?.code?.trim().toUpperCase() ?? "INR";
   }, [defaultCurrency]);
 
+  const legalEntitySummaryLabel = useMemo(() => {
+    if (selectedLegalEntityIds.length === 0) return "All entities";
+    if (selectedLegalEntityIds.length === 1) {
+      return entities.find((entity) => entity.id === selectedLegalEntityIds[0])?.legal_name ?? "1 entity";
+    }
+    return `${selectedLegalEntityIds.length} entities`;
+  }, [entities, selectedLegalEntityIds]);
+
+  const accountSummaryLabel = useMemo(() => {
+    return account?.name ?? account?.account_name ?? "All accounts";
+  }, [account]);
+
   useEffect(() => {
-    if (entityLoading) return;
+    if (entityLoading || !selectionReady) return;
     void fetchIncomeStatement(account);
-  }, [entityLoading, fetchIncomeStatement, account]);
+  }, [entityLoading, selectionReady, fetchIncomeStatement, account]);
 
   useEffect(() => {
     if (!fetchOnButtonClick) return;
-    if (entityLoading) return;
+    if (entityLoading || !selectionReady) return;
     void fetchIncomeStatement(account);
     setFetchOnButtonClick(false);
-  }, [fetchOnButtonClick, entityLoading, fetchIncomeStatement, account]);
+  }, [fetchOnButtonClick, entityLoading, selectionReady, fetchIncomeStatement, account]);
 
   const handleAccountChange = (value: any) => setAccount(value);
   const handleAccountClear = () => setAccount(null);
@@ -610,17 +632,13 @@ export default function IncomeStatement() {
           </div>
           <div className="flex items-center gap-2 flex-nowrap overflow-x-auto ml-auto">
             <ReportControls
-              selectedAccount={account}
-              onAccountChange={handleAccountChange}
-              onAccountClear={handleAccountClear}
               onRefresh={handleRefresh}
               loading={reportLoading}
-              showAccountFilter={true}
+              showAccountFilter={false}
               showRefreshButton={true}
               className="!flex-row !items-center !gap-2 shrink-0"
               beforeRefresh={
                 <>
-                  {/* Financial year selector */}
                   <FinancialYearSelector
                     fyType={currentEntity?.financial_year_type}
                     value={selectedFY.value}
@@ -628,7 +646,6 @@ export default function IncomeStatement() {
                     className="w-[130px] h-9 border-slate-300 text-sm shrink-0"
                   />
 
-                  {/* Month selector — null = All Months */}
                   <Select
                     value={selectedMonth?.value ?? "__all__"}
                     onValueChange={(v) => {
@@ -647,31 +664,6 @@ export default function IncomeStatement() {
                       {monthOptions.map((m) => (
                         <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Currency — shows ISO code only */}
-                  <Select
-                    value={selectedCurrencyId ? selectedCurrencyId : "__default__"}
-                    onValueChange={(v) => setSelectedCurrencyId(v === "__default__" ? "" : v)}
-                    disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
-                  >
-                    <SelectTrigger className="w-[110px] h-9 border-slate-300 text-sm shrink-0">
-                      <DollarSign className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
-                      <SelectValue placeholder={currenciesLoading ? "…" : "Default"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__default__">
-                        {entityLoading ? "…" : orgDefaultLabel}
-                      </SelectItem>
-                      {sortedActiveCurrencies.map((row) => (
-                        <SelectItem key={row.id || row.code} value={row.id}>
-                          {row.code.toUpperCase()}
-                        </SelectItem>
-                      ))}
-                      {selectedCurrencyId && !selectedCurrencyInMasterList && (
-                        <SelectItem value={selectedCurrencyId}>{reportCurrencyCode}</SelectItem>
-                      )}
                     </SelectContent>
                   </Select>
                 </>
@@ -707,6 +699,56 @@ export default function IncomeStatement() {
             </DropdownMenu>
           </div>
         </div>
+
+        <ReportAdvancedFilters
+          summary={
+            <>
+              <ReportAdvancedSummaryChip>{legalEntitySummaryLabel}</ReportAdvancedSummaryChip>
+              <ReportAdvancedSummaryChip>{reportCurrencyCode}</ReportAdvancedSummaryChip>
+              <ReportAdvancedSummaryChip>{accountSummaryLabel}</ReportAdvancedSummaryChip>
+            </>
+          }
+        >
+          <ReportAdvancedField
+            label="Legal entity"
+            hint="None selected includes all entities. Choose one or more to scope the report."
+          >
+            <LegalEntityMultiSelect
+              entities={entities}
+              selectedIds={selectedLegalEntityIds}
+              onChange={setSelectedLegalEntityIds}
+              disabled={entityLoading}
+              className="w-full justify-between"
+            />
+          </ReportAdvancedField>
+
+          <ReportAdvancedField
+            label="Currency"
+            hint="Reporting currency for amounts. Default uses the entity's base currency."
+          >
+            <ReportCurrencySelect
+              selectedCurrencyId={selectedCurrencyId}
+              onSelectedCurrencyIdChange={setSelectedCurrencyId}
+              sortedActiveCurrencies={sortedActiveCurrencies}
+              orgDefaultLabel={orgDefaultLabel}
+              reportCurrencyCode={reportCurrencyCode}
+              selectedCurrencyInMasterList={selectedCurrencyInMasterList}
+              currenciesLoading={currenciesLoading}
+              entityLoading={entityLoading}
+            />
+          </ReportAdvancedField>
+
+          <ReportAdvancedField
+            label="Account"
+            hint="Optional. Limit the income statement to a single account subtree."
+          >
+            <ReportAccountFilter
+              selectedAccount={account}
+              onAccountChange={handleAccountChange}
+              onAccountClear={handleAccountClear}
+            />
+          </ReportAdvancedField>
+        </ReportAdvancedFilters>
 
         {/* View tabs + activity filter */}
         <div className="mt-3 flex flex-wrap items-center gap-4">

@@ -97,6 +97,17 @@ const POSTING_CSV_FILES = [
   'posting-demo-bangalore.csv',
 ];
 
+/** Bank-import style lines for reconciliation / categorization UI (one-sided; HQ only). */
+const RECONCILIATION_POSTING_CSV = 'posting.csv';
+
+const DEMO_POSTING_IDS = [
+  'post_demo_01', 'post_demo_02', 'post_demo_03', 'post_demo_04', 'post_demo_05',
+  'post_demo_06', 'post_demo_07', 'post_demo_08', 'post_demo_09', 'post_demo_10',
+  'post_demo_11', 'post_demo_12', 'post_demo_13', 'post_demo_14', 'post_demo_15',
+  'post_demo_16', 'post_demo_17', 'post_demo_18', 'post_demo_19', 'post_demo_20',
+  'post_demo_21', 'post_demo_22', 'post_demo_23', 'post_demo_24',
+];
+
 async function upsertPostingsFromCsvFile(csvFileName: string, demoOrgId: string): Promise<number> {
   const filePath = path.join(__dirname, csvFileName);
   if (!fs.existsSync(filePath)) {
@@ -127,15 +138,218 @@ async function upsertAllPostingsFromCsv(demoOrgId: string): Promise<number> {
   return total;
 }
 
-async function loadPostingIdsFromCsv(): Promise<string[]> {
-  const ids: string[] = [];
-  for (const file of POSTING_CSV_FILES) {
-    const filePath = path.join(__dirname, file);
-    if (!fs.existsSync(filePath)) continue;
-    const rows = await loadCsvData(filePath);
-    ids.push(...rows.map((r) => r.id).filter((id) => id && String(id).trim() !== ''));
+/** `payment_receipt_id` is @unique on posting — only one posting may reference a receipt. */
+async function releasePaymentReceiptLink(
+  demoOrgId: string,
+  paymentReceiptId: string,
+  keepPostingId: string
+): Promise<number> {
+  const result = await prisma.posting.updateMany({
+    where: {
+      org_id: demoOrgId,
+      payment_receipt_id: paymentReceiptId,
+      id: { not: keepPostingId },
+    },
+    data: {
+      payment_receipt_id: null,
+      reconciliation_status: null,
+      matched_reference: null,
+    },
+  });
+  return result.count;
+}
+
+/**
+ * Load one-sided bank postings for reconciliation demo (post_demo_*).
+ * Loaded after FY journal CSVs so both datasets coexist.
+ */
+const INDIAN_DEMO_ORG_ID = 'org_indian_demo';
+const INDIAN_DEMO_LEGAL_ENTITY_ID = 'org_indian_demo';
+
+/** Resolve payment_terms.id from CSV (id or label e.g. pay_demo_net30 / "Net 30"). */
+async function resolveDemoPaymentTermsId(
+  raw: string | undefined,
+  orgId: string,
+  cache: Map<string, string | null>
+): Promise<string | null> {
+  const key = (raw ?? '').trim();
+  if (!key) return null;
+  if (cache.has(key)) return cache.get(key) ?? null;
+
+  const byId = await prisma.payment_terms.findFirst({
+    where: { id: key, org_id: orgId },
+    select: { id: true },
+  });
+  if (byId) {
+    cache.set(key, byId.id);
+    return byId.id;
   }
-  return ids;
+
+  const byLabel = await prisma.payment_terms.findFirst({
+    where: { org_id: orgId, payment_terms: key },
+    select: { id: true },
+  });
+  const resolved = byLabel?.id ?? null;
+  cache.set(key, resolved);
+  if (!resolved) {
+    console.warn(`  ⚠ Unknown payment_terms_id "${key}" for org ${orgId}; leaving null`);
+  }
+  return resolved;
+}
+
+/**
+ * Upsert demo sales invoices + line items from CSV (includes invoice_net_total).
+ * Safe to re-run without full setup — use CLI flag --sync-invoices.
+ */
+async function upsertDemoInvoicesFromCsv(
+  arAccountId: string,
+  baseDate: Date = (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 2);
+    return d;
+  })()
+): Promise<{ invoices: number; lineItems: number }> {
+  const invoiceData = await loadCsvData(path.join(__dirname, 'invoice.csv'));
+  const paymentTermsCache = new Map<string, string | null>();
+  const orgId = INDIAN_DEMO_ORG_ID;
+
+  for (const row of invoiceData) {
+    const daysOffset = parseInt(row.days_offset, 10) || 0;
+    const invDate = new Date(baseDate);
+    invDate.setDate(invDate.getDate() + daysOffset);
+    const invoiceTotal = parseFloat(row.invoice_total);
+    const invoiceNetTotal =
+      row.invoice_net_total != null && String(row.invoice_net_total).trim() !== ''
+        ? parseFloat(row.invoice_net_total)
+        : invoiceTotal;
+    const paymentTermsId = await resolveDemoPaymentTermsId(
+      row.payment_terms_id,
+      row.org_id || orgId,
+      paymentTermsCache
+    );
+    const invoiceFields = {
+      invoice_number: row.invoice_number,
+      invoice_date: invDate,
+      invoice_type: 'SALES' as const,
+      customer_id: row.customer_id,
+      invoice_total: invoiceTotal,
+      invoice_net_total: invoiceNetTotal,
+      balance_amount: parseFloat(row.balance_amount),
+      payment_terms_id: paymentTermsId,
+      org_id: row.org_id || INDIAN_DEMO_ORG_ID,
+      account_id: arAccountId,
+      status: row.status || 'SENT',
+      legal_entity_id: row.legal_entity_id || INDIAN_DEMO_LEGAL_ENTITY_ID,
+    };
+    await prisma.invoice.upsert({
+      where: { id: row.id },
+      update: invoiceFields,
+      create: { id: row.id, ...invoiceFields },
+    });
+  }
+
+  const invoiceLineItemData = await loadCsvData(path.join(__dirname, 'invoice_line_item.csv'));
+  for (const row of invoiceLineItemData) {
+    const qty = parseFloat(row.ordered_quantity ?? row.invoice_qty ?? '1');
+    const rate = parseFloat(row.rate ?? row.line_total);
+    const lineTotal = parseFloat(row.line_total);
+    const lineFields = {
+      instance_id: row.instance_id,
+      item_master_id: postingCsvStr(row.item_master_id) || null,
+      item_name: postingCsvOpt(row.item_name),
+      item_number: postingCsvOpt(row.item_number),
+      item_type: postingCsvOpt(row.item_type),
+      ordered_quantity: qty,
+      invoice_qty: parseInt(String(row.invoice_qty ?? qty), 10) || Math.round(qty),
+      rate,
+      ordered_amount: row.ordered_amount ? parseFloat(row.ordered_amount) : rate * qty,
+      line_total: lineTotal,
+      invoiced_amount: parseFloat(row.invoiced_amount),
+      org_id: row.org_id || orgId,
+    };
+    await prisma.invoice_line_item.upsert({
+      where: { id: row.id },
+      update: lineFields,
+      create: { id: row.id, ...lineFields },
+    });
+  }
+
+  return { invoices: invoiceData.length, lineItems: invoiceLineItemData.length };
+}
+
+async function syncDemoInvoicesFromCsv() {
+  console.log('📄 Syncing demo invoices from CSV (invoice_net_total, balances, line items)...');
+
+  const arAccount = await prisma.account.findFirst({
+    where: {
+      org_id: INDIAN_DEMO_ORG_ID,
+      legal_entity_id: INDIAN_DEMO_LEGAL_ENTITY_ID,
+      code: '1105',
+    },
+  });
+  if (!arAccount) {
+    throw new Error('Chart of accounts missing Accounts Receivable (1105). Run full Indian demo setup first.');
+  }
+
+  const { invoices, lineItems } = await upsertDemoInvoicesFromCsv(arAccount.id);
+  console.log(`  ✓ Invoices: ${invoices}, line items: ${lineItems}`);
+  console.log('✅ Demo invoice sync complete.');
+  await prisma.$disconnect();
+}
+
+async function upsertReconciliationBankPostingsFromCsv(
+  bankAccount: { id: string },
+  demoOrgId: string,
+  demoLegalEntityId: string,
+  baseDate: Date
+): Promise<number> {
+  const filePath = path.join(__dirname, RECONCILIATION_POSTING_CSV);
+  if (!fs.existsSync(filePath)) {
+    console.warn(`  ⚠ Skipping ${RECONCILIATION_POSTING_CSV} (file not found)`);
+    return 0;
+  }
+
+  const postingData = await loadCsvData(filePath);
+  for (const row of postingData) {
+    const daysOffset = parseInt(row.days_offset, 10) || 0;
+    const valueDate = new Date(baseDate);
+    valueDate.setDate(valueDate.getDate() + daysOffset);
+    const isCredit = row.is_credit === 'true' || row.is_credit === '1';
+    const updateData: Record<string, unknown> = {
+      value_date: valueDate,
+      posting_date: valueDate,
+      amount: parseFloat(row.amount),
+      description: row.description,
+      org_id: row.org_id || demoOrgId,
+      legal_entity_id: demoLegalEntityId,
+      name: (row.description || '').slice(0, 50),
+      account_id: isCredit ? bankAccount.id : null,
+      credit_account_id: isCredit ? null : bankAccount.id,
+      status: 'ACTIVE',
+    };
+    if (row.payment_receipt_id && String(row.payment_receipt_id).trim() !== '') {
+      const receiptId = String(row.payment_receipt_id).trim();
+      const released = await releasePaymentReceiptLink(demoOrgId, receiptId, row.id);
+      if (released > 0) {
+        console.log(
+          `  ↳ Cleared payment_receipt_id on ${released} other posting(s) before linking ${row.id} → ${receiptId}`
+        );
+      }
+      updateData.payment_receipt_id = receiptId;
+      updateData.reconciliation_status = row.reconciliation_status || 'MATCHED';
+      updateData.matched_reference = row.matched_reference || null;
+    } else {
+      updateData.payment_receipt_id = null;
+      updateData.reconciliation_status = row.reconciliation_status?.trim() || null;
+      updateData.matched_reference = row.matched_reference?.trim() || null;
+    }
+    await prisma.posting.upsert({
+      where: { id: row.id },
+      update: updateData as any,
+      create: { id: row.id, ...updateData } as any,
+    });
+  }
+  return postingData.length;
 }
 
 async function setupIndianDemoData() {
@@ -674,6 +888,18 @@ async function setupIndianDemoData() {
     // ===== 8. LOAD AND INSERT ROLE-USER DATA =====
     console.log('🔗 Loading role-user assignments...');
     const roleUserData = await loadCsvData(path.join(__dirname, 'role_user.csv'));
+
+    // Sanjay: Finance Team + Super Admin (no Buyer) — remove legacy assignment if re-seeding
+    const removedSanjayBuyer = await prisma.role_user.deleteMany({
+      where: {
+        user_id: 'user_sanjay_gupta',
+        role_id: 'role_83c8876b-a13b-4098-84ca-da0832abade3',
+        org_id: 'org_indian_demo',
+      },
+    });
+    if (removedSanjayBuyer.count > 0) {
+      console.log(`  ✓ Removed ${removedSanjayBuyer.count} Buyer role assignment for Sanjay Gupta`);
+    }
 
     for (const user of userData) {
       const apiKeyHash = await hashStableDemoApiKey(stableIndianDemoApiKeyPlaintext(user.id));
@@ -1364,50 +1590,9 @@ async function setupIndianDemoData() {
     baseDate.setMonth(baseDate.getMonth() - 2);
 
     console.log('📄 Loading sales invoices and line items from CSV...');
-    const invoiceData = await loadCsvData(path.join(__dirname, 'invoice.csv'));
-    for (const row of invoiceData) {
-      const daysOffset = parseInt(row.days_offset, 10) || 0;
-      const invDate = new Date(baseDate);
-      invDate.setDate(invDate.getDate() + daysOffset);
-      await prisma.invoice.upsert({
-        where: { id: row.id },
-        update: {
-          invoice_number: row.invoice_number,
-          invoice_date: invDate,
-          invoice_type: 'SALES',
-          customer_id: row.customer_id,
-          invoice_total: parseFloat(row.invoice_total),
-          balance_amount: parseFloat(row.balance_amount),
-          payment_terms_id: row.payment_terms_id,
-          org_id: row.org_id,
-          account_id: arAccount.id,
-          status: row.status || 'SENT',
-          legal_entity_id: row.legal_entity_id,
-        },
-        create: {
-          id: row.id,
-          invoice_number: row.invoice_number,
-          invoice_date: invDate,
-          invoice_type: 'SALES',
-          customer_id: row.customer_id,
-          invoice_total: parseFloat(row.invoice_total),
-          balance_amount: parseFloat(row.balance_amount),
-          org_id: row.org_id,
-          account_id: arAccount.id,
-          status: row.status || 'SENT',
-          legal_entity_id: row.legal_entity_id,
-        },
-      });
-    }
-    const invoiceLineItemData = await loadCsvData(path.join(__dirname, 'invoice_line_item.csv'));
-    for (const row of invoiceLineItemData) {
-      await prisma.invoice_line_item.upsert({
-        where: { id: row.id },
-        update: { instance_id: row.instance_id, line_total: parseFloat(row.line_total), invoiced_amount: parseFloat(row.invoiced_amount), org_id: row.org_id },
-        create: { id: row.id, instance_id: row.instance_id, line_total: parseFloat(row.line_total), invoiced_amount: parseFloat(row.invoiced_amount), org_id: row.org_id },
-      });
-    }
-    console.log(`  ✓ Invoices: ${invoiceData.length}, Invoice line items: ${invoiceLineItemData.length}`);
+    const { invoices: invoiceCount, lineItems: invoiceLineItemCount } =
+      await upsertDemoInvoicesFromCsv(arAccount.id, baseDate);
+    console.log(`  ✓ Invoices: ${invoiceCount}, Invoice line items: ${invoiceLineItemCount}`);
 
     console.log('📄 Loading credit notes and line items from CSV (after invoices for FK)...');
     const cnAccountIdAr = await accountIdByCoaCode('1105');
@@ -1525,9 +1710,18 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Loaded ${paymentReceiptData.length} payment receipts`);
 
-    console.log('📒 Loading journal postings from CSV (India + USA)...');
+    console.log('📒 Loading journal postings from CSV (India + branches + USA entity)...');
     const postingCount = await upsertAllPostingsFromCsv(demoOrgId);
     console.log(`  ✓ Loaded ${postingCount} journal postings total (double-entry)`);
+
+    console.log('🏦 Loading reconciliation demo bank postings (one-sided, HQ checking 1102)...');
+    const reconciliationPostingCount = await upsertReconciliationBankPostingsFromCsv(
+      bankAccount,
+      demoOrgId,
+      demoLegalEntityId,
+      baseDate
+    );
+    console.log(`  ✓ Loaded ${reconciliationPostingCount} reconciliation demo postings from ${RECONCILIATION_POSTING_CSV}`);
 
     // ===== 10. SUMMARY =====
     console.log('');
@@ -1551,9 +1745,10 @@ async function setupIndianDemoData() {
     console.log(`   👤 Users: ${userData.length}`);
     console.log(`   🔗 Role Assignments: ${roleUserData.length}`);
     console.log(`   📋 Payment terms: ${paymentTermsLoadedCount}`);
-    console.log(`   📄 Sales invoices: ${invoiceData.length}, Invoice line items: ${invoiceLineItemData.length}`);
+    console.log(`   📄 Sales invoices: ${invoiceCount}, Invoice line items: ${invoiceLineItemCount}`);
     console.log(`   💳 Payment receipts: ${paymentReceiptData.length}`);
     console.log(`   📒 Journal postings: ${postingCount}`);
+    console.log(`   🏦 Reconciliation demo bank lines: ${reconciliationPostingCount} (${RECONCILIATION_POSTING_CSV})`);
     console.log(
       `   🧾 Sales pipeline: SO ${indianDemoSeedRowCounts.salesOrders} (+${indianDemoSeedRowCounts.salesOrderItems} lines), quotes ${indianDemoSeedRowCounts.quotes} (+${indianDemoSeedRowCounts.quoteItems} lines), DC ${indianDemoSeedRowCounts.deliveryChallans} (+${indianDemoSeedRowCounts.deliveryChallanItems} lines), credit notes ${indianDemoSeedRowCounts.creditNotes} (+${indianDemoSeedRowCounts.creditNoteItems} lines)`
     );
@@ -1562,9 +1757,9 @@ async function setupIndianDemoData() {
     );
     console.log('');
     console.log('🎯 Demo Users Available:');
-    console.log('   Super Admin: sanjay.gupta@demo-india.com (Password: Metalimits@123)');
+    console.log('   Super Admin + Finance: sanjay.gupta@demo-india.com (Password: Metalimits@123)');
     console.log('   Admin: vikram.joshi@demo-india.com, karan.bhatia@demo-india.com');
-    console.log('   Finance Team: priya.patel@demo-india.com, kavya.nair@demo-india.com, divya.menon@demo-india.com, pooja.saxena@demo-india.com');
+    console.log('   Finance Team: priya.patel@demo-india.com, kavya.nair@demo-india.com, divya.menon@demo-india.com, pooja.saxena@demo-india.com, sanjay.gupta@demo-india.com');
     console.log('   Buyers: arjun.sharma@demo-india.com, ananya.singh@demo-india.com, meera.rao@demo-india.com, neha.agarwal@demo-india.com');
     console.log('   Delivery Team: amit.shah@demo-india.com, rajesh.yadav@demo-india.com');
     console.log('   Employees: All users have Employee role');
@@ -1591,18 +1786,17 @@ const SEED_RECEIPT_IDS = [
 ];
 
 /**
- * Drop postings listed in posting.csv (and any payment receipts created by confirming),
- * then reload from posting.csv. Reconciliation links in the CSV are preserved on reload.
+ * Drop only post_demo_* reconciliation lines (and receipts created by confirming),
+ * then reload from posting.csv. FY journal postings (post_fy25_*, etc.) are untouched.
  */
 async function resetDemoPostingsAndReceipts() {
   const demoOrgId = 'org_indian_demo';
+  const demoLegalEntityId = 'org_indian_demo';
 
-  console.log('🔄 Resetting demo postings from posting.csv...');
-
-  const postingIds = await loadPostingIdsFromCsv();
+  console.log(`🔄 Resetting reconciliation demo postings (${RECONCILIATION_POSTING_CSV})...`);
 
   const existingPostings = await prisma.posting.findMany({
-    where: { id: { in: postingIds }, org_id: demoOrgId },
+    where: { id: { in: DEMO_POSTING_IDS }, org_id: demoOrgId },
     select: { id: true, payment_receipt_id: true },
   });
 
@@ -1616,36 +1810,68 @@ async function resetDemoPostingsAndReceipts() {
   }
 
   const deleted = await prisma.posting.deleteMany({
-    where: { id: { in: postingIds }, org_id: demoOrgId },
+    where: { id: { in: DEMO_POSTING_IDS }, org_id: demoOrgId },
   });
-  console.log(`  ✓ Deleted ${deleted.count} demo postings`);
+  console.log(`  ✓ Deleted ${deleted.count} reconciliation demo postings`);
 
-  const count = await upsertAllPostingsFromCsv(demoOrgId);
-  console.log(`  ✓ Reloaded ${count} journal postings from CSV`);
-  console.log('✅ Demo postings reset complete.');
+  const bankAccount = await prisma.account.findFirst({
+    where: { org_id: demoOrgId, legal_entity_id: demoLegalEntityId, code: '1102' },
+  });
+  if (!bankAccount) {
+    throw new Error('Chart of accounts missing Checking (1102). Run full Indian demo setup first.');
+  }
+
+  const baseDate = new Date();
+  baseDate.setMonth(baseDate.getMonth() - 2);
+
+  const count = await upsertReconciliationBankPostingsFromCsv(
+    bankAccount,
+    demoOrgId,
+    demoLegalEntityId,
+    baseDate
+  );
+  console.log(`  ✓ Reloaded ${count} reconciliation demo postings`);
+  console.log('✅ Reconciliation demo postings reset complete.');
   await prisma.$disconnect();
 }
 
 /**
- * Drop ALL postings for the Indian demo org and re-create them from posting.csv
- * (full double-entry journal entries as defined in the CSV).
+ * Drop ALL postings for the Indian demo org and re-create FY journals plus reconciliation demo bank lines.
  */
 async function resetAllPostingsFromCSV() {
   const demoOrgId = 'org_indian_demo';
+  const demoLegalEntityId = 'org_indian_demo';
 
   console.log('🔄 Dropping all postings and re-creating from CSV...');
 
   const deleted = await prisma.posting.deleteMany({ where: { org_id: demoOrgId } });
   console.log(`  ✓ Deleted ${deleted.count} postings`);
 
-  const count = await upsertAllPostingsFromCsv(demoOrgId);
-  console.log(`  ✓ Created ${count} journal postings from CSV`);
+  const journalCount = await upsertAllPostingsFromCsv(demoOrgId);
+  console.log(`  ✓ Created ${journalCount} journal postings from FY CSVs`);
+
+  const bankAccount = await prisma.account.findFirst({
+    where: { org_id: demoOrgId, legal_entity_id: demoLegalEntityId, code: '1102' },
+  });
+  if (!bankAccount) {
+    throw new Error('Chart of accounts missing Checking (1102). Run full Indian demo setup first.');
+  }
+
+  const baseDate = new Date();
+  baseDate.setMonth(baseDate.getMonth() - 2);
+
+  const reconCount = await upsertReconciliationBankPostingsFromCsv(
+    bankAccount,
+    demoOrgId,
+    demoLegalEntityId,
+    baseDate
+  );
+  console.log(`  ✓ Created ${reconCount} reconciliation demo postings from ${RECONCILIATION_POSTING_CSV}`);
   console.log('✅ Posting reset complete.');
   await prisma.$disconnect();
 }
 
 const US_LEGAL_ENTITY_ID = 'org_us_office';
-const INDIAN_DEMO_ORG_ID = 'org_indian_demo';
 
 /**
  * Create chart of accounts for Demo Tech Solutions USA Inc (org_us_office).
@@ -1675,23 +1901,28 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const resetOnly = args.includes('--reset-postings');
   const resetFull = args.includes('--reset-postings-full');
+  const syncInvoices = args.includes('--sync-invoices');
   const setupUsCoa = args.includes('--setup-us-coa');
 
   const run = resetFull
     ? resetAllPostingsFromCSV()
     : resetOnly
       ? resetDemoPostingsAndReceipts()
-      : setupUsCoa
-        ? setupUsOfficeChartOfAccounts()
-        : setupIndianDemoData();
+      : syncInvoices
+        ? syncDemoInvoicesFromCsv()
+        : setupUsCoa
+          ? setupUsOfficeChartOfAccounts()
+          : setupIndianDemoData();
 
   const label = resetFull
     ? 'Posting full reset'
     : resetOnly
       ? 'Demo postings reset'
-      : setupUsCoa
-        ? 'USA chart of accounts setup'
-        : 'Indian demo data setup';
+      : syncInvoices
+        ? 'Demo invoice sync'
+        : setupUsCoa
+          ? 'USA chart of accounts setup'
+          : 'Indian demo data setup';
 
   run
     .then(() => {
@@ -1707,6 +1938,9 @@ if (require.main === module) {
 export {
   setupIndianDemoData,
   setupUsOfficeChartOfAccounts,
+  upsertDemoInvoicesFromCsv,
+  syncDemoInvoicesFromCsv,
+  upsertReconciliationBankPostingsFromCsv,
   resetDemoPostingsAndReceipts,
   resetAllPostingsFromCSV,
 };

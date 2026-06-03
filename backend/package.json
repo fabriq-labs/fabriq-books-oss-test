@@ -1,7 +1,7 @@
 {
-  "name": "hasura-clone",
+  "name": "fabriq-backend",
   "version": "1.0.0",
-  "description": "A TypeScript-based GraphQL API generator with automatic CRUD API generation and type-safe operations",
+  "description": "Fabriq Books API backend — metadata-driven REST/GraphQL, workflows, and AI agent",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc && node -e \"require('fs').cpSync('src/config', 'dist/config', {recursive: true, force: true})\"",
@@ -27,6 +27,7 @@
     "@apollo/server": "^4.9.5",
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@google-cloud/storage": "^7.14.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@prisma/client": "^5.22.0",
     "@slack/web-api": "^7.12.0",
     "@slidev/theme-default": "^0.25.0",

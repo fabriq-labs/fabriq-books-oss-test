@@ -195,6 +195,52 @@ INSERT INTO public.role_view (id, role_id, view_id, created_at, updated_at, crea
 INSERT INTO public.role_view (id, role_id, view_id, created_at, updated_at, created_by, modified_by, org_id) VALUES ('rovi_f4dea380-3293-43ad-a67b-6a0ba952325c', 'role_2c4accef-74a0-4b10-9bc9-dcad64442013', 'view_0498aa82-23bc-4632-af52-73c3d03a8245', '2025-09-05 22:12:59.54', '2025-09-05 22:03:52.469', NULL, NULL, NULL);
 INSERT INTO public.role_view (id, role_id, view_id, created_at, updated_at, created_by, modified_by, org_id) VALUES ('rovi_f4dea380-3293-43ad-a67b-6a0ba9523777', 'role_2c4accef-74a0-4b10-9bc9-dcad64442013', 'view_f3def97d-a1f7-4800-b5ed-acce401e7c8b', '2025-09-05 22:12:59.54', '2025-09-05 22:03:52.469', NULL, NULL, NULL);
 
+-- import_run audit (import_run_view) - idempotent upsert section
+INSERT INTO public.permission (
+  id, view_id, field_name, access, created_at, updated_at, created_by, modified_by, org_id
+) VALUES (
+  'perm_import_run_view_read',
+  'view_7d95b281-6cc2-4ea8-bf4a-bf67d68f5741',
+  '*',
+  'read',
+  NOW(),
+  NOW(),
+  NULL,
+  NULL,
+  NULL
+)
+ON CONFLICT (view_id, field_name) DO UPDATE
+SET access = EXCLUDED.access,
+    updated_at = NOW();
+
+INSERT INTO public.role_view (
+  id, role_id, view_id, created_at, updated_at, created_by, modified_by, org_id
+) VALUES (
+  'rovi_import_run_super_admin',
+  'role_cc202e8c-204b-4451-b0fd-a9dc4cec5e38',
+  'view_7d95b281-6cc2-4ea8-bf4a-bf67d68f5741',
+  NOW(),
+  NOW(),
+  NULL,
+  NULL,
+  NULL
+)
+ON CONFLICT (role_id, view_id) DO NOTHING;
+
+INSERT INTO public.role_view (
+  id, role_id, view_id, created_at, updated_at, created_by, modified_by, org_id
+) VALUES (
+  'rovi_import_run_admin',
+  'role_6ccb8e78-f6cb-4ad5-bb6a-038958a71bad',
+  'view_7d95b281-6cc2-4ea8-bf4a-bf67d68f5741',
+  NOW(),
+  NOW(),
+  NULL,
+  NULL,
+  NULL
+)
+ON CONFLICT (role_id, view_id) DO NOTHING;
+
 
 -- Reporting views (account_hierarchy, account_balances, v_posting_legs, ...)
 -- are applied from prisma/migration/views.sql via src/utils/setup/applyDatabaseViews.ts

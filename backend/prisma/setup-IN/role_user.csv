@@ -14,7 +14,7 @@ ru_rohit_employee,role_83d156bf-0371-4f6d-9e6c-dddf2c6d4020,user_rohit_kumar,202
 ru_meera_employee,role_83d156bf-0371-4f6d-9e6c-dddf2c6d4020,user_meera_rao,2024-01-15T10:35:00Z,2024-01-15T10:35:00Z,system,system,org_indian_demo
 ru_meera_buyer,role_83c8876b-a13b-4098-84ca-da0832abade3,user_meera_rao,2024-01-15T10:35:00Z,2024-01-15T10:35:00Z,system,system,org_indian_demo
 ru_sanjay_employee,role_83d156bf-0371-4f6d-9e6c-dddf2c6d4020,user_sanjay_gupta,2024-01-15T10:40:00Z,2024-01-15T10:40:00Z,system,system,org_indian_demo
-ru_sanjay_buyer,role_83c8876b-a13b-4098-84ca-da0832abade3,user_sanjay_gupta,2024-01-15T10:40:00Z,2024-01-15T10:40:00Z,system,system,org_indian_demo
+ru_sanjay_finance,role_2c4accef-74a0-4b10-9bc9-dcad64442013,user_sanjay_gupta,2024-01-15T10:40:00Z,2024-01-15T10:40:00Z,system,system,org_indian_demo
 ru_sanjay_super,role_cc202e8c-204b-4451-b0fd-a9dc4cec5e38,user_sanjay_gupta,2024-01-15T10:40:00Z,2024-01-15T10:40:00Z,system,system,org_indian_demo
 ru_divya_employee,role_83d156bf-0371-4f6d-9e6c-dddf2c6d4020,user_divya_menon,2024-01-15T10:45:00Z,2024-01-15T10:45:00Z,system,system,org_indian_demo
 ru_divya_finance,role_2c4accef-74a0-4b10-9bc9-dcad64442013,user_divya_menon,2024-01-15T10:45:00Z,2024-01-15T10:45:00Z,system,system,org_indian_demo

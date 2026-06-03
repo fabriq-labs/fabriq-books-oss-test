@@ -18,6 +18,15 @@ import { pdf } from "@react-pdf/renderer";
 import { TrialBalancePDFDocument } from "@/components/pdf_generator/TrialBalancePdf";
 import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
+import { LegalEntityMultiSelect } from "@/components/Reports/LegalEntityMultiSelect";
+import {
+  ReportAdvancedField,
+  ReportAdvancedFilters,
+  ReportAdvancedSummaryChip,
+} from "@/components/Reports/ReportAdvancedFilters";
+import { ReportAccountFilter } from "@/components/Reports/ReportAccountFilter";
+import { ReportCurrencySelect } from "@/components/Reports/ReportCurrencySelect";
+import { useReportLegalEntitySelection } from "@/components/Reports/useReportLegalEntitySelection";
 import { isEntityHeadquarters, useEntity, CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import { aggregateTrialBalanceSectionRows } from "@/lib/aggregateTrialBalanceSectionRows";
 import {
@@ -206,20 +215,21 @@ export default function BalanceSheet() {
     [selectedCurrencyId, defaultReportingCurrencyId]
   );
 
-  const legalEntityIds = useMemo(
-    () => currentEntityId ? [currentEntityId] : [],
-    [currentEntityId]
-  );
+  const {
+    selectedLegalEntityIds,
+    setSelectedLegalEntityIds,
+    selectionReady,
+  } = useReportLegalEntitySelection(currentEntityId, entityLoading);
 
   const { data, loading, error, fetchTrialBalance } = useTrialBalance({
     dateRange: effectiveDateRange,
     view,
     currencyId: effectiveReportCurrencyId,
     currencyCode: reportCurrencyCode,
-    legalEntityIds,
+    legalEntityIds: selectedLegalEntityIds,
   });
 
-  const reportLoading = loading || entityLoading;
+  const reportLoading = loading || entityLoading || !selectionReady;
 
   const loadCurrencies = useCallback(async () => {
     setCurrenciesLoading(true);
@@ -267,6 +277,18 @@ export default function BalanceSheet() {
     return defaultCurrency?.code?.trim().toUpperCase() ?? "INR";
   }, [defaultCurrency]);
 
+  const legalEntitySummaryLabel = useMemo(() => {
+    if (selectedLegalEntityIds.length === 0) return "All entities";
+    if (selectedLegalEntityIds.length === 1) {
+      return entities.find((entity) => entity.id === selectedLegalEntityIds[0])?.legal_name ?? "1 entity";
+    }
+    return `${selectedLegalEntityIds.length} entities`;
+  }, [entities, selectedLegalEntityIds]);
+
+  const accountSummaryLabel = useMemo(() => {
+    return account?.name ?? account?.account_name ?? "All accounts";
+  }, [account]);
+
   const displayedData = showOnlyNonZero ? data.filter(hasNonZeroAmount) : data;
 
   const groupedData = (data: TrialBalanceRow[]) => {
@@ -299,16 +321,16 @@ export default function BalanceSheet() {
   };
 
   useEffect(() => {
-    if (entityLoading) return;
+    if (entityLoading || !selectionReady) return;
     void fetchTrialBalance(account);
-  }, [entityLoading, fetchTrialBalance, account]);
+  }, [entityLoading, selectionReady, fetchTrialBalance, account]);
 
   useEffect(() => {
     if (!fetchOnButtonClick) return;
-    if (entityLoading) return;
+    if (entityLoading || !selectionReady) return;
     void fetchTrialBalance(account);
     setFetchOnButtonClick(false);
-  }, [fetchOnButtonClick, entityLoading, fetchTrialBalance, account]);
+  }, [fetchOnButtonClick, entityLoading, selectionReady, fetchTrialBalance, account]);
 
   const getClassificationIcon = (classification: string) => {
     const normalized = classification.toLowerCase();
@@ -596,17 +618,13 @@ export default function BalanceSheet() {
 
           <div className="flex items-center gap-2 flex-nowrap overflow-x-auto ml-auto">
             <ReportControls
-              selectedAccount={account}
-              onAccountChange={handleAccountChange}
-              onAccountClear={handleAccountClear}
               onRefresh={handleRefresh}
               loading={reportLoading}
-              showAccountFilter={true}
+              showAccountFilter={false}
               showRefreshButton={true}
               className="!flex-row !items-center !gap-2 shrink-0"
               beforeRefresh={
                 <>
-                  {/* Financial year selector */}
                   <FinancialYearSelector
                     fyType={currentEntity?.financial_year_type}
                     value={selectedFY.value}
@@ -614,7 +632,6 @@ export default function BalanceSheet() {
                     className="w-[130px] h-9 border-slate-300 text-sm shrink-0"
                   />
 
-                  {/* Month selector — null = All Months */}
                   <Select
                     value={selectedMonth?.value ?? "__all__"}
                     onValueChange={(v) => {
@@ -633,31 +650,6 @@ export default function BalanceSheet() {
                       {monthOptions.map((m) => (
                         <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Currency — shows ISO code only */}
-                  <Select
-                    value={selectedCurrencyId ? selectedCurrencyId : "__default__"}
-                    onValueChange={(v) => setSelectedCurrencyId(v === "__default__" ? "" : v)}
-                    disabled={currenciesLoading && sortedActiveCurrencies.length === 0}
-                  >
-                    <SelectTrigger className="w-[110px] h-9 border-slate-300 text-sm shrink-0">
-                      <DollarSign className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
-                      <SelectValue placeholder={currenciesLoading ? "…" : "Default"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__default__">
-                        {entityLoading ? "…" : orgDefaultLabel}
-                      </SelectItem>
-                      {sortedActiveCurrencies.map((row) => (
-                        <SelectItem key={row.id || row.code} value={row.id}>
-                          {row.code.toUpperCase()}
-                        </SelectItem>
-                      ))}
-                      {selectedCurrencyId && !selectedCurrencyInMasterList && (
-                        <SelectItem value={selectedCurrencyId}>{reportCurrencyCode}</SelectItem>
-                      )}
                     </SelectContent>
                   </Select>
                 </>
@@ -693,6 +685,56 @@ export default function BalanceSheet() {
             </DropdownMenu>
           </div>
         </div>
+
+        <ReportAdvancedFilters
+          summary={
+            <>
+              <ReportAdvancedSummaryChip>{legalEntitySummaryLabel}</ReportAdvancedSummaryChip>
+              <ReportAdvancedSummaryChip>{reportCurrencyCode}</ReportAdvancedSummaryChip>
+              <ReportAdvancedSummaryChip>{accountSummaryLabel}</ReportAdvancedSummaryChip>
+            </>
+          }
+        >
+          <ReportAdvancedField
+            label="Legal entity"
+            hint="None selected includes all entities. Choose one or more to scope the report."
+          >
+            <LegalEntityMultiSelect
+              entities={entities}
+              selectedIds={selectedLegalEntityIds}
+              onChange={setSelectedLegalEntityIds}
+              disabled={entityLoading}
+              className="w-full justify-between"
+            />
+          </ReportAdvancedField>
+
+          <ReportAdvancedField
+            label="Currency"
+            hint="Reporting currency for balances. Default uses the entity's base currency."
+          >
+            <ReportCurrencySelect
+              selectedCurrencyId={selectedCurrencyId}
+              onSelectedCurrencyIdChange={setSelectedCurrencyId}
+              sortedActiveCurrencies={sortedActiveCurrencies}
+              orgDefaultLabel={orgDefaultLabel}
+              reportCurrencyCode={reportCurrencyCode}
+              selectedCurrencyInMasterList={selectedCurrencyInMasterList}
+              currenciesLoading={currenciesLoading}
+              entityLoading={entityLoading}
+            />
+          </ReportAdvancedField>
+
+          <ReportAdvancedField
+            label="Account"
+            hint="Optional. Limit the balance sheet to a single account and its roll-up."
+          >
+            <ReportAccountFilter
+              selectedAccount={account}
+              onAccountChange={handleAccountChange}
+              onAccountClear={handleAccountClear}
+            />
+          </ReportAdvancedField>
+        </ReportAdvancedFilters>
 
         {/* View tabs + activity filter */}
         <div className="mt-3 flex flex-wrap items-center gap-4">

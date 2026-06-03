@@ -24,6 +24,7 @@ This directory documents the Workbench agent subsystem. All documents reflect co
 | Posting domain model, contra-account as category | [features/POSTING_DOMAIN.md](./features/POSTING_DOMAIN.md) | `handlers/erp/utils/categorizationUtils.ts` |
 | Diagnosing failed/stuck sessions | [debugging/SESSION_FAILURE_PATTERNS.md](./debugging/SESSION_FAILURE_PATTERNS.md) | `AgentService.ts`, `routes.ts` |
 | In-app conversational chat (non-session) — history, PageContext, SDK | [CONVERSATION.md](./CONVERSATION.md) | `ChatUI.tsx`, `ChatContext.tsx`, `AgentService.ts` |
+| MCP server — design, tools, Cursor setup (WIP) | [MCP.md](./MCP.md) | `src/mcp/` |
 
 ---
 
