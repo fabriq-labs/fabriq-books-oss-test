@@ -75,21 +75,34 @@ export function getCreateRecordSchema(toolContext?: { modelName?: string }) {
   });
 }
 
+/** Scalar filter value, or nested object/array for or/and logical filters. */
+export const searchFilterValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string()).describe('Account ids for in operator, e.g. ["acco_…", "acco_…"]'),
+  z.record(z.any()).describe('Nested condition for or/and, e.g. { "created_at": { "gte": "...", "lte": "..." } }'),
+  z
+    .array(z.record(z.any()))
+    .describe('Array of branches for or/and, e.g. [{ "created_at": { "gte": "...", "lte": "..." } }]'),
+]);
+
+export const searchFilterSchema = z.object({
+  field: z.string().describe('Field name, or "or" / "and" for logical groups'),
+  operator: z
+    .string()
+    .describe(
+      'Operator: eq, neq, gt, gte, lt, lte, icontains, ncontains, or, and. For or/and, value is an array of nested field conditions.'
+    ),
+  value: searchFilterValueSchema,
+});
+
 export const searchRecordsSchema = z.object({
   modelName: z.string().describe('Name of the model to search in'),
   search: z
     .union([
-      z.array(
-        z.object({
-          field: z.string().describe('Field name to search on'),
-          operator: z
-            .string()
-            .describe(
-              'Operator: eq, neq, gt, gte, lt, lte, in, nin, contains, icontains (NOT ilike — use icontains), startsWith, endsWith'
-            ),
-          value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
-        })
-      ),
+      z.array(searchFilterSchema),
       z
         .record(z.any())
         .describe('Legacy object format — prefer array format'),

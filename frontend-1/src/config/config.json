@@ -1,7 +1,7 @@
 {
-  "appName": "Fabriq Books",
-  "appTagline": "Agentic FinOps",
+  "appName": "Zeiv",
+  "appTagline": "Procurement Management System",
   "sidebarFallbackName": "Fabriq Books",
   "copyright": "fabriq labs inc",
-  "appId": "fabriq_books"
+  "appId": "zeiv"
 }

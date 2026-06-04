@@ -129,7 +129,7 @@ export class ToolManager {
         // Posting model gets search + write tools + advanced SQL + reconciliation + categorization
         if (modelName === 'posting') {
             return {
-                searchRecords: searchRecordsTool(auth),
+                searchRecords: searchRecordsTool(auth, toolContext),
                 createRecord: createRecordTool(auth, toolContext),
                 updateRecord: updateRecordTool(auth, toolContext),
                 advancedSqlQuery: advancedSqlQueryTool(auth),

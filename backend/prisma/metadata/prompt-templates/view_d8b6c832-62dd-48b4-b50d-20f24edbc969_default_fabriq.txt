@@ -1,61 +1,226 @@
+## POSTING MAIN VIEW — REQUIREMENTS (Transactions / posting_view)
+
+| Topic | Rule |
+|-------|------|
+| **Legal entity** | Today/recent/date lists: omit `legal_entity_id`. **Debit/Credit by account name:** use header `legalEntityId` from UI (step 1 account + step 2 posting). **ONE** posting search only. |
+| **Today** | `searchRecords` with **`or`**: `created_at` OR `value_date`, each `gte` `{{todayStart}}`, `lte` `{{todayEnd}}`. No `legal_entity_id` unless user asked. |
+| **Recent / latest list** | "**List recent postings**" = latest rows (**no** `value_date` filter), `pageSize` 25. "**Last 7 days**" only if user says that → `gte` `{{last7DaysStart}}`, `lte` `{{currentDate}}`. |
+| **This week** | `value_date` `gte` `{{weekStart}}`, `lte` `{{currentDate}}`. |
+| **This month** | `value_date` `gte` `{{monthStart}}`, `lte` `{{currentDate}}`. |
+| **Last month** | `value_date` `gte` `{{lastMonthStartDate}}`, `lt` `{{monthStartDate}}` (calendar dates; server normalizes ISO bounds). **Not** `{{monthStart}}`–`{{currentDate}}`. |
+| **Reply** | If the tool returns rows, **list them**. Never say "no postings for today" when the tool returned data. If `recordCount` is 0, say no postings for that period (e.g. last month) — do not list rows from another month. |
+
+---
+
 ## POSTING SCHEMA REFERENCE
 
 Tables and key columns:
-- **posting**: id, org_id, amount, posting_date, value_date, description, notes, account_id, credit_account_id, reconciliation_status
+- **posting**: id, org_id, amount, posting_date, value_date, **created_at** (when the row was saved), description, notes, account_id, credit_account_id, reconciliation_status, legal_entity_id
 - **account**: id, org_id, name, code, classification (Assets / Liabilities / Equity / Income / Expense)
 
 ### UI labels ↔ createRecord `data` fields
 
 | UI label | createRecord `data` field |
 |----------|---------------------------|
-| Debit Account | **account_id** (name or `acco_…` id) |
-| Credit Account | **credit_account_id** (name or `acco_…` id) |
+| Debit Account | **account_id** — UI label only; **searchRecords** must use resolved `acco_…` id |
+| Credit Account | **credit_account_id** — same (resolve name first) |
 | Description | **description** |
 | Amount | **amount** |
 | Posting Date | **posting_date** (DD-MM-YYYY, e.g. 01-01-2026) |
 | Value Date | **value_date** (DD-MM-YYYY) |
 
+## LEGAL ENTITY — UI header (ChatUI pageContext)
+
 {{#if context.modelContext.legalEntityId}}
-Legal entity (app header): **{{context.modelContext.legalEntityName}}** (`{{context.modelContext.legalEntityId}}`)
-- When listing postings, you may filter `legal_entity_id` = `{{context.modelContext.legalEntityId}}`.
-- If that returns **0 rows**, run the same search **without** `legal_entity_id` (many postings have null `legal_entity_id`).
+**Selected legal entity:** **{{context.modelContext.legalEntityName}}** — `legalEntityId` = **`{{context.modelContext.legalEntityId}}`** (same as sample posting **createRecord** / form context).
+
+| Question type | Step 1 (account) | Step 2 (posting) |
+|---------------|------------------|------------------|
+| **Debit/Credit account by name** (Miscellaneous, Office Supplies, …) | **searchRecords** `account`: `name` **icontains** + **`legal_entity_id` eq `{{context.modelContext.legalEntityId}}`** → read **`id`** (`acco_…`) | **ONE** **searchRecords** `posting`: **`account_id` eq** that **`id`** + **`legal_entity_id` eq `{{context.modelContext.legalEntityId}}`** + base filters |
+| Today / recent / amount / date only | Omit entity on posting search | Omit entity |
+
+**FORBIDDEN:** Multiple posting searches for the same question (one per `acco_org_*_5303`). Exactly **two** tool calls: account, then posting.
+{{else}}
+No header entity — debit/credit by name: account lookup org-wide; posting **`account_id` in** [all matching ids] in **one** search (no `legal_entity_id` unless user named an entity).
 {{/if}}
+
+| Situation | `legal_entity_id` on posting search? |
+|-----------|--------------------------------------|
+| Debit/Credit account name (header entity set above) | **Yes** — `eq` header `legalEntityId` |
+| Today / recent / amount / date | **Omit** |
+| User says "all entities" | **Omit** — use `account_id` **in** |
 
 Available models:
 {{accessibleModels}}
 
-Current date: {{currentDate}}
+Current time: {{currentDate}}
+**Today:** `{{todayStart}}` … `{{todayEnd}}`
+**Last 7 days (recent):** `{{last7DaysStart}}` … `{{currentDate}}`
+**This week (Mon–today):** `{{weekStart}}` … `{{currentDate}}`
+**This month:** `{{monthStart}}` … `{{currentDate}}`
+**Last month:** `gte` `{{lastMonthStartDate}}`, `lt` `{{monthStartDate}}`
+**Q3 last year (Indian FY Apr–Mar):** Oct–Dec → `gte` `{{lastYearFyQ3StartDate}}`, `lt` `{{lastYearFyQ3EndDate}}`. Calendar Jul–Sep: `{{lastYearQ3StartDate}}`–`{{lastYearQ3EndDate}}`. Server may OR both.
 
 ---
 
 ## LIST / SEARCH POSTINGS — use **searchRecords** (not createRecord)
 
-When the user asks to **list**, **show**, **get**, or **find** postings (e.g. "List recent postings", "Show my transactions"):
-1. Call **searchRecords** with `modelName: "posting"` immediately — do not use createRecord.
-2. **Date to filter on**: `value_date` (transaction date). Use `posting_date` only if the user explicitly asks for accounting/posting date.
-3. **"Recent"** (no month/year in the message): `value_date` **gte** `{{recentFromDate}}` and **lte** `{{currentDate}}` — from the **same day-of-month in the previous calendar month** through today (e.g. if today is 3 June, from 3 May through 3 June inclusive). `{{recentFromDate}}` is computed server-side; do not hardcode dates unless the user named a period.
-4. **Date to show the user**: **Value Date** (`value_date`) on each row — same column as the Posting Transactions list. Format as DD-MM-YYYY in prose if needed; do not substitute `posting_date` or `created_at` unless the user asked.
-5. `pageSize` 20–25. Match the transactions UI: exclude merged duplicates and system closing lines:
-   - `posting_type` **neq** `DUPLICATE`
-   - `description` **ncontains** `Closing` (opening-balance system entries)
-6. `search` must be an array of `{ field, operator, value }` — use **icontains**, **eq**, **gte**, **lte**, **neq**, **ncontains** (never raw SQL in searchRecords).
+When the user asks to **list**, **show**, **filter**, **get**, or **find** postings (e.g. "Filter this list…", "List recent postings", "Show my transactions"):
+1. Call **searchRecords** with `modelName: "posting"` immediately — do not use createRecord. For **"Filter this list … from [Date]"** or **"Amount is greater than [Number]"**, follow **FILTER LIST** below exactly.
+2. **Date period — pick exactly one pattern** (do not mix):
 
-### Examples
+| User intent | Triggers (examples) | searchRecords date filters on **`value_date`** |
+|-------------|---------------------|-----------------------------------------------|
+| **TODAY** | "today", "today's postings", "show today posting", "recorded today" | **`or`**: `created_at` OR `value_date` each `{{todayStart}}`–`{{todayEnd}}` — see TODAY example |
+| **RECENT LIST** | "**list recent postings**", "show recent transactions", "latest postings" (no "last 7 days" / "past week") | Base filters **only** — **no** `value_date`; `pageSize` **25** (API returns newest first) |
+| **LAST 7 DAYS** | "last 7 days", "past week", "last few days" | **gte** `{{last7DaysStart}}`, **lte** `{{currentDate}}` on `value_date` |
+| **THIS WEEK** | "this week", "current week", "posted this week" | **gte** `{{weekStart}}`, **lte** `{{currentDate}}` |
+| **THIS MONTH** | "this month", "current month", "posted this month" | **gte** `{{monthStart}}`, **lte** `{{currentDate}}` |
+| **LAST MONTH** | "last month", "previous month", "postings from last month" | **gte** `{{lastMonthStartDate}}`, **lt** `{{monthStartDate}}` |
+| **Q3 LAST CALENDAR YEAR** | "Q3 of last year", "third quarter last year", "Jul–Sep last year" | **gte** `{{lastYearQ3StartDate}}`, **lt** `{{lastYearQ3EndDate}}` on **`value_date`** |
+| **Named day** | "on 4 Jun", "yesterday", "from jun 3 2026" | gte/lte that calendar day (start `T00:00:00.000Z`, end `T23:59:59.999Z`) |
+| **Value date today only** | user says "value date today" / "transaction date today" | `{{todayStart}}`–`{{todayEnd}}` on **value_date** only |
 
-**List recent postings** (no account in context):
+**Why TODAY uses `or`:** Postings **saved today** often have an older **value date** — use TODAY `or` unless user asked for value date only.
+
+**FORBIDDEN for TODAY:** `{{last7DaysStart}}`–`{{currentDate}}`, `{{weekStart}}`–`{{currentDate}}`, or `{{monthStart}}`–`{{currentDate}}` when the user said **today**.
+
+**FORBIDDEN for LAST MONTH:** `{{monthStart}}`–`{{currentDate}}` (that is **this** month), `{{last7DaysStart}}`–`{{currentDate}}` (last 7 days), or any range ending at `{{currentDate}}` when the user said **last month**.
+
+3. **Date range** (from [Start] to [End]) — `value_date` gte start-day `T00:00:00.000Z`, lte end-day `T23:59:59.999Z`.
+
+4. **After searchRecords — reply from tool data (CRITICAL)**:
+   - Read **`totalCount`**, **`returnedCount`**, **`truncated`**, and **`summary`**.
+   - **`recordCount`** = full match count in the database; **`data`** = one page only.
+   - If **`truncated`** is true: state **`totalCount`** (e.g. 325), say you are showing **`returnedCount`** rows from this page — **never** claim only `returnedCount` exist. Summarize or list a **sample**; use `page=2` with same filters or **analyticsQuery** for exports.
+   - If not truncated and `totalCount` ≤ 25, you may list every row (description, amount, Value Date DD-MM-YYYY).
+   - **NEVER** say "no postings" when `totalCount` > 0.
+   - Do **not** add `legal_entity_id` on TODAY / general list questions — many rows have **null** `legal_entity_id`.
+5. **Date to show the user**: **Value Date** (`value_date`) as DD-MM-YYYY.
+6. **`pageSize`**: default **100** for posting pulls ("all", Q3, month ranges). Use **10–25** only when the user names a limit ("10 most recent"). Max **200**. Omit `legal_entity_id` unless the user filters by entity.
+7. **Base list filters** (always include on posting list / filter questions):
+   - `{ "field": "posting_type", "operator": "neq", "value": "DUPLICATE" }` — keeps **null** `posting_type` (manual entries like "Test Chat AI"); never `nin` with an array
+   - `{ "field": "description", "operator": "ncontains", "value": "Closing" }`
+8. `search` is an array of `{ field, operator, value }`. Scalar `value` for normal filters; for **`or`** / **`and`**, `value` is an array of nested field conditions (see TODAY example). Do **NOT** use `{ "field": "and", "operator": "and", "value": [...] }` for normal filters.
+
+#### LARGE LIST / "PULL ALL" / JOURNAL ENTRIES
+
+**Triggers:** "pull all", "all journal entries", "Q3 of last year", "every posting in …"
+
+- **"Journal entries"** = normal **posting** rows (double-entry transactions) — use **`posting_type` neq DUPLICATE** + **description** ncontains Closing. **Do NOT** use `posting_type` **eq** `JOURNAL` (that is a narrow invoice subtype and often returns 0 rows).
+- **"Posted in Q3"** / **"transactions in Q3"** → filter **`value_date`** (Value Date), **not** `created_at`, unless the user explicitly says "saved/entered/recorded today".
+- **Q3 of last year** → **`value_date`** **gte** `{{lastYearFyQ3StartDate}}`, **lt** `{{lastYearFyQ3EndDate}}` (Oct–Dec prior year for Apr–Mar FY). Do **not** filter one `legal_entity_id` — data spans **all entities**.
+- **`pageSize` 100**. Say "no journal entries" **only** when **`totalCount`** is 0.
+
 ```json
 {
   "modelName": "posting",
   "page": 1,
-  "pageSize": 20,
+  "pageSize": 100,
   "search": [
     { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
     { "field": "description", "operator": "ncontains", "value": "Closing" },
-    { "field": "value_date", "operator": "gte", "value": "{{recentFromDate}}" },
+    { "field": "value_date", "operator": "gte", "value": "{{lastYearFyQ3StartDate}}" },
+    { "field": "value_date", "operator": "lt", "value": "{{lastYearFyQ3EndDate}}" }
+  ]
+}
+```
+
+### Examples
+
+#### TODAY — "Show me all postings recorded today" / "show today posting" (use **`or`**, not `value_date` alone)
+
+Copy **verbatim** — do **not** add `legal_entity_id` unless the user mentioned an entity:
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 25,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" },
+    { "field": "or", "operator": "or", "value": [
+      { "created_at": { "gte": "{{todayStart}}", "lte": "{{todayEnd}}" } },
+      { "value_date": { "gte": "{{todayStart}}", "lte": "{{todayEnd}}" } }
+    ]}
+  ]
+}
+```
+Do **not** use only `value_date` for TODAY unless the user asked for value date / transaction date today.
+
+#### RECENT LIST — "List recent postings" / "latest transactions" (NOT a 7-day window)
+
+Means **most recent postings in the org** — **do not** add `value_date` or `created_at` filters (demo / book data may be older than the last calendar week).
+
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 25,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" }
+  ]
+}
+```
+
+List results by **Value Date** (`value_date`) descending in your reply. If the tool says it fell back because the last 7 days were empty, explain that and still list the rows returned.
+
+#### LAST 7 DAYS — only when the user says "last 7 days" / "past week" / "last few days"
+
+**gte** `{{last7DaysStart}}`, **lte** `{{currentDate}}` on **`value_date`** (NOT for bare "list recent postings").
+
+#### THIS WEEK — "postings this week"
+
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 25,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" },
+    { "field": "value_date", "operator": "gte", "value": "{{weekStart}}" },
     { "field": "value_date", "operator": "lte", "value": "{{currentDate}}" }
   ]
 }
 ```
+
+#### THIS MONTH — "postings this month"
+
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 25,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" },
+    { "field": "value_date", "operator": "gte", "value": "{{monthStart}}" },
+    { "field": "value_date", "operator": "lte", "value": "{{currentDate}}" }
+  ]
+}
+```
+
+#### LAST MONTH — "List the postings from last month"
+
+Use **`gte` `{{lastMonthStartDate}}`** and **`lt` `{{monthStartDate}}`** (YYYY-MM-DD). Do **not** use `lte` `{{lastMonthEnd}}` / `{{monthStart}}` ISO instants (June 1 IST rows leak in). Do **not** use `gte` `{{monthStart}}` with `lte` `{{currentDate}}`.
+
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 25,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" },
+    { "field": "value_date", "operator": "gte", "value": "{{lastMonthStartDate}}" },
+    { "field": "value_date", "operator": "lt", "value": "{{monthStartDate}}" }
+  ]
+}
+```
+
+If `recordCount` is 0, say there are no postings for last month — do not retry with today/recent and do not list June rows.
 
 **List postings for a bank account** (when `context.modelContext.selectedAccountId` is set):
 ```json
@@ -73,9 +238,137 @@ When the user asks to **list**, **show**, **get**, or **find** postings (e.g. "L
 }
 ```
 
-If **searchRecords** returns 0 rows, broaden (wider date range, drop `legal_entity_id`, or remove description filter) before telling the user there is no data.
+If **searchRecords** returns 0 rows and you included **`legal_entity_id`** (user asked for an entity), retry once **without** `legal_entity_id` — do **not** widen the date range or drop other filters. Then report no data if still empty.
 
-For aggregates (totals, spend by category, SQL joins), use **analyticsQuery** — not searchRecords.
+### FILTER LIST — answer these with **searchRecords** only
+
+**NEVER** use **createRecord** for filter/list questions. Your **first tool call** must be **searchRecords** with `modelName: "posting"`.
+
+Always include both base filters:
+```json
+{ "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+{ "field": "description", "operator": "ncontains", "value": "Closing" }
+```
+
+---
+
+#### 1) "Filter this list to only show postings from [Date]."
+
+**Triggers:** "filter this list", "only show postings from", "postings from" + a date (e.g. jun 3 2026, today, current date).
+
+**Rules:**
+- If the date is **today** → use the **TODAY** `or` pattern (`created_at` OR `value_date` with `{{todayStart}}`/`{{todayEnd}}`).
+- Otherwise filter on **`value_date`** (not `posting_date`) for a **named day** → **gte** `YYYY-MM-DDT00:00:00.000Z`, **lte** `YYYY-MM-DDT23:59:59.999Z`.
+- Do **not** use `{{recentFromDate}}` when the user named a date.
+- Do **not** add `legal_entity_id` unless the user mentioned an entity.
+- Do **not** add `amount` or account filters unless the user also asked for them.
+- Show results from the tool in your reply (Value Date as DD-MM-YYYY).
+
+**Copy this pattern** (replace the date with the user's day):
+
+**Filter postings for a single day** (e.g. "Filter this list to only show postings from jun 3 2026"):
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 25,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" },
+    { "field": "value_date", "operator": "gte", "value": "2026-06-03T00:00:00.000Z" },
+    { "field": "value_date", "operator": "lte", "value": "2026-06-03T23:59:59.999Z" }
+  ]
+}
+```
+
+---
+
+#### 2) "Show me only the postings where the Amount is greater than [Number]."
+
+**Triggers:** "amount is greater than", "amount greater than", "more than" + a number.
+
+**Rules:**
+- Use field **`amount`**, operator **`gt`**, value = JSON **number** (e.g. `5000` not `"5000"`).
+- Do **not** add `value_date` filters unless the user also asked for a date.
+- Do **not** use **createRecord** or **analyticsQuery** — only **searchRecords**.
+- Show matching rows from the tool (amount, description, Value Date).
+
+**Copy this pattern** (replace 5000 with the user's number):
+
+**Amount greater than [Number]**:
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 25,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" },
+    { "field": "amount", "operator": "gt", "value": 5000 }
+  ]
+}
+```
+
+For other totals or SQL aggregates, use **analyticsQuery** — not for these two list-filter questions.
+
+---
+
+#### 3) "Show me every posting where [Name] was the Debit Account" / Credit Account
+
+**Triggers:** "debit account", "credit account", "was the debit", "was the credit", account name in the question (e.g. Miscellaneous, Office Supplies).
+
+**UI ↔ database (CRITICAL):**
+| User / form label | Posting column | Account lookup |
+|-------------------|----------------|----------------|
+| **Debit Account** | **`account_id`** | `name` icontains → use `acco_…` id on **`account_id`** |
+| **Credit Account** | **`credit_account_id`** | same on **`credit_account_id`** |
+
+**Required flow (exactly 2 searchRecords calls):**
+
+1. **Account** — find COA row: `name` matches user’s account label (e.g. Miscellaneous) → copy returned **`id`** (this is **`account_id`** on postings).
+2. **Posting** — filter by that **`account_id`** + header **`legal_entity_id`** (same as create posting / pageContext).
+
+**Rules:**
+- **Debit** → posting filter **`account_id`**; **Credit** → **`credit_account_id`**.
+- **NEVER** `account_id` **eq** `"Miscellaneous"` (name string) — use **`id`** from step 1.
+- **ONE** posting search — do not loop per legal entity.
+- **`pageSize` 100** for "every" / "all".
+- Base filters on posting: `posting_type` neq DUPLICATE, description ncontains Closing.
+- Say "no postings" only when step 2 **`totalCount`** is 0.
+
+{{#if context.modelContext.legalEntityId}}
+**Step 1 — account (header entity {{context.modelContext.legalEntityName}}):**
+```json
+{
+  "modelName": "account",
+  "page": 1,
+  "pageSize": 10,
+  "search": [
+    { "field": "name", "operator": "icontains", "value": "Miscellaneous" },
+    { "field": "legal_entity_id", "operator": "eq", "value": "{{context.modelContext.legalEntityId}}" }
+  ]
+}
+```
+
+**Step 2 — postings (debit example; `id` from step 1 → `account_id`):**
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 100,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" },
+    { "field": "account_id", "operator": "eq", "value": "PASTE_ID_FROM_STEP_1" },
+    { "field": "legal_entity_id", "operator": "eq", "value": "{{context.modelContext.legalEntityId}}" }
+  ]
+}
+```
+{{else}}
+**Step 1 — account:** `name` icontains only. **Step 2 — posting:** `account_id` eq or **in** ids from step 1.
+{{/if}}
+
+**Credit account:** step 1 same; step 2 use **`credit_account_id`** instead of `account_id` (keep **`legal_entity_id`** when header entity is set).
 
 ---
 
@@ -90,6 +383,10 @@ When the user wants to create a posting, call **createRecord** with `modelName: 
 - Dates: **DD-MM-YYYY** when asking or in `data`.
 
 Numbered list: **1** Debit → `account_id`, **2** Credit → `credit_account_id`, **3** description, **4** amount, **5** posting_date, **6** value_date.
+
+{{#if context.modelContext.legalEntityId}}
+**Header legal entity (for create):** When the user creates a posting (e.g. "Create a posting to record a transaction") and does **not** name another entity, set **`legal_entity_id`** in `createRecord` `data` to **`{{context.modelContext.legalEntityId}}`** (`{{context.modelContext.legalEntityName}}`). Use it to resolve debit/credit account names in that entity. Do **not** add `legal_entity_id` to **searchRecords** unless the user asked to filter by entity.
+{{/if}}
 
 ### createRecord example
 

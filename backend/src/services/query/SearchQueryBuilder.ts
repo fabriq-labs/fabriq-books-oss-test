@@ -170,14 +170,22 @@ export class SearchQueryBuilder {
     filters.forEach(filter => {
       const { field, operator, value } = filter;
 
+      if (value === undefined || value === null || value === '') {
+        return;
+      }
+
       // Handle logical operators at root level
       if (field.toLowerCase() === 'or' && operator.toLowerCase() === 'or') {
-        where.OR = Array.isArray(value) ? value.map(v => this.convertObjectToFilters(v)) : [this.convertObjectToFilters(value)];
+        where.OR = Array.isArray(value)
+          ? value.map((v) => this.normalizeFilterEntry(v))
+          : [this.convertObjectToFilters(value)];
         return;
       }
 
       if (field.toLowerCase() === 'and' && operator.toLowerCase() === 'and') {
-        where.AND = Array.isArray(value) ? value.map(v => this.convertObjectToFilters(v)) : [this.convertObjectToFilters(value)];
+        where.AND = Array.isArray(value)
+          ? value.map((v) => this.normalizeFilterEntry(v))
+          : [this.convertObjectToFilters(value)];
         return;
       }
 
@@ -196,7 +204,12 @@ export class SearchQueryBuilder {
           where[field] = value;
           break;
         case 'neq':
-          where[field] = { not: value };
+        case 'ne': // LLMs often emit SQL-style ne; treat as neq
+          // Prisma { not: X } excludes NULL; SQL "<> X" / IS DISTINCT FROM keeps NULL rows
+          where.AND = where.AND || [];
+          where.AND.push({
+            OR: [{ [field]: null }, { [field]: { not: value } }],
+          });
           break;
         case 'gt':
           where[field] = { ...where[field], gt: value };
@@ -228,9 +241,19 @@ export class SearchQueryBuilder {
           };
           break;
         case 'ncontains':
-        case 'not_contains':
-          where[field] = { not: { contains: value } };
+        case 'not_contains': {
+          // (col IS NULL OR col NOT ILIKE '%x%') — field.not.contains does not support mode in Prisma
+          const needle =
+            typeof value === 'string' ? value.replace(/^%|%$/g, '') : value;
+          where.AND = where.AND || [];
+          where.AND.push({
+            OR: [
+              { [field]: null },
+              { NOT: { [field]: { contains: needle, mode: 'insensitive' } } },
+            ],
+          });
           break;
+        }
 
         case 'is_null':
           where[field] = null;
@@ -246,10 +269,14 @@ export class SearchQueryBuilder {
           where[field] = { endsWith: value };
           break;
         case 'and':
-          where.AND = Array.isArray(value) ? value.map(v => this.convertObjectToFilters(v)) : [this.convertObjectToFilters(value)];
+          where.AND = Array.isArray(value)
+            ? value.map((v) => this.normalizeFilterEntry(v))
+            : [this.convertObjectToFilters(value)];
           break;
         case 'or':
-          where.OR = Array.isArray(value) ? value.map(v => this.convertObjectToFilters(v)) : [this.convertObjectToFilters(value)];
+          where.OR = Array.isArray(value)
+            ? value.map((v) => this.normalizeFilterEntry(v))
+            : [this.convertObjectToFilters(value)];
           break;
         case 'not':
           where.NOT = this.convertObjectToFilters(value);
@@ -267,7 +294,222 @@ export class SearchQueryBuilder {
       }
     });
 
+    for (const key of Object.keys(where)) {
+      const v = where[key];
+      if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) {
+        delete where[key];
+      }
+    }
+
+    this.finalizeWhereDateBounds(where);
+
     return where;
+  }
+
+  /** Apply calendar-day bounds on root fields and inside OR branches (value_date / created_at / posting_date). */
+  private static finalizeWhereDateBounds(where: any): void {
+    if (!where || typeof where !== 'object') {
+      return;
+    }
+    for (const field of ['value_date', 'posting_date', 'created_at']) {
+      this.finalizeDateFieldDayBounds(where, field);
+    }
+    if (Array.isArray(where.OR)) {
+      for (const branch of where.OR) {
+        if (!branch || typeof branch !== 'object') continue;
+        for (const field of ['value_date', 'created_at', 'posting_date']) {
+          if (branch[field]) {
+            const nested: any = {};
+            nested[field] = branch[field];
+            this.finalizeDateFieldDayBounds(nested, field);
+            branch[field] = nested[field];
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * LLMs often send only `lte` (or only start-of-day `gte`) for a single calendar day.
+   * Complete missing bound(s) on the same UTC day so "today" does not match all history.
+   */
+  private static finalizeDateFieldDayBounds(where: any, field: string): void {
+    const cond = where[field];
+    if (cond === undefined || cond === null) {
+      return;
+    }
+
+    if (typeof cond !== 'object' || Array.isArray(cond) || cond instanceof Date) {
+      const bounds = this.calendarDayBounds(cond);
+      if (bounds) {
+        where[field] = { gte: bounds.gte, lt: bounds.lt };
+      }
+      return;
+    }
+
+    const hasGte = cond.gte != null && cond.gte !== '';
+    const hasLte = cond.lte != null && cond.lte !== '';
+    const hasLt = cond.lt != null && cond.lt !== '';
+    if (hasGte && (hasLte || hasLt)) {
+      const gteD = new Date(cond.gte);
+      const endD = new Date(hasLte ? cond.lte : cond.lt);
+      const now = new Date();
+      if (!Number.isNaN(gteD.getTime()) && !Number.isNaN(endD.getTime())) {
+        if (this.isMultiDayDateRange(cond.gte, hasLte ? cond.lte : cond.lt)) {
+          return;
+        }
+        if (this.isRecentFromMistakenForToday(gteD, endD, now)) {
+          const bounds = this.calendarDayBounds(endD);
+          if (bounds) {
+            where[field] = { gte: bounds.gte, lt: bounds.lt };
+          }
+          return;
+        }
+        if (this.sameUtcDate(gteD, endD) || this.sameCalendarDayFromIso(cond.gte, hasLte ? cond.lte : cond.lt)) {
+          const bounds = this.calendarDayBounds(cond.gte);
+          if (bounds) {
+            where[field] = { gte: bounds.gte, lt: bounds.lt };
+          }
+          return;
+        }
+      }
+      return;
+    }
+
+    const anchor = hasLte ? cond.lte : hasLt ? cond.lt : hasGte ? cond.gte : null;
+    if (anchor == null) {
+      return;
+    }
+
+    const bounds = this.calendarDayBounds(anchor);
+    if (!bounds) {
+      return;
+    }
+
+    if (!hasGte && (hasLte || hasLt)) {
+      where[field] = { gte: bounds.gte, lt: bounds.lt };
+    } else if (hasGte && !hasLte && !hasLt && this.isUtcStartOfDay(cond.gte)) {
+      where[field] = { gte: bounds.gte, lt: bounds.lt };
+    }
+  }
+
+  /**
+   * App calendar day (default IST UTC+5:30). Posting value_date is often midnight local;
+   * naive UTC day bounds miss rows (e.g. 2026-06-04 00:00 IST stored vs gte 2026-06-04T00:00:00Z).
+   */
+  private static getAppTimezoneOffsetMinutes(): number {
+    const raw = process.env.APP_TIMEZONE_OFFSET_MINUTES;
+    const parsed = raw ? parseInt(raw, 10) : 330;
+    return Number.isNaN(parsed) ? 330 : parsed;
+  }
+
+  private static calendarDayBounds(value: unknown): { gte: string; lt: string } | null {
+    const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+    if (!match) {
+      const d = value instanceof Date ? value : new Date(String(value));
+      if (Number.isNaN(d.getTime())) return null;
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return this.calendarDayBounds(`${y}-${m}-${day}`);
+    }
+    const [y, m, d] = match[1].split('-').map(Number);
+    const offset = this.getAppTimezoneOffsetMinutes();
+    const startUtc = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+    startUtc.setUTCMinutes(startUtc.getUTCMinutes() - offset);
+    const endUtc = new Date(startUtc);
+    endUtc.setUTCDate(endUtc.getUTCDate() + 1);
+    return { gte: startUtc.toISOString(), lt: endUtc.toISOString() };
+  }
+
+  private static sameCalendarDayFromIso(gte: unknown, lte: unknown): boolean {
+    const g = String(gte).slice(0, 10);
+    const l = String(lte).slice(0, 10);
+    return g.length === 10 && g === l;
+  }
+
+  /** Week/month ranges — do not collapse to a single calendar day. */
+  private static isMultiDayDateRange(gte: unknown, end: unknown): boolean {
+    const g = String(gte).slice(0, 10);
+    const e = String(end).slice(0, 10);
+    if (g.length !== 10 || e.length !== 10 || g === e) {
+      return false;
+    }
+    const gDay = /^\d{4}-\d{2}-\d{2}$/.test(String(gte).trim());
+    const eDay = /^\d{4}-\d{2}-\d{2}$/.test(String(end).trim());
+    if (gDay && eDay) {
+      return true;
+    }
+    const gteD = new Date(String(gte));
+    const endD = new Date(String(end));
+    if (Number.isNaN(gteD.getTime()) || Number.isNaN(endD.getTime())) {
+      return false;
+    }
+    return !this.sameUtcDate(gteD, endD);
+  }
+
+  private static isUtcStartOfDay(value: unknown): boolean {
+    const d = new Date(String(value));
+    if (Number.isNaN(d.getTime())) {
+      return false;
+    }
+    return (
+      d.getUTCHours() === 0 &&
+      d.getUTCMinutes() === 0 &&
+      d.getUTCSeconds() === 0 &&
+      d.getUTCMilliseconds() === 0
+    );
+  }
+
+  private static isUtcEndOfDay(value: Date): boolean {
+    return (
+      value.getUTCHours() === 23 &&
+      value.getUTCMinutes() === 59 &&
+      value.getUTCSeconds() === 59 &&
+      value.getUTCMilliseconds() >= 999
+    );
+  }
+
+  private static sameUtcDate(a: Date, b: Date): boolean {
+    return (
+      a.getUTCFullYear() === b.getUTCFullYear() &&
+      a.getUTCMonth() === b.getUTCMonth() &&
+      a.getUTCDate() === b.getUTCDate()
+    );
+  }
+
+  /** LLM uses {{recentFromDate}}–{{currentDate}} when the user asked for "today". */
+  private static isRecentFromMistakenForToday(gte: Date, lte: Date, now: Date): boolean {
+    if (
+      gte.getUTCFullYear() !== lte.getUTCFullYear() ||
+      gte.getUTCMonth() !== lte.getUTCMonth()
+    ) {
+      return false;
+    }
+    if (!this.sameUtcDate(lte, now) || !this.isUtcStartOfDay(gte)) {
+      return false;
+    }
+    const prevMonth = now.getUTCMonth() === 0 ? 11 : now.getUTCMonth() - 1;
+    const prevYear = now.getUTCMonth() === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+    return (
+      gte.getUTCDate() === now.getUTCDate() &&
+      gte.getUTCMonth() === prevMonth &&
+      gte.getUTCFullYear() === prevYear
+    );
+  }
+
+  /** Accepts legacy nested objects or searchRecords array items { field, operator, value }. */
+  private static normalizeFilterEntry(entry: any): any {
+    if (
+      entry &&
+      typeof entry === 'object' &&
+      typeof entry.field === 'string' &&
+      typeof entry.operator === 'string' &&
+      'value' in entry
+    ) {
+      return this.buildSearchWhereClause([entry as SearchFilter]);
+    }
+    return this.convertObjectToFilters(entry);
   }
 
   private static convertObjectToFilters(filterObject: any): any {

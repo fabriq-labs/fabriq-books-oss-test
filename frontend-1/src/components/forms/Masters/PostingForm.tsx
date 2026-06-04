@@ -21,6 +21,7 @@ import { SearchDropDown } from '../../search_dropdown/dropdown';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { useEntity } from '@/contexts/EntityContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
+import { buildPostingModelContext } from '@/utils/postingChatContext';
 import { Badge } from '@/components/ui/badge';
 
 const itemMasterSchema = z.object({
@@ -101,7 +102,7 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
     const { latestFormToolResponse } = useTool();
     const location = useLocation();
     const { setPageContext } = useChatContext();
-    const { currentEntityId } = useEntity();
+    const { currentEntity, entities, currentEntityId } = useEntity();
     const accountAdditionalFilters = currentEntityId
         ? { legal_entity_id: { eq: currentEntityId } }
         : undefined;
@@ -142,13 +143,22 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
             stateId: null,
             viewId: viewId || null,
             modelDisplayName: getModelDisplayName(modelName),
-            currentPath: location.pathname
+            currentPath: location.pathname,
+            modelContext: buildPostingModelContext(currentEntity, entities),
         });
 
         return () => {
             setPageContext(null);
         };
-    }, [id, viewId, location.pathname, setPageContext]);
+    }, [
+        id,
+        viewId,
+        location.pathname,
+        setPageContext,
+        currentEntity?.id,
+        currentEntity?.legal_name,
+        entities,
+    ]);
 
     // Handle latest form tool response updates
     useEffect(() => {

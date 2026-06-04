@@ -24,6 +24,7 @@ import {
 } from './chatUtils';
 import { useUserData } from '@/hooks/useUserData';
 import { useEntity } from '@/contexts/EntityContext';
+import { buildDefaultPostingChatContext, buildPostingModelContext } from '@/utils/postingChatContext';
 import Cookies from 'js-cookie';
 
 interface ChatMessage {
@@ -47,24 +48,20 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
     const { addToolData } = useTool();
     const { pageContext, messagesAi, setMessagesAi, clearMessages } = useChatContext();
     const { getBaseCurrencyCode } = useUserData();
-    const { currentEntityId, currentEntity } = useEntity();
+    const { currentEntityId, currentEntity, entities } = useEntity();
 
     const chatContext = useMemo(() => {
-        if (!pageContext) return undefined;
-        if (pageContext.modelName !== 'posting') return pageContext;
+        const base = pageContext ?? buildDefaultPostingChatContext(currentEntity, entities);
+        if (base.modelName !== 'posting') return base;
         return {
-            ...pageContext,
-            modelContext: {
-                ...pageContext.modelContext,
-                legalEntityId:
-                    pageContext.modelContext?.legalEntityId ?? currentEntityId ?? null,
-                legalEntityName:
-                    pageContext.modelContext?.legalEntityName ??
-                    currentEntity?.legal_name ??
-                    null,
-            },
+            ...base,
+            modelContext: buildPostingModelContext(
+                currentEntity,
+                entities,
+                base.modelContext
+            ),
         };
-    }, [pageContext, currentEntityId, currentEntity?.legal_name]);
+    }, [pageContext, currentEntity, entities, currentEntityId, currentEntity?.legal_name]);
     const token = Cookies.get("__session");
 
     const chatCurrencyCode = useMemo(

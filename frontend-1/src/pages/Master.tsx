@@ -15,7 +15,9 @@ import { FilterModal } from "@/components/filter/FilterModal";
 import { BulkEdit } from "@/components/masters/BulkEdit";
 import { EnhancedFilterBadges } from "@/components/filter/EnhancedFilterBadges";
 import { useChat as useChatContext } from "@/contexts/ChatContext";
+import { useEntity } from "@/contexts/EntityContext";
 import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
+import { buildPostingModelContext } from "@/utils/postingChatContext";
 import { BulkAction, MergeRow } from "@/types/bulkActions";
 import type { CellHighlightMap } from "@/components/masters/DynamicTable";
 import type { CustomRowRenderer, FilterEnhancements } from "@/types/customRowRenderer";
@@ -159,6 +161,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   const navigate = useNavigate();
   const location = useLocation();
   const { setPageContext } = useChatContext();
+  const { currentEntity, entities } = useEntity();
 
   interface MasterData {
     metaData?: any;
@@ -292,12 +295,26 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
       viewId: null,
       modelDisplayName: displayName || getModelDisplayName(type),
       currentPath: location.pathname,
+      ...(type === 'posting'
+        ? {
+            modelContext: buildPostingModelContext(currentEntity, entities),
+          }
+        : {}),
     });
 
     return () => {
       setPageContext(null);
     };
-  }, [type, view, displayName, location.pathname, setPageContext]);
+  }, [
+    type,
+    view,
+    displayName,
+    location.pathname,
+    setPageContext,
+    currentEntity?.id,
+    currentEntity?.legal_name,
+    entities,
+  ]);
 
   useEffect(() => {
     return () => {

@@ -1,6 +1,7 @@
 import { ModelService } from '../services/core/ModelService';
 import { AuthContext } from '../auth/types';
 import logger from '../utils/logger';
+import prisma from '../lib/prisma';
 
 const modelService = ModelService.getInstance();
 
@@ -66,7 +67,121 @@ async function resolveLegalEntityId(
   return null;
 }
 
-async function resolveAccountIdForPosting(
+function matchAccountsByName(rows: any[], trimmed: string): any[] {
+  const lower = trimmed.toLowerCase();
+  let matches = rows.filter((r) => (r.name || '').toLowerCase() === lower);
+  if (matches.length === 0) {
+    matches = rows.filter((r) => (r.name || '').toLowerCase().includes(lower));
+  }
+  return matches;
+}
+
+/** Org-wide COA lookup (bypasses view-scoped search that can hide accounts under other entities). */
+async function findAccountsByNameOrgWide(
+  auth: AuthContext,
+  trimmed: string
+): Promise<Array<{ id: string; name: string | null; legal_entity_id: string | null }>> {
+  const orgId = auth.user?.org_id;
+  if (!orgId) return [];
+
+  const prismaRows = await prisma.account.findMany({
+    where: {
+      org_id: orgId,
+      name: { contains: trimmed, mode: 'insensitive' },
+    },
+    take: 50,
+    select: { id: true, name: true, legal_entity_id: true },
+  });
+  if (prismaRows.length > 0) return prismaRows;
+
+  const result = await modelService.search('account', auth, {
+    search: [{ field: 'name', operator: 'icontains', value: trimmed }],
+    pageSize: 50,
+    page: 1,
+  });
+  return extractSearchRows(result);
+}
+
+/** Same COA code under the header legal entity (fixes wrong-entity acco_ id from the model). */
+export async function alignAccountIdToHeaderLegalEntity(
+  auth: AuthContext,
+  accountId: string,
+  preferredLegalEntityId?: string | null
+): Promise<string> {
+  const trimmed = String(accountId).trim();
+  const entityId = preferredLegalEntityId?.trim();
+  if (!trimmed.startsWith('acco_') || !entityId || !auth.user?.org_id) {
+    return trimmed;
+  }
+
+  const account = await prisma.account.findFirst({
+    where: { id: trimmed, org_id: auth.user.org_id },
+    select: { id: true, code: true, legal_entity_id: true },
+  });
+  if (!account?.code || account.legal_entity_id === entityId) {
+    return trimmed;
+  }
+
+  const sibling = await prisma.account.findFirst({
+    where: {
+      org_id: auth.user.org_id,
+      legal_entity_id: entityId,
+      code: account.code,
+    },
+    select: { id: true },
+  });
+  return sibling?.id ?? trimmed;
+}
+
+/**
+ * Resolve account name → id(s) for posting list/search.
+ * When header legal entity is set, prefer that entity's COA row (one eq) — do not search every entity.
+ */
+export async function resolveAccountIdsForPostingSearch(
+  auth: AuthContext,
+  nameOrId: string,
+  preferredLegalEntityId?: string | null
+): Promise<{ operator: 'eq' | 'in'; value: string | string[] }> {
+  const trimmed = String(nameOrId).trim();
+  if (trimmed.startsWith('acco_')) {
+    const aligned = await alignAccountIdToHeaderLegalEntity(
+      auth,
+      trimmed,
+      preferredLegalEntityId
+    );
+    return { operator: 'eq', value: aligned };
+  }
+
+  const rows = await findAccountsByNameOrgWide(auth, trimmed);
+  const matches = matchAccountsByName(rows, trimmed);
+
+  if (matches.length === 0) {
+    throw new Error(
+      `No account found for name "${trimmed}". Lookup is org-wide (do not filter account search by header legal entity).`
+    );
+  }
+
+  const exact = rows.filter((r) => (r.name || '').toLowerCase() === trimmed.toLowerCase());
+  const pool = exact.length > 0 ? exact : matches;
+
+  const entityId = preferredLegalEntityId?.trim() || null;
+  if (entityId) {
+    const forEntity = pool.filter((r) => r.legal_entity_id === entityId);
+    if (forEntity.length === 1) {
+      return { operator: 'eq', value: forEntity[0].id };
+    }
+    if (forEntity.length > 1) {
+      return { operator: 'in', value: forEntity.map((r) => r.id as string) };
+    }
+  }
+
+  if (pool.length === 1) {
+    return { operator: 'eq', value: pool[0].id };
+  }
+  return { operator: 'in', value: pool.map((r) => r.id as string) };
+}
+
+export async function resolveAccountIdForPosting(
   auth: AuthContext,
   nameOrId: string,
   legalEntityId?: string | null
@@ -74,24 +189,18 @@ async function resolveAccountIdForPosting(
   const trimmed = String(nameOrId).trim();
   if (trimmed.startsWith('acco_')) return trimmed;
 
-  const search: Array<{ field: string; operator: string; value: string }> = [
-    { field: 'name', operator: 'icontains', value: trimmed },
-  ];
-  if (legalEntityId) {
-    search.push({ field: 'legal_entity_id', operator: 'eq', value: legalEntityId });
-  }
-
   const result = await modelService.search('account', auth, {
-    search,
-    pageSize: 25,
+    search: [{ field: 'name', operator: 'icontains', value: trimmed }],
+    pageSize: 50,
     page: 1,
   });
   const rows = extractSearchRows(result);
-  const lower = trimmed.toLowerCase();
+  let matches = matchAccountsByName(rows, trimmed);
 
-  let matches = rows.filter((r) => (r.name || '').toLowerCase() === lower);
-  if (matches.length === 0) {
-    matches = rows.filter((r) => (r.name || '').toLowerCase().includes(lower));
+  if (legalEntityId && matches.length > 1) {
+    const inEntity = matches.filter((r) => r.legal_entity_id === legalEntityId);
+    if (inEntity.length === 1) return inEntity[0].id;
+    if (inEntity.length > 1) matches = inEntity;
   }
 
   if (matches.length === 1) return matches[0].id;
@@ -104,7 +213,7 @@ async function resolveAccountIdForPosting(
       )
       .join('; ');
     throw new Error(
-      `Multiple accounts match "${trimmed}". Matches: ${names}. Select the legal entity in the app header and retry.`
+      `Multiple accounts match "${trimmed}". Matches: ${names}. Ask which entity or use a more specific account name.`
     );
   }
 
@@ -175,10 +284,14 @@ export async function preparePostingCreatePayload(
     legalEntityId
   );
 
+  if (legalEntityId && !data.legal_entity_id) {
+    data.legal_entity_id = legalEntityId;
+  }
+
   logger.info('Posting create: resolved accounts, calling DAL', {
     account_id: data.account_id,
     credit_account_id: data.credit_account_id,
-    legalEntityId,
+    legal_entity_id: data.legal_entity_id,
   });
 
   return data;

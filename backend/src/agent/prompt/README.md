@@ -82,7 +82,12 @@ Replaces template variables with actual values.
 
 **Supported Placeholders:**
 
-- `{{currentDate}}` → Current ISO timestamp
+- `{{currentDate}}` → Current ISO timestamp (now; do not use alone for "today" day filters)
+- `{{todayStart}}` / `{{todayEnd}}` → start/end of today in app TZ (default IST)
+- `{{last7DaysStart}}` / `{{recentFromDate}}` → start of last 7 calendar days (recent listings)
+- `{{weekStart}}` → Monday of current week (app TZ)
+- `{{monthStart}}` → first day of current month (app TZ)
+- `{{lastMonthStart}}` / `{{lastMonthEnd}}` → previous calendar month (`gte` start, `lte` end where `lastMonthEnd` = `monthStart`)
 - `{{userId}}` → Current user ID
 - `{{modelName}}` → Model name
 - `{{viewName}}` → View name

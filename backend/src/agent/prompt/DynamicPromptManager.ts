@@ -4,6 +4,7 @@ import { ModelRegistry } from '../../services/registry/ModelRegistry';
 import prisma from '../../lib/prisma';
 import logger from '../../utils/logger';
 import { TOOL_RESPONSE_HANDLING_GUIDELINE } from './constants';
+import { applyDatePlaceholders, computeDatePlaceholders } from './datePlaceholders';
 
 export interface PromptTemplate {
     id: string;
@@ -506,16 +507,7 @@ export class DynamicPromptManager {
 
         // Replace basic placeholders
         const now = new Date();
-        const currentDate = now.toISOString();
-        processedPrompt = processedPrompt.replace(/\{\{currentDate\}\}/g, currentDate);
-        // Same calendar day in the previous month (e.g. today 3 Jun → from 3 May) — "recent postings" window
-        const recentFrom = new Date(Date.UTC(
-            now.getUTCFullYear(),
-            now.getUTCMonth() - 1,
-            now.getUTCDate(),
-            0, 0, 0, 0
-        ));
-        processedPrompt = processedPrompt.replace(/\{\{recentFromDate\}\}/g, recentFrom.toISOString());
+        processedPrompt = applyDatePlaceholders(processedPrompt, computeDatePlaceholders(now));
         processedPrompt = processedPrompt.replace(/\{\{userId\}\}/g, this.user_id);
         processedPrompt = processedPrompt.replace(/\{\{modelName\}\}/g, this.modelName);
         const viewName = this.viewName || `${this.modelName}_views`;
@@ -525,7 +517,7 @@ export class DynamicPromptManager {
             : 'default';
         processedPrompt = processedPrompt.replace(/\{\{promptType\}\}/g, promptTypeValue);
 
-        // Replace org_id placeholder in SQL examples (both single brace {org_id} and double brace {{orgId}})
+        // Replace org_id placeholder in SQL examples2 (both single brace {org_id} and double brace {{orgId}})
         processedPrompt = processedPrompt.replace(/\{org_id\}/g, this.org_id);
         processedPrompt = processedPrompt.replace(/\{\{orgId\}\}/g, this.org_id);
 

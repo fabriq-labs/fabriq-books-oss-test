@@ -1,12 +1,93 @@
-## POSTING ANALYTICS
+## POSTING ANALYTICS (main view — same list rules as default prompt)
 
-Use SQL analytics tools for aggregate questions: totals, breakdowns by category (contra account), or time-period summaries.
+Use **searchRecords** for simple lists; **analyticsQuery** for aggregates, JOINs, and top-N rankings.
 
-### SIMPLE LISTS (e.g. "List recent postings")
-- Prefer **searchRecords** on `posting` — faster and matches the list UI filters (`posting_type` neq DUPLICATE, description ncontains Closing).
-- **Show Value Date** (`value_date`) to the user; filter "recent" with `value_date` gte `{{recentFromDate}}` and lte `{{currentDate}}` (previous-month same day through today, e.g. 3 May–3 Jun when today is 3 Jun). Do not hardcode a month unless the user named it.
-- Use **analyticsQuery** for lists only when you need JOINs (account names in one query) or the user asked for SQL-style drill-down.
-- If `context.modelContext.legalEntityId` is set and SQL returns 0 rows, retry without `legal_entity_id` filter.
+### LEGAL ENTITY (searchRecords and SQL)
+- **Default:** omit `legal_entity_id` / do not filter SQL by entity — search whole org (includes null `legal_entity_id` rows).
+- **Only when user mentions** an entity name, "this entity", "selected entity", or "for [entity]": filter `legal_entity_id` = that id.
+- Header `legalEntityId` alone does **not** require a filter.
+
+### DATE PERIODS — searchRecords (not analyticsQuery)
+
+**Today** (`{{todayStart}}` / `{{todayEnd}}`):
+
+```json
+{
+  "modelName": "posting",
+  "page": 1,
+  "pageSize": 25,
+  "search": [
+    { "field": "posting_type", "operator": "neq", "value": "DUPLICATE" },
+    { "field": "description", "operator": "ncontains", "value": "Closing" },
+    { "field": "or", "operator": "or", "value": [
+      { "created_at": { "gte": "{{todayStart}}", "lte": "{{todayEnd}}" } },
+      { "value_date": { "gte": "{{todayStart}}", "lte": "{{todayEnd}}" } }
+    ]}
+  ]
+}
+```
+
+**Recent list:** base filters only, `pageSize` 25, no date filter. **Last 7 days:** `gte` `{{last7DaysStart}}`, `lte` `{{currentDate}}`
+
+**This week:** `gte` `{{weekStart}}`, `lte` `{{currentDate}}`
+
+**This month:** `gte` `{{monthStart}}`, `lte` `{{currentDate}}`
+
+**Last month:** `gte` `{{lastMonthStartDate}}`, `lt` `{{monthStartDate}}`
+
+**FORBIDDEN for today:** last-7-days / week / month windows when the user said **today**; auto `legal_entity_id` from header.
+
+**Reply:** List rows returned by the tool — do not claim "no postings" when the tool returned records.
+
+### SIMPLE LISTS (e.g. "List recent postings", "show today posting", "filter this list")
+- Prefer **searchRecords** on `posting` with base filters (`posting_type` neq DUPLICATE, description ncontains Closing).
+- **Show Value Date** (`value_date`) as DD-MM-YYYY to the user.
+- **"This list"** (date, amount, account): **searchRecords**; resolve accounts via `account` search then **`account_id`** (Debit Account) / **`credit_account_id`** (Credit Account). **Omit** `legal_entity_id` on account and posting search unless the user names an entity — header `legalEntityId` alone must not filter.
+- Use **analyticsQuery** only for JOINs, SQL drill-down, sums, or top-N — not for today/recent list questions above.
+
+### AGGREGATES ON THE POSTING LIST ("this list")
+
+Use **analyticsQuery** (after **getAnalyticsContext**) for totals and breakdowns — always include `p.org_id` and base filters: `posting_type <> 'DUPLICATE'` and `description NOT ILIKE '%Closing%'`.
+
+| User asks | SQL pattern |
+|-----------|-------------|
+| "What is the total Amount of all the postings in this list?" | `SELECT SUM(p.amount) AS total FROM posting p WHERE …` |
+| "Sum up the postings for [Date]." | `SUM(p.amount)` with `value_date` on that calendar day (start/end of day) |
+| "What is the total amount debited to [Account Name] in this specific list?" | Resolve account id; `SUM(p.amount) WHERE p.account_id = $id` (debit side only) |
+| "Give me a daily breakdown of the total amounts posted this week." | `DATE_TRUNC('day', p.value_date) AS day, SUM(p.amount)` grouped by day for the week containing `{{currentDate}}` |
+
+**Total amount in list** (illustrative — substitute org id and optional date/account filters from the user's message):
+```sql
+SELECT SUM(p.amount) AS total_amount
+FROM posting p
+WHERE p.org_id = '<org_id>'
+  AND (p.posting_type IS NULL OR p.posting_type <> 'DUPLICATE')
+  AND (p.description IS NULL OR p.description NOT ILIKE '%Closing%');
+```
+
+**Daily breakdown this week**:
+```sql
+SELECT DATE_TRUNC('day', p.value_date AT TIME ZONE 'UTC')::date AS day,
+       SUM(p.amount) AS total_amount
+FROM posting p
+WHERE p.org_id = '<org_id>'
+  AND (p.posting_type IS NULL OR p.posting_type <> 'DUPLICATE')
+  AND (p.description IS NULL OR p.description NOT ILIKE '%Closing%')
+  AND p.value_date >= '<week_start>'
+  AND p.value_date < '<week_end>'
+GROUP BY 1
+ORDER BY 1;
+```
+
+**Total debited to an account** (debit = `account_id`):
+```sql
+SELECT SUM(p.amount) AS total_debited
+FROM posting p
+WHERE p.org_id = '<org_id>'
+  AND p.account_id = '<resolved_account_id>'
+  AND (p.posting_type IS NULL OR p.posting_type <> 'DUPLICATE')
+  AND (p.description IS NULL OR p.description NOT ILIKE '%Closing%');
+```
 
 ### KEY SCHEMA NOTE
 - `account.type` is a **text array** column (e.g. `'{BANK,CHECKING}'`).
@@ -25,10 +106,17 @@ Use SQL analytics tools for aggregate questions: totals, breakdowns by category 
 - **Income / money-in**: bank is on the **debit** side (`account_id`); the credit side (`credit_account_id`) is the category.
 - To sum spend on "X": `SUM(p.amount)` where the contra account name ILIKE `'%X%'`.
 
+### DEBIT / CREDIT ACCOUNT LISTS (searchRecords)
+- **Debit Account** (UI) → `p.account_id` = resolved `acco_…` id.
+- **Credit Account** (UI) → `p.credit_account_id` = resolved id.
+- **ONE** posting query per user question — never one query per legal entity.
+- Header `legalEntityId`: pick the `acco_…` row for that entity from account lookup; single `account_id = $id`. No header: `account_id IN (...)`.
+- Do **not** add `p.legal_entity_id` on posting lists unless the user asked for an entity.
+
 ### FUZZY ACCOUNT MATCHING
 - Never assume the user's wording matches `account.name` exactly.
-- Resolve candidates: `SELECT id, name FROM account WHERE org_id = $orgId AND name ILIKE '%term%'`
-- If multiple candidates, group by `account.name` and show totals per candidate.
+- Resolve candidates: `SELECT id, name FROM account WHERE org_id = $orgId AND name ILIKE '%term%'` (no header entity filter)
+- If multiple candidates with the same name across entities, include all matching ids (`account_id IN (…)`).
 - Never reference `posting.account_name` — it does not exist; always JOIN the `account` table.
 
 ### SELECTED ACCOUNT

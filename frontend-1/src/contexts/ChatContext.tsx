@@ -11,6 +11,8 @@ export interface PageContext {
     promptTypes?: string[];
     /** Model-specific context (e.g., selectedAccountId for posting, supplierId for purchase_order) */
     modelContext?: Record<string, any>;
+    /** Limit agent prompt/tools to these models (e.g. posting + account on global chat) */
+    focusModels?: string[];
 }
 
 interface ChatContextType {

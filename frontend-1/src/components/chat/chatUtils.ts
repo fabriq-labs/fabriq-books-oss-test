@@ -31,11 +31,11 @@ export interface UserMessage {
 // ============================================================================
 
 export const DEFAULT_SUGGESTIONS = [
-    'Show recent purchase orders',
-    'Show spend by department',
-    'Create a new purchase requisition',
-    'Track the status of my latest order',
-    'What are the top spending categories?'
+    'Create a posting to record a transaction',
+    'List recent postings',
+    'List the postings from last month',
+    'What is the current balance for my checking account?',
+    'Show me every posting where Miscellaneous was the Debit Account',
 ] as const;
 
 // ============================================================================
@@ -135,7 +135,7 @@ export const getInputPlaceholder = (context: PageContext | null): string => {
     if (context && context.modelDisplayName) {
         return `Ask about this ${context.modelDisplayName.toLowerCase()}`;
     }
-    return 'Ask anything';
+    return 'Ask about postings and accounts';
 };
 
 // ============================================================================

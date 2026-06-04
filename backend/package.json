@@ -9,6 +9,8 @@
     "dev": "node -r dotenv/config ./node_modules/ts-node-dev/lib/bin.js --respawn --transpile-only src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:posting-prompt": "ts-node --transpile-only src/agent/__tests__/posting-prompt.test.ts",
+    "test:posting-sample-questions": "DOTENV_CONFIG_PATH=.env node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/agent/__tests__/posting-sample-questions.test.ts",
     "test:import-api-key": "jest src/__tests__/import/bank-statement-import-api-key.test.ts",
     "generate:sample-bank-pdf": "ts-node --transpile-only scripts/generate-us-ca-sample-bank-pdf.ts",
     "generate-types": "ts-node scripts/generateTypes.ts",

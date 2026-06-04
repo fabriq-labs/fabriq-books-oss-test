@@ -22,25 +22,52 @@
  */
 
 import { AgentService } from '../AgentService';
-import { PermissionService } from '../../services/permissions/PermissionService';
 import { AuthContext } from '../../auth/types';
+import {
+    buildTestAuthContext,
+    DEFAULT_TEST_ORG_ID,
+    DEFAULT_TEST_USER_ID,
+} from './posting-harness-auth';
 import prisma from '../../lib/prisma';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Load environment variables from .env.test first, then .env as fallback
-dotenv.config({ path: path.join(__dirname, '../../../.env.test') });
-dotenv.config(); // Fallback to .env for any missing vars
+// Prefer backend/.env (LLM keys, DATABASE_URL); .env.test fills gaps only
+const BACKEND_ROOT = path.resolve(__dirname, '../../..');
+const envTest = path.join(BACKEND_ROOT, '.env.test');
+const envFile = path.join(BACKEND_ROOT, '.env');
+if (fs.existsSync(envTest)) dotenv.config({ path: envTest });
+if (fs.existsSync(envFile)) dotenv.config({ path: envFile, override: true });
+
+function isLlmConfigured(): boolean {
+    switch (process.env.LLM_PROVIDER) {
+        case 'openrouter': return !!process.env.OPENROUTER_API_KEY;
+        case 'openai': return !!process.env.OPENAI_API_KEY;
+        case 'vertex':
+            return !!(
+                process.env.GOOGLE_CLOUD_PROJECT_ID &&
+                (process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+                    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON_BASE64)
+            );
+        case 'custom': return !!(process.env.LLM_BASE_URL && process.env.LLM_API_KEY);
+        default:
+            return !!(
+                process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+                process.env.GOOGLE_API_KEY ||
+                process.env.OPENROUTER_API_KEY ||
+                process.env.OPENAI_API_KEY
+            );
+    }
+}
 
 // Report output directory
 const REPORTS_DIR = path.join(__dirname, 'reports');
 
 // Test configuration - adjust these to match your test data
 const TEST_CONFIG = {
-    // User to test with (must exist in database)
-    userId: process.env.TEST_USER_ID || 'user_rajesh_kumar',
-    orgId: process.env.TEST_ORG_ID || 'org_rajesh',
+    userId: process.env.TEST_USER_ID || DEFAULT_TEST_USER_ID,
+    orgId: process.env.TEST_ORG_ID || DEFAULT_TEST_ORG_ID,
     
     // Account to use as "selected" credit card/bank
     // Set to actual account ID from your database, or null to test without selection
@@ -163,27 +190,10 @@ const TEST_CASES_WITH_ACCOUNT: TestCase[] = [
  * Build auth context for testing
  */
 async function buildAuthContext(): Promise<AuthContext> {
-    // Get user from database
-    const user = await prisma.user.findUnique({
-        where: { id: TEST_CONFIG.userId }
-    });
-
-    if (!user) {
-        throw new Error(`Test user not found: ${TEST_CONFIG.userId}. Update TEST_CONFIG or create the user.`);
-    }
-
-    // Get user permissions
-    const permissions = await PermissionService.getUserPermissions(TEST_CONFIG.userId);
-
-    return {
-        user: {
-            id: user.id,
-            email: user.email || '',
-            name: user.name,
-            org_id: user.org_id || TEST_CONFIG.orgId,
-        },
-        permissions,
-    };
+    const auth = await buildTestAuthContext();
+    TEST_CONFIG.userId = auth.user.id;
+    TEST_CONFIG.orgId = auth.user.org_id || TEST_CONFIG.orgId;
+    return auth;
 }
 
 /**
@@ -587,11 +597,12 @@ async function runAllTests(verbose: boolean = true): Promise<void> {
     console.log('█'.repeat(60));
 
     // Verify environment
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && !process.env.GOOGLE_API_KEY) {
-        console.error('\n❌ ERROR: GOOGLE_GENERATIVE_AI_API_KEY or GOOGLE_API_KEY not set');
-        console.error('Set it in .env or environment before running tests');
+    if (!isLlmConfigured()) {
+        console.error('\n❌ ERROR: LLM not configured. Set LLM_PROVIDER and credentials in backend/.env');
+        console.error('  e.g. LLM_PROVIDER=openrouter and OPENROUTER_API_KEY=...');
         process.exit(1);
     }
+    console.log(`  LLM: ${process.env.LLM_PROVIDER} / ${process.env.LLM_MODEL || '(unset)'}`);
 
     console.log('\nConfiguration:');
     console.log(`  User ID: ${TEST_CONFIG.userId}`);
@@ -710,8 +721,8 @@ async function runSingleQuestion(question: string): Promise<void> {
     console.log('  POSTING ANALYTICS — SINGLE QUESTION');
     console.log('█'.repeat(60));
 
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && !process.env.GOOGLE_API_KEY) {
-        console.error('\n❌ ERROR: GOOGLE_GENERATIVE_AI_API_KEY or GOOGLE_API_KEY not set');
+    if (!isLlmConfigured()) {
+        console.error('\n❌ ERROR: LLM not configured. Set LLM_PROVIDER and credentials in backend/.env');
         await prisma.$disconnect();
         process.exit(1);
     }

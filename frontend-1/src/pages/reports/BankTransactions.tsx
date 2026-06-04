@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useEntity } from "@/contexts/EntityContext";
+import { buildPostingModelContext } from "@/utils/postingChatContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatters";
 import { ReportControls } from "@/components/Reports/ReportControls";
@@ -142,7 +143,7 @@ function resolveEntityFYType(entities: { id: string; is_it_headquartres?: boolea
 }
 
 export default function BankTransactions() {
-    const { entities, currentEntityId } = useEntity();
+    const { entities, currentEntityId, currentEntity } = useEntity();
     const location = useLocation();
     const navigate = useNavigate();
     const { toast } = useToast();
@@ -205,16 +206,25 @@ export default function BankTransactions() {
             modelDisplayName: getModelDisplayName(modelName),
             currentPath: location.pathname,
             promptTypes: ['reconciliation', 'analytics', 'default'],
-            modelContext: {
+            modelContext: buildPostingModelContext(currentEntity, entities, {
                 selectedAccountId: account?.id || null,
-                selectedAccountName: account?.name || null
-            }
+                selectedAccountName: account?.name || null,
+            }),
         });
 
         return () => {
             setPageContext(null);
         };
-    }, [account?.id, account?.name, location.pathname, setPageContext, selectedTransactionId]);
+    }, [
+        account?.id,
+        account?.name,
+        location.pathname,
+        setPageContext,
+        selectedTransactionId,
+        currentEntity?.id,
+        currentEntity?.legal_name,
+        entities,
+    ]);
 
     // Clear selected transaction when account changes
     useEffect(() => {
