@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Modal } from "antd";
+import { Modal, Pagination } from "antd";
 import {
   Activity,
-  ChevronLeft,
-  ChevronRight,
+  Edit,
   Eye,
   Layers,
   Loader2,
@@ -12,7 +11,8 @@ import {
   Trash2,
   Wrench,
 } from "lucide-react";
-import { viewAPI } from "@/api/api";
+import { viewAPI, bulkEditAPI } from "@/api/api";
+import { BulkEdit } from "@/components/masters/BulkEdit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,6 @@ import { cn } from "@/lib/utils";
 
 const MODEL = "llm_trace";
 const VIEW = "llm_trace_view";
-const PAGE_SIZE = 10;
 
 interface TraceRow {
   id: string;
@@ -158,9 +157,13 @@ export const LLMTracesPage: React.FC = () => {
   const { toast } = useToast();
 
   const [traces, setTraces] = useState<TraceRow[]>([]);
+  const [metaData, setMetaData] = useState<Record<string, unknown>>({});
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedRows, setSelectedRows] = useState<TraceRow[]>([]);
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
 
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -174,7 +177,12 @@ export const LLMTracesPage: React.FC = () => {
 
   const loadingRef = useRef(false);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const selectedIds = useMemo(
+    () => new Set(selectedRows.map((r) => r.id)),
+    [selectedRows]
+  );
+  const allSelected =
+    traces.length > 0 && traces.every((t) => selectedIds.has(t.id));
 
   const modelNameOptions = useMemo(() => {
     const values = new Set<string>();
@@ -201,21 +209,25 @@ export const LLMTracesPage: React.FC = () => {
         MODEL,
         VIEW,
         page,
-        PAGE_SIZE,
+        pageSize,
         undefined,
         buildFilters(filters, searchTerm),
         { created_at: "desc" }
       );
       setTraces(res.data ?? []);
+      setMetaData(res.metaData ?? {});
       setTotal(res.total ?? 0);
+      setSelectedRows([]);
     } catch {
       setTraces([]);
+      setMetaData({});
       setTotal(0);
+      setSelectedRows([]);
     } finally {
       setIsLoading(false);
       loadingRef.current = false;
     }
-  }, [page, filters, searchTerm]);
+  }, [page, pageSize, filters, searchTerm]);
 
   useEffect(() => {
     void loadTraces();
@@ -223,6 +235,70 @@ export const LLMTracesPage: React.FC = () => {
 
   const handleView = (id: string) => {
     navigate(`/llm_trace/${id}/view/${VIEW}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handlePageSizeChange = (current: number, size: number) => {
+    setPageSize(size);
+    setPage(current);
+  };
+
+  const toggleAll = () => {
+    if (allSelected) {
+      const pageIds = new Set(traces.map((t) => t.id));
+      setSelectedRows((prev) => prev.filter((r) => !pageIds.has(r.id)));
+    } else {
+      const toAdd = traces.filter((t) => !selectedIds.has(t.id));
+      setSelectedRows((prev) => [...prev, ...toAdd]);
+    }
+  };
+
+  const toggleOne = (trace: TraceRow) => {
+    setSelectedRows((prev) =>
+      prev.some((r) => r.id === trace.id)
+        ? prev.filter((r) => r.id !== trace.id)
+        : [...prev, trace]
+    );
+  };
+
+  const handleBulkEditClose = () => {
+    setIsBulkEditOpen(false);
+  };
+
+  const handleBulkEditSave = async () => {
+    setIsBulkEditOpen(false);
+    setSelectedRows([]);
+    void loadTraces();
+  };
+
+  const handleBulkDelete = (ids: string[]) => {
+    Modal.confirm({
+      title: "Are you sure you want to delete the selected items?",
+      content: `This will delete ${ids.length} items.`,
+      okText: "Yes, Delete",
+      okType: "danger",
+      cancelText: "Cancel",
+      onOk: async () => {
+        try {
+          await bulkEditAPI.bulkDelete(MODEL, VIEW, ids);
+          toast({
+            title: "Success",
+            description: `${ids.length} items deleted successfully`,
+          });
+          setSelectedRows([]);
+          void loadTraces();
+        } catch {
+          toast({
+            title: "Bulk delete",
+            description: "Failed to delete items",
+            variant: "destructive",
+          });
+        }
+      },
+    });
   };
 
   const handleDelete = (id: string) => {
@@ -272,11 +348,17 @@ export const LLMTracesPage: React.FC = () => {
     filters.date_range !== "24h" ||
     !!searchTerm;
 
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(page * PAGE_SIZE, total);
-
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      <BulkEdit
+        isOpen={isBulkEditOpen}
+        onClose={handleBulkEditClose}
+        onSave={handleBulkEditSave}
+        selectedRows={selectedRows}
+        metaData={metaData}
+        type={MODEL}
+        view={VIEW}
+      />
         {/* Header */}
         <div className="px-6 py-4 border-b">
           <h1 className="text-lg font-semibold text-gray-900">LLM Traces</h1>
@@ -391,6 +473,34 @@ export const LLMTracesPage: React.FC = () => {
           )}
         </div>
 
+        {!isLoading && selectedRows.length > 1 && (
+          <div className="mx-6 mt-3 flex justify-between items-center p-3 bg-[#F1F0FB] rounded-md shrink-0">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 text-[#9b87f5] border-[#9b87f5] hover:bg-[#E5DEFF]"
+                onClick={() => setIsBulkEditOpen(true)}
+              >
+                <Edit size={16} />
+                <span>Edit</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 text-red-500 hover:text-red-600 border-red-300 hover:bg-red-50"
+                onClick={() => handleBulkDelete(selectedRows.map((row) => row.id))}
+              >
+                <Trash2 size={16} />
+                <span>Delete</span>
+              </Button>
+            </div>
+            <div className="text-sm font-medium text-[#403E43]">
+              {selectedRows.length} items selected
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="flex-1 overflow-auto">
           {isLoading ? (
@@ -407,6 +517,14 @@ export const LLMTracesPage: React.FC = () => {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-gray-50 border-b z-10">
                 <tr>
+                  <th className="px-4 py-2.5 w-10">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                    />
+                  </th>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 w-24">Status</th>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 w-36">Timestamp</th>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500">Trace / Context</th>
@@ -424,8 +542,19 @@ export const LLMTracesPage: React.FC = () => {
                   return (
                     <tr
                       key={trace.id}
-                      className="transition-colors hover:bg-gray-50/80"
+                      className={cn(
+                        "transition-colors hover:bg-gray-50/80",
+                        selectedIds.has(trace.id) && "bg-blue-50/40"
+                      )}
                     >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                          checked={selectedIds.has(trace.id)}
+                          onChange={() => toggleOne(trace)}
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -541,37 +670,19 @@ export const LLMTracesPage: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        <div className="px-6 py-3 border-t flex items-center justify-between text-xs text-gray-500 shrink-0">
-          <span>
-            {total > 0
-              ? `Showing ${rangeStart}–${rangeEnd} of ${total} traces`
-              : "No traces"}
-          </span>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="px-2">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+        <div className="px-6 py-3 border-t shrink-0 flex justify-end">
+          <Pagination
+            current={page}
+            pageSize={pageSize}
+            total={total}
+            onChange={handlePageChange}
+            onShowSizeChange={handlePageSizeChange}
+            showSizeChanger
+            pageSizeOptions={["10", "20", "50", "100"]}
+            showTotal={(totalCount, range) =>
+              `${range[0]}-${range[1]} of ${totalCount} items`
+            }
+          />
         </div>
     </div>
   );
