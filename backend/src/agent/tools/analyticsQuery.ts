@@ -15,7 +15,7 @@ import { ModelService } from '../../services/core/ModelService';
 import { ModelRegistry, SYSTEM_FIELDS } from '../../services/registry/ModelRegistry';
 import logger from '../../utils/logger';
 import { computeDatePlaceholders } from '../prompt/datePlaceholders';
-import { userRequestedAllEntities, userRequestedLastWeek } from '../AgentTools';
+import { userRequestedAllEntities, userRequestedLastWeek } from '../search/searchIntent';
 import { resolvePostingHeaderLegalEntityId } from '../postingCreateHelpers';
 
 const modelService = ModelService.getInstance();

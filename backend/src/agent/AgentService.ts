@@ -31,6 +31,7 @@ const DEFAULT_MAX_STEPS = 5;
 // in the system prompt to reduce noise and improve LLM accuracy
 const RELATED_MODELS: Record<string, string[]> = {
   posting: ['posting', 'account', 'payment_receipt', 'invoice'],
+  account: ['account', 'posting'],
   invoice: ['invoice', 'supplier', 'purchase_order', 'posting', 'account'],
   trade: ['trade', 'instrument', 'holding', 'posting', 'account'],
 };

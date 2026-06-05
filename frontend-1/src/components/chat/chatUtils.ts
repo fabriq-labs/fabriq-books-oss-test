@@ -33,9 +33,23 @@ export interface UserMessage {
 export const DEFAULT_SUGGESTIONS = [
     'Create a posting to record a transaction',
     'List recent postings',
-    'List the postings from last month',
-    'What is the current balance for my checking account?',
+    'What is the balance for Miscellaneous?',
+    'Find account Office Supplies',
     'Show me every posting where Miscellaneous was the Debit Account',
+] as const;
+
+const ACCOUNT_LIST_SUGGESTIONS = [
+    'List all expense accounts',
+    'Find account Office Supplies',
+    'What is the balance for Miscellaneous?',
+    'Show trial balance for this month',
+] as const;
+
+const ACCOUNT_DETAIL_SUGGESTIONS = [
+    'What is the current balance for this account?',
+    'Show opening balance and debits/credits this month',
+    'Monthly balance trend for this financial year',
+    'List recent postings on this account',
 ] as const;
 
 // ============================================================================
@@ -137,12 +151,10 @@ export const getContextSuggestions = (context: PageContext | null): string[] => 
         ];
     }
     if (context && context.modelName === 'account' && context.recordId) {
-        return [
-            'What is the current balance for this account?',
-            'Show opening balance and debits/credits this month',
-            'Monthly balance trend for this financial year',
-            'List recent postings on this account'
-        ];
+        return [...ACCOUNT_DETAIL_SUGGESTIONS];
+    }
+    if (context && context.modelName === 'account') {
+        return [...ACCOUNT_LIST_SUGGESTIONS];
     }
     if (context && context.modelDisplayName) {
         const lowerModelName = context.modelDisplayName.toLowerCase();
@@ -160,6 +172,14 @@ export const getContextSuggestions = (context: PageContext | null): string[] => 
  * Gets the input placeholder text based on page context
  */
 export const getInputPlaceholder = (context: PageContext | null): string => {
+    if (context?.modelName === 'account') {
+        return context.recordId
+            ? 'Ask about this account (balance, activity, updates)'
+            : 'Ask about chart of accounts and balances';
+    }
+    if (context?.modelName === 'posting') {
+        return 'Ask about transactions and postings';
+    }
     if (context && context.modelDisplayName) {
         return `Ask about this ${context.modelDisplayName.toLowerCase()}`;
     }

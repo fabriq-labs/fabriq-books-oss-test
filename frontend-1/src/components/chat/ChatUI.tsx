@@ -26,7 +26,10 @@ import {
 } from './chatUtils';
 import { useUserData } from '@/hooks/useUserData';
 import { useEntity } from '@/contexts/EntityContext';
-import { buildDefaultPostingChatContext, buildPostingModelContext } from '@/utils/postingChatContext';
+import {
+    buildDefaultPostingChatContext,
+    enrichFinanceChatContext,
+} from '@/utils/postingChatContext';
 import Cookies from 'js-cookie';
 
 interface ChatMessage {
@@ -54,15 +57,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
 
     const chatContext = useMemo(() => {
         const base = pageContext ?? buildDefaultPostingChatContext(currentEntity, entities);
-        if (base.modelName !== 'posting') return base;
-        return {
-            ...base,
-            modelContext: buildPostingModelContext(
-                currentEntity,
-                entities,
-                base.modelContext
-            ),
-        };
+        return enrichFinanceChatContext(base, currentEntity, entities);
     }, [pageContext, currentEntity, entities, currentEntityId, currentEntity?.legal_name]);
     const token = Cookies.get("__session");
 
