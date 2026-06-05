@@ -38,7 +38,7 @@
       "isColumnShow": false
     },
     "status": {
-      "orderNo": 3,
+      "orderNo": 1,
       "dataType": "string",
       "required": false,
       "permission": "read",
@@ -64,12 +64,12 @@
       "isColumnShow": false
     },
     "feedback": {
-      "orderNo": 9,
+      "orderNo": 8,
       "dataType": "string",
       "required": false,
       "permission": "update",
       "tableProps": {
-        "width": "200",
+        "width": "100",
         "columnType": "text",
         "defaultValue": ""
       },
@@ -77,7 +77,7 @@
       "isColumnShow": false
     },
     "question": {
-      "orderNo": 1,
+      "orderNo": 3,
       "width": "350",
       "dataType": "string",
       "required": false,
@@ -87,11 +87,11 @@
         "columnType": "text",
         "defaultValue": ""
       },
-      "displayName": "Question",
+      "displayName": "Trace / Context",
       "isColumnShow": true
     },
     "llm_model": {
-      "orderNo": 4,
+      "orderNo": 5,
       "dataType": "string",
       "required": false,
       "permission": "read",
@@ -101,7 +101,7 @@
         "defaultValue": ""
       },
       "displayName": "LLM Model",
-      "isColumnShow": false
+      "isColumnShow": true
     },
     "record_id": {
       "dataType": "string",
@@ -111,7 +111,7 @@
       "isColumnShow": false
     },
     "created_at": {
-      "orderNo": 10,
+      "orderNo": 2,
       "dataType": "datetime",
       "required": false,
       "permission": "read",
@@ -120,8 +120,8 @@
         "columnType": "date",
         "defaultValue": ""
       },
-      "displayName": "Created At",
-      "isColumnShow": false
+      "displayName": "Timestamp",
+      "isColumnShow": true
     },
     "model_name": {
       "orderNo": 11,
@@ -137,7 +137,7 @@
       "isColumnShow": false
     },
     "query_type": {
-      "orderNo": 2,
+      "orderNo": 4,
       "dataType": "string",
       "required": false,
       "permission": "read",
@@ -157,16 +157,16 @@
       "isColumnShow": false
     },
     "duration_ms": {
-      "orderNo": 5,
+      "orderNo": 6,
       "dataType": "int",
       "required": false,
       "permission": "read",
       "tableProps": {
-        "width": "120",
+        "width": "100",
         "columnType": "number",
         "defaultValue": ""
       },
-      "displayName": "Duration (ms)",
+      "displayName": "Latency",
       "isColumnShow": true
     },
     "steps_count": {
@@ -196,16 +196,16 @@
       "isColumnShow": false
     },
     "total_tokens": {
-      "orderNo": 6,
+      "orderNo": 7,
       "dataType": "int",
       "required": false,
       "permission": "read",
       "tableProps": {
-        "width": "120",
+        "width": "100",
         "columnType": "number",
         "defaultValue": ""
       },
-      "displayName": "Total Tokens",
+      "displayName": "Tokens",
       "isColumnShow": true
     },
     "error_message": {

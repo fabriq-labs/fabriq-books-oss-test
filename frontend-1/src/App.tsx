@@ -54,6 +54,7 @@ import { PromptTemplateForm } from "./components/forms/Masters/PromptTemplateFor
 import { AgentTemplateForm } from "./components/forms/Masters/AgentTemplateForm";
 import { AITemplatesPage } from "./pages/settings/AITemplatesPage";
 import { LLMTraceDetailPage } from "./components/forms/Masters/LLMTraceDetailPage";
+import { LLMTracesPage } from "./pages/settings/LLMTracesPage";
 import { TaxMasterForm } from "./components/forms/Masters/TaxMasterForm";
 import { ViewForm } from "./components/forms/Masters/ViewForm";
 import { PermissionForm } from "./components/forms/Masters/PermissionForm";
@@ -422,13 +423,7 @@ const AppRoutes: React.FC = () => {
 
                 <Route path="settings/llm-traces" element={
                   <SuperAdminGuard>
-                    <Master
-                      type="llm_trace"
-                      view="llm_trace_view"
-                      displayName="LLM Traces"
-                      defaultSortOption={{ field: 'created_at', direction: 'desc' }}
-                      listConfig={{ enableCreate: false }}
-                    />
+                    <LLMTracesPage />
                   </SuperAdminGuard>
                 } />
                 <Route path="llm_trace/:id/view/:viewId" element={
