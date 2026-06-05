@@ -196,8 +196,6 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                     if (Array.isArray(data) && data.length > 0) {
                         return (
                             <div key={index} className="space-y-3">
-                                {toolNameBadge}
-                                {descriptionElement}
                                 <SearchResultsTable
                                     data={data}
                                     columns={columns}
@@ -210,8 +208,6 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                         // Show message when no results found
                         return (
                             <div key={index} className="space-y-3">
-                                {toolNameBadge}
-                                {descriptionElement}
                                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                                     <p className="text-sm text-gray-700">
                                         No records found matching your search criteria.
@@ -228,8 +224,6 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                         if (resultType === 'sql_result') {
                             return (
                                 <div key={index} className="space-y-3">
-                                    {toolNameBadge}
-                                    {descriptionElement}
                                     <SqlResultsTable
                                         data={data}
                                         columns={columns}
@@ -241,8 +235,6 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                             // Fallback to SearchResultsTable for other table types
                             return (
                                 <div key={index} className="space-y-3">
-                                    {toolNameBadge}
-                                    {descriptionElement}
                                     <SearchResultsTable
                                         data={data}
                                         columns={columns}

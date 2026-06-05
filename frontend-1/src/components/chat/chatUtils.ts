@@ -253,9 +253,31 @@ export function hasTableToolResults(toolInvocations?: ToolInvocation[]): boolean
     });
 }
 
-/** Remove inline/bulleted row lists from assistant text when a table will also render. */
+/** Remove inline/bulleted row lists and markdown tables when a UI table will also render. */
 export function stripDuplicateTableListFromText(text: string): string {
     if (!text?.trim()) return text;
+
+    // Inline markdown table on same line: "Here is the account: |Code|Name|..."
+    const inlineTableMatch = text.match(/^(.+?:)\s*\|[^|\n]+\|/);
+    if (inlineTableMatch) {
+        return inlineTableMatch[1].trim();
+    }
+
+    // Intro sentence then inline table (no colon before pipes)
+    const looseInlineTable = text.match(/^(.{1,160}?[.!?])\s*\|[^|\n]+\|/);
+    if (looseInlineTable) {
+        return looseInlineTable[1].trim();
+    }
+
+    // Multi-line markdown table — keep lines before the first pipe row
+    const lines = text.split('\n');
+    const tableLineIndex = lines.findIndex((line) => /^\s*\|.*\|/.test(line.trim()));
+    if (tableLineIndex >= 0) {
+        if (tableLineIndex > 0) {
+            return lines.slice(0, tableLineIndex).join('\n').trim();
+        }
+        return '';
+    }
 
     // Inline list after intro: "...this week: * Description:"
     const inlineMatch = text.match(/:\s*[*\-•]\s*Description\s*:/i);

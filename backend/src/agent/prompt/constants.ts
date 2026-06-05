@@ -15,6 +15,7 @@ export const TOOL_RESPONSE_HANDLING_GUIDELINE = `
 **CRITICAL: When tool responses display structured data (tables, search results, lists):**
 - Provide only brief contextual introductions (1-2 sentences) in plain text
 - DO NOT repeat data that appears in the tool response table
+- DO NOT output markdown tables (pipe syntax like |Col|Val|) — the UI renders the table automatically
 - DO NOT use markdown code blocks, backticks, code formatting, or special characters
 - DO NOT include tool names, function names, or technical details
 - The UI automatically renders structured data - your text should be simple plain text that introduces it
