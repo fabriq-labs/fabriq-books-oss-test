@@ -21,6 +21,7 @@ import {
     getInputPaddingClasses,
     formatCurrencyInMessage,
     getChatCurrencyCode,
+    formatAssistantMessageForTableTools,
     type UserMessage,
     type MessagePart
 } from './chatUtils';
@@ -163,7 +164,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         onError: (error) => {
             // Stream errors arrive as useChat error state; message comes from backend getErrorMessage
             console.error('Chat error:', error);
-            if (error instanceof Error && error.cause) {
+            if (error instanceof Error && 'cause' in error && error.cause) {
                 console.error('Chat error cause:', error.cause);
             }
         }
@@ -229,22 +230,27 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
     const renderMessageContent = (msg: ChatMessage, isLastMessage: boolean = false) => {
         const hasToolInvocations = msg.toolInvocations && Array.isArray(msg.toolInvocations);
         const hasTextContent = msg.content && msg.content.trim().length > 0;
-        const displayContent =
+        const textForDisplay =
             msg.role === 'assistant' && hasTextContent
-                ? formatAssistantText(msg.content)
+                ? formatAssistantMessageForTableTools(msg.content, msg.toolInvocations)
+                : msg.content;
+        const hasDisplayText = Boolean(textForDisplay?.trim());
+        const displayContent =
+            msg.role === 'assistant' && hasDisplayText
+                ? formatAssistantText(textForDisplay)
                 : msg.content;
 
         if (hasToolInvocations) {
             const willShowToolResponses = (!isLoading || !isLastMessage);
 
             // If no text content and tool responses won't show, return null
-            if (!hasTextContent && !willShowToolResponses) {
+            if (!hasDisplayText && !willShowToolResponses) {
                 return null;
             }
 
             return (
                 <div className="space-y-3">
-                    {hasTextContent && (
+                    {hasDisplayText && (
                         <div className="mb-3">
                             {displayContent}
                         </div>
@@ -271,7 +277,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
             );
         }
 
-        return hasTextContent ? <div>{displayContent}</div> : null;
+        return hasDisplayText ? <div>{displayContent}</div> : null;
     };
 
     // Handle new chat

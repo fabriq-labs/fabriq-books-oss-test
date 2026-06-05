@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { PageContext } from '@/contexts/ChatContext';
 import { formatCurrency } from '@/lib/formatters';
+import type { ToolInvocation } from '@/components/utils/helper';
 
 // ============================================================================
 // Types
@@ -220,6 +221,76 @@ export const buildFileParts = async (files: File[]): Promise<MessagePart[]> => {
         })
     );
 };
+
+// ============================================================================
+// Assistant text when table tool results are present
+// ============================================================================
+
+/** True when completed tool results will render a data table in the chat UI. */
+export function hasTableToolResults(toolInvocations?: ToolInvocation[]): boolean {
+    if (!toolInvocations?.length) return false;
+
+    return toolInvocations.some((tool) => {
+        if (tool.state !== 'result' || !tool.result) return false;
+
+        const result = tool.result as {
+            uiHint?: string;
+            resultType?: string;
+            data?: unknown;
+        };
+        const data = result.data;
+        const hasRows = Array.isArray(data) && data.length > 0;
+        if (!hasRows) return false;
+
+        if (tool.toolName === 'searchRecords' || /search/i.test(tool.toolName)) {
+            return true;
+        }
+        if (result.uiHint === 'table' || result.resultType === 'sql_result') {
+            return true;
+        }
+
+        return false;
+    });
+}
+
+/** Remove inline/bulleted row lists from assistant text when a table will also render. */
+export function stripDuplicateTableListFromText(text: string): string {
+    if (!text?.trim()) return text;
+
+    // Inline list after intro: "...this week: * Description:"
+    const inlineMatch = text.match(/:\s*[*\-•]\s*Description\s*:/i);
+    if (inlineMatch && inlineMatch.index !== undefined) {
+        return text.slice(0, inlineMatch.index + 1).trim();
+    }
+
+    // Space-separated asterisk items (common LLM pattern without newlines)
+    const spaceListMatch = text.match(/\s+\*\s+Description\s*:/i);
+    if (spaceListMatch && spaceListMatch.index !== undefined) {
+        const intro = text.slice(0, spaceListMatch.index).trim();
+        return intro.endsWith(':') ? intro : `${intro}:`;
+    }
+
+    // Newline-separated list items
+    const listStart = text.search(/\n\s*[*\-•]\s*(?:Description|Amount|Value Date|PO Number)/i);
+    if (listStart >= 0) {
+        const intro = text.slice(0, listStart).trim();
+        return intro.endsWith(':') ? intro : `${intro}:`;
+    }
+
+    return text;
+}
+
+/** Keep intro-only assistant text when tool results include a table. */
+export function formatAssistantMessageForTableTools(
+    content: string,
+    toolInvocations?: ToolInvocation[]
+): string {
+    const trimmed = content?.trim() ?? '';
+    if (!trimmed || !hasTableToolResults(toolInvocations)) {
+        return content;
+    }
+    return stripDuplicateTableListFromText(trimmed);
+}
 
 // ============================================================================
 // Currency formatting in chat messages

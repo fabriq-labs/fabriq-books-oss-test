@@ -9,7 +9,7 @@
 | **Last week** | `value_date` `gte` `{{lastWeekStart}}`, `lt` `{{weekStart}}` (previous Mon–Sun — **not** this week). |
 | **This month** | `value_date` `gte` `{{monthStart}}`, `lt` `{{nextMonthStart}}` (full calendar month). |
 | **Last month** | `value_date` `gte` `{{lastMonthStart}}`, `lt` `{{monthStart}}` (full ISO timestamps). **Not** `{{monthStart}}`–`{{currentDate}}`. |
-| **Reply** | If the tool returns rows, **list them**. Never say "no postings for today" when the tool returned data. If `recordCount` is 0, say no postings for that period (e.g. last month) — do not list rows from another month. |
+| **Reply** | If the tool returns rows, give a **brief one-sentence intro only** (e.g. "Here are the postings for this week:") — the UI renders a **table**; **do NOT list row details** (description, amount, dates) in your text. Never say "no postings for today" when the tool returned data. If `recordCount` is 0, say no postings for that period (e.g. last month) — do not show rows from another month. |
 
 ---
 
@@ -106,8 +106,8 @@ When the user asks to **list**, **show**, **filter**, **get**, or **find** posti
 4. **After searchRecords — reply from tool data (CRITICAL)**:
    - Read **`totalCount`**, **`returnedCount`**, **`truncated`**, and **`summary`**.
    - **`recordCount`** = full match count in the database; **`data`** = one page only.
-   - If **`truncated`** is true: state **`totalCount`** (e.g. 325), say you are showing **`returnedCount`** rows from this page — **never** claim only `returnedCount` exist. Summarize or list a **sample**; use `page=2` with same filters or **analyticsQuery** for exports.
-   - If not truncated and `totalCount` ≤ 25, you may list every row (description, amount, Value Date DD-MM-YYYY).
+   - If **`truncated`** is true: state **`totalCount`** (e.g. 325) in a brief intro, note you are showing **`returnedCount`** rows from this page — **never** claim only `returnedCount` exist. **Do NOT list row details** — the UI table shows them; use `page=2` with same filters or **analyticsQuery** for exports.
+   - If not truncated: brief intro only (e.g. "Here are the N postings:") — **do NOT list** description, amount, or Value Date in text; the UI table shows all rows.
    - **NEVER** say "no postings" when `totalCount` > 0.
    - Do **not** add `legal_entity_id` on TODAY / general list questions — many rows have **null** `legal_entity_id`.
 5. **Date to show the user**: **Value Date** (`value_date`) as DD-MM-YYYY.

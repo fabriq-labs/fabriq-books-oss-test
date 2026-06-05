@@ -256,7 +256,7 @@ export function searchRecordsTool(
               enrichedResult = {
                 ...enrichedResult,
                 summary:
-                  `No postings with value_date in the last 7 days; showing ${enrichedResult.totalCount} most recent matching posting(s) instead. List them (description, amount, value_date as DD-MM-YYYY).`,
+                  `No postings with value_date in the last 7 days; showing ${enrichedResult.totalCount} most recent matching posting(s) instead. Give a brief one-sentence intro only — the UI shows a table; do NOT list row details in your reply.`,
               };
             }
           }
@@ -531,11 +531,10 @@ function enrichSearchResult(
     summary =
       `Found ${totalCount} matching record(s); returned ${returnedCount} on page ${page}` +
       (pageSize ? ` (pageSize ${pageSize})` : '') +
-      '. Do NOT say only ' +
-      `${returnedCount} exist — state the full total ${totalCount}. Summarize or show a short sample from data; use page=2+ or analyticsQuery for full export.`;
+      '. State the full totalCount in a brief intro — do NOT list row details; the UI shows a table. Use page=2+ or analyticsQuery for full export.';
   } else {
     summary =
-      `Found ${totalCount} record(s). List them in your reply (description, amount, value_date as DD-MM-YYYY).`;
+      `Found ${totalCount} record(s). Give a brief one-sentence intro only — the UI shows a table; do NOT list row details in your reply.`;
   }
   return {
     tool: 'searchRecords',

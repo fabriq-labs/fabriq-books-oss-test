@@ -19,7 +19,7 @@ export const HARDCODED_POSTING_PROMPT = `## POSTING MAIN VIEW — REQUIREMENTS
 | Last week | value_date gte {{lastWeekStart}}, lt {{weekStart}} (prior Mon–Sun — NOT this week) |
 | This month | value_date gte {{monthStart}}, lt {{nextMonthStart}} (full calendar month) |
 | Last month | value_date gte {{lastMonthStart}}, lt {{monthStart}} (ISO timestamps) |
-| Reply | Use tool recordCount/summary; if recordCount > 0 list rows — never say no postings |
+| Reply | Use tool recordCount/summary; if recordCount > 0 brief intro only — UI table shows rows; never list row details in text; never say no postings |
 | legal_entity on today | Do not add — null entity rows (e.g. Test Chat AI) are excluded by legal_entity_id eq |
 
 ## POSTING SCHEMA
