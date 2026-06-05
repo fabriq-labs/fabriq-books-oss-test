@@ -86,8 +86,11 @@ Replaces template variables with actual values.
 - `{{todayStart}}` / `{{todayEnd}}` → start/end of today in app TZ (default IST)
 - `{{last7DaysStart}}` / `{{recentFromDate}}` → start of last 7 calendar days (recent listings)
 - `{{weekStart}}` → Monday of current week (app TZ)
-- `{{monthStart}}` → first day of current month (app TZ)
-- `{{lastMonthStart}}` / `{{lastMonthEnd}}` → previous calendar month (`gte` start, `lte` end where `lastMonthEnd` = `monthStart`)
+- `{{lastWeekStart}}` / `{{lastWeekEnd}}` → previous calendar week Mon–Sun (`gte` start, `lt weekStart` or `lte lastWeekEnd`)
+- `{{monthStart}}` → first instant of current month (app TZ; may appear as prior UTC date)
+- `{{nextMonthStart}}` → first instant of next month (app TZ) — use with `lt` as exclusive end for **this month**
+- `{{monthEnd}}` → last instant of current month (app TZ) — alternative to `lt nextMonthStart`
+- `{{lastMonthStart}}` / `{{lastMonthEnd}}` → previous calendar month (`gte` start, `lt monthStart`)
 - `{{userId}}` → Current user ID
 - `{{modelName}}` → Model name
 - `{{viewName}}` → View name

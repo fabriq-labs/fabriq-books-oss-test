@@ -3,9 +3,10 @@
 Use **searchRecords** for simple lists; **analyticsQuery** for aggregates, JOINs, and top-N rankings.
 
 ### LEGAL ENTITY (searchRecords and SQL)
-- **Default:** omit `legal_entity_id` / do not filter SQL by entity — search whole org (includes null `legal_entity_id` rows).
-- **Only when user mentions** an entity name, "this entity", "selected entity", or "for [entity]": filter `legal_entity_id` = that id.
-- Header `legalEntityId` alone does **not** require a filter.
+- **Today / recent list / last 7 days:** omit `legal_entity_id` — includes null-entity rows.
+- **Period list pulls** and **amount filters** (gt/lt/eq): when header `legalEntityId` is in pageContext, filter `legal_entity_id` = that id on **searchRecords** and in SQL.
+- **Debit/credit by account name:** same header `legal_entity_id` on account lookup + posting search.
+- User names a **different** entity in chat → use that id; "all entities" → omit filter.
 
 ### DATE PERIODS — searchRecords (not analyticsQuery)
 
@@ -29,20 +30,36 @@ Use **searchRecords** for simple lists; **analyticsQuery** for aggregates, JOINs
 
 **Recent list:** base filters only, `pageSize` 25, no date filter. **Last 7 days:** `gte` `{{last7DaysStart}}`, `lte` `{{currentDate}}`
 
-**This week:** `gte` `{{weekStart}}`, `lte` `{{currentDate}}`
+**This week:** `gte` `{{weekStart}}`, `lte` `{{currentDate}}` (Mon–today)
 
-**This month:** `gte` `{{monthStart}}`, `lte` `{{currentDate}}`
+**Last week:** `gte` `{{lastWeekStart}}`, `lt` `{{weekStart}}` (previous Mon–Sun — **not** this week, **not** `{{currentDate}}`)
 
-**Last month:** `gte` `{{lastMonthStartDate}}`, `lt` `{{monthStartDate}}`
+**This month:** `gte` `{{monthStart}}`, `lt` `{{nextMonthStart}}` (full calendar month — e.g. 1 Jun–30 Jun; not `{{currentDate}}`)
+
+**Last month:** `gte` `{{lastMonthStart}}`, `lt` `{{monthStart}}` (ISO timestamps — not bare YYYY-MM-DD)
 
 **FORBIDDEN for today:** last-7-days / week / month windows when the user said **today**; auto `legal_entity_id` from header.
 
+**FORBIDDEN for this month:** `{{last7DaysStart}}`–`{{currentDate}}`, `{{weekStart}}`–`{{currentDate}}`, or "recent / last 7 days" when the user said **this month** / **current month**.
+
 **Reply:** List rows returned by the tool — do not claim "no postings" when the tool returned records.
+
+### DATE PERIODS — analyticsQuery SQL (use **`p.value_date`**, ISO timestamps)
+
+| User says | SQL on `p.value_date` |
+|-----------|----------------------|
+| **This month** / **current month** | `>= '{{monthStart}}'` AND `< '{{nextMonthStart}}'` (full month — **not** `{{currentDate}}`) |
+| **Last month** | `>= '{{lastMonthStart}}'` AND `< '{{monthStart}}'` |
+| **This week** | `>= '{{weekStart}}'` AND `<= '{{currentDate}}'` |
+| **Last week** | `>= '{{lastWeekStart}}'` AND `< '{{weekStart}}'` |
+| **Last 7 days** (only if user said that) | `>= '{{last7DaysStart}}'` AND `<= '{{currentDate}}'` |
+
+Never use `{{last7DaysStart}}` for **this month** questions.
 
 ### SIMPLE LISTS (e.g. "List recent postings", "show today posting", "filter this list")
 - Prefer **searchRecords** on `posting` with base filters (`posting_type` neq DUPLICATE, description ncontains Closing).
 - **Show Value Date** (`value_date`) as DD-MM-YYYY to the user.
-- **"This list"** (date, amount, account): **searchRecords**; resolve accounts via `account` search then **`account_id`** (Debit Account) / **`credit_account_id`** (Credit Account). **Omit** `legal_entity_id` on account and posting search unless the user names an entity — header `legalEntityId` alone must not filter.
+- **"This list"** (date, amount, account): **searchRecords**; resolve accounts via `account` search then **`account_id`** (Debit Account) / **`credit_account_id`** (Credit Account). Include header **`legal_entity_id`** on period pulls and account-scoped searches; omit on today/recent unless user names an entity.
 - Use **analyticsQuery** only for JOINs, SQL drill-down, sums, or top-N — not for today/recent list questions above.
 
 ### AGGREGATES ON THE POSTING LIST ("this list")
@@ -80,14 +97,38 @@ ORDER BY 1;
 ```
 
 **Total debited to an account** (debit = `account_id`):
+
+1. Resolve account: `searchRecords` on `account` (`name` **icontains** + header **`legal_entity_id`** when set) → `acco_…` id.
+2. `analyticsQuery` with **`SUM(p.amount)`** and period on **`p.value_date`**.
+
+**This month** (replace account id; copy **`{{monthStart}}`** / **`{{nextMonthStart}}`** verbatim — full calendar month, not last 7 days or `{{currentDate}}`):
 ```sql
 SELECT SUM(p.amount) AS total_debited
 FROM posting p
 WHERE p.org_id = '<org_id>'
   AND p.account_id = '<resolved_account_id>'
   AND (p.posting_type IS NULL OR p.posting_type <> 'DUPLICATE')
-  AND (p.description IS NULL OR p.description NOT ILIKE '%Closing%');
+  AND (p.description IS NULL OR p.description NOT ILIKE '%Closing%')
+  AND p.value_date >= '{{monthStart}}'
+  AND p.value_date < '{{nextMonthStart}}'
+  AND p.legal_entity_id = '{{context.modelContext.legalEntityId}}';
 ```
+**Note:** `{{monthStart}}` is midnight on the 1st in app timezone (may show as the prior UTC calendar date — e.g. June 1 IST = `…T18:30:00.000Z` on May 31). Copy placeholders exactly; do **not** hand-type `YYYY-MM-DD`. **`legal_entity_id`** must be the header **`legalEntityId`** (`lega_…` / entity id) — never `org_id`.
+Omit the `legal_entity_id` line when the user said **all entities** or no header entity is set. Omit date lines only when the user did **not** name a period.
+
+**All-time total** (no period in question) — omit the `value_date` lines.
+
+**Total volume last week** (copy placeholders verbatim):
+```sql
+SELECT SUM(p.amount) AS total_volume
+FROM posting p
+WHERE p.org_id = '<org_id>'
+  AND (p.posting_type IS NULL OR p.posting_type <> 'DUPLICATE')
+  AND (p.description IS NULL OR p.description NOT ILIKE '%Closing%')
+  AND p.value_date >= '{{lastWeekStart}}'
+  AND p.value_date < '{{weekStart}}';
+```
+**FORBIDDEN for last week:** `>= '{{weekStart}}'` AND `<= '{{currentDate}}'` — that is **this week**, not last week.
 
 ### KEY SCHEMA NOTE
 - `account.type` is a **text array** column (e.g. `'{BANK,CHECKING}'`).
@@ -130,4 +171,4 @@ For "by store" or "group by company": `GROUP BY p.description`. Do NOT use `acco
 
 ### MULTI-TENANCY
 Always include `org_id` filter on every table: `posting.org_id`, `account.org_id`.
-Use `posting_date` or `value_date` for time filtering.
+Use **`value_date`** (Value Date) for period filters in SQL — full ISO timestamps (`{{monthStart}}`, `{{nextMonthStart}}`, etc.), not bare `YYYY-MM-DD`. **This month** = `>= {{monthStart}}` AND `< {{nextMonthStart}}`.

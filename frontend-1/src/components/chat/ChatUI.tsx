@@ -13,6 +13,8 @@ import { FileInputDisplay } from './FileInputDisplay';
 import { LoadingIndicator } from './LoadingIndicator';
 import {
     transformUserMessage,
+    extractUserMessageText,
+    userRequestedAllEntities,
     buildFileParts,
     getContextSuggestions,
     getInputPlaceholder,
@@ -110,8 +112,17 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
                 messages: transformedMessages
             };
 
+            const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+            const userQuestion = lastUserMessage
+                ? extractUserMessageText(lastUserMessage as UserMessage)
+                : '';
+
             if (chatContext) {
-                preparedBody.context = chatContext;
+                preparedBody.context = {
+                    ...chatContext,
+                    searchAllEntities: userRequestedAllEntities(userQuestion),
+                    userQuestion,
+                };
             }
 
             return preparedBody;

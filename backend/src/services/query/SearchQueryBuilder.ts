@@ -356,6 +356,7 @@ export class SearchQueryBuilder {
       const now = new Date();
       if (!Number.isNaN(gteD.getTime()) && !Number.isNaN(endD.getTime())) {
         if (this.isMultiDayDateRange(cond.gte, hasLte ? cond.lte : cond.lt)) {
+          this.normalizeMultiDayDateOnlyBounds(cond);
           return;
         }
         if (this.isRecentFromMistakenForToday(gteD, endD, now)) {
@@ -426,6 +427,27 @@ export class SearchQueryBuilder {
     const g = String(gte).slice(0, 10);
     const l = String(lte).slice(0, 10);
     return g.length === 10 && g === l;
+  }
+
+  /** Date-only YYYY-MM-DD multi-day bounds → app-TZ ISO instants for Prisma DateTime fields. */
+  private static normalizeMultiDayDateOnlyBounds(cond: {
+    gte?: unknown;
+    lte?: unknown;
+    lt?: unknown;
+  }): void {
+    const gDay = cond.gte != null && /^\d{4}-\d{2}-\d{2}$/.test(String(cond.gte).trim());
+    const endVal = cond.lt ?? cond.lte;
+    const eDay = endVal != null && /^\d{4}-\d{2}-\d{2}$/.test(String(endVal).trim());
+    if (gDay) {
+      const startBounds = this.calendarDayBounds(cond.gte);
+      if (startBounds) cond.gte = startBounds.gte;
+    }
+    if (eDay) {
+      const endBounds = this.calendarDayBounds(endVal);
+      if (!endBounds) return;
+      if (cond.lt != null) cond.lt = endBounds.gte;
+      if (cond.lte != null) cond.lte = endBounds.gte;
+    }
   }
 
   /** Week/month ranges — do not collapse to a single calendar day. */

@@ -42,6 +42,22 @@ function extractSearchRows(result: any): any[] {
   return [];
 }
 
+/** Same legal entity id used for createRecord and posting searchRecords. */
+export async function resolvePostingHeaderLegalEntityId(
+  auth: AuthContext,
+  toolContext?: { modelContext?: Record<string, unknown> }
+): Promise<string | null> {
+  const mc = toolContext?.modelContext || {};
+  const direct = mc.legalEntityId ?? mc.legal_entity_id;
+  if (direct != null && String(direct).trim() !== '') {
+    return String(direct).trim();
+  }
+  if (mc.legalEntityName) {
+    return resolveLegalEntityId(auth, String(mc.legalEntityName));
+  }
+  return null;
+}
+
 async function resolveLegalEntityId(
   auth: AuthContext,
   hint?: string | null

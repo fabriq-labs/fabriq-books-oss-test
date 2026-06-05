@@ -23,11 +23,15 @@ import logger from '../utils/logger';
 import { createERPConnector } from '../lib/integrations/connectors/index';
 import prisma from '../lib/prisma';
 import { ERPConnector } from '../lib/integrations/connectors/types';
-import { computeDatePlaceholders } from './prompt/datePlaceholders';
+import {
+  computeDatePlaceholders,
+  getAppTimezoneOffsetMinutes,
+} from './prompt/datePlaceholders';
 import { getHandler, getAllMethodNames } from './handlers/erp/registry';
 import { matchExtractedLineItemsToPO } from './invoiceMatching';
 import {
   preparePostingCreatePayload,
+  resolvePostingHeaderLegalEntityId,
   resolveAccountIdForPosting,
   resolveAccountIdsForPostingSearch,
   alignAccountIdToHeaderLegalEntity,
@@ -199,8 +203,37 @@ function coerceSearchFilters(search: unknown): SearchFilterEntry[] | undefined {
   return undefined;
 }
 
+type PostingSearchToolContext = {
+  modelContext?: Record<string, unknown>;
+  searchAllEntities?: boolean;
+  userQuestion?: unknown;
+  lastUserMessage?: unknown;
+  questionText?: unknown;
+};
+
+export function userRequestedAllEntities(text?: unknown): boolean {
+  if (!text || typeof text !== 'string') return false;
+  return /\b(all entities|any entity|every entity|across all entities|from all entities|all legal entities)\b/i.test(
+    text
+  );
+}
+
+export function userRequestedLastWeek(text?: unknown): boolean {
+  if (!text || typeof text !== 'string') return false;
+  return /\b(last week|previous week|prior week)\b/i.test(text);
+}
+
+function resolveSearchAllEntities(toolContext?: PostingSearchToolContext): boolean {
+  if (Boolean(toolContext?.searchAllEntities)) return true;
+  const question =
+    toolContext?.userQuestion ??
+    toolContext?.lastUserMessage ??
+    toolContext?.questionText;
+  return userRequestedAllEntities(question);
+}
+
 function headerLegalEntityIdFromContext(
-  toolContext?: { modelContext?: Record<string, unknown> }
+  toolContext?: PostingSearchToolContext
 ): string | null {
   const mc = toolContext?.modelContext;
   if (!mc) return null;
@@ -212,12 +245,21 @@ async function normalizeSearchParam(
   search: unknown,
   modelName?: string,
   auth?: AuthContext,
-  toolContext?: { modelContext?: Record<string, unknown> }
+  toolContext?: PostingSearchToolContext
 ): Promise<unknown> {
   const filters = coerceSearchFilters(search);
   if (!filters) return search;
-  const headerLegalEntityId = headerLegalEntityIdFromContext(toolContext);
+  const searchAllEntities = resolveSearchAllEntities(toolContext);
+  let headerLegalEntityId = searchAllEntities
+    ? null
+    : headerLegalEntityIdFromContext(toolContext);
+  if (modelName === 'posting' && auth && !headerLegalEntityId && !searchAllEntities) {
+    headerLegalEntityId = await resolvePostingHeaderLegalEntityId(auth, toolContext);
+  }
   if (modelName === 'account' && auth) {
+    if (!headerLegalEntityId) {
+      headerLegalEntityId = await resolvePostingHeaderLegalEntityId(auth, toolContext);
+    }
     return normalizeAccountSearchFilters(filters, headerLegalEntityId);
   }
   if (modelName === 'posting' && auth) {
@@ -225,6 +267,11 @@ async function normalizeSearchParam(
     let normalized = normalizePostingSearchFilters(filters, {
       headerLegalEntityId,
       accountScoped,
+      searchAllEntities,
+      userQuestion:
+        toolContext?.userQuestion ??
+        toolContext?.lastUserMessage ??
+        toolContext?.questionText,
     });
     normalized = await resolvePostingSearchAccountNames(
       normalized,
@@ -236,16 +283,20 @@ async function normalizeSearchParam(
   return filters;
 }
 
-/** Keep header legal_entity_id on account lookup; drop other auto-added entity filters. */
+/** Scope account lookup to header legal entity when set (same as posting create/search). */
 function normalizeAccountSearchFilters(
   filters: SearchFilterEntry[],
   headerLegalEntityId?: string | null
 ): SearchFilterEntry[] {
-  return filters.filter((f) => {
-    if (f.field !== 'legal_entity_id') return true;
-    if (!headerLegalEntityId) return false;
-    return f.operator === 'eq' && f.value === headerLegalEntityId;
-  });
+  const headerEntity = headerLegalEntityId?.trim() || null;
+  if (!headerEntity) {
+    return filters.filter((f) => f.field !== 'legal_entity_id');
+  }
+  const withoutEntity = filters.filter((f) => f.field !== 'legal_entity_id');
+  return [
+    ...withoutEntity,
+    { field: 'legal_entity_id', operator: 'eq', value: headerEntity },
+  ];
 }
 
 function normalizePostingAccountFilterFields(
@@ -328,6 +379,77 @@ function isExplicitPostingAccountSearch(filters: SearchFilterEntry[]): boolean {
   );
 }
 
+/** Both debit and credit account ids set — transfer / "between two accounts". */
+function isPostingTransferBetweenAccountsSearch(filters: SearchFilterEntry[]): boolean {
+  const hasDebit = filters.some(
+    (f) => f.field === 'account_id' && f.operator === 'eq'
+  );
+  const hasCredit = filters.some(
+    (f) => f.field === 'credit_account_id' && f.operator === 'eq'
+  );
+  return hasDebit && hasCredit;
+}
+
+/** Do not drop header legal_entity_id on 0-row retry for dated / transfer pulls. */
+function shouldKeepEntityOnEmptyPostingSearch(filters: SearchFilterEntry[]): boolean {
+  return (
+    isPostingNamedDaySearch(filters) ||
+    hasPostingAmountFilter(filters) ||
+    isExplicitPostingDateRangeSearch(filters) ||
+    isPostingTransferBetweenAccountsSearch(filters)
+  );
+}
+
+/** "Yesterday" and named days use value_date — not created_at (created_at is for today OR only). */
+function normalizePostingNamedDayUseValueDate(
+  filters: SearchFilterEntry[]
+): SearchFilterEntry[] {
+  if (filters.some((f) => f.field === 'value_date')) {
+    return filters.filter((f) => f.field !== 'created_at');
+  }
+
+  const createdGte = filters.find(
+    (f) => f.field === 'created_at' && f.operator === 'gte'
+  );
+  const createdLte = filters.find(
+    (f) => f.field === 'created_at' && f.operator === 'lte'
+  );
+  if (
+    !createdGte ||
+    !createdLte ||
+    typeof createdGte.value !== 'string' ||
+    typeof createdLte.value !== 'string'
+  ) {
+    return filters;
+  }
+
+  const ph = computeDatePlaceholders();
+  const matchesYesterday =
+    createdGte.value === ph.yesterdayStart && createdLte.value === ph.yesterdayEnd;
+  const isNamedDay =
+    sameUtcCalendarDay(createdGte.value, createdLte.value) &&
+    !isPostingTodayBounds(createdGte.value, createdLte.value);
+
+  if (!matchesYesterday && !isNamedDay) {
+    return filters;
+  }
+
+  const withoutCreated = filters.filter((f) => f.field !== 'created_at');
+  return [
+    ...withoutCreated,
+    {
+      field: 'value_date',
+      operator: 'gte',
+      value: matchesYesterday ? ph.yesterdayStart : createdGte.value,
+    },
+    {
+      field: 'value_date',
+      operator: 'lte',
+      value: matchesYesterday ? ph.yesterdayEnd : createdLte.value,
+    },
+  ];
+}
+
 function sameUtcCalendarDay(a: string, b: string): boolean {
   const da = new Date(a);
   const db = new Date(b);
@@ -373,13 +495,35 @@ function isExplicitPostingDateRangeSearch(filters: SearchFilterEntry[]): boolean
   return false;
 }
 
+function appCalendarDayFromIso(iso: string): string {
+  const offset = getAppTimezoneOffsetMinutes();
+  const d = new Date(iso);
+  const local = new Date(d.getTime() + offset * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}`;
+}
+
+/** True only for today's bounds — not yesterday or other named single days. */
+function isPostingTodayBounds(gte: string, lte: string): boolean {
+  const ph = computeDatePlaceholders();
+  if (gte === ph.todayStart && lte === ph.todayEnd) return true;
+  if (!sameUtcCalendarDay(gte, lte)) return false;
+  return appCalendarDayFromIso(gte) === appCalendarDayFromIso(ph.todayStart);
+}
+
 function isTodayPostingSearch(filters: SearchFilterEntry[]): boolean {
   const orFilter = filters.find((f) => f.field === 'or' && f.operator === 'or');
   if (orFilter && Array.isArray(orFilter.value)) {
     return (orFilter.value as Record<string, unknown>[]).some((branch) => {
       for (const field of ['created_at', 'value_date']) {
         const cond = branch[field] as { gte?: string; lte?: string } | undefined;
-        if (cond?.gte && cond?.lte && sameUtcCalendarDay(cond.gte, cond.lte)) return true;
+        if (
+          cond?.gte &&
+          cond?.lte &&
+          isPostingTodayBounds(cond.gte, cond.lte)
+        ) {
+          return true;
+        }
       }
       return false;
     });
@@ -392,7 +536,7 @@ function isTodayPostingSearch(filters: SearchFilterEntry[]): boolean {
       lte &&
       typeof gte.value === 'string' &&
       typeof lte.value === 'string' &&
-      sameUtcCalendarDay(gte.value, lte.value)
+      isPostingTodayBounds(gte.value, lte.value)
     ) {
       return true;
     }
@@ -522,14 +666,14 @@ function normalizePostingQ3LastYearRange(filters: SearchFilterEntry[]): SearchFi
       value: [
         {
           value_date: {
-            gte: ph.lastYearQ3StartDate,
-            lt: ph.lastYearQ3EndDate,
+            gte: ph.lastYearQ3Start,
+            lt: ph.lastYearQ3End,
           },
         },
         {
           value_date: {
-            gte: ph.lastYearFyQ3StartDate,
-            lt: ph.lastYearFyQ3EndDate,
+            gte: ph.lastYearFyQ3Start,
+            lt: ph.lastYearFyQ3End,
           },
         },
       ],
@@ -561,27 +705,124 @@ function normalizePostingLastMonthRange(filters: SearchFilterEntry[]): SearchFil
 
   return filters.map((f) => {
     if (f === gteF) {
-      return { field: 'value_date', operator: 'gte', value: ph.lastMonthStartDate };
+      return { field: 'value_date', operator: 'gte', value: ph.lastMonthStart };
     }
     if (f === endF) {
-      return { field: 'value_date', operator: 'lt', value: ph.monthStartDate };
+      return { field: 'value_date', operator: 'lt', value: ph.monthStart };
     }
     return f;
   });
 }
 
+/** Previous calendar week (Mon–Sun): gte lastWeekStart, lt weekStart — not this week Mon→today. */
+function normalizePostingLastWeekRange(
+  filters: SearchFilterEntry[],
+  userQuestion?: unknown
+): SearchFilterEntry[] {
+  const ph = computeDatePlaceholders();
+  const wantsLastWeek = userRequestedLastWeek(userQuestion);
+
+  const gteF = filters.find((f) => f.field === 'value_date' && f.operator === 'gte');
+  const endF = filters.find(
+    (f) =>
+      f.field === 'value_date' && (f.operator === 'lte' || f.operator === 'lt')
+  );
+
+  const matchesLastWeekLower =
+    gteF &&
+    typeof gteF.value === 'string' &&
+    (gteF.value === ph.lastWeekStart ||
+      gteF.value.startsWith(ph.lastWeekStartDate));
+
+  const misusedThisWeek =
+    wantsLastWeek &&
+    gteF &&
+    typeof gteF.value === 'string' &&
+    gteF.value === ph.weekStart;
+
+  if (!wantsLastWeek && !matchesLastWeekLower && !misusedThisWeek) {
+    return filters;
+  }
+
+  const without = filters.filter(
+    (f) => f.field !== 'value_date' && f.field !== 'created_at'
+  );
+  return [
+    ...without,
+    { field: 'value_date', operator: 'gte', value: ph.lastWeekStart },
+    { field: 'value_date', operator: 'lt', value: ph.weekStart },
+  ];
+}
+
+const POSTING_AMOUNT_FILTER_OPERATORS = new Set(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']);
+
+function hasPostingAmountFilter(filters: SearchFilterEntry[]): boolean {
+  return filters.some(
+    (f) =>
+      f.field === 'amount' &&
+      POSTING_AMOUNT_FILTER_OPERATORS.has(f.operator.toLowerCase())
+  );
+}
+
+/** Single calendar day on value_date/created_at that is not today (yesterday, named day). */
+function isPostingNamedDaySearch(filters: SearchFilterEntry[]): boolean {
+  for (const field of ['value_date', 'created_at'] as const) {
+    const gte = filters.find((f) => f.field === field && f.operator === 'gte');
+    const lte = filters.find((f) => f.field === field && f.operator === 'lte');
+    if (
+      gte &&
+      lte &&
+      typeof gte.value === 'string' &&
+      typeof lte.value === 'string' &&
+      sameUtcCalendarDay(gte.value, lte.value) &&
+      !isPostingTodayBounds(gte.value, lte.value)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Header legal entity scopes account, period, and amount list pulls; not today/recent/all-entities. */
+function shouldScopePostingToHeaderEntity(
+  filters: SearchFilterEntry[],
+  options?: {
+    headerLegalEntityId?: string | null;
+    accountScoped?: boolean;
+    searchAllEntities?: boolean;
+  }
+): boolean {
+  if (options?.searchAllEntities) return false;
+  const headerEntity = options?.headerLegalEntityId?.trim() || null;
+  if (!headerEntity) return false;
+  if (options?.accountScoped) return true;
+  if (isPostingTransferBetweenAccountsSearch(filters)) return true;
+  if (isPostingNamedDaySearch(filters)) return true;
+  if (matchesLast7DaysValueDateRange(filters)) return false;
+  if (isTodayPostingSearch(filters)) return false;
+  if (isExplicitPostingDateRangeSearch(filters)) return true;
+  return hasPostingAmountFilter(filters);
+}
+
 function normalizePostingSearchFilters(
   filters: SearchFilterEntry[],
-  options?: { headerLegalEntityId?: string | null; accountScoped?: boolean }
+  options?: {
+    headerLegalEntityId?: string | null;
+    accountScoped?: boolean;
+    searchAllEntities?: boolean;
+    userQuestion?: unknown;
+  }
 ): SearchFilterEntry[] {
   let normalized = normalizePostingAccountFilterFields(filters);
+  normalized = normalizePostingNamedDayUseValueDate(normalized);
   normalized = normalizePostingJournalEntryFilters(normalized);
   normalized = normalizePostingPostedDateToValueDate(normalized);
   normalized = normalizePostingQ3LastYearRange(normalized);
   normalized = normalizePostingLastMonthRange(normalized);
+  normalized = normalizePostingLastWeekRange(normalized, options?.userQuestion);
 
-  const headerEntity = options?.headerLegalEntityId?.trim() || null;
-  if (options?.accountScoped && headerEntity) {
+  if (shouldScopePostingToHeaderEntity(normalized, options)) {
+    const headerEntity = options!.headerLegalEntityId!.trim();
     const withoutEntity = normalized.filter((f) => f.field !== 'legal_entity_id');
     return [
       ...withoutEntity,
@@ -659,13 +900,30 @@ function injectPostingTodayOrFallback(filters: SearchFilterEntry[]): SearchFilte
 const POSTING_AGENT_DEFAULT_PAGE_SIZE = 100;
 const POSTING_AGENT_MAX_PAGE_SIZE = 200;
 
+const POSTING_AMOUNT_LIST_PAGE_SIZE = 25;
+
+/** Amount-only list pulls default to 25 rows; Q3/month "pull all" stays at 100. */
+function isPostingAmountOnlyListSearch(filters: SearchFilterEntry[]): boolean {
+  return (
+    hasPostingAmountFilter(filters) && !isExplicitPostingDateRangeSearch(filters)
+  );
+}
+
 /** DAL defaults to 10 rows when pageSize is omitted — bump for posting list pulls. */
 function resolvePostingSearchPageSize(params: {
   modelName: string;
   pageSize?: number;
+  search?: unknown;
 }): number | undefined {
   if (params.modelName !== 'posting') return params.pageSize;
   const max = POSTING_AGENT_MAX_PAGE_SIZE;
+  const filters = Array.isArray(params.search)
+    ? (params.search as SearchFilterEntry[])
+    : [];
+  if (isPostingAmountOnlyListSearch(filters)) {
+    const requested = params.pageSize ?? POSTING_AMOUNT_LIST_PAGE_SIZE;
+    return Math.min(requested, POSTING_AMOUNT_LIST_PAGE_SIZE);
+  }
   if (params.pageSize != null && params.pageSize > 0) {
     return Math.min(params.pageSize, max);
   }
@@ -686,7 +944,7 @@ function sanitizeSearchFilters(filters: unknown[]): unknown[] {
 
 export function searchRecordsTool(
   auth: AuthContext,
-  toolContext?: { modelContext?: Record<string, unknown> }
+  toolContext?: PostingSearchToolContext
 ) {
   return tool({
     parameters: searchRecordsSchema,
@@ -695,7 +953,6 @@ export function searchRecordsTool(
       params: { modelName: string; search?: any; page?: number; pageSize?: number },
       _options
     ) => {
-      const postingPageSize = resolvePostingSearchPageSize(params);
       let searchParam: unknown;
       try {
         searchParam = await normalizeSearchParam(
@@ -721,6 +978,11 @@ export function searchRecordsTool(
           })
         );
       }
+      const postingPageSize = resolvePostingSearchPageSize({
+        modelName: params.modelName,
+        pageSize: params.pageSize,
+        search: searchParam,
+      });
       let normalized = {
         ...params,
         page: params.page ?? 1,
@@ -741,8 +1003,14 @@ export function searchRecordsTool(
         const postingFilters = normalized.search as SearchFilterEntry[];
         const accountScoped = isExplicitPostingAccountSearch(postingFilters);
         const hadEntity = postingFilters.some((f) => f.field === 'legal_entity_id');
+        const keepEntity = shouldKeepEntityOnEmptyPostingSearch(postingFilters);
 
-        if (accountScoped && hadEntity) {
+        // Widen without entity only for generic account lookups — never for yesterday/period/transfer pulls.
+        if (
+          hadEntity &&
+          !keepEntity &&
+          (accountScoped || resolveSearchAllEntities(toolContext))
+        ) {
           const withoutEntity = postingFilters.filter((f) => f.field !== 'legal_entity_id');
           normalized = { ...normalized, search: withoutEntity };
           result = await modelService.search('posting', auth, normalized);
@@ -769,7 +1037,9 @@ export function searchRecordsTool(
           }
         } else if (
           !accountScoped &&
-          !isExplicitPostingDateRangeSearch(postingFilters)
+          !isExplicitPostingDateRangeSearch(postingFilters) &&
+          !hasPostingAmountFilter(postingFilters) &&
+          !isPostingNamedDaySearch(postingFilters)
         ) {
           const relaxed = injectPostingTodayOrFallback(postingFilters);
           if (relaxed) {

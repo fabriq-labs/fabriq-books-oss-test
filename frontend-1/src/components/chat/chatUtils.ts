@@ -89,6 +89,34 @@ export const transformUserMessage = (message: UserMessage): UserMessage => {
 // Context Utilities
 // ============================================================================
 
+/** True when the user explicitly asks for an org-wide search (omit header legal_entity_id). */
+export const userRequestedAllEntities = (text?: string): boolean => {
+    if (!text) return false;
+    return /\b(all entities|any entity|every entity|across all entities|from all entities|all legal entities)\b/i.test(
+        text
+    );
+};
+
+/** Plain text from a user message (string content or text parts). */
+export const extractUserMessageText = (message: UserMessage): string => {
+    if (typeof message.content === 'string') {
+        return message.content;
+    }
+    if (Array.isArray(message.content)) {
+        return message.content
+            .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+            .map((part) => part.text)
+            .join(' ');
+    }
+    if (message.parts?.length) {
+        return message.parts
+            .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+            .map((part) => part.text)
+            .join(' ');
+    }
+    return '';
+};
+
 /**
  * Gets context-aware suggestions based on page context
  */

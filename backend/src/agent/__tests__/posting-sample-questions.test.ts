@@ -114,7 +114,7 @@ export const POSTING_SAMPLE_QUESTION_TEST_CASES: TestCase[] = [
     {
         name: 'Q3 journal entries',
         question: 'Pull all journal entries posted in Q3 of last year.',
-        expectedBehavior: 'searchRecords with value_date Q3 range (FY Oct–Dec or calendar Jul–Sep), neq DUPLICATE, no legal_entity_id.',
+        expectedBehavior: 'searchRecords with value_date Q3 range (FY Oct–Dec or calendar Jul–Sep), neq DUPLICATE, legal_entity_id eq header when TEST_LEGAL_ENTITY_ID set.',
         expectToolPatterns: ['searchRecords', 'value_date', 'neq'],
         minSteps: 1,
     },
@@ -142,14 +142,14 @@ export const POSTING_SAMPLE_QUESTION_TEST_CASES: TestCase[] = [
     {
         name: 'Amount greater than threshold',
         question: `Show me all postings with an amount greater than ${SAMPLE.amountHigh}.`,
-        expectedBehavior: 'searchRecords amount gt (numeric), base posting filters.',
+        expectedBehavior: 'searchRecords amount gt (numeric), pageSize 25, base posting filters, legal_entity_id eq header when TEST_LEGAL_ENTITY_ID set; if truncated state totalCount.',
         expectToolPatterns: ['searchRecords', 'amount'],
         minSteps: 1,
     },
     {
         name: 'Exact amount',
         question: `Find all transactions where the amount was exactly ${SAMPLE.amountExact}.`,
-        expectedBehavior: 'searchRecords amount eq.',
+        expectedBehavior: 'searchRecords amount eq, legal_entity_id eq header when TEST_LEGAL_ENTITY_ID set.',
         expectToolPatterns: ['searchRecords', 'amount'],
         minSteps: 1,
     },
@@ -163,15 +163,22 @@ export const POSTING_SAMPLE_QUESTION_TEST_CASES: TestCase[] = [
     {
         name: 'Postings under amount yesterday',
         question: `List all postings under ${SAMPLE.amountExact} from yesterday.`,
-        expectedBehavior: 'searchRecords amount lt + value_date yesterday.',
-        expectToolPatterns: ['searchRecords', 'amount'],
+        expectedBehavior: 'searchRecords amount lt + value_date yesterday, pageSize 25, legal_entity_id eq header (same as createRecord). If 0 rows, say none for that entity — do not widen to all entities.',
+        expectToolPatterns: ['searchRecords', 'amount', 'value_date'],
+        minSteps: 1,
+    },
+    {
+        name: 'Postings under amount yesterday all entities',
+        question: `List all postings under ${SAMPLE.amountExact} from yesterday from all entities.`,
+        expectedBehavior: 'searchRecords amount lt + value_date yesterday, pageSize 25, NO legal_entity_id — org-wide search.',
+        expectToolPatterns: ['searchRecords', 'amount', 'value_date'],
         minSteps: 1,
     },
     {
         name: 'Total debited to account this month',
         question: `What is the total amount debited to ${SAMPLE.debitAccount} this month?`,
-        expectedBehavior: 'analyticsQuery SUM(amount) WHERE account_id = debit account, month filter.',
-        expectToolPatterns: ['analyticsQuery', 'SUM'],
+        expectedBehavior: 'analyticsQuery SUM(p.amount) WHERE account_id = debit account; p.value_date >= {{monthStart}} AND < {{nextMonthStart}} (full calendar month, not currentDate/last7Days); legal_entity_id eq header legalEntityId when set.',
+        expectToolPatterns: ['analyticsQuery', 'SUM', 'monthStart'],
         minSteps: 1,
     },
     {
@@ -183,16 +190,19 @@ export const POSTING_SAMPLE_QUESTION_TEST_CASES: TestCase[] = [
     },
     {
         name: 'Volume between accounts yesterday',
-        question: `How much total money was moved between ${SAMPLE.creditAccount} and ${SAMPLE.debitAccount} yesterday?`,
-        expectedBehavior: 'analyticsQuery SUM with both account sides and yesterday value_date.',
-        expectToolPatterns: ['analyticsQuery'],
+        question:
+            'How much total money was moved between Office Supplies and Miscellaneous yesterday?',
+        expectedBehavior:
+            'searchRecords both transfer directions with value_date yesterday (not created_at), legal_entity_id eq header; 0 rows for entity = $0 total — do not report null-entity org-wide rows.',
+        expectToolPatterns: ['searchRecords', 'value_date'],
         minSteps: 1,
     },
     {
         name: 'Total volume last week',
         question: 'What is the total volume of postings recorded last week?',
-        expectedBehavior: 'analyticsQuery SUM(amount) for last week value_date range.',
-        expectToolPatterns: ['analyticsQuery', 'SUM'],
+        expectedBehavior:
+            'analyticsQuery SUM(p.amount) with value_date >= {{lastWeekStart}} AND < {{weekStart}} (prior Mon–Sun, not this week Mon→today or last 7 days).',
+        expectToolPatterns: ['analyticsQuery', 'SUM', 'lastWeekStart'],
         minSteps: 1,
     },
     {

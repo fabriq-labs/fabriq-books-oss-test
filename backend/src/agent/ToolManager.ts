@@ -184,9 +184,9 @@ export class ToolManager {
             return {
                 // Analytics-specific tools
                 getAnalyticsContext: getAnalyticsContextTool(auth),
-                analyticsQuery: analyticsQueryTool(auth),
+                analyticsQuery: analyticsQueryTool(auth, context),
                 // Keep search for lookups during analysis
-                searchRecords: searchRecordsTool(auth),
+                searchRecords: searchRecordsTool(auth, context),
             };
         }
 
@@ -198,12 +198,12 @@ export class ToolManager {
     /**
      * Get analytics tools directly (for explicit analytics requests)
      */
-    public getAnalyticsTools(auth: AuthContext): any {
+    public getAnalyticsTools(auth: AuthContext, context?: any): any {
         logger.debug('Getting analytics tools');
         return {
             getAnalyticsContext: getAnalyticsContextTool(auth),
-            analyticsQuery: analyticsQueryTool(auth),
-            searchRecords: searchRecordsTool(auth),
+            analyticsQuery: analyticsQueryTool(auth, context),
+            searchRecords: searchRecordsTool(auth, context),
         };
     }
 
@@ -233,7 +233,7 @@ export class ToolManager {
         const tools: any = {
             ...modelTools,
             getAnalyticsContext: getAnalyticsContextTool(auth),
-            analyticsQuery: analyticsQueryTool(auth),
+            analyticsQuery: analyticsQueryTool(auth, context),
         };
 
         // Add session tools only when operating inside an agent session

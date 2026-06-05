@@ -13,6 +13,10 @@ export interface PageContext {
     modelContext?: Record<string, any>;
     /** Limit agent prompt/tools to these models (e.g. posting + account on global chat) */
     focusModels?: string[];
+    /** Per-request: user asked for org-wide posting search (omit header legal_entity_id) */
+    searchAllEntities?: boolean;
+    /** Per-request: latest user question (for server-side entity scoping) */
+    userQuestion?: string;
 }
 
 interface ChatContextType {
