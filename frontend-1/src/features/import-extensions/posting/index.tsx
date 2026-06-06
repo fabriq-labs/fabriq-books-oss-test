@@ -7,6 +7,7 @@ import {
   PdfUploadResult,
   PdfUploadOptions,
   PdfUploadContext,
+  RelationFilterContext,
 } from '../types';
 import { CategorizationButton } from './CategorizationButton';
 import { getCategorizationColumn } from './CategorizationColumn';
@@ -124,6 +125,16 @@ export const postingImportExtension: ImportExtension = {
     // relationId is the actual selected account ID (relationFieldId is the field name "account_id")
     const accountId = context.relationId || undefined;
     return { legalEntityId, accountId };
+  },
+
+  getRelationFormLabel(): string {
+    return 'Bank account';
+  },
+
+  getRelationAdditionalFilters(context: RelationFilterContext): Record<string, any> {
+    const entityId = context.currentEntityId ?? context.effectiveEntityId;
+    if (!entityId) return {};
+    return { legal_entity_id: { eq: entityId } };
   },
 
   /**

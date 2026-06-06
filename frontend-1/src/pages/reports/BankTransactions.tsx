@@ -49,13 +49,22 @@ interface SimpleTransaction {
     currency: string;
 }
 
-/** Exclude DUPLICATE / OPENING_BALANCE; allow null posting_type (plain NOT IN drops NULL in SQL). */
-const postingTypeExcludeClause = {
-    OR: [
-        { posting_type: null },
-        { posting_type: { nin: ["DUPLICATE", "OPENING_BALANCE"] } },
-    ],
-};
+/** FY range as one value_date object — SearchDateBounds treats split gte/lte AND clauses as single-day filters. */
+function buildFyValueDateFilter(fy: FinancialYearOption) {
+    return {
+        value_date: {
+            gte: fy.from_date,
+            lte: fy.to_date,
+        },
+    };
+}
+
+/** Exclude DUPLICATE / OPENING_BALANCE; keep NULL + all other types (JOURNAL, BANK, …).
+ *  Uses neq so SearchQueryBuilder emits (IS NULL OR <> value) per field — plain notIn/nin drops NULL. */
+const postingTypeExcludeFilters = [
+    { posting_type: { neq: "DUPLICATE" } },
+    { posting_type: { neq: "OPENING_BALANCE" } },
+];
 
 // Chart colors
 const EXPENSE_COLORS = ['#E74A3B', '#F6C23E', '#36B9CC', '#4E73DF', '#858796', '#1CC88A', '#6f42c1', '#fd7e14'];
@@ -160,8 +169,6 @@ export default function BankTransactions() {
         setSelectedFY(getPreviousFYOption(fyType));
     }, [fyType]);
 
-    const fyDateRange = useMemo(() => [dayjs(selectedFY.from_date), dayjs(selectedFY.to_date)] as const, [selectedFY]);
-
     const [account, setAccount] = useState<any>(null);
     const [mergePair, setMergePair] = useState<[PostingRowLike, PostingRowLike] | null>(null);
     const [accountDropdownKey, setAccountDropdownKey] = useState(0);
@@ -188,12 +195,11 @@ export default function BankTransactions() {
             ];
         }
         base.AND = [
-            postingTypeExcludeClause,
-            { value_date: { gte: fyDateRange[0].startOf("day").toISOString() } },
-            { value_date: { lte: fyDateRange[1].endOf("day").toISOString() } },
+            ...postingTypeExcludeFilters,
+            buildFyValueDateFilter(selectedFY),
         ];
         return base;
-    }, [account, fyDateRange, currentEntityId]);
+    }, [account, selectedFY, currentEntityId]);
 
     useEffect(() => {
         const modelName = 'posting';
@@ -327,11 +333,10 @@ export default function BankTransactions() {
             ],
         }),
         AND: [
-            postingTypeExcludeClause,
-            { value_date: { gte: fyDateRange[0].startOf("day").toISOString() } },
-            { value_date: { lte: fyDateRange[1].endOf("day").toISOString() } },
+            ...postingTypeExcludeFilters,
+            buildFyValueDateFilter(selectedFY),
         ],
-    }), [account, fyDateRange]);
+    }), [account, selectedFY]);
 
     const displayCurrency = useMemo(() => {
         if (account?.currency?.code) return account.currency.code;

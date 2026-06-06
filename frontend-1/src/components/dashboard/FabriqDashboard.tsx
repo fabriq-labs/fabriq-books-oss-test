@@ -5,6 +5,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntity } from '@/contexts/EntityContext';
+import { useChat } from '@/contexts/ChatContext';
+import { ChatUI } from '@/components/chat/ChatUI';
 import {
   FinancialYearSelector,
   getPreviousFYOption,
@@ -28,6 +30,7 @@ import { C } from './design-system';
 
 const FabriqDashboard: React.FC = () => {
   const { currentEntity } = useEntity();
+  const { isChatOpen } = useChat();
   const navigate = useNavigate();
 
   const isIndividual = currentEntity?.is_individual === true;
@@ -48,13 +51,17 @@ const FabriqDashboard: React.FC = () => {
 
   const handleLaunchAgent = (_goal: string) => { navigate('/workbench'); };
 
+  if (isChatOpen) {
+    return <ChatUI />;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontFamily: 'Poppins,sans-serif', fontWeight: 600, fontSize: 16, color: C.gray900 }}>
-            {isIndividual ? 'Personal Finance' : 'Bookkeeping dashboard'}
+            {isIndividual ? 'Personal Finance' : 'Bookkeeping dashboard (Demo Data)'}
           </div>
           {currentEntity && (
             <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{currentEntity.legal_name}</div>

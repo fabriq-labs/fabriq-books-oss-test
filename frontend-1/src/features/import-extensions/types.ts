@@ -102,6 +102,16 @@ export interface PdfUploadContext {
 }
 
 /**
+ * Context for relation dropdown filters in the upload modal
+ */
+export interface RelationFilterContext {
+  /** Selected entity from the global switcher, or null when "All Entities" */
+  currentEntityId?: string | null;
+  /** Fallback entity (HQ / first) when currentEntityId is null */
+  effectiveEntityId?: string | null;
+}
+
+/**
  * Import Extension Interface
  *
  * Implementations provide model-specific import UI features without
@@ -140,6 +150,16 @@ export interface ImportExtension {
    * Build PDF upload options from current import context
    */
   getPdfUploadOptions?(context: PdfUploadContext): PdfUploadOptions;
+
+  /**
+   * Additional SearchDropDown filters for the upload-modal relation picker
+   */
+  getRelationAdditionalFilters?(context: RelationFilterContext): Record<string, any>;
+
+  /**
+   * Override the form label for the upload-modal relation picker
+   */
+  getRelationFormLabel?(): string;
 
   /**
    * Get data transformations for upload

@@ -1,0 +1,15 @@
+Account Code,Account Name,Debit Balance,Credit Balance
+1101,Cash on Hand,124000,
+1102,Checking Account,8804000,
+1103,Savings Account,620000,
+1105,Accounts Receivable,2356000,
+1107,Prepaid Expenses,217000,
+1201,Fixed Assets,1550000,
+1202,Accumulated Depreciation,,496000
+1203,Deposits,310000,
+2101,Accounts Payable,,1364000
+2103,Payroll Liabilities,,186000
+2104,Taxes Payable,,341000
+2201,Loan Payable,,1860000
+3101,Owner Capital,,1240000
+3102,Retained Earnings,,8494000

@@ -24,13 +24,22 @@ export interface MigrationJournalResult {
 // Assets/Expense are debit-normal; everything else is credit-normal.
 const CREDIT_NORMAL = new Set(['Liabilities', 'Income', 'Equity']);
 
+function dedupeMigrationRows(rows: MigrationJournalRow[]): MigrationJournalRow[] {
+  const byAccount = new Map<string, MigrationJournalRow>();
+  for (const row of rows) {
+    byAccount.set(row.account_id, row);
+  }
+  return [...byAccount.values()];
+}
+
 export async function createMigrationJournal(
   sdl: SystemDataLayer,
   input: CreateMigrationJournalInput
 ): Promise<MigrationJournalResult> {
   const { legal_entity_id, migration_date, rows, replace } = input;
 
-  if (!rows.length) throw new Error('No rows provided');
+  const uniqueRows = dedupeMigrationRows(rows);
+  if (!uniqueRows.length) throw new Error('No rows provided');
 
   const date = new Date(migration_date);
 
@@ -49,7 +58,7 @@ export async function createMigrationJournal(
   }
 
   // ── 2. Resolve account classifications ────────────────────────────────────
-  const accountIds = rows.map((r) => r.account_id);
+  const accountIds = uniqueRows.map((r) => r.account_id);
   const accounts = await sdl.findMany<{ id: string; name: string; classification: string | null }>(
     'account',
     { id: { in: accountIds } },
@@ -83,7 +92,7 @@ export async function createMigrationJournal(
   // ── 4. Build postings ──────────────────────────────────────────────────────
   const postingData: object[] = [];
 
-  for (const row of rows) {
+  for (const row of uniqueRows) {
     if (row.balance === 0) continue;
 
     const account = accountMap.get(row.account_id)!;
@@ -120,13 +129,19 @@ export async function createMigrationJournal(
 
   // ── 5. Execute in transaction (delete-then-create if replace) ─────────────
   await sdl.transaction(async (tx) => {
-    if (existing && replace) {
-      await tx.deleteMany('posting', {
+    if (replace) {
+      const deleted = await tx.deleteMany('posting', {
         legal_entity_id,
         posting_type: 'OPENING_BALANCE',
         value_date: date,
       });
-      logger.info('Deleted existing opening balance postings', { legal_entity_id, migration_date });
+      if (deleted.count > 0) {
+        logger.info('Deleted existing opening balance postings', {
+          legal_entity_id,
+          migration_date,
+          deleted: deleted.count,
+        });
+      }
     }
     await tx.createMany('posting', postingData);
   });

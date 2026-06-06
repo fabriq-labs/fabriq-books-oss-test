@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +34,19 @@ import {
   buildFYOptions,
   type FinancialYearType,
 } from "@/components/Reports/FinancialYearSelector";
-import { AlertTriangle, CheckCircle2, Plus, Trash2, Upload, Loader2 } from "lucide-react";
+import {
+  buildImportSampleCsvUrl,
+  responseBodyLooksLikeCsv,
+} from "@/components/import/utils/importSampleCsv";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  Loader2,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import dayjs from "dayjs";
 import { formatCurrency } from "@/lib/formatters";
 
@@ -55,8 +67,10 @@ interface JournalRow {
 }
 
 interface ImportedPostingRow {
+  accountId: string;
   accountName: string;
   accountCode: string | null;
+  classification: string;
   isDebitLeg: boolean;
   amount: number;
   date: string;
@@ -66,6 +80,22 @@ interface ImportedPostingRow {
 
 const BALANCE_SHEET_CLASSIFICATIONS = ["Assets", "Liabilities", "Equity"];
 const CREDIT_NORMAL = new Set(["Liabilities", "Equity"]);
+
+const BASE_CURRENCY_ID_TO_CODE: Record<string, string> = {
+  curr_inr: "INR",
+  curr_usd: "USD",
+};
+
+function resolveEntityCurrencyCode(
+  entity: { currency?: { code?: string }; basecurrency_id?: string } | null
+): string {
+  const code = entity?.currency?.code?.trim().toUpperCase();
+  if (code) return code;
+  const fromId = entity?.basecurrency_id
+    ? BASE_CURRENCY_ID_TO_CODE[entity.basecurrency_id.toLowerCase()]
+    : undefined;
+  return fromId ?? "INR";
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -79,10 +109,49 @@ function computeImbalance(rows: JournalRow[]): number {
   return net;
 }
 
+/** Reconstruct signed balance stored in migration journal rows from posting leg. */
+function signedBalanceFromLeg(
+  classification: string,
+  isDebitLeg: boolean,
+  amount: number
+): number {
+  if (CREDIT_NORMAL.has(classification)) {
+    return isDebitLeg ? -amount : amount;
+  }
+  return isDebitLeg ? amount : -amount;
+}
+
+function dedupeJournalRows(rows: JournalRow[]): Array<{ account_id: string; balance: number }> {
+  const byAccount = new Map<string, { account_id: string; balance: number }>();
+  for (const row of rows) {
+    if (!row.account_id || row.balance === "" || parseFloat(row.balance) === 0) continue;
+    byAccount.set(row.account_id, {
+      account_id: row.account_id,
+      balance: parseFloat(row.balance),
+    });
+  }
+  return [...byAccount.values()];
+}
+
 function defaultMigrationDate(fyType: FinancialYearType): string {
   const options = buildFYOptions(fyType, 5);
   const prevFY = options[options.length - 2];
   return prevFY.to_date;
+}
+
+function formatBalanceSheetDate(raw: string | null | undefined): string {
+  if (!raw) return "";
+  return dayjs(String(raw).slice(0, 10)).format("DD MMM YYYY");
+}
+
+function triggerCsvDownload(csvContent: string, filename: string) {
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 async function apiPost(path: string, body: unknown) {
@@ -116,6 +185,11 @@ export default function OpeningBalances() {
   const { toast } = useToast();
   const { currentEntity, currentEntityId } = useEntity();
 
+  const displayCurrencyCode = useMemo(
+    () => resolveEntityCurrencyCode(currentEntity),
+    [currentEntity]
+  );
+
   // ── State ─────────────────────────────────────────────────────────────────
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -136,6 +210,11 @@ export default function OpeningBalances() {
   const [submitting, setSubmitting] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const replaceOnSave = useMemo(
+    () => existingCount > 0 && (!existingDate || migrationDate === existingDate),
+    [existingCount, existingDate, migrationDate]
+  );
 
   // ── Entity-driven initialization ──────────────────────────────────────────
 
@@ -182,8 +261,11 @@ export default function OpeningBalances() {
       const res = await apiPost("/api/setup/custom/migration-journal-status", {
         legal_entity_id: entityId,
       });
-      setExistingCount(res?.postings_count ?? 0);
-      setExistingDate(res?.dates?.[0] ?? null);
+      const count = res?.postings_count ?? 0;
+      const savedDate = res?.dates?.[0] ?? null;
+      setExistingCount(count);
+      setExistingDate(savedDate);
+      if (savedDate) setMigrationDate(savedDate);
     } catch { /* non-critical */ }
   }, []);
 
@@ -207,31 +289,39 @@ export default function OpeningBalances() {
         if (isOBCDebit) {
           if (creditAcct) {
             result.push({
+              accountId: creditAcct.id,
               accountName: creditAcct.name ?? creditAcct.id,
               accountCode: creditAcct.code ?? null,
+              classification: creditAcct.classification ?? "",
               isDebitLeg: false,
               amount: Number(p.amount),
               date: p.value_date ?? p.posting_date ?? "",
             });
           }
-        } else {
-          if (acct) {
-            result.push({
-              accountName: acct.name ?? acct.id,
-              accountCode: acct.code ?? null,
-              isDebitLeg: true,
-              amount: Number(p.amount),
-              date: p.value_date ?? p.posting_date ?? "",
-            });
-          }
+        } else if (acct) {
+          result.push({
+            accountId: acct.id,
+            accountName: acct.name ?? acct.id,
+            accountCode: acct.code ?? null,
+            classification: acct.classification ?? "",
+            isDebitLeg: true,
+            amount: Number(p.amount),
+            date: p.value_date ?? p.posting_date ?? "",
+          });
         }
       }
 
-      result.sort((a, b) =>
-        Number(b.isDebitLeg) - Number(a.isDebitLeg) ||
-        (a.accountName ?? "").localeCompare(b.accountName ?? "")
+      const byAccount = new Map<string, ImportedPostingRow>();
+      for (const row of result) {
+        byAccount.set(row.accountId, row);
+      }
+
+      const deduped = [...byAccount.values()].sort(
+        (a, b) =>
+          Number(b.isDebitLeg) - Number(a.isDebitLeg) ||
+          (a.accountName ?? "").localeCompare(b.accountName ?? "")
       );
-      setImportedPostings(result);
+      setImportedPostings(deduped);
     } catch {
       setImportedPostings([]);
     } finally {
@@ -268,7 +358,25 @@ export default function OpeningBalances() {
   }, []);
 
   const openAddModal = () => {
-    setRows([]);
+    if (importedPostings.length > 0) {
+      setRows(
+        importedPostings.map((row) => {
+          const classification =
+            accounts.find((a) => a.id === row.accountId)?.classification ??
+            row.classification;
+          return {
+            account_id: row.accountId,
+            account_name: row.accountName,
+            classification,
+            balance: String(
+              signedBalanceFromLeg(classification, row.isDebitLeg, row.amount)
+            ),
+          };
+        })
+      );
+    } else {
+      setRows([]);
+    }
     setIsModalOpen(true);
   };
 
@@ -276,9 +384,7 @@ export default function OpeningBalances() {
 
   const handleSubmit = async () => {
     if (!currentEntityId) return;
-    const filledRows = rows
-      .filter((r) => r.account_id && r.balance !== "" && parseFloat(r.balance) !== 0)
-      .map((r) => ({ account_id: r.account_id, balance: parseFloat(r.balance) }));
+    const filledRows = dedupeJournalRows(rows);
 
     if (!filledRows.length) {
       toast({ title: "Enter at least one non-zero balance", variant: "destructive" });
@@ -291,7 +397,7 @@ export default function OpeningBalances() {
         legal_entity_id: currentEntityId,
         migration_date: migrationDate,
         rows: filledRows,
-        replace: existingCount > 0,
+        replace: replaceOnSave,
       });
 
       const obcMsg = Math.abs(result.obc_balance) > 0.01
@@ -303,6 +409,7 @@ export default function OpeningBalances() {
       setExistingCount(result.postings_created);
       setExistingDate(migrationDate);
       await loadImportedPostings(currentEntityId);
+      await loadStatus(currentEntityId);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -314,11 +421,15 @@ export default function OpeningBalances() {
 
   const handleCsvUpload = async (file: File) => {
     if (!currentEntityId) return;
+    if (!migrationDate) {
+      toast({ title: "Choose a balances-as-of date first", variant: "destructive" });
+      return;
+    }
     const fd = new FormData();
     fd.append("file", file);
     fd.append("legal_entity_id", currentEntityId);
     fd.append("migration_date", migrationDate);
-    fd.append("replace", String(existingCount > 0));
+    fd.append("replace", String(replaceOnSave));
 
     setSubmitting(true);
     try {
@@ -329,11 +440,34 @@ export default function OpeningBalances() {
       setExistingCount(result.postings_created);
       setExistingDate(migrationDate);
       await loadImportedPostings(currentEntityId);
+      await loadStatus(currentEntityId);
     } catch (err: any) {
       toast({ title: "CSV import failed", description: err.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDownloadSample = async () => {
+    const url = buildImportSampleCsvUrl("opening_balances");
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      if (!responseBodyLooksLikeCsv(text, res.headers.get("content-type"))) {
+        throw new Error("Sample file not found");
+      }
+      triggerCsvDownload(text, "opening_balances_sample.csv");
+    } catch {
+      toast({ title: "Could not download sample CSV", variant: "destructive" });
+    }
+  };
+
+  const openCsvPicker = () => {
+    if (!migrationDate) {
+      toast({ title: "Choose a balances-as-of date first", variant: "destructive" });
+      return;
+    }
+    fileRef.current?.click();
   };
 
   // ── Delete all ────────────────────────────────────────────────────────────
@@ -362,54 +496,88 @@ export default function OpeningBalances() {
   const imbalance = computeImbalance(rows);
   const isBalanced = Math.abs(imbalance) < 0.01;
   const usedAccountIds = new Set(rows.map((r) => r.account_id).filter(Boolean));
-  const asOfLabel = importedPostings[0]?.date
-    ? dayjs(importedPostings[0].date).format("DD MMM YYYY")
-    : existingDate ? dayjs(existingDate).format("DD MMM YYYY") : "";
+  const savedAsOfLabel = formatBalanceSheetDate(existingDate);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="container mx-auto py-6">
       {/* ── Page header ── */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="space-y-4 mb-6">
         <div>
           <h2 className="text-2xl font-bold">Opening Balances</h2>
-          {asOfLabel && (
+          {savedAsOfLabel ? (
             <p className="text-sm text-muted-foreground mt-0.5">
-              Imported as of <span className="font-medium">{asOfLabel}</span>
+              Current balances as of <span className="font-medium">{savedAsOfLabel}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Set balance-sheet opening balances for the selected entity — enter manually or import a CSV.
             </p>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90"
-            onClick={openAddModal}
-            disabled={accountsLoading}
-          >
-            <Plus size={16} />
-            Add Opening Balance
-          </Button>
-          <Button
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90"
-            onClick={() => fileRef.current?.click()}
-            disabled={submitting || !migrationDate}
-          >
-            {submitting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            Import CSV
-          </Button>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            ref={fileRef}
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              handleCsvUpload(file);
-              e.target.value = "";
-            }}
-          />
+
+        <div className="flex flex-wrap items-end justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3">
+          <div className="space-y-1">
+            <Label htmlFor="migration-date">Balances as of</Label>
+            <Input
+              id="migration-date"
+              type="date"
+              value={migrationDate}
+              onChange={(e) => setMigrationDate(e.target.value)}
+              className="w-48 bg-background"
+            />
+            <p className="text-xs text-muted-foreground">
+              Same date is used for manual entry and CSV import.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              className="flex items-center gap-2"
+              onClick={handleDownloadSample}
+            >
+              <Download size={16} />
+              Download sample CSV
+            </Button>
+            <Button
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+              onClick={openAddModal}
+              disabled={accountsLoading || !migrationDate}
+            >
+              <Plus size={16} />
+              {existingCount > 0 ? "Edit manually" : "Enter manually"}
+            </Button>
+            <Button
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+              onClick={openCsvPicker}
+              disabled={submitting || !migrationDate}
+            >
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+              Import CSV
+            </Button>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              ref={fileRef}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                handleCsvUpload(file);
+                e.target.value = "";
+              }}
+            />
+          </div>
         </div>
+
+        {existingCount > 0 && existingDate && migrationDate !== existingDate && (
+          <p className="text-sm text-amber-600 flex items-center gap-1.5">
+            <AlertTriangle size={14} />
+            Saving on {formatBalanceSheetDate(migrationDate)} will add a new batch; existing balances on{" "}
+            {savedAsOfLabel} stay until removed.
+          </p>
+        )}
       </div>
 
       {/* ── Imported entries table ── */}
@@ -420,8 +588,10 @@ export default function OpeningBalances() {
         </div>
       ) : importedPostings.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-          <p className="text-sm font-medium">No opening balances imported yet.</p>
-          <p className="text-xs mt-1">Click "Add Opening Balance" or "Import CSV" to get started.</p>
+          <p className="text-sm font-medium">No opening balances set yet.</p>
+          <p className="text-xs mt-1 max-w-md text-center">
+            Choose a date above, then enter balances manually or import a CSV. Download the sample to see the expected format.
+          </p>
         </div>
       ) : (
         <div className="w-full space-y-4">
@@ -437,7 +607,8 @@ export default function OpeningBalances() {
           <div className="rounded-md border">
             <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
               <span className="text-sm font-medium text-muted-foreground">
-                {importedPostings.length} accounts · {asOfLabel}
+                {importedPostings.length} accounts
+                {savedAsOfLabel ? ` · as of ${savedAsOfLabel}` : ""}
               </span>
               <Button
                 variant="ghost"
@@ -454,12 +625,12 @@ export default function OpeningBalances() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-4">Account</TableHead>
-                  <TableHead className="text-right pr-4 w-48">Balance</TableHead>
+                  <TableHead className="text-right pr-4 w-48">Balance ({displayCurrencyCode})</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {importedPostings.map((row, i) => (
-                  <TableRow key={i}>
+                {importedPostings.map((row) => (
+                  <TableRow key={row.accountId}>
                     <TableCell className="pl-4 text-sm">
                       {row.accountCode && (
                         <span className="text-muted-foreground mr-1.5 font-mono text-xs">{row.accountCode}</span>
@@ -467,7 +638,9 @@ export default function OpeningBalances() {
                       {row.accountName}
                     </TableCell>
                     <TableCell className="text-right pr-4">
-                      <span className="font-mono text-sm">{formatCurrency(row.amount)}</span>
+                      <span className="font-mono text-sm">
+                        {formatCurrency(row.amount, displayCurrencyCode)}
+                      </span>
                       <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded ${
                         row.isDebitLeg
                           ? "bg-blue-50 text-blue-700"
@@ -489,26 +662,32 @@ export default function OpeningBalances() {
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              {existingCount > 0 ? "Replace Opening Balances" : "Add Opening Balances"}
+              {replaceOnSave ? "Replace Opening Balances" : "Enter Opening Balances"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-4 py-2">
-            {/* Date field */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1 space-y-1">
-                <Label>Balances as of</Label>
+            {existingCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Existing accounts are loaded below. Change a balance or add accounts, then save —
+                the full list replaces opening balances for this date (one row per account).
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-4 rounded-md border bg-muted/30 px-3 py-2">
+              <div className="space-y-0.5">
+                <Label htmlFor="modal-migration-date">Balances as of</Label>
                 <Input
+                  id="modal-migration-date"
                   type="date"
                   value={migrationDate}
                   onChange={(e) => setMigrationDate(e.target.value)}
-                  className="w-48"
+                  className="w-48 bg-background"
                 />
               </div>
-              {existingCount > 0 && (
-                <p className="text-sm text-amber-600 flex items-center gap-1 mt-5">
+              {replaceOnSave && (
+                <p className="text-sm text-amber-600 flex items-center gap-1">
                   <AlertTriangle size={14} />
-                  {existingCount} existing entries will be replaced.
+                  {existingCount} existing entries on this date will be replaced.
                 </p>
               )}
             </div>
@@ -615,7 +794,7 @@ export default function OpeningBalances() {
                   : <AlertTriangle size={15} />}
                 {isBalanced
                   ? "Assets = Liabilities + Equity"
-                  : `Difference: ${Math.abs(imbalance).toLocaleString("en-IN", { maximumFractionDigits: 2 })} — will post to "Opening Balance Clearing"`}
+                  : `Difference: ${formatCurrency(Math.abs(imbalance), displayCurrencyCode)} — will post to "Opening Balance Clearing"`}
               </div>
             )}
           </div>
@@ -632,7 +811,7 @@ export default function OpeningBalances() {
               {submitting ? (
                 <><Loader2 size={14} className="animate-spin mr-1.5" />Saving…</>
               ) : (
-                existingCount > 0 ? "Replace opening balances" : "Save opening balances"
+                replaceOnSave ? "Replace opening balances" : "Save opening balances"
               )}
             </Button>
           </DialogFooter>

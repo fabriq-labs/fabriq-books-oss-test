@@ -295,6 +295,7 @@ curl -X POST http://localhost:4000/api/auth/login \
 - **Invoices**: INV-001 … INV-012 (SALES), mix of balance = 0 and balance &gt; 0, some overdue.
 - **Payment receipts**: REC-DEMO-001 … REC-DEMO-007; five applied to invoices, one unapplied (advance) for cash-application demo.
 - **FY journal postings**: `posting-demo-*.csv` (~300 lines per legal entity; full double-entry).
+- **Opening balances**: `opening-balances/*.csv` — FY2024-25 closing (2025-03-31) for India entities, CY2024 closing (2024-12-31) for US; imported as `OPENING_BALANCE` migration journal on setup.
 - **Reconciliation bank lines**: `posting.csv` — 24 one-sided lines on HQ Checking (1102); `DEMO:` descriptions; `post_demo_01`–`05` pre-matched to receipts; `post_demo_21`–`24` for invoice/receipt matching in UI/agent.
 - **Reset reconciliation only**: `npx ts-node setup-indian-demo.ts --reset-postings` (does not touch FY journals).
 

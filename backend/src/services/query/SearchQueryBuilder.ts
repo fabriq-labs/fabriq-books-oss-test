@@ -228,7 +228,11 @@ export class SearchQueryBuilder {
           where[field] = { in: Array.isArray(value) ? value : [value] };
           break;
         case 'nin':
-          where[field] = { notIn: Array.isArray(value) ? value : [value] };
+          // Prisma { notIn: [...] } excludes NULL; SQL NOT IN drops NULL rows
+          where.AND = where.AND || [];
+          where.AND.push({
+            OR: [{ [field]: null }, { [field]: { notIn: Array.isArray(value) ? value : [value] } }],
+          });
           break;
         case 'contains':
         case 'icontains':

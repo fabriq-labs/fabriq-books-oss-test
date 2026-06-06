@@ -3,6 +3,8 @@ import * as path from 'path';
 import { setupChartOfAccounts } from '../setup-chart-of-accounts';
 
 import prisma from '../../src/lib/prisma';
+import { SystemDataLayer } from '../../src/services/dal/SystemDataLayer';
+import { importMigrationJournalFromCsv } from '../../src/services/book-keeping/migration-journal/MigrationJournalCsvParser';
 import { seedPaymentTermsFromCsv } from '../../src/utils/setup/seedPaymentTermsFromCsv';
 import { buildAirbyteExtractionConfigFromEnv } from '../setup-airbyte-extraction-config';
 import {
@@ -96,6 +98,71 @@ const POSTING_CSV_FILES = [
   'posting-demo-mumbai.csv',
   'posting-demo-bangalore.csv',
 ];
+
+/** FY closing balances imported via migration journal (Zoho Books migration narrative). */
+const OPENING_BALANCE_SEED_USER = 'user_sanjay_gupta';
+const OPENING_BALANCE_CSV_IMPORTS: Array<{
+  file: string;
+  legalEntityId: string;
+  migrationDate: string;
+}> = [
+  {
+    file: 'opening-balances/opening-balances-india-hq.csv',
+    legalEntityId: 'org_indian_demo',
+    migrationDate: '2025-03-31',
+  },
+  {
+    file: 'opening-balances/opening-balances-mumbai.csv',
+    legalEntityId: 'org_mumbai_branch',
+    migrationDate: '2025-03-31',
+  },
+  {
+    file: 'opening-balances/opening-balances-bangalore.csv',
+    legalEntityId: 'org_bangalore_office',
+    migrationDate: '2025-03-31',
+  },
+  {
+    file: 'opening-balances/opening-balances-usa.csv',
+    legalEntityId: 'org_us_office',
+    migrationDate: '2024-12-31',
+  },
+];
+
+async function importOpeningBalancesFromSeedCsv(demoOrgId: string): Promise<number> {
+  const sdl = new SystemDataLayer(prisma, demoOrgId, OPENING_BALANCE_SEED_USER);
+  let totalPostings = 0;
+
+  for (const entry of OPENING_BALANCE_CSV_IMPORTS) {
+    const filePath = path.join(__dirname, entry.file);
+    if (!fs.existsSync(filePath)) {
+      console.warn(`  ⚠ Skipping ${entry.file} (file not found)`);
+      continue;
+    }
+
+    const csvText = fs.readFileSync(filePath, 'utf-8');
+    const result = await importMigrationJournalFromCsv(
+      sdl,
+      csvText,
+      entry.legalEntityId,
+      entry.migrationDate,
+      true
+    );
+
+    if (result.parse_errors.length > 0) {
+      const detail = result.parse_errors
+        .map((e) => `line ${e.line}: ${e.message}`)
+        .join('; ');
+      throw new Error(`Opening balance CSV ${entry.file}: ${detail}`);
+    }
+
+    console.log(
+      `  ✓ ${entry.legalEntityId}: ${result.postings_created} opening balance postings (${entry.migrationDate}, OBC balanced)`
+    );
+    totalPostings += result.postings_created;
+  }
+
+  return totalPostings;
+}
 
 /** Bank-import style lines for reconciliation / categorization UI (one-sided; HQ only). */
 const RECONCILIATION_POSTING_CSV = 'posting.csv';
@@ -1710,6 +1777,10 @@ async function setupIndianDemoData() {
     }
     console.log(`  ✓ Loaded ${paymentReceiptData.length} payment receipts`);
 
+    console.log('📊 Importing FY closing / opening balances (Zoho migration journal)...');
+    const openingBalancePostingCount = await importOpeningBalancesFromSeedCsv(demoOrgId);
+    console.log(`  ✓ Loaded ${openingBalancePostingCount} opening balance postings across ${OPENING_BALANCE_CSV_IMPORTS.length} entities`);
+
     console.log('📒 Loading journal postings from CSV (India + branches + USA entity)...');
     const postingCount = await upsertAllPostingsFromCsv(demoOrgId);
     console.log(`  ✓ Loaded ${postingCount} journal postings total (double-entry)`);
@@ -1747,6 +1818,7 @@ async function setupIndianDemoData() {
     console.log(`   📋 Payment terms: ${paymentTermsLoadedCount}`);
     console.log(`   📄 Sales invoices: ${invoiceCount}, Invoice line items: ${invoiceLineItemCount}`);
     console.log(`   💳 Payment receipts: ${paymentReceiptData.length}`);
+    console.log(`   📊 Opening balance postings: ${openingBalancePostingCount} (FY2024-25 close / CY2024 close for US)`);
     console.log(`   📒 Journal postings: ${postingCount}`);
     console.log(`   🏦 Reconciliation demo bank lines: ${reconciliationPostingCount} (${RECONCILIATION_POSTING_CSV})`);
     console.log(
@@ -1847,6 +1919,9 @@ async function resetAllPostingsFromCSV() {
   const deleted = await prisma.posting.deleteMany({ where: { org_id: demoOrgId } });
   console.log(`  ✓ Deleted ${deleted.count} postings`);
 
+  const openingCount = await importOpeningBalancesFromSeedCsv(demoOrgId);
+  console.log(`  ✓ Created ${openingCount} opening balance postings`);
+
   const journalCount = await upsertAllPostingsFromCsv(demoOrgId);
   console.log(`  ✓ Created ${journalCount} journal postings from FY CSVs`);
 
@@ -1941,6 +2016,7 @@ export {
   upsertDemoInvoicesFromCsv,
   syncDemoInvoicesFromCsv,
   upsertReconciliationBankPostingsFromCsv,
+  importOpeningBalancesFromSeedCsv,
   resetDemoPostingsAndReceipts,
   resetAllPostingsFromCSV,
 };

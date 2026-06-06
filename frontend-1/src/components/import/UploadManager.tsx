@@ -32,6 +32,8 @@ export const UploadManager = ({
   onPdfCategorizationModeChange,
   enableChunking,
   onEnableChunkingChange,
+  relationAdditionalFilters,
+  relationFormLabel,
 }: any) => {
   const [form] = Form.useForm();
   const { readString } = usePapaParse();
@@ -125,7 +127,7 @@ export const UploadManager = ({
     <Modal
       width={"50%"}
       height={"100%"}
-      title="Enter Your Upload"
+      title={null}
       open={isOpen}
       onCancel={() => {
         handleCancel();
@@ -171,7 +173,10 @@ export const UploadManager = ({
           {isForeign && isOpen && (
             <Form form={form} layout="vertical">
               <Form.Item
-                label={`Select a ${relationField ? formatLabel(relationField) : "Value"}`}
+                label={
+                  relationFormLabel ??
+                  `Select a ${relationField ? formatLabel(relationField) : "Value"}`
+                }
                 name="name"
                 rules={[{ required: false, message: "Please a Value !" }]}
               >
@@ -195,6 +200,7 @@ export const UploadManager = ({
                   onClear={handleClear}
                   limit="10"
                   searchParams={relationField}
+                  additionalFilters={relationAdditionalFilters}
                 />
               </Form.Item>
             </Form>

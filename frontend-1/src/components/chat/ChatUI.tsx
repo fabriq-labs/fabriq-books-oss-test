@@ -372,6 +372,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
             return;
         }
 
+        const filesToSend = [...selectedFiles];
+        setInput('');
+        clearSelectedFiles();
+
         try {
             const parts: MessagePart[] = [];
 
@@ -379,8 +383,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
                 parts.push({ type: 'text', text: trimmedInput });
             }
 
-            if (selectedFiles.length > 0) {
-                const fileParts = await buildFileParts(selectedFiles);
+            if (filesToSend.length > 0) {
+                const fileParts = await buildFileParts(filesToSend);
                 parts.push(...fileParts);
             }
 
@@ -394,9 +398,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
                     allowEmptySubmit: true
                 }
             );
-
-            setInput('');
-            clearSelectedFiles();
         } catch (err) {
             console.error('Failed to submit message with attachments:', err);
         }
@@ -408,14 +409,16 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
             return;
         }
 
-        setInput(suggestion);
+        const filesToSend = [...selectedFiles];
+        setInput('');
+        clearSelectedFiles();
 
         try {
             const parts: MessagePart[] = [];
             parts.push({ type: 'text', text: suggestion });
 
-            if (selectedFiles.length > 0) {
-                const fileParts = await buildFileParts(selectedFiles);
+            if (filesToSend.length > 0) {
+                const fileParts = await buildFileParts(filesToSend);
                 parts.push(...fileParts);
             }
 
@@ -429,9 +432,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
                     allowEmptySubmit: true
                 }
             );
-
-            setInput('');
-            clearSelectedFiles();
         } catch (err) {
             console.error('Failed to submit suggestion:', err);
         }

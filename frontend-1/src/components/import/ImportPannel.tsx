@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, notification } from "antd";
 import { importAPI, viewAPI } from "@/api/api";
 import { buildDataWithLookupFields, fetchColumns } from "./utils/upload";
@@ -12,6 +12,7 @@ import { ChevronLeft, FileText, Upload, Download } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { importExtensionRegistry } from "@/features/import-extensions";
+import { useEntity } from "@/contexts/EntityContext";
 
 export const ImportPannel = ({
   modelType,
@@ -61,6 +62,24 @@ export const ImportPannel = ({
 
   // Get import extension for this model type (if any)
   const extension = importExtensionRegistry.getForModel(modelType);
+  const { currentEntityId, entities } = useEntity();
+  const effectiveEntityId = useMemo(
+    () =>
+      currentEntityId ??
+      entities.find((e) => e.is_it_headquartres)?.id ??
+      entities[0]?.id ??
+      null,
+    [currentEntityId, entities]
+  );
+  const relationAdditionalFilters = useMemo(
+    () =>
+      extension?.getRelationAdditionalFilters?.({
+        currentEntityId,
+        effectiveEntityId,
+      }) ?? {},
+    [extension, currentEntityId, effectiveEntityId]
+  );
+  const relationFormLabel = extension?.getRelationFormLabel?.();
 
   useEffect(() => {
     if (metaData) setFieldSets(metaData);
@@ -559,6 +578,8 @@ export const ImportPannel = ({
           onPdfCategorizationModeChange={setPdfCategorizationMode}
           enableChunking={enableChunking}
           onEnableChunkingChange={setEnableChunking}
+          relationAdditionalFilters={relationAdditionalFilters}
+          relationFormLabel={relationFormLabel}
         />
       )}
       {csvContent && csvContent.length > 0 && (

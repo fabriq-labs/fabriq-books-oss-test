@@ -95,7 +95,12 @@ export async function parseMigrationJournalCsv(
     rows.push({ account_id, balance });
   }
 
-  return { rows, errors };
+  const byAccount = new Map<string, MigrationJournalRow>();
+  for (const row of rows) {
+    byAccount.set(row.account_id, row);
+  }
+
+  return { rows: [...byAccount.values()], errors };
 }
 
 export async function importMigrationJournalFromCsv(

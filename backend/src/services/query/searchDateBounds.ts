@@ -84,6 +84,17 @@ export class SearchDateBounds {
     }
 
     if (!hasGte && (hasLte || hasLt)) {
+      const anchorDate = new Date(String(anchor));
+      const isRangeUpperBound =
+        !Number.isNaN(anchorDate.getTime()) &&
+        (!this.isUtcStartOfDay(anchor) || this.isUtcEndOfDay(anchorDate));
+      if (isRangeUpperBound) {
+        const endBounds = this.calendarDayBounds(anchor);
+        if (endBounds) {
+          where[field] = { lt: endBounds.lt };
+        }
+        return;
+      }
       where[field] = { gte: bounds.gte, lt: bounds.lt };
     } else if (hasGte && !hasLte && !hasLt && this.isUtcStartOfDay(cond.gte)) {
       where[field] = { gte: bounds.gte, lt: bounds.lt };
