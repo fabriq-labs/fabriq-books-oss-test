@@ -18,6 +18,18 @@ export function resolvePostingLegalEntity(
   };
 }
 
+/** posting_type applied when creating a posting through the UI form. */
+export const DEFAULT_POSTING_TYPE = 'JOURNAL';
+
+/** Default legal entity for a new posting form (reuses resolvePostingLegalEntity). */
+export function buildNewPostingFormDefaults(
+  currentEntity: Entity | null,
+  entities: Entity[]
+): { legal_entity_id: string } {
+  const { legalEntityId } = resolvePostingLegalEntity(currentEntity, entities);
+  return { legal_entity_id: legalEntityId ?? '' };
+}
+
 export function buildPostingModelContext(
   currentEntity: Entity | null,
   entities: Entity[],

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,7 +21,12 @@ import { SearchDropDown } from '../../search_dropdown/dropdown';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { useEntity } from '@/contexts/EntityContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
-import { buildPostingModelContext } from '@/utils/postingChatContext';
+import {
+    buildNewPostingFormDefaults,
+    buildPostingModelContext,
+    DEFAULT_POSTING_TYPE,
+    resolvePostingLegalEntity,
+} from '@/utils/postingChatContext';
 import { Badge } from '@/components/ui/badge';
 
 const itemMasterSchema = z.object({
@@ -29,7 +34,7 @@ const itemMasterSchema = z.object({
     category_name: z.string().optional(),
     notes:z.string().optional(),
     description: z.string().min(1, { message: 'Description is required' }),
-    posting_type: z.string().optional(),
+    legal_entity_id: z.string().optional(),
     account_id: z.string().min(1, { message: 'Account is required' }),
     amount: z.string().min(1, { message: 'Amount is required' }).refine(
         (value) => !isNaN(parseFloat(value)) && parseFloat(value) >= 0,
@@ -102,17 +107,14 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
     const { latestFormToolResponse } = useTool();
     const location = useLocation();
     const { setPageContext } = useChatContext();
-    const { currentEntity, entities, currentEntityId } = useEntity();
-    const accountAdditionalFilters = currentEntityId
-        ? { legal_entity_id: { eq: currentEntityId } }
-        : undefined;
+    const { currentEntity, entities } = useEntity();
 
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
         defaultValues: initialValues || {
             account_name: '',
             notes: '',
-            posting_type: '',
+            legal_entity_id: '',
             description: '',
             amount: '',
             account_id: '',
@@ -126,6 +128,19 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
         },
     });
 
+    const formLegalEntityId = form.watch('legal_entity_id');
+    const accountAdditionalFilters = formLegalEntityId
+        ? { legal_entity_id: { eq: formLegalEntityId } }
+        : undefined;
+
+    const legalEntityDropdownValue = useMemo(() => {
+        if (initialValues?.legal_entity) return initialValues.legal_entity;
+        const entityId =
+            formLegalEntityId ||
+            resolvePostingLegalEntity(currentEntity, entities).legalEntityId;
+        return entityId ? entities.find((e) => e.id === entityId) ?? null : null;
+    }, [initialValues?.legal_entity, formLegalEntityId, entities, currentEntity]);
+
     useEffect(() => {
         if (id) {
             fetchingDetails(id);
@@ -133,6 +148,14 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
         }
         setLastPredictedField(null);
     }, [id]);
+
+    useEffect(() => {
+        if (id || isLoading) return;
+        const { legal_entity_id } = buildNewPostingFormDefaults(currentEntity, entities);
+        if (!form.getValues('legal_entity_id') && legal_entity_id) {
+            form.setValue('legal_entity_id', legal_entity_id);
+        }
+    }, [id, isLoading, currentEntity, entities, form]);
 
     useEffect(() => {
         const modelName = 'posting';
@@ -172,7 +195,7 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                     form.reset({
                         account_name: toolResultData?.account?.name || '',
                         notes: toolResultData?.notes || '',
-                        posting_type: toolResultData?.posting_type || '',
+                        legal_entity_id: toolResultData?.legal_entity_id || '',
                         description: toolResultData?.description || '',
                         account_id: toolResultData?.account_id || undefined,
                         amount: toolResultData?.amount,
@@ -197,7 +220,7 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                 form.reset({
                     account_name: res.data?.account?.name || '',
                     notes: res.data?.notes || '',
-                    posting_type: res.data?.posting_type || '',
+                    legal_entity_id: res.data?.legal_entity_id || '',
                     description: res.data?.description || '',
                     account_id: res.data?.account_id || undefined,
                     amount: res.data?.amount,
@@ -243,7 +266,8 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                 holding_id: data.holding_id || null,
                 income_type: data.income_type || null,
                 income_source: data.income_source || null,
-                posting_type: data.posting_type || null
+                legal_entity_id: data.legal_entity_id || null,
+                ...(!id ? { posting_type: DEFAULT_POSTING_TYPE } : {}),
             };
 
             let postingId: string;
@@ -664,6 +688,29 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                         ) : (
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                                    <FormField
+                                        control={form.control}
+                                        name="legal_entity_id"
+                                        render={() => (
+                                            <FormItem>
+                                                <FormLabel>Legal Entity</FormLabel>
+                                                <SearchDropDown
+                                                    instanceType="entity"
+                                                    instanceSourceKey="legal_entity_id"
+                                                    instanceKey="id"
+                                                    instanceLabel="legal_name"
+                                                    instanceValue={legalEntityDropdownValue}
+                                                    onSelectItem={handleSelectChange}
+                                                    onClear={handleSelectClear}
+                                                    limit="10"
+                                                    searchParams="legal_name"
+                                                    type="posting"
+                                                />
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
                                     {/* Amount and Posting Date Row */}
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         <FormField
