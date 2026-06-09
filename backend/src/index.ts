@@ -88,6 +88,10 @@ async function startServer(): Promise<void> {
     // Error handling middleware
     app.use(errorHandler);
 
+    // Load agent model tool config (Super Admin UI → ToolManager)
+    const { warmAgentModelToolCache } = await import('./agent/agentModelToolConfigCache');
+    await warmAgentModelToolCache();
+
     // Start HTTP server
     httpServer = app.listen(port, () => {
       console.log(`🚀 Server ready at http://localhost:${port}`);

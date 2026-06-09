@@ -24,6 +24,7 @@ export class DataAccessLayer {
     'permission',
     'role_view',
     'prompt_template',
+    'agent_model_tool_config', // Global agent tool assignment per model (no org_id)
     'currency', // Global platform data — seeded once, shared across all tenants
   ];
 

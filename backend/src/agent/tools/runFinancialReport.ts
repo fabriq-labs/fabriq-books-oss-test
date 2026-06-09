@@ -56,6 +56,71 @@ type ReportPageContext = {
   };
 };
 
+type ReportRow = Record<string, unknown>;
+
+function filterTrialBalanceRowsForDisplay(rows: ReportRow[]): ReportRow[] {
+  return rows.filter((row) => {
+    const level = Number(row.level ?? 0);
+    if (level === 0) return true;
+    return (
+      Number(row.total_debits ?? 0) !== 0 ||
+      Number(row.total_credits ?? 0) !== 0 ||
+      Number(row.opening_balance ?? 0) !== 0 ||
+      Number(row.balance ?? 0) !== 0 ||
+      Number(row.total_balance ?? 0) !== 0
+    );
+  });
+}
+
+function enrichFinancialReportResult(
+  reportId: string,
+  rows: ReportRow[],
+  description: string,
+  filters: Record<string, unknown>
+) {
+  const displayRows =
+    reportId === 'trial_balance' ? filterTrialBalanceRowsForDisplay(rows) : rows;
+
+  const currencyCode =
+    (displayRows[0]?.report_currency as string | undefined) ??
+    (displayRows[0]?.account_currency as string | undefined) ??
+    'INR';
+
+  const columnMap: Record<string, { field: string; label: string }[]> = {
+    trial_balance: [
+      { field: 'account_name', label: 'Account' },
+      { field: 'opening_balance', label: 'Opening' },
+      { field: 'total_debits', label: 'Debits' },
+      { field: 'total_credits', label: 'Credits' },
+      { field: 'total_balance', label: 'Closing' },
+    ],
+    monthly_trial_balance: [
+      { field: 'account_name', label: 'Account' },
+      { field: 'period_month', label: 'Month' },
+      { field: 'period_debits', label: 'Debits' },
+      { field: 'period_credits', label: 'Credits' },
+      { field: 'cumulative_balance', label: 'Balance' },
+    ],
+    income_statement: [
+      { field: 'account_name', label: 'Account' },
+      { field: 'classification', label: 'Type' },
+      { field: 'total_amount', label: 'Amount' },
+    ],
+  };
+
+  return {
+    uiHint: 'financial_report' as const,
+    description,
+    report_id: reportId,
+    filters,
+    currencyCode,
+    columns: columnMap[reportId] ?? columnMap.trial_balance,
+    data: displayRows,
+    rowCount: displayRows.length,
+    totalRowCount: rows.length,
+  };
+}
+
 async function resolveFinancialYearType(
   accountId: string | undefined,
   legalEntityId: string | undefined
@@ -178,22 +243,21 @@ ${contextHints.join(' ')}`,
         };
 
         const data = await run_report(auth, report_id, filters);
-        const rows = Array.isArray(data) ? data : [];
+        const rows: ReportRow[] = Array.isArray(data) ? (data as ReportRow[]) : [];
+
+        const resolvedFilters = {
+          from_date: resolvedFromDate,
+          to_date: resolvedToDate,
+          account_id: resolvedAccountId,
+          currency_id,
+          legal_entity_ids: resolvedLegalEntityIds,
+        };
 
         return {
           tool: 'runFinancialReport',
           success: true,
-          report_id,
           periodSource,
-          filters: {
-            from_date: resolvedFromDate,
-            to_date: resolvedToDate,
-            account_id: resolvedAccountId,
-            currency_id,
-            legal_entity_ids: resolvedLegalEntityIds,
-          },
-          rowCount: rows.length,
-          data: rows,
+          ...enrichFinancialReportResult(report_id, rows, description, resolvedFilters),
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';

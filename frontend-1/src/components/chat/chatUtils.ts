@@ -31,27 +31,39 @@ export interface UserMessage {
 // Constants
 // ============================================================================
 
-export const DEFAULT_SUGGESTIONS = [
+export const POSTING_CHAT_SUGGESTIONS = [
+    'List postings from yesterday',
+    'How much did I spend on office supplies last month?',
     'Create a posting to record a transaction',
-    'List recent postings',
-    'What is the balance for Miscellaneous?',
-    'Find account Office Supplies',
-    'Show me every posting where Miscellaneous was the Debit Account',
 ] as const;
 
-const ACCOUNT_LIST_SUGGESTIONS = [
-    'List all expense accounts',
+export const ACCOUNT_CHAT_SUGGESTIONS = [
     'Find account Office Supplies',
-    'What is the balance for Miscellaneous?',
+    'What is the closing balance for Miscellaneous?',
     'Show trial balance for this month',
 ] as const;
+
+export const FINANCE_CHAT_SUGGESTIONS = [
+    ...POSTING_CHAT_SUGGESTIONS,
+    ...ACCOUNT_CHAT_SUGGESTIONS,
+] as const;
+
+export const DEFAULT_SUGGESTIONS = [...FINANCE_CHAT_SUGGESTIONS];
 
 const ACCOUNT_DETAIL_SUGGESTIONS = [
     'What is the current balance for this account?',
     'Show opening balance and debits/credits this month',
-    'Monthly balance trend for this financial year',
     'List recent postings on this account',
 ] as const;
+
+function hasFinanceFocus(context: PageContext | null): boolean {
+    const focus = context?.focusModels as string[] | undefined;
+    return Boolean(focus?.includes('posting') && focus?.includes('account'));
+}
+
+function getFinanceSuggestions(): string[] {
+    return [...FINANCE_CHAT_SUGGESTIONS];
+}
 
 // ============================================================================
 // Message Transformation Utilities
@@ -136,26 +148,24 @@ export const extractUserMessageText = (message: UserMessage): string => {
  * Gets context-aware suggestions based on page context
  */
 export const getContextSuggestions = (context: PageContext | null): string[] => {
-    if (context && context.modelName === 'posting' && context.modelContext?.selectedAccountId) {
+    if (context?.modelName === 'posting' && context.modelContext?.selectedAccountId) {
         return [
             'Which transactions are unreconciled?',
             'Suggest matches for unreconciled items',
             'Show reconciliation summary',
-            'Explain the latest transaction'
         ];
     }
+    if (hasFinanceFocus(context) || !context || context.currentPath === '/') {
+        return getFinanceSuggestions();
+    }
     if (context && context.modelName === 'posting') {
-        return [
-            'Create a posting to record a transaction',
-            'How much did I spend on office supplies last month?',
-            'List recent postings'
-        ];
+        return [...POSTING_CHAT_SUGGESTIONS];
     }
     if (context && context.modelName === 'account' && context.recordId) {
         return [...ACCOUNT_DETAIL_SUGGESTIONS];
     }
     if (context && context.modelName === 'account') {
-        return [...ACCOUNT_LIST_SUGGESTIONS];
+        return [...ACCOUNT_CHAT_SUGGESTIONS];
     }
     if (context && context.modelDisplayName) {
         const lowerModelName = context.modelDisplayName.toLowerCase();
@@ -163,7 +173,6 @@ export const getContextSuggestions = (context: PageContext | null): string[] => 
             `Show details for this ${lowerModelName}`,
             `What actions can I take on this ${lowerModelName}?`,
             `Explain the current status`,
-            `Show related records`
         ];
     }
     return [...DEFAULT_SUGGESTIONS];
@@ -242,6 +251,14 @@ export function hasTableToolResults(toolInvocations?: ToolInvocation[]): boolean
         const hasRows = Array.isArray(data) && data.length > 0;
         if (!hasRows) return false;
 
+        if (
+            result.uiHint === 'account_ledger' ||
+            result.uiHint === 'posting_journal' ||
+            result.uiHint === 'posting_dual' ||
+            result.uiHint === 'financial_report'
+        ) {
+            return true;
+        }
         if (tool.toolName === 'searchRecords' || /search/i.test(tool.toolName)) {
             return true;
         }

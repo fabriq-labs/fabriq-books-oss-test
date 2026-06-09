@@ -43,6 +43,7 @@ import {
 import { resolveSearchAllEntities } from './search/searchIntent';
 export { userRequestedAllEntities, userRequestedLastWeek } from './search/searchIntent';
 import type { PostingSearchToolContext, SearchFilterEntry } from './search/searchFilterTypes';
+import { enrichPostingSearchResult } from './tools/enrichPostingSearchResult';
 
 const modelService = ModelService.getInstance();
 
@@ -276,6 +277,19 @@ export function searchRecordsTool(
             });
           }
         }
+      }
+
+      if (
+        params.modelName === 'posting' &&
+        Array.isArray(enrichedResult.data) &&
+        enrichedResult.data.length > 0
+      ) {
+        enrichedResult = (await enrichPostingSearchResult(
+          enrichedResult,
+          auth,
+          Array.isArray(normalized.search) ? (normalized.search as SearchFilterEntry[]) : [],
+          toolContext
+        )) as typeof enrichedResult;
       }
 
       const safeResult = JSON.parse(JSON.stringify(enrichedResult));

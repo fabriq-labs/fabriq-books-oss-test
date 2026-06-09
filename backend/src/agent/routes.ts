@@ -1109,7 +1109,10 @@ export function createAgentRouter() {
   router.post('/admin/templates', authMiddleware, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
-      const { name, description, icon, goal_model, system_prompt, user_hint, default_mode, is_active, sort_order } = req.body;
+      const {
+        name, description, icon, goal_model, system_prompt, user_hint, default_mode,
+        is_active, sort_order, focus_models, allowed_tools,
+      } = req.body;
       if (!name || !description || !system_prompt || !user_hint) {
         return res.status(400).json({ error: 'name, description, system_prompt, and user_hint are required' });
       }
@@ -1124,6 +1127,8 @@ export function createAgentRouter() {
           default_mode: default_mode || 'supervised',
           is_active: is_active ?? true,
           sort_order: sort_order ?? 0,
+          focus_models: Array.isArray(focus_models) ? focus_models : [],
+          allowed_tools: Array.isArray(allowed_tools) ? allowed_tools : [],
           org_id: null,
         },
       });
@@ -1139,7 +1144,10 @@ export function createAgentRouter() {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const { id } = req.params;
-      const { name, description, icon, goal_model, system_prompt, user_hint, default_mode, is_active, sort_order } = req.body;
+      const {
+        name, description, icon, goal_model, system_prompt, user_hint, default_mode,
+        is_active, sort_order, focus_models, allowed_tools,
+      } = req.body;
       const existing = await prisma.agent_template.findUnique({ where: { id } });
       if (!existing) return res.status(404).json({ error: 'Template not found' });
       const template = await prisma.agent_template.update({
@@ -1154,6 +1162,12 @@ export function createAgentRouter() {
           ...(default_mode !== undefined && { default_mode }),
           ...(is_active !== undefined && { is_active }),
           ...(sort_order !== undefined && { sort_order }),
+          ...(focus_models !== undefined && {
+            focus_models: Array.isArray(focus_models) ? focus_models : [],
+          }),
+          ...(allowed_tools !== undefined && {
+            allowed_tools: Array.isArray(allowed_tools) ? allowed_tools : [],
+          }),
         },
       });
       res.json({ data: template });
@@ -1174,6 +1188,86 @@ export function createAgentRouter() {
       res.json({ success: true });
     } catch (error: any) {
       logger.error('Error deleting agent template:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==========================================
+  // Agent Model Tool Config (Super Admin)
+  // ==========================================
+
+  /** GET /api/agent/admin/model-tools/catalog — Tool names + labels for checkboxes */
+  router.get('/admin/model-tools/catalog', authMiddleware, async (req: Request, res) => {
+    try {
+      if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
+      const { AGENT_TOOL_CATALOG } = await import('./toolRegistry');
+      res.json({ data: AGENT_TOOL_CATALOG });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /** GET /api/agent/admin/model-tools — List per-model tool configs */
+  router.get('/admin/model-tools', authMiddleware, async (req: Request, res) => {
+    try {
+      if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
+      const { listModelToolConfigsForAdmin } = await import('./agentModelToolConfigCache');
+      const data = await listModelToolConfigsForAdmin();
+      res.json({ data });
+    } catch (error: any) {
+      logger.error('Error listing model tool configs', { error });
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /** GET /api/agent/admin/model-tools/:modelName */
+  router.get('/admin/model-tools/:modelName', authMiddleware, async (req: Request, res) => {
+    try {
+      if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
+      const { listModelToolConfigsForAdmin } = await import('./agentModelToolConfigCache');
+      const configs = await listModelToolConfigsForAdmin();
+      const row = configs.find((c) => c.model_name === req.params.modelName);
+      if (!row) return res.status(404).json({ error: 'Model not found' });
+      res.json({ data: row });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /** PUT /api/agent/admin/model-tools/:modelName — Upsert model tool config */
+  router.put('/admin/model-tools/:modelName', authMiddleware, async (req: Request, res) => {
+    try {
+      if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
+      const { modelName } = req.params;
+      const { display_name, description, model_tools, include_analytics_tools, is_active, sort_order } =
+        req.body;
+      if (!Array.isArray(model_tools)) {
+        return res.status(400).json({ error: 'model_tools must be an array of tool names' });
+      }
+      const { upsertModelToolConfig } = await import('./agentModelToolConfigCache');
+      const row = await upsertModelToolConfig(modelName, {
+        display_name,
+        description,
+        model_tools,
+        include_analytics_tools,
+        is_active,
+        sort_order,
+      });
+      res.json({ data: row });
+    } catch (error: any) {
+      logger.error('Error upserting model tool config', { error });
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /** POST /api/agent/admin/model-tools/seed — Apply prisma/seed-agent-model-tools.sql (idempotent) */
+  router.post('/admin/model-tools/seed', authMiddleware, async (req: Request, res) => {
+    try {
+      if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
+      const { seedDefaultModelToolConfigs } = await import('./agentModelToolConfigCache');
+      const count = await seedDefaultModelToolConfigs();
+      res.json({ success: true, count, created: count });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

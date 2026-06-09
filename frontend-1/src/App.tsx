@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ConfigProvider } from 'antd';
 import { ChatProvider } from "./contexts/ChatContext";
+import { ChatAuthSync } from "./components/chat/ChatAuthSync";
 import { AppLayout } from "./components/layout/AppLayout";
 import UnifiedDashboard from "./components/dashboard/UnifiedDashboard";
 import PurchaseRequisition from "./pages/PurchaseRequisition";
@@ -52,6 +53,7 @@ import OpeningBalances from "./pages/accounting/OpeningBalances";
 import { SuperAdminGuard } from "./components/layout/SuperAdminGuard";
 import { PromptTemplateForm } from "./components/forms/Masters/PromptTemplateForm";
 import { AgentTemplateForm } from "./components/forms/Masters/AgentTemplateForm";
+import { AgentModelToolsForm } from "./components/forms/Masters/AgentModelToolsForm";
 import { AITemplatesPage } from "./pages/settings/AITemplatesPage";
 import { LLMTraceDetailPage } from "./components/forms/Masters/LLMTraceDetailPage";
 import { LLMTracesPage } from "./pages/settings/LLMTracesPage";
@@ -94,7 +96,6 @@ import WorkbenchPage from "./pages/workbench/WorkbenchPage";
 import { SessionView } from "./pages/workbench/SessionView";
 import { InboxPage } from "./pages/workbench/InboxPage";
 import { GoalSetter } from "./components/workbench/GoalSetter";
-
 import { ExchangeRateForm } from "./components/forms/Masters/ExchangeRateForm";
 import { CurrencyForm } from "./components/forms/Masters/CurrencyForm";
 // Create a client
@@ -138,6 +139,7 @@ const AppRoutes: React.FC = () => {
       }}
     >
       <AuthProvider>
+        <ChatAuthSync />
         <EntityProvider>
         <ReportControllerProvider>
           <div className="font-lato">
@@ -418,6 +420,11 @@ const AppRoutes: React.FC = () => {
                 <Route path="settings/agent-templates/:id/edit" element={
                   <SuperAdminGuard>
                     <AgentTemplateForm />
+                  </SuperAdminGuard>
+                } />
+                <Route path="settings/agent-model-tools/:modelName/edit" element={
+                  <SuperAdminGuard>
+                    <AgentModelToolsForm />
                   </SuperAdminGuard>
                 } />
 

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { userAPI } from '@/api/api';
 import { userStorage } from '@/utils/userStorage';
 import Cookies from 'js-cookie';
+import { triggerChatReset } from '@/utils/chatSessionBridge';
 
 // Type for the API response structure
 interface UserAPIResponse {
@@ -141,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userStorage.setUserData(userResponse.data); // Cache in sessionStorage
         setUserDetailsFetched(true);
 
+        triggerChatReset();
         toast.success('Login successful!');
         // 2f. Navigate to dashboard
         navigate('/');
@@ -159,6 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    triggerChatReset();
     // Clear all user-related data first
     setUser(null);
     setUserDetailsFetched(false);

@@ -52,7 +52,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const { addToolData } = useTool();
-    const { pageContext, messagesAi, setMessagesAi, clearMessages } = useChatContext();
+    const { pageContext, messagesAi, setMessagesAi, clearMessages, chatSessionId } = useChatContext();
+    const prevChatSessionId = useRef<number | null>(null);
     const { getBaseCurrencyCode } = useUserData();
     const { currentEntityId, currentEntity, entities } = useEntity();
 
@@ -170,12 +171,22 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         }
     });
 
-    // Initialize messages from context if available
+    // Clear local messages only when auth session resets (logout/login), not on remount
+    useEffect(() => {
+        if (prevChatSessionId.current !== null && prevChatSessionId.current !== chatSessionId) {
+            setMessages([]);
+            setInput('');
+            setSelectedFiles([]);
+        }
+        prevChatSessionId.current = chatSessionId;
+    }, [chatSessionId, setMessages, setInput]);
+
+    // Initialize messages from context if available (same browser session, route changes)
     useEffect(() => {
         if (messagesAi.length > 0 && messages.length === 0) {
             setMessages(messagesAi);
         }
-    }, [messagesAi, messages.length, setMessages]);
+    }, [messagesAi, messages.length, setMessages, chatSessionId]);
 
     // Sync messages to context when they change
     useEffect(() => {
@@ -443,7 +454,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         [pageContext]
     );
 
-
     // Get input placeholder and padding
     const inputPlaceholder = useMemo(
         () => getInputPlaceholder(pageContext),
@@ -552,12 +562,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         </>
     );
 
-    // Render suggestion chips
     const renderSuggestions = () => (
         <div className="flex flex-wrap justify-center gap-2 mt-8">
-            {suggestions.map((suggestion, i) => (
+            {suggestions.map((suggestion) => (
                 <button
-                    key={i}
+                    key={suggestion}
                     className="px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition-colors border border-gray-200"
                     onClick={() => void handleSuggestionSubmit(suggestion)}
                     type="button"

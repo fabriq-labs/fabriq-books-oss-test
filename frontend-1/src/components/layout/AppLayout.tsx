@@ -179,7 +179,7 @@ export const AppLayout: React.FC = () => {
                 <Outlet />
             </main>
 
-            {/* Fixed Right Chat Sidebar - 2 columns out of 12, only on non-dashboard routes */}
+            {/* Fixed Right Chat Sidebar */}
             {showChatSidebar && !isMobile && (
                 <aside
                     className="fixed right-0 top-16 bottom-0 z-40 w-[20.666%] bg-white border-l shadow-lg flex flex-col transition-transform duration-500 ease-in-out overflow-hidden"

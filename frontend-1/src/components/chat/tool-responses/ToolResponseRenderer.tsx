@@ -7,14 +7,25 @@ import { SqlResultsTable } from '.';
 import { MetricsDisplay } from './MetricsDisplay';
 import { InvoiceMapPreview } from './InvoiceMapPreview';
 import { ReconciliationSuggestions } from './ReconciliationSuggestions';
+import { FinancialReportDisplay } from './FinancialReportDisplay';
+import { AccountLedgerDisplay } from './AccountLedgerDisplay';
+import { PostingJournalDisplay } from './PostingJournalDisplay';
+import { PostingDualDisplay, type PostingDualTable } from './PostingDualDisplay';
 import { ToolInvocation as BaseToolInvocation, ToolResult as BaseToolResult } from '@/components/utils/helper';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
 
 interface ExtendedToolResult extends BaseToolResult {
-    error?: boolean;
+    error?: boolean | string;
     description?: string;
     message?: string;
+    report_id?: string;
+    filters?: Record<string, unknown>;
+    currencyCode?: string;
+    success?: boolean;
+    focusAccountName?: string;
+    focusAccountId?: string;
+    tables?: PostingDualTable[];
 }
 
 interface ToolInvocation extends Omit<BaseToolInvocation, 'result'> {
@@ -191,6 +202,74 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                     </div>
                 );
 
+                // Financial reports (trial balance, etc.)
+                if (
+                    tool.toolName === 'runFinancialReport' ||
+                    uiHint === 'financial_report'
+                ) {
+                    return (
+                        <div key={index} className="space-y-3">
+                            {toolNameBadge}
+                            <FinancialReportDisplay
+                                reportId={String(tool.result.report_id ?? 'trial_balance')}
+                                data={Array.isArray(data) ? data : []}
+                                filters={tool.result.filters as Record<string, unknown> | undefined}
+                                description={description ?? (tool.result.description as string | undefined)}
+                                currencyCode={tool.result.currencyCode as string | undefined}
+                                sidebarMode={sidebarMode}
+                            />
+                        </div>
+                    );
+                }
+
+                // Posting search — ledger (+/−) or journal (debit/credit columns)
+                if (
+                    (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) &&
+                    Array.isArray(data) &&
+                    data.length > 0
+                ) {
+                    if (uiHint === 'account_ledger') {
+                        return (
+                            <div key={index} className="space-y-3">
+                                {descriptionElement}
+                                <AccountLedgerDisplay
+                                    rows={data}
+                                    focusAccountName={
+                                        (tool.result.focusAccountName as string | undefined) ??
+                                        undefined
+                                    }
+                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    sidebarMode={sidebarMode}
+                                />
+                            </div>
+                        );
+                    }
+                    if (uiHint === 'posting_journal') {
+                        return (
+                            <div key={index} className="space-y-3">
+                                {descriptionElement}
+                                <PostingJournalDisplay
+                                    rows={data}
+                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    sidebarMode={sidebarMode}
+                                />
+                            </div>
+                        );
+                    }
+                    if (uiHint === 'posting_dual' && Array.isArray(tool.result.tables)) {
+                        return (
+                            <div key={index} className="space-y-3">
+                                {descriptionElement}
+                                <PostingDualDisplay
+                                    tables={tool.result.tables as PostingDualTable[]}
+                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    sidebarMode={sidebarMode}
+                                />
+                            </div>
+                        );
+                    }
+                }
+
                 // Handle searchRecords - always render as table
                 if (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) {
                     if (Array.isArray(data) && data.length > 0) {
@@ -304,6 +383,21 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                 <ReconciliationSuggestions
                                     data={Array.isArray(data) ? data : []}
                                     onSendMessage={onSendMessage}
+                                    sidebarMode={sidebarMode}
+                                />
+                            </div>
+                        );
+
+                    case 'financial_report':
+                        return (
+                            <div key={index} className="space-y-3">
+                                {toolNameBadge}
+                                <FinancialReportDisplay
+                                    reportId={String(tool.result.report_id ?? 'trial_balance')}
+                                    data={Array.isArray(data) ? data : []}
+                                    filters={tool.result.filters as Record<string, unknown> | undefined}
+                                    description={description ?? tool.result.description as string | undefined}
+                                    currencyCode={tool.result.currencyCode as string | undefined}
                                     sidebarMode={sidebarMode}
                                 />
                             </div>

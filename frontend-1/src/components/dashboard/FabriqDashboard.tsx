@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEntity } from '@/contexts/EntityContext';
 import { useChat } from '@/contexts/ChatContext';
 import { ChatUI } from '@/components/chat/ChatUI';
+import { buildDefaultPostingChatContext } from '@/utils/postingChatContext';
 import {
   FinancialYearSelector,
   getPreviousFYOption,
@@ -29,11 +30,19 @@ import { C } from './design-system';
 // TODO: lift AgentSessionProvider to App.tsx to enable createSession() here.
 
 const FabriqDashboard: React.FC = () => {
-  const { currentEntity } = useEntity();
-  const { isChatOpen } = useChat();
+  const { currentEntity, entities } = useEntity();
+  const { isChatOpen, setPageContext } = useChat();
   const navigate = useNavigate();
 
   const isIndividual = currentEntity?.is_individual === true;
+
+  useEffect(() => {
+    setPageContext({
+      ...buildDefaultPostingChatContext(currentEntity, entities),
+      currentPath: '/',
+    });
+    return () => setPageContext(null);
+  }, [setPageContext, currentEntity, entities]);
 
   // Period state for the company layout only (individual manages its own internally)
   const [selectedFY, setSelectedFY] = useState<FinancialYearOption>(() =>
