@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Plus, ExternalLink, Sparkles, Loader2, FileCheck, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -688,30 +689,54 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                         ) : (
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                                    <FormField
-                                        control={form.control}
-                                        name="legal_entity_id"
-                                        render={() => (
-                                            <FormItem>
-                                                <FormLabel>Legal Entity</FormLabel>
-                                                <SearchDropDown
-                                                    instanceType="entity"
-                                                    instanceSourceKey="legal_entity_id"
-                                                    instanceKey="id"
-                                                    instanceLabel="legal_name"
-                                                    instanceValue={legalEntityDropdownValue}
-                                                    onSelectItem={handleSelectChange}
-                                                    onClear={handleSelectClear}
-                                                    limit="10"
-                                                    searchParams="legal_name"
-                                                    type="posting"
-                                                />
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    {/* Legal Entity and Posting Date */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        <FormField
+                                            control={form.control}
+                                            name="legal_entity_id"
+                                            render={() => (
+                                                <FormItem>
+                                                    <FormLabel>Legal Entity</FormLabel>
+                                                    <SearchDropDown
+                                                        instanceType="entity"
+                                                        instanceSourceKey="legal_entity_id"
+                                                        instanceKey="id"
+                                                        instanceLabel="legal_name"
+                                                        instanceValue={legalEntityDropdownValue}
+                                                        onSelectItem={handleSelectChange}
+                                                        onClear={handleSelectClear}
+                                                        limit="10"
+                                                        searchParams="legal_name"
+                                                        type="posting"
+                                                    />
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
 
-                                    {/* Amount and Posting Date Row */}
+                                        <FormField
+                                            control={form.control}
+                                            name="posting_date"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Posting Date</FormLabel>
+                                                    <DatePicker
+                                                        className="w-full h-10 px-3 py-2 border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        style={{ width: "100%" }}
+                                                        value={field.value ? dayjs(field.value) : null}
+                                                        onChange={(date) => {
+                                                            field.onChange(date ? date.toDate() : null);
+                                                        }}
+                                                        format="DD-MM-YYYY"
+                                                        placeholder="Posting Date"
+                                                    />
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+
+                                    {/* Amount and Value Date */}
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         <FormField
                                             control={form.control}
@@ -734,10 +759,10 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
 
                                         <FormField
                                             control={form.control}
-                                            name="posting_date"
+                                            name="value_date"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>Posting Date</FormLabel>
+                                                    <FormLabel>Value Date</FormLabel>
                                                     <DatePicker
                                                         className="w-full h-10 px-3 py-2 border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                                         style={{ width: "100%" }}
@@ -746,7 +771,7 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                                                             field.onChange(date ? date.toDate() : null);
                                                         }}
                                                         format="DD-MM-YYYY"
-                                                        placeholder="Posting Date"
+                                                        placeholder="Value Date"
                                                     />
                                                     <FormMessage />
                                                 </FormItem>
@@ -805,45 +830,24 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                                         />
                                     </div>
 
-                                    {/* Value Date and Description Row */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="value_date"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Value Date</FormLabel>
-                                                    <DatePicker
-                                                        className="w-full h-10 px-3 py-2 border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                        style={{ width: "100%" }}
-                                                        value={field.value ? dayjs(field.value) : null}
-                                                        onChange={(date) => {
-                                                            field.onChange(date ? date.toDate() : null);
-                                                        }}
-                                                        format="DD-MM-YYYY"
-                                                        placeholder="Value Date"
+                                    <FormField
+                                        control={form.control}
+                                        name="description"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Description</FormLabel>
+                                                <FormControl>
+                                                    <Textarea
+                                                        placeholder="Enter description..."
+                                                        className="resize-y min-h-[80px]"
+                                                        {...field}
                                                     />
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                                        <FormField
-                                            control={form.control}
-                                            name="description"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Description</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter Description" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    {/* Notes - Full Width */}
                                     <FormField
                                         control={form.control}
                                         name="notes"
@@ -851,11 +855,10 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                                             <FormItem>
                                                 <FormLabel>Notes</FormLabel>
                                                 <FormControl>
-                                                    <textarea
-                                                        placeholder="Enter Notes"
+                                                    <Textarea
+                                                        placeholder="Enter notes..."
+                                                        className="resize-y min-h-[80px]"
                                                         {...field}
-                                                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                        rows={3}
                                                     />
                                                 </FormControl>
                                                 <FormMessage />
