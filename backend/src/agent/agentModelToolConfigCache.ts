@@ -1,8 +1,13 @@
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
+import { AuthContext } from '../auth/types';
+import { ModelService } from '../services/core/ModelService';
 import { FALLBACK_MODEL_NAME } from './toolRegistry';
 import { runSeedAgentModelToolsSql } from '../utils/setup/metadata/seedAgentModelToolsSql';
 import * as path from 'path';
+
+const MODEL_NAME = 'agent_model_tool_config';
+const VIEW_NAME = 'agent_model_tool_config_view';
 
 /** Prisma model → table agent_model_tool_config */
 export const AGENT_MODEL_TOOL_CONFIG_TABLE = 'agent_model_tool_config' as const;
@@ -126,6 +131,7 @@ export async function listModelToolConfigsForAdmin(): Promise<AgentModelToolConf
 }
 
 export async function upsertModelToolConfig(
+  context: AuthContext,
   modelName: string,
   data: {
     display_name?: string;
@@ -136,31 +142,55 @@ export async function upsertModelToolConfig(
     sort_order?: number;
   }
 ): Promise<AgentModelToolConfigRow> {
-  const row = await prisma.agent_model_tool_config.upsert({
-    where: { model_name: modelName },
-    create: {
-      model_name: modelName,
-      display_name: data.display_name ?? modelName,
-      description: data.description ?? null,
+  const modelService = ModelService.getInstance();
+  const existing = await loadModelToolRowFromDb(modelName);
+
+  let result: AgentModelToolConfigRow;
+  if (existing) {
+    const updatePayload: Record<string, unknown> = {
       model_tools: data.model_tools,
-      include_analytics_tools: data.include_analytics_tools ?? true,
-      is_active: data.is_active ?? true,
-      sort_order: data.sort_order ?? 0,
-    },
-    update: {
-      ...(data.display_name !== undefined && { display_name: data.display_name }),
-      ...(data.description !== undefined && { description: data.description }),
-      model_tools: data.model_tools,
-      ...(data.include_analytics_tools !== undefined && {
-        include_analytics_tools: data.include_analytics_tools,
-      }),
-      ...(data.is_active !== undefined && { is_active: data.is_active }),
-      ...(data.sort_order !== undefined && { sort_order: data.sort_order }),
-    },
-  });
+    };
+    if (data.display_name !== undefined) updatePayload.display_name = data.display_name;
+    if (data.description !== undefined) updatePayload.description = data.description;
+    if (data.include_analytics_tools !== undefined) {
+      updatePayload.include_analytics_tools = data.include_analytics_tools;
+    }
+    if (data.is_active !== undefined) updatePayload.is_active = data.is_active;
+    if (data.sort_order !== undefined) updatePayload.sort_order = data.sort_order;
+
+    const dalResult = await modelService.update(
+      MODEL_NAME,
+      context,
+      existing.id,
+      updatePayload,
+      { viewName: VIEW_NAME }
+    );
+    if (!dalResult.success || !dalResult.data) {
+      throw new Error(dalResult.error || 'Failed to update model tool config');
+    }
+    result = dalResult.data as AgentModelToolConfigRow;
+  } else {
+    // DAL.create injects org_id, but this model has no org_id column — use Prisma for rare creates.
+    // Rows are normally seeded; the edit UI only updates existing configs via DAL.update above.
+    const row = await prisma.agent_model_tool_config.create({
+      data: {
+        model_name: modelName,
+        display_name: data.display_name ?? modelName,
+        description: data.description ?? null,
+        model_tools: data.model_tools,
+        include_analytics_tools: data.include_analytics_tools ?? true,
+        is_active: data.is_active ?? true,
+        sort_order: data.sort_order ?? 0,
+        created_by: context.user.id,
+        modified_by: context.user.id,
+      },
+    });
+    result = row as AgentModelToolConfigRow;
+  }
+
   invalidateModelToolCache();
   await warmAgentModelToolCache();
-  return row as AgentModelToolConfigRow;
+  return result;
 }
 
 /** Apply prisma/seed-agent-model-tools.sql (idempotent upsert). Returns row count after seed. */

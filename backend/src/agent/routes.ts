@@ -1245,7 +1245,7 @@ export function createAgentRouter() {
         return res.status(400).json({ error: 'model_tools must be an array of tool names' });
       }
       const { upsertModelToolConfig } = await import('./agentModelToolConfigCache');
-      const row = await upsertModelToolConfig(modelName, {
+      const row = await upsertModelToolConfig(req.context.auth, modelName, {
         display_name,
         description,
         model_tools,
