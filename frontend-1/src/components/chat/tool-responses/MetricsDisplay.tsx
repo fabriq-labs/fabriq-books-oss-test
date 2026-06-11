@@ -16,13 +16,15 @@ interface MetricsDisplayProps {
     columns: Column[];
     toolName: string;
     description?: string;
+    hideToolBadge?: boolean;
 }
 
 export const MetricsDisplay: React.FC<MetricsDisplayProps> = ({
     data,
     columns,
     toolName,
-    description
+    description,
+    hideToolBadge = false,
 }) => {
     const { formatCurrency, getBaseCurrencyCode } = useCurrencyFormatting();
     const sessionCurrency = getBaseCurrencyCode(); // Get currency from user session
@@ -72,7 +74,7 @@ export const MetricsDisplay: React.FC<MetricsDisplayProps> = ({
 
     return (
         <div className="w-full space-y-3">
-            {/* Tool Name Badge - Same style as ToolResponseRenderer */}
+            {!hideToolBadge && (
             <div className="mb-2">
                 <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                     <svg
@@ -97,9 +99,10 @@ export const MetricsDisplay: React.FC<MetricsDisplayProps> = ({
                     {toolName}
                 </div>
             </div>
+            )}
 
             {/* Description - Same style as ToolResponseRenderer */}
-            {description && (
+            {!hideToolBadge && description && (
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-700">{description}</p>
                 </div>
