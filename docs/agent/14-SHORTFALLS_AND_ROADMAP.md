@@ -73,23 +73,6 @@ this gap).
 
 ---
 
-## Orphaned Categorization V2 Docs
-
-`docs/agent/features/CATEGORIZATION_V2.md` and
-`docs/agent/features/specs/CATEGORIZATION_V2.md` describe the historical
-corpus + LLM-fallback prediction pipeline used by `categorizeTransactionBatchHandler`
-(referenced from [05-TOOLS.md — categorizePostings](./05-TOOLS.md#categorizepostings)
-and [07-WORKED_EXAMPLES.md](./07-WORKED_EXAMPLES.md#trace-1-categorization-atpl_categorise)
-via a link to `./archive/CATEGORIZATION_V2.md`, which does not exist yet).
-
-**Action**: Move `docs/agent/features/CATEGORIZATION_V2.md` to
-`docs/agent/archive/CATEGORIZATION_V2.md` (fixing the dangling link in
-07-WORKED_EXAMPLES.md), and either fold `features/specs/CATEGORIZATION_V2.md`
-into it or archive it alongside. This is part of the broader `features/`
-directory retirement — see "Migration Cleanup" below.
-
----
-
 ## Slack Integration — Functional but Unverified
 
 `backend/src/agent/slack/` (`handle-app-mention.ts`, `handle-messages.ts`,
@@ -126,20 +109,19 @@ or users will see "approved" actions silently do nothing.
 
 ---
 
-## Migration Cleanup (Doc Restructure)
+## Migration Cleanup (Doc Restructure) — Remaining Items
 
-This 01-14 doc set supersedes the following files, which should be removed
-once this set is confirmed stable:
+The bulk of the doc restructure is done: `ARCHITECTURE.md`,
+`SESSION_LIFECYCLE.md`, `PROMPT_SYSTEM.md`, `TOOLS_REFERENCE.md`,
+`BUILDERS_EXECUTORS.md`, `DATA_MODELS.md`, `API_REFERENCE.md`,
+`OBSERVABILITY.md`, `TESTING.md`, and `features/CATEGORIZATION.md`,
+`RECONCILIATION.md`, `POSTING_DOMAIN.md` have been deleted (absorbed into
+02-12, 01/06/07/08). `WORKBENCH_AGENT_LOOP.md`, `WORKBENCH_BACKEND.md`, and
+`DOCS_REWRITE_PLAN.md` have been moved to `archive/` as superseded planning
+and reference material.
 
-- `docs/agent/ARCHITECTURE.md`, `SESSION_LIFECYCLE.md`, `PROMPT_SYSTEM.md`,
-  `TOOLS_REFERENCE.md`, `BUILDERS_EXECUTORS.md`, `DATA_MODELS.md`,
-  `API_REFERENCE.md`, `OBSERVABILITY.md`, `TESTING.md` — content absorbed into
-  02-12 respectively
-- `docs/agent/features/CATEGORIZATION.md`, `RECONCILIATION.md`,
-  `POSTING_DOMAIN.md` — absorbed into 01/06/07/08
-- `docs/agent/features/CATEGORIZATION_V2.md`,
-  `docs/agent/features/specs/CATEGORIZATION_V2.md` — move to `archive/` (see
-  above), don't delete (still referenced)
+Remaining:
+
 - `docs/agent/MCP.md`, `docs/agent/CONVERSATION.md`,
   `docs/agent/README.md` — `CONVERSATION.md` will be absorbed by the deferred
   `15-CONVERSATIONAL_CHAT.md`; `MCP.md` and the old `README.md` can be
