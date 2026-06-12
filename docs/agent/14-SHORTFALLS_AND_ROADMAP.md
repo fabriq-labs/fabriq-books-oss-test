@@ -111,32 +111,27 @@ or users will see "approved" actions silently do nothing.
 
 ## Migration Cleanup (Doc Restructure) — Remaining Items
 
-The bulk of the doc restructure is done: `ARCHITECTURE.md`,
+The doc restructure is essentially complete: `ARCHITECTURE.md`,
 `SESSION_LIFECYCLE.md`, `PROMPT_SYSTEM.md`, `TOOLS_REFERENCE.md`,
 `BUILDERS_EXECUTORS.md`, `DATA_MODELS.md`, `API_REFERENCE.md`,
-`OBSERVABILITY.md`, `TESTING.md`, and `features/CATEGORIZATION.md`,
-`RECONCILIATION.md`, `POSTING_DOMAIN.md` have been deleted (absorbed into
-02-12, 01/06/07/08). `WORKBENCH_AGENT_LOOP.md`, `WORKBENCH_BACKEND.md`, and
-`DOCS_REWRITE_PLAN.md` have been moved to `archive/` as superseded planning
-and reference material.
+`OBSERVABILITY.md`, `TESTING.md`, `features/CATEGORIZATION.md`,
+`RECONCILIATION.md`, `POSTING_DOMAIN.md`, and `CONVERSATION.md` have all been
+deleted (absorbed into 02-12, 01/06/07/08, and 15 respectively).
+`WORKBENCH_AGENT_LOOP.md`, `WORKBENCH_BACKEND.md`, and `DOCS_REWRITE_PLAN.md`
+have been moved to `archive/` as superseded planning and reference material.
+`README.md` has been rewritten as a two-track (narrative/reference) plus meta
+index covering 01-15.
 
 Remaining:
 
-- `docs/agent/MCP.md`, `docs/agent/CONVERSATION.md`,
-  `docs/agent/README.md` — `CONVERSATION.md` will be absorbed by the deferred
-  `15-CONVERSATIONAL_CHAT.md`; `MCP.md` and the old `README.md` can be
-  archived or deleted once 15 lands and a new `README.md` index is written
-- Top-level `docs/CLAUDE.md` and root `CLAUDE.md` — both link to non-existent
-  `docs/agent/RECONCILIATION_TOOL.md`, `AI_Categorizer.md`,
-  `END_USER_CONVERSATION_FLOW.md`; update both to point into this 01-14 set
+- Top-level `docs/CLAUDE.md` and root `CLAUDE.md` — confirm both point only at
+  the new numbered docs (01-15) and not at any deleted filenames as new docs
+  are added in the future.
 
 ---
 
 ## What's Next
 
-This is the last doc in the 01-14 set. Second-pass work:
-
-- **15-CONVERSATIONAL_CHAT.md** — in-app chat (history, `PageContext`, SDK,
-  prompt selection), absorbing `CONVERSATION.md`
-- New `README.md` — two-track index (narrative 01-07, reference 08-12, meta
-  13-14) plus links to `debugging/SESSION_FAILURE_PATTERNS.md`
+This 01-15 set is the full agent documentation. Future additions should slot
+into the narrative/reference/meta tracks described in
+[README.md](./README.md) rather than growing a new flat top-level file.

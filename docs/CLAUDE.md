@@ -51,7 +51,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Agent docs index + reading order | [docs/agent/README.md](./agent/README.md) |
 | Bank reconciliation (posting → receipt/invoice), Reconcile/Confirm flow | [docs/agent/07-WORKED_EXAMPLES.md](./agent/07-WORKED_EXAMPLES.md) |
 | Transaction categorization (AI), batch categorize | [docs/agent/05-TOOLS.md](./agent/05-TOOLS.md#categorizepostings) |
-| In-app conversational chat | [docs/agent/CONVERSATION.md](./agent/CONVERSATION.md) |
+| In-app conversational chat | [docs/agent/15-CONVERSATIONAL_CHAT.md](./agent/15-CONVERSATIONAL_CHAT.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Railway sync button implementation (backend + frontend) | [docs/RAILWAY_SYNC_SERVICE_IMPLEMENTATION.md](./docs/RAILWAY_SYNC_SERVICE_IMPLEMENTATION.md) |

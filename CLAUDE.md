@@ -65,7 +65,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Adding a new tool/handler/builder/executor | [docs/agent/13-EXTENDING.md](./docs/agent/13-EXTENDING.md) |
 | Known agent gaps and roadmap | [docs/agent/14-SHORTFALLS_AND_ROADMAP.md](./docs/agent/14-SHORTFALLS_AND_ROADMAP.md) |
 | Diagnose a failed/stuck agent session | [docs/agent/debugging/SESSION_FAILURE_PATTERNS.md](./docs/agent/debugging/SESSION_FAILURE_PATTERNS.md) |
-| In-app conversational chat (history, PageContext, SDK, prompt selection) | [docs/agent/CONVERSATION.md](./docs/agent/CONVERSATION.md) |
+| In-app conversational chat (history, PageContext, SDK, prompt selection) | [docs/agent/15-CONVERSATIONAL_CHAT.md](./docs/agent/15-CONVERSATIONAL_CHAT.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
