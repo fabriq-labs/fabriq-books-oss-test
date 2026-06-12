@@ -25,7 +25,7 @@ import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { workflowAPI } from '@/api/api';
 import { useChat } from '@/contexts/ChatContext';
-import { ChatUI } from '@/components/chat/ChatUI';
+import { ChatShell } from '@/components/chat/ChatShell';
 // Dummy data for charts
 const approvalTimeData = {
     sixMonths: [
@@ -202,7 +202,7 @@ const RequesterDashboard = () => {
     const totalsForPurchaseOrder = calculateTotalsForPurchaseOrder();
 
     if (isChatOpen) {
-        return <ChatUI />;
+        return <ChatShell className="h-full" fullPage />;
     }
 
     return (

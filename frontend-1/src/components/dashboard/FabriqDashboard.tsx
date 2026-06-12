@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntity } from '@/contexts/EntityContext';
 import { useChat } from '@/contexts/ChatContext';
-import { ChatUI } from '@/components/chat/ChatUI';
+import { ChatShell } from '@/components/chat/ChatShell';
 import { buildDefaultPostingChatContext } from '@/utils/postingChatContext';
 import {
   FinancialYearSelector,
@@ -61,7 +61,7 @@ const FabriqDashboard: React.FC = () => {
   const handleLaunchAgent = (_goal: string) => { navigate('/workbench'); };
 
   if (isChatOpen) {
-    return <ChatUI />;
+    return <ChatShell className="h-full" fullPage />;
   }
 
   return (

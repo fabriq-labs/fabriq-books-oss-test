@@ -633,3 +633,22 @@ model pending_action {
   @@index([batch_id])
   @@map("pending_action")
 }
+
+/// Persisted Vercel AI SDK useChat threads (UIMessage[] + audit metadata)
+model chat_thread {
+  id                String   @id @db.VarChar(255) // Maps to useChat / streamText chatId
+  user_id           String   @db.VarChar(255)
+  title             String   @default("New Financial Inquiry") @db.VarChar(255)
+  messages          Json     @default("[]") @db.JsonB
+  metadata          Json     @default("{}") @db.JsonB
+  model_used        String?  @db.VarChar(255)
+  total_tokens_used Int      @default(0)
+  created_by        String?
+  modified_by       String?
+  assigned_to       String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@index([user_id])
+  @@map("chat_thread")
+}
