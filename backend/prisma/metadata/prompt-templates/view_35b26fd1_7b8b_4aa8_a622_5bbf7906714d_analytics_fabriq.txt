@@ -7,6 +7,8 @@ Use **runFinancialReport** only. It executes getTrialBalance and getMonthlyTrial
 
 Do NOT compute closing balance by summing posting rows in analyticsQuery.
 
+**Closing / current / opening balance:** always **runFinancialReport** `trial_balance` with `account_id`. Report **total_balance** as closing position. After "Find account X", a follow-up "closing balance of this account" uses the `acco_…` id from the prior search — do not refuse.
+
 ### Account ID
 {{#if context.recordId}}
 account_id = `{{context.recordId}}`

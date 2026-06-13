@@ -1,0 +1,117 @@
+{
+  "id": "view_f3c8a912-5b6e-4d7a-9f01-2e8b4c6d0a3f",
+  "name": "agent_model_tool_config_view",
+  "model_name": "agent_model_tool_config",
+  "description": "Agent model tool configuration — which tools are enabled per page model (posting, account, etc.)",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "ID"
+    },
+    "model_name": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "160",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Model Name",
+      "isColumnShow": true
+    },
+    "display_name": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "tableProps": {
+        "width": "220",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Display Name",
+      "isColumnShow": true
+    },
+    "description": {
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "320",
+        "columnType": "textarea",
+        "defaultValue": ""
+      },
+      "displayName": "Description",
+      "isColumnShow": false
+    },
+    "model_tools": {
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "listProps": {
+        "key": "model_tools",
+        "type": "badge",
+        "label": "model_tools"
+      },
+      "tableProps": {
+        "width": "400",
+        "columnType": "textarea",
+        "defaultValue": ""
+      },
+      "displayName": "Model Tools",
+      "isColumnShow": true
+    },
+    "include_analytics_tools": {
+      "dataType": "boolean",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "120",
+        "columnType": "checkbox",
+        "defaultValue": true
+      },
+      "displayName": "Analytics Tools",
+      "isColumnShow": true
+    },
+    "is_active": {
+      "dataType": "boolean",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "90",
+        "columnType": "checkbox",
+        "defaultValue": true
+      },
+      "displayName": "Active",
+      "isColumnShow": true
+    },
+    "sort_order": {
+      "dataType": "number",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "90",
+        "columnType": "number",
+        "defaultValue": 0
+      },
+      "displayName": "Sort Order",
+      "isColumnShow": true
+    },
+    "created_at": {
+      "dataType": "datetime",
+      "permission": "read",
+      "displayName": "Created At",
+      "isColumnShow": false
+    },
+    "modified_at": {
+      "dataType": "datetime",
+      "permission": "read",
+      "displayName": "Modified At",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "52",
+  "created_by": null,
+  "modified_by": null
+}

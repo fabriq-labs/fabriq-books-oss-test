@@ -347,6 +347,33 @@ async function main() {
         );
         console.log("   Skipping agent template seed...");
       }
+
+      // Step 3.6: Seed per-model agent tool configs
+      console.log("🛠️  Step 3.6: Seeding agent model tool configs...");
+      const seedAgentModelToolsSqlPath = path.join(
+        __dirname,
+        "prisma",
+        "seed-agent-model-tools.sql"
+      );
+
+      if (fs.existsSync(seedAgentModelToolsSqlPath)) {
+        console.log(`Target: ${databaseTargetLog}`);
+        try {
+          runPrismaSqlFile(
+            seedAgentModelToolsSqlPath,
+            "Agent model tool configs seeded successfully"
+          );
+          console.log("✅ Agent model tool configs seeded successfully");
+        } catch (error) {
+          console.error("⚠️  Error seeding agent model tool configs:", error.message);
+          console.log("   Continuing setup...");
+        }
+      } else {
+        console.log(
+          `⚠️  Agent model tools SQL file not found at: ${seedAgentModelToolsSqlPath}`
+        );
+        console.log("   Skipping agent model tool config seed...");
+      }
       console.log("");
 
       console.log("🎉 Core database setup completed successfully!");

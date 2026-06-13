@@ -240,7 +240,7 @@ export class AgentService {
       // Use unified tools (model-specific + analytics + session tools if applicable)
       const toolManager = ToolManager.getInstance();
       const templateAllowedTools: string[] = templateForHandleRequest?.allowed_tools || [];
-      const tools = toolManager.getUnifiedTools(modelName, auth, enhancedContext, sessionId, templateAllowedTools);
+      const tools = await toolManager.getUnifiedTools(modelName, auth, enhancedContext, sessionId, templateAllowedTools);
 
       // Build messages: for session requests, include persisted session messages
       let allMessages: any[];
@@ -688,7 +688,7 @@ export class AgentService {
       // Use unified tools (model-specific + analytics + session tools if applicable)
       const toolManager = ToolManager.getInstance();
       const templateAllowedToolsStreaming: string[] = templateForStreaming?.allowed_tools || [];
-      const tools = toolManager.getUnifiedTools(modelName, auth, enhancedContext, sessionId, templateAllowedToolsStreaming);
+      const tools = await toolManager.getUnifiedTools(modelName, auth, enhancedContext, sessionId, templateAllowedToolsStreaming);
 
       // Use streamText with configurable maxSteps
       const llmModelId = getModelId('agent');
@@ -932,7 +932,7 @@ export class AgentService {
       );
 
       const toolManager = ToolManager.getInstance();
-      const tools = toolManager.getUnifiedTools(modelName, auth, enhancedContext);
+      const tools = await toolManager.getUnifiedTools(modelName, auth, enhancedContext);
       logger.info('maxSteps', { maxSteps });
       const llmModelId = getModelId('agent');
       const startTime = Date.now();

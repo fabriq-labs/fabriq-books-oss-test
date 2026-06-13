@@ -2,6 +2,10 @@
 
 Use **searchRecords** for simple lists; **analyticsQuery** for aggregates, JOINs, and top-N rankings.
 
+**Chat UI tables (automatic):** specific account / bank register → ledger with +/− amounts and balance; debit/credit account filters or general lists → journal with Debit/Credit columns; transfer between two accounts → two journal tables. Brief intro only — do not list row details in text.
+
+**Account closing / current / opening balance:** use **runFinancialReport** `trial_balance` with `account_id` — report **total_balance** as closing position. Do NOT refuse balance questions; do NOT SUM postings for trial balance. After finding an account, "closing balance of this account" uses the `acco_…` id from the prior search.
+
 ### LEGAL ENTITY (searchRecords and SQL)
 - **Today / recent list / last 7 days:** omit `legal_entity_id` — includes null-entity rows.
 - **Period list pulls** and **amount filters** (gt/lt/eq): when header `legalEntityId` is in pageContext, filter `legal_entity_id` = that id on **searchRecords** and in SQL.

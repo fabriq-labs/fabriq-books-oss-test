@@ -29,7 +29,9 @@ export const getModelDisplayName = (modelName: string): string => {
         'shipping_terms': 'Shipping Terms',
         'shipping_method': 'Shipping Method',
         'currency_master': 'Currency Master',
-        'currency': 'Currency'
+        'currency': 'Currency',
+        'agent_model_tool_config': 'Agent Model Tools',
+        'prompt_template': 'Prompt Template',
     };
 
     return modelNames[modelName] || modelName;

@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
-import { useChat } from '@ai-sdk/react';
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
+import { useChat, type Message } from '@ai-sdk/react';
 import { Plus, MessageSquare, Square, RotateCw, Upload, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,6 @@ import {
     buildFileParts,
     getContextSuggestions,
     getInputPlaceholder,
-    getInputPaddingClasses,
     formatCurrencyInMessage,
     getChatCurrencyCode,
     formatAssistantMessageForTableTools,
@@ -32,6 +31,12 @@ import {
     enrichFinanceChatContext,
 } from '@/utils/postingChatContext';
 import Cookies from 'js-cookie';
+import { v4 as uuidv4 } from 'uuid';
+import {
+    createChatThread,
+    loadChatThread,
+    saveChatThread,
+} from '@/lib/chatThreadApi';
 
 interface ChatMessage {
     role: 'user' | 'assistant' | 'system' | 'data';
@@ -42,9 +47,22 @@ interface ChatMessage {
 
 interface ChatUIProps {
     sidebarMode?: boolean;
+    chatId?: string;
+    threadTitle?: string;
+    hideThreadControls?: boolean;
+    onThreadSaved?: () => void;
 }
 
-export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
+export const ChatUI: React.FC<ChatUIProps> = ({
+    sidebarMode,
+    chatId,
+    threadTitle,
+    hideThreadControls = false,
+    onThreadSaved,
+}) => {
+    const [fallbackChatId] = useState(() => `chat_${uuidv4()}`);
+    const effectiveChatId = chatId ?? fallbackChatId;
+
     const chatEndRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const chatInputRef = useRef<HTMLInputElement | null>(null);
@@ -52,7 +70,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const { addToolData } = useTool();
-    const { pageContext, messagesAi, setMessagesAi, clearMessages } = useChatContext();
+    const { pageContext, messagesAi, setMessagesAi, clearMessages, chatSessionId } = useChatContext();
+    const prevChatSessionId = useRef<number | null>(null);
     const { getBaseCurrencyCode } = useUserData();
     const { currentEntityId, currentEntity, entities } = useEntity();
 
@@ -61,6 +80,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         return enrichFinanceChatContext(base, currentEntity, entities);
     }, [pageContext, currentEntity, entities, currentEntityId, currentEntity?.legal_name]);
     const token = Cookies.get("__session");
+    const messagesRef = useRef<Message[]>([]);
+    const persistThreadRef = useRef<(threadMessages: Message[]) => Promise<void>>(async () => {});
+    const [historyLoaded, setHistoryLoaded] = useState(!effectiveChatId);
 
     const chatCurrencyCode = useMemo(
         () => getChatCurrencyCode(pageContext, getBaseCurrencyCode()),
@@ -80,6 +102,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         setInput,
         status
     } = useChat({
+        id: effectiveChatId,
         api: `${import.meta.env.VITE_API_BASE_URL || ''}/api/agent/chat/stream`,
         headers: {
             'Accept': 'text/event-stream',
@@ -87,6 +110,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         },
         body: {
             stream: true,
+            chatId: effectiveChatId,
             context: chatContext || undefined
         },
         experimental_prepareRequestBody: ({ id, messages, requestBody }) => {
@@ -99,11 +123,13 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
 
             const preparedBody: {
                 id: string;
+                chatId?: string;
                 stream: boolean;
                 messages: typeof transformedMessages;
                 context?: typeof chatContext;
             } = {
                 id,
+                chatId: effectiveChatId,
                 stream: true,
                 messages: transformedMessages
             };
@@ -145,20 +171,21 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
             }
         },
         onFinish: (message) => {
-
-            if (!message.toolInvocations || !Array.isArray(message.toolInvocations)) {
-                return;
+            if (message.toolInvocations && Array.isArray(message.toolInvocations)) {
+                message.toolInvocations.forEach((tool: ToolInvocation) => {
+                    if (tool.state === 'result') {
+                        addToolData({
+                            toolName: tool.toolName,
+                            state: tool.state,
+                            result: tool.result
+                        });
+                    }
+                });
             }
 
-            // Process tool invocations with results
-            message.toolInvocations.forEach((tool: ToolInvocation) => {
-                if (tool.state === 'result') {
-                    addToolData({
-                        toolName: tool.toolName,
-                        state: tool.state,
-                        result: tool.result
-                    });
-                }
+            // Persist full session (user + assistant + tool invocations) after each turn
+            queueMicrotask(() => {
+                void persistThreadRef.current(messagesRef.current);
             });
         },
         onError: (error) => {
@@ -170,17 +197,94 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         }
     });
 
-    // Initialize messages from context if available
+    const buildThreadMetadata = useCallback(
+        () => ({
+            pageContext: chatContext ?? null,
+            entityId: currentEntityId ?? null,
+            entityName: currentEntity?.legal_name ?? null,
+        }),
+        [chatContext, currentEntity?.legal_name, currentEntityId]
+    );
+
+    const persistThread = useCallback(
+        async (threadMessages: Message[]) => {
+            if (!effectiveChatId || threadMessages.length === 0) return;
+            try {
+                await saveChatThread(effectiveChatId, threadMessages, buildThreadMetadata());
+                onThreadSaved?.();
+            } catch (persistError) {
+                console.error('Failed to persist chat thread', persistError);
+            }
+        },
+        [buildThreadMetadata, effectiveChatId, onThreadSaved]
+    );
+
+    const ensureThreadExists = useCallback(async () => {
+        await createChatThread(effectiveChatId, buildThreadMetadata());
+    }, [buildThreadMetadata, effectiveChatId]);
+
     useEffect(() => {
+        persistThreadRef.current = persistThread;
+    }, [persistThread]);
+
+    // Keep ref in sync for onFinish persistence
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
+
+    // Load persisted session when switching threads (ChatGPT-style history restore)
+    useEffect(() => {
+        if (!effectiveChatId) {
+            setHistoryLoaded(true);
+            return;
+        }
+
+        let cancelled = false;
+        setHistoryLoaded(false);
+        setMessages([]);
+
+        async function loadThreadHistory() {
+            try {
+                const thread = await loadChatThread(effectiveChatId);
+                if (cancelled) return;
+                setMessages(Array.isArray(thread?.messages) ? thread.messages : []);
+            } catch (loadError) {
+                console.error('Failed to load chat thread', loadError);
+            } finally {
+                if (!cancelled) setHistoryLoaded(true);
+            }
+        }
+
+        void loadThreadHistory();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [effectiveChatId, setMessages]);
+
+    // Clear local messages only when auth session resets (logout/login), not on remount
+    useEffect(() => {
+        if (prevChatSessionId.current !== null && prevChatSessionId.current !== chatSessionId) {
+            setMessages([]);
+            setInput('');
+            setSelectedFiles([]);
+        }
+        prevChatSessionId.current = chatSessionId;
+    }, [chatSessionId, setMessages, setInput]);
+
+    // Initialize messages from context if available (same browser session, route changes)
+    useEffect(() => {
+        if (chatId != null || !historyLoaded) return;
         if (messagesAi.length > 0 && messages.length === 0) {
             setMessages(messagesAi);
         }
-    }, [messagesAi, messages.length, setMessages]);
+    }, [chatId, historyLoaded, messagesAi, messages.length, setMessages, chatSessionId]);
 
-    // Sync messages to context when they change
+    // Sync messages to context when they change (skip when using persisted thread IDs)
     useEffect(() => {
+        if (chatId != null) return;
         setMessagesAi(messages);
-    }, [messages, setMessagesAi]);
+    }, [messages, setMessagesAi, chatId]);
 
     useEffect(() => {
         if (chatEndRef.current) {
@@ -223,8 +327,28 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         };
     }, [setInput]);
 
+    const suggestions = useMemo(
+        () => getContextSuggestions(pageContext),
+        [pageContext]
+    );
+
+    const inputPlaceholder = useMemo(
+        () => getInputPlaceholder(pageContext),
+        [pageContext]
+    );
     const formatAssistantText = (content: string) =>
         formatCurrencyInMessage(content, chatCurrencyCode);
+
+    if (effectiveChatId && !historyLoaded) {
+        return (
+            <div className={cn(
+                "flex h-full items-center justify-center bg-white",
+                sidebarMode ? "" : "min-h-[calc(100vh-8rem)]"
+            )}>
+                <p className="text-sm text-gray-500">Loading conversation…</p>
+            </div>
+        );
+    }
 
     // Render message content (text only, files are rendered separately)
     const renderMessageContent = (msg: ChatMessage, isLastMessage: boolean = false) => {
@@ -263,6 +387,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
                             onSendMessage={async (text) => {
                                 if (isLoading) return;
                                 try {
+                                    await ensureThreadExists();
                                     await append(
                                         { role: 'user', content: text },
                                         { allowEmptySubmit: true }
@@ -377,6 +502,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         clearSelectedFiles();
 
         try {
+            await ensureThreadExists();
+
             const parts: MessagePart[] = [];
 
             if (trimmedInput) {
@@ -414,6 +541,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         clearSelectedFiles();
 
         try {
+            await ensureThreadExists();
+
             const parts: MessagePart[] = [];
             parts.push({ type: 'text', text: suggestion });
 
@@ -437,20 +566,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         }
     };
 
-    // Get suggestions based on pageContext
-    const suggestions = useMemo(
-        () => getContextSuggestions(pageContext),
-        [pageContext]
-    );
-
-
-    // Get input placeholder and padding
-    const inputPlaceholder = useMemo(
-        () => getInputPlaceholder(pageContext),
-        [pageContext]
-    );
-    const inputPadding = useMemo(() => getInputPaddingClasses(sidebarMode), [sidebarMode]);
-
     // Render chat input component
     const renderChatInput = (containerClasses: string, paddingClasses: string) => (
         <>
@@ -473,8 +588,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
             )}
 
             <div className={cn(
-                "shadow-md border bg-white",
-                sidebarMode ? "rounded-none border-x-0 border-t" : "rounded-2xl",
+                "shadow-md border border-gray-200 bg-white rounded-3xl",
                 !sidebarMode && paddingClasses
             )}>
                 <div className={cn(
@@ -552,12 +666,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         </>
     );
 
-    // Render suggestion chips
     const renderSuggestions = () => (
-        <div className="flex flex-wrap justify-center gap-2 mt-8">
-            {suggestions.map((suggestion, i) => (
+        <div className="flex flex-wrap justify-center gap-2 mt-3">
+            {suggestions.map((suggestion) => (
                 <button
-                    key={i}
+                    key={suggestion}
                     className="px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition-colors border border-gray-200"
                     onClick={() => void handleSuggestionSubmit(suggestion)}
                     type="button"
@@ -568,68 +681,26 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         </div>
     );
 
-    // Initial centered UI (when no messages)
-    if (messages.length === 0) {
-        return (
-            <div
-                className={cn(
-                    "flex flex-col bg-white relative h-full",
-                    sidebarMode ? "" : "items-center justify-center min-h-[calc(100vh-8rem)]"
-                )}
-                onDragEnter={handleDragEnter}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-            >
-                {/* Drag and drop overlay for initial state */}
-                {isDragging && (
-                    <div className="absolute inset-0 z-50 bg-blue-50/95 border-4 border-dashed border-blue-400 rounded-lg flex flex-col items-center justify-center backdrop-blur-sm">
-                        <div className="text-center">
-                            <Upload className="h-16 w-16 text-blue-500 mx-auto mb-4" />
-                            <p className="text-2xl font-semibold text-blue-700 mb-2">Drop any file here</p>
-                            <p className="text-lg text-blue-600">Add files to your conversation</p>
-                        </div>
-                    </div>
-                )}
-
-                {sidebarMode ? (
-                    <div className={cn(
-                        "flex-1 overflow-y-auto",
-                        sidebarMode ? "px-2 py-2" : ""
-                    )}>
-                        <div className="flex flex-col items-center justify-center min-h-full py-4">
-                            <div className="mb-6 text-xl font-medium text-gray-800 text-center">
-                                What can I help with?
-                            </div>
-                            {renderSuggestions()}
-                            <div className="w-full mt-6">
-                                {renderChatInput('', '')}
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        <div className="mb-10 text-3xl font-medium text-gray-800 text-center">
-                            What can I help with?
-                        </div>
-                        <div className="w-full max-w-2xl">
-                            {renderChatInput('', inputPadding)}
-                            {renderSuggestions()}
-                        </div>
-                    </>
-                )}
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    multiple
-                    onChange={handleFileSelection}
-                />
+    const renderBottomComposer = () => (
+        <div
+            className={cn(
+                'w-full flex-shrink-0 bg-white',
+                sidebarMode ? 'px-2 py-2' : 'px-4 py-4 md:px-6 md:py-5'
+            )}
+        >
+            <div className={cn('mx-auto w-full', sidebarMode ? '' : 'max-w-3xl')}>
+                {renderChatInput('', sidebarMode ? '' : '')}
             </div>
-        );
-    }
+        </div>
+    );
 
-    // Render chat header
+    const renderEmptyComposer = () => (
+        <div className={cn('w-full', sidebarMode ? 'px-2' : 'max-w-3xl')}>
+            {renderChatInput('', sidebarMode ? '' : '')}
+            {renderSuggestions()}
+        </div>
+    );
+
     const renderChatHeader = () => (
         <div className={cn(
             "flex items-center justify-between border-b bg-white flex-shrink-0",
@@ -637,7 +708,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         )}>
             <div className="flex items-center gap-3">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <h3 className="text-base font-medium text-gray-700">Chat</h3>
+                <h3 className="text-base font-medium text-gray-700 truncate max-w-[min(100%,20rem)]">
+                    {threadTitle ?? 'Chat'}
+                </h3>
             </div>
             <div className="flex items-center gap-2">
                 {!isLoading && messages.length > 0 && (
@@ -655,24 +728,72 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
                         {!sidebarMode && "Regenerate"}
                     </Button>
                 )}
-                <Button
-                    variant="outline"
-                    size={sidebarMode ? "icon" : "sm"}
-                    onClick={handleNewChat}
-                    className={cn(
-                        "text-blue-600 border-blue-200 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors",
-                        sidebarMode ? "h-8 w-8" : "text-xs"
-                    )}
-                    title="New Chat"
-                >
-                    <MessageSquare className={cn("h-4 w-4", !sidebarMode && "mr-1")} />
-                    {!sidebarMode && "New Chat"}
-                </Button>
+                {!hideThreadControls && (
+                    <Button
+                        variant="outline"
+                        size={sidebarMode ? "icon" : "sm"}
+                        onClick={handleNewChat}
+                        className={cn(
+                            "text-blue-600 border-blue-200 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors",
+                            sidebarMode ? "h-8 w-8" : "text-xs"
+                        )}
+                        title="New Chat"
+                    >
+                        <MessageSquare className={cn("h-4 w-4", !sidebarMode && "mr-1")} />
+                        {!sidebarMode && "New Chat"}
+                    </Button>
+                )}
             </div>
         </div>
     );
 
+    // Empty state — centered welcome, chat bar on top, suggestions below
+    if (messages.length === 0) {
+        return (
+            <div
+                className={cn(
+                    "flex flex-col bg-white relative h-full overflow-hidden",
+                    sidebarMode ? "" : "min-h-[calc(100vh-8rem)]"
+                )}
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+            >
+                <div className="flex flex-1 items-center justify-center px-4 overflow-y-auto">
+                    <div className="flex w-full flex-col items-center py-4">
+                        <h1
+                            className={cn(
+                                "mb-6 font-medium text-gray-800 text-center",
+                                sidebarMode ? "text-xl" : "text-2xl md:text-3xl"
+                            )}
+                        >
+                            What can I help with?
+                        </h1>
+                        {renderEmptyComposer()}
+                    </div>
+                </div>
 
+                {isDragging && (
+                    <div className="absolute inset-0 z-50 bg-blue-50/95 border-4 border-dashed border-blue-400 rounded-lg flex flex-col items-center justify-center backdrop-blur-sm">
+                        <div className="text-center">
+                            <Upload className="h-16 w-16 text-blue-500 mx-auto mb-4" />
+                            <p className="text-2xl font-semibold text-blue-700 mb-2">Drop any file here</p>
+                            <p className="text-lg text-blue-600">Add files to your conversation</p>
+                        </div>
+                    </div>
+                )}
+
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={handleFileSelection}
+                />
+            </div>
+        );
+    }
 
     // Render chat messages
     const renderMessages = () => (
@@ -752,12 +873,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ sidebarMode }) => {
         )}>
             {renderChatHeader()}
             {renderMessages()}
-            <div className={cn(
-                "w-full border-t bg-white flex-shrink-0",
-                sidebarMode ? "py-2 px-2" : "py-6 px-6"
-            )}>
-                {renderChatInput('', sidebarMode ? '' : 'px-6')}
-            </div>
+            {renderBottomComposer()}
             <input
                 ref={fileInputRef}
                 type="file"

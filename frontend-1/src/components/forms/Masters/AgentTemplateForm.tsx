@@ -13,16 +13,23 @@ import { CodeEditor } from '@/components/ui/code-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import Cookies from 'js-cookie';
+import { fetchToolCatalog, type ToolCatalogEntry } from '@/api/agentModelToolsApi';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const GOAL_MODELS = [
   { value: '', label: 'General (no specific model)' },
   { value: 'posting', label: 'Posting' },
+  { value: 'account', label: 'Account' },
   { value: 'invoice', label: 'Invoice' },
   { value: 'purchase_order', label: 'Purchase Order' },
   { value: 'purchase_requisition', label: 'Purchase Requisition' },
   { value: 'payment_receipt', label: 'Payment Receipt' },
+];
+
+const FOCUS_MODEL_OPTIONS = [
+  'posting', 'account', 'invoice', 'purchase_order', 'purchase_requisition',
+  'payment_receipt', 'category', 'supplier', 'customer',
 ];
 
 const MODES = [
@@ -41,6 +48,8 @@ const agentTemplateSchema = z.object({
   default_mode: z.enum(['supervised', 'semi_auto', 'autonomous']),
   is_active: z.boolean(),
   sort_order: z.number().min(0),
+  focus_models: z.array(z.string()),
+  allowed_tools: z.array(z.string()),
 });
 
 type AgentTemplateValues = z.infer<typeof agentTemplateSchema>;
@@ -68,6 +77,7 @@ export const AgentTemplateForm: React.FC = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(!!id);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toolCatalog, setToolCatalog] = useState<ToolCatalogEntry[]>([]);
   const isEditing = !!id;
 
   const form = useForm<AgentTemplateValues>({
@@ -82,8 +92,16 @@ export const AgentTemplateForm: React.FC = () => {
       default_mode: 'supervised',
       is_active: true,
       sort_order: 0,
+      focus_models: [],
+      allowed_tools: [],
     },
   });
+
+  useEffect(() => {
+    fetchToolCatalog()
+      .then(setToolCatalog)
+      .catch(() => setToolCatalog([]));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -101,6 +119,8 @@ export const AgentTemplateForm: React.FC = () => {
           default_mode: t.default_mode ?? 'supervised',
           is_active: t.is_active ?? true,
           sort_order: t.sort_order ?? 0,
+          focus_models: Array.isArray(t.focus_models) ? t.focus_models : [],
+          allowed_tools: Array.isArray(t.allowed_tools) ? t.allowed_tools : [],
         });
       })
       .catch((err) => toast({ variant: 'destructive', title: 'Error', description: err.message }))
@@ -283,6 +303,88 @@ export const AgentTemplateForm: React.FC = () => {
                     </FormItem>
                   )}
                 />
+
+                {/* Focus models + allowed tools */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="focus_models"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Focus models (prompt scope)</FormLabel>
+                        <p className="text-xs text-gray-400 mb-2">
+                          Limit which models appear in the system prompt. Empty = RELATED_MODELS fallback.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {FOCUS_MODEL_OPTIONS.map((m) => {
+                            const checked = field.value.includes(m);
+                            return (
+                              <label
+                                key={m}
+                                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-xs cursor-pointer ${
+                                  checked ? 'bg-blue-50 border-blue-300' : 'border-gray-200'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    field.onChange(
+                                      checked
+                                        ? field.value.filter((x: string) => x !== m)
+                                        : [...field.value, m]
+                                    );
+                                  }}
+                                />
+                                {m}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="allowed_tools"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Allowed tools (security ceiling)</FormLabel>
+                        <p className="text-xs text-gray-400 mb-2">
+                          Empty = full model tool set. createPlan + completeStep are always included in sessions.
+                        </p>
+                        <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
+                          {toolCatalog
+                            .filter((t) => t.category !== 'session')
+                            .map((tool) => {
+                              const checked = field.value.includes(tool.name);
+                              return (
+                                <label
+                                  key={tool.name}
+                                  className="flex items-center gap-2 text-xs cursor-pointer py-0.5"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => {
+                                      field.onChange(
+                                        checked
+                                          ? field.value.filter((x: string) => x !== tool.name)
+                                          : [...field.value, tool.name]
+                                      );
+                                    }}
+                                  />
+                                  <span className="font-mono">{tool.name}</span>
+                                </label>
+                              );
+                            })}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 {/* System Prompt */}
                 <FormField

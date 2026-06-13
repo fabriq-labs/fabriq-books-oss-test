@@ -111,7 +111,7 @@ describe('Agent Service Tests', () => {
             console.log('\n=== TEST 3: Default Model Tools ===');
 
             const toolManager = ToolManager.getInstance();
-            const tools = toolManager.getToolsForModel('default', context);
+            const tools = await toolManager.getToolsForModel('default', context);
 
             console.log('✓ Available Tools:', Object.keys(tools));
             assertToolsAvailable(tools);
@@ -132,7 +132,7 @@ describe('Agent Service Tests', () => {
             console.log('\n=== TEST 4: Purchase Requisition Model Tools ===');
 
             const toolManager = ToolManager.getInstance();
-            const tools = toolManager.getToolsForModel('purchase_requisition', context);
+            const tools = await toolManager.getToolsForModel('purchase_requisition', context);
 
             console.log('✓ Available Tools:', Object.keys(tools));
             assertToolsAvailable(tools);

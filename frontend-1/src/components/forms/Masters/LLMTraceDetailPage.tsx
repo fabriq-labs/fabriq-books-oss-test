@@ -1,6 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronDown, ChevronRight, Clock, Cpu, Database, AlertTriangle, MessageSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Cpu,
+  Database,
+  AlertTriangle,
+  MessageSquare,
+  User,
+  Layers,
+  Sparkles,
+} from "lucide-react";
 import { viewAPI } from "@/api/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +20,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ToolResponseRenderer } from "@/components/chat/tool-responses";
+import {
+  extractSqlQueriesFromStep,
+  parseTraceToolInvocations,
+  parseTraceStepsToolInvocations,
+} from "@/lib/traceToolResults";
 
 interface TraceStep {
   id: string;
@@ -60,17 +83,55 @@ function formatTokens(count?: number): string {
 
 function StatusBadge({ status }: { status: string }) {
   const variant = status === "success" ? "default" : "destructive";
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant} className="capitalize">{status}</Badge>;
+}
+
+function formatUserIdFallback(userId?: string): string {
+  if (!userId) return "—";
+  return userId
+    .replace(/^user_/, "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function DetailField({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
+      <div className="text-sm text-foreground">{children}</div>
+    </div>
+  );
+}
+
+function truncateId(id?: string, len = 12): string {
+  if (!id) return "—";
+  if (id.length <= len + 4) return id;
+  return `${id.slice(0, len)}…`;
 }
 
 function StepCard({ step }: { step: TraceStep }) {
   const [expanded, setExpanded] = useState(false);
-  const [toolResultsExpanded, setToolResultsExpanded] = useState(false);
 
-  const sqlQueries = Array.isArray(step.sql_queries) ? step.sql_queries : [];
   const toolCalls = Array.isArray(step.tool_calls) ? step.tool_calls : [];
   const toolResults = Array.isArray(step.tool_results) ? step.tool_results : [];
-  const hasContent = sqlQueries.length > 0 || toolCalls.length > 0 || toolResults.length > 0 || step.response_text;
+  const sqlQueries = extractSqlQueriesFromStep(step);
+  const toolInvocations = parseTraceToolInvocations(toolResults);
+  const hasContent =
+    sqlQueries.length > 0 ||
+    toolCalls.length > 0 ||
+    toolResults.length > 0 ||
+    toolInvocations.length > 0 ||
+    step.response_text;
 
   return (
     <Card className="border">
@@ -105,49 +166,60 @@ function StepCard({ step }: { step: TraceStep }) {
           {sqlQueries.length > 0 && (
             <div>
               <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                <Database className="h-4 w-4" /> SQL Queries ({sqlQueries.length})
+                <Database className="h-4 w-4" /> SQL details ({sqlQueries.length})
               </h4>
               <div className="space-y-2">
-                {sqlQueries.map((q: any, i: number) => (
-                  <div key={i} className="rounded bg-muted p-3">
-                    {q.description && (
-                      <p className="text-xs text-muted-foreground mb-1">{q.description}</p>
-                    )}
+                {sqlQueries.map((q, i) => (
+                  <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <Badge variant="outline" className="text-[10px] font-normal">
+                        {q.source}
+                      </Badge>
+                      {q.description && (
+                        <span className="text-xs text-muted-foreground">{q.description}</span>
+                      )}
+                    </div>
                     {q.reasoning && (
-                      <p className="text-xs text-muted-foreground mb-1 italic">{q.reasoning}</p>
+                      <p className="text-xs text-muted-foreground mb-1.5 italic">{q.reasoning}</p>
                     )}
-                    <pre className="text-xs overflow-x-auto whitespace-pre-wrap"><code>{q.sql || JSON.stringify(q, null, 2)}</code></pre>
+                    <pre className="text-xs overflow-x-auto whitespace-pre-wrap font-mono text-slate-800">
+                      <code>{q.sql}</code>
+                    </pre>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Tool Calls */}
           {toolCalls.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium mb-2">Tool Calls ({toolCalls.length})</h4>
-              <pre className="rounded bg-muted p-3 text-xs overflow-x-auto whitespace-pre-wrap">
-                <code>{JSON.stringify(toolCalls, null, 2)}</code>
-              </pre>
+              <h4 className="text-sm font-medium mb-2">Tool calls ({toolCalls.length})</h4>
+              <div className="space-y-2">
+                {toolCalls.map((tc: any, i: number) => {
+                  const name = tc.toolName ?? tc.tool ?? "unknown";
+                  const args = tc.args ?? {};
+                  const argKeys = Object.keys(args);
+                  return (
+                    <div key={i} className="rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2">
+                      <p className="text-xs font-medium text-indigo-800">{name}</p>
+                      {argKeys.length > 0 && (
+                        <pre className="text-[11px] text-slate-600 mt-1 overflow-x-auto whitespace-pre-wrap">
+                          {JSON.stringify(args, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* Tool Results */}
-          {toolResults.length > 0 && (
+          {toolResults.length > 0 && toolInvocations.length === 0 && (
             <div>
-              <button
-                className="text-sm font-medium mb-2 flex items-center gap-1 hover:underline"
-                onClick={(e) => { e.stopPropagation(); setToolResultsExpanded(!toolResultsExpanded); }}
-              >
-                {toolResultsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                Tool Results ({toolResults.length})
-              </button>
-              {toolResultsExpanded && (
-                <pre className="rounded bg-muted p-3 text-xs overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
-                  <code>{JSON.stringify(toolResults, null, 2)}</code>
-                </pre>
-              )}
+              <h4 className="text-sm font-medium mb-2">Tool results (raw)</h4>
+              <pre className="rounded-lg bg-muted p-3 text-xs overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
+                <code>{JSON.stringify(toolResults, null, 2)}</code>
+              </pre>
             </div>
           )}
 
@@ -182,6 +254,7 @@ export const LLMTraceDetailPage: React.FC = () => {
   const { toast } = useToast();
 
   const [trace, setTrace] = useState<TraceData | null>(null);
+  const [userDisplay, setUserDisplay] = useState<{ name?: string | null; email?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [feedback, setFeedback] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -189,12 +262,24 @@ export const LLMTraceDetailPage: React.FC = () => {
   useEffect(() => {
     if (id && viewId) {
       setIsLoading(true);
+      setUserDisplay(null);
       viewAPI
         .getById("llm_trace", id, viewId)
-        .then((res: any) => {
+        .then(async (res: any) => {
           const data = res.data;
           setTrace(data);
           setFeedback(data.feedback || "");
+          if (data.user_id) {
+            try {
+              const userRes: any = await viewAPI.getById("user", data.user_id, "user_view");
+              const user = userRes?.data;
+              if (user) {
+                setUserDisplay({ name: user.name, email: user.email });
+              }
+            } catch {
+              // Fall back to formatted user_id
+            }
+          }
         })
         .catch((err: any) => {
           console.error("Failed to load trace:", err);
@@ -202,7 +287,7 @@ export const LLMTraceDetailPage: React.FC = () => {
         })
         .finally(() => setIsLoading(false));
     }
-  }, [id, viewId]);
+  }, [id, viewId, toast]);
 
   const handleSaveFeedback = async () => {
     if (!id || !viewId) return;
@@ -240,105 +325,174 @@ export const LLMTraceDetailPage: React.FC = () => {
   }
 
   const steps = (trace.steps || []).sort((a, b) => a.step_number - b.step_number);
+  const allToolInvocations = parseTraceStepsToolInvocations(steps);
+  const userLabel = userDisplay?.name?.trim() || formatUserIdFallback(trace.user_id);
+  const userSubtext = userDisplay?.email || (userDisplay?.name ? undefined : trace.user_id);
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/settings/llm-traces")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+    <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold truncate">{trace.question}</h1>
-          <p className="text-sm text-muted-foreground">{trace.id}</p>
+          <h1 className="text-2xl font-bold text-gray-900">LLM Trace</h1>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="text-sm text-muted-foreground font-mono mt-1 cursor-default">
+                {truncateId(trace.id, 20)}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent>{trace.id}</TooltipContent>
+          </Tooltip>
         </div>
+        <Button
+          variant="ghost"
+          className="flex items-center gap-2 text-muted-foreground shrink-0"
+          onClick={() => navigate("/settings/llm-traces")}
+        >
+          <ArrowLeft size={16} />
+          Back to list
+        </Button>
       </div>
 
       {/* Summary Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Question</p>
-              <p className="font-medium whitespace-pre-wrap">{trace.question}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Query Type</p>
-              <p className="font-medium">{trace.query_type || "-"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Status</p>
-              <StatusBadge status={trace.status} />
-            </div>
-            <div>
-              <p className="text-muted-foreground">LLM Model</p>
-              <p className="font-medium">{trace.llm_model}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Duration</p>
-              <p className="font-medium">{formatDuration(trace.duration_ms)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Tokens (prompt / completion / total)</p>
-              <p className="font-medium">
-                {formatTokens(trace.prompt_tokens)} / {formatTokens(trace.completion_tokens)} / {formatTokens(trace.total_tokens)}
+      <Card className="shadow-sm border-gray-200 overflow-hidden">
+        <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-gray-100 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={trace.status} />
+            {trace.query_type && (
+              <Badge variant="outline" className="capitalize font-normal">
+                {trace.query_type}
+              </Badge>
+            )}
+            {trace.model_name && (
+              <Badge variant="secondary" className="font-normal">
+                {trace.model_name}
+              </Badge>
+            )}
+            <span className="text-xs text-muted-foreground ml-auto">
+              {new Date(trace.created_at).toLocaleString()}
+            </span>
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Question
               </p>
+              <span className="text-xs text-muted-foreground">
+                LLM Model{" "}
+                <span className="font-medium text-foreground">{trace.llm_model}</span>
+              </span>
             </div>
-            <div>
-              <p className="text-muted-foreground">Steps</p>
-              <p className="font-medium">{trace.steps_count ?? "-"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Tools Called</p>
-              <p className="font-medium">{trace.tools_called?.join(", ") || "-"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Model</p>
-              <p className="font-medium">{trace.model_name || "-"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">User</p>
-              <p className="font-medium">{trace.user_id || "-"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Created</p>
-              <p className="font-medium">{new Date(trace.created_at).toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Session</p>
-              <p className="font-medium text-xs break-all">{trace.session_id || "-"}</p>
-            </div>
+            <p className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+              {trace.question}
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+            <DetailField label="Duration">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                {formatDuration(trace.duration_ms)}
+              </span>
+            </DetailField>
+            <DetailField label="Steps">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                {trace.steps_count ?? "—"}
+              </span>
+            </DetailField>
+            <DetailField label="Tokens">
+              <div className="space-y-0.5">
+                <p className="font-medium">
+                  {formatTokens(trace.total_tokens)} <span className="text-muted-foreground font-normal">total</span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatTokens(trace.prompt_tokens)} in · {formatTokens(trace.completion_tokens)} out
+                </p>
+              </div>
+            </DetailField>
+            <DetailField label="User">
+              <div className="inline-flex items-start gap-1.5">
+                <User className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium">{userLabel}</p>
+                  {userSubtext && (
+                    <p className="text-xs text-muted-foreground">{userSubtext}</p>
+                  )}
+                </div>
+              </div>
+            </DetailField>
+            <DetailField label="Session">
+              {trace.session_id ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="font-mono text-xs text-muted-foreground cursor-default">
+                      {truncateId(trace.session_id, 16)}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm break-all">{trace.session_id}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <span>—</span>
+              )}
+            </DetailField>
+            <DetailField label="Tools called">
+              {trace.tools_called && trace.tools_called.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {trace.tools_called.map((tool) => (
+                    <Badge key={tool} variant="secondary" className="font-normal">
+                      {tool}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <span>—</span>
+              )}
+            </DetailField>
           </div>
         </CardContent>
       </Card>
 
-      {/* Response Card */}
-      {trace.response_text && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Response</CardTitle>
+      {/* Response Card — tool output tables/reports + assistant text */}
+      {(allToolInvocations.length > 0 || trace.response_text) && (
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-gray-100 py-4">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
+              Response
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <pre className="rounded bg-muted p-4 text-sm overflow-x-auto whitespace-pre-wrap max-h-96 overflow-y-auto">
-              {trace.response_text}
-            </pre>
+          <CardContent className="pt-4 space-y-4">
+            {allToolInvocations.length > 0 && (
+              <ToolResponseRenderer toolInvocations={allToolInvocations} />
+            )}
+            {trace.response_text && (
+              <div className={allToolInvocations.length > 0 ? "pt-2 border-t border-gray-100" : ""}>
+                {allToolInvocations.length > 0 && (
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                    Assistant summary
+                  </p>
+                )}
+                <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-800">
+                  {trace.response_text}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
       {/* Error Card */}
       {trace.status === "error" && trace.error_message && (
-        <Card className="border-destructive/50">
-          <CardHeader>
+        <Card className="shadow-sm border-destructive/40">
+          <CardHeader className="border-b border-destructive/20 bg-destructive/5 py-4">
             <CardTitle className="text-base text-destructive flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" /> Error
+              <AlertTriangle className="h-4 w-4" /> Error
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <pre className="rounded bg-destructive/5 p-4 text-sm overflow-x-auto whitespace-pre-wrap">
+          <CardContent className="pt-4">
+            <pre className="rounded-lg bg-destructive/5 p-4 text-sm overflow-x-auto whitespace-pre-wrap">
               {trace.error_message}
             </pre>
           </CardContent>
@@ -346,29 +500,33 @@ export const LLMTraceDetailPage: React.FC = () => {
       )}
 
       {/* Feedback Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" /> Feedback
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-gray-100 py-4">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            Feedback
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="pt-4 space-y-3">
           <Textarea
             placeholder="Add feedback for prompt improvement..."
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             rows={4}
+            className="resize-none"
           />
-          <Button onClick={handleSaveFeedback} disabled={isSaving} size="sm">
-            {isSaving ? "Saving..." : "Save Feedback"}
-          </Button>
+          <div className="flex justify-end">
+            <Button onClick={handleSaveFeedback} disabled={isSaving} size="sm">
+              {isSaving ? "Saving..." : "Save feedback"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       {/* Steps Section */}
       {steps.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-base font-semibold">Steps ({steps.length})</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Steps ({steps.length})</h2>
           {steps.map((step) => (
             <StepCard key={step.id} step={step} />
           ))}

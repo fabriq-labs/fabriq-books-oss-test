@@ -23,7 +23,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { Clock, CheckCircle, TrendingUp, Package, DollarSign, AlertTriangle, ShoppingCart, Receipt, Plus, FileText, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '@/contexts/ChatContext';
-import { ChatUI } from '@/components/chat/ChatUI';
+import { ChatShell } from '@/components/chat/ChatShell';
 import { workflowAPI } from '@/api/api';
 // Mock data for procurement spend by category
 const procurementSpendData = [
@@ -225,7 +225,7 @@ const ProcurementApproverDashboard = () => {
     const totalSpend = procurementSpendData.reduce((sum, item) => sum + item.spend, 0);
 
     if (isChatOpen) {
-        return <ChatUI />;
+        return <ChatShell className="h-full" fullPage />;
     }
     return (
 

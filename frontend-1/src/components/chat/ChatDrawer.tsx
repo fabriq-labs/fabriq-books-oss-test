@@ -1,7 +1,8 @@
 import React from 'react';
 import { Drawer, DrawerPortal, DrawerOverlay } from '@/components/ui/drawer';
 import { useChat } from '@/contexts/ChatContext';
-import { ChatUI } from './ChatUI';
+import { ChatShell } from './ChatShell';
+import { cn } from '@/lib/utils';
 
 export const ChatDrawer: React.FC = () => {
     const { isChatOpen, toggleChat } = useChat();
@@ -11,12 +12,16 @@ export const ChatDrawer: React.FC = () => {
             <DrawerPortal>
                 <DrawerOverlay />
                 <div
-                    className={`fixed top-0 right-0 bottom-0 z-[100] h-full w-[30vw] max-w-[420px] bg-white border-l shadow-lg flex flex-col transition-transform duration-500 ease-in-out ${isChatOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                    className={cn(
+                        'fixed top-0 right-0 bottom-0 z-[100] h-full bg-white border-l shadow-lg transition-transform duration-500 ease-in-out',
+                        'w-[min(96vw,920px)]',
+                        isChatOpen ? 'translate-x-0' : 'translate-x-full'
+                    )}
                     style={{ borderRadius: 0 }}
                 >
-                    <ChatUI />
+                    <ChatShell className="h-full" />
                 </div>
             </DrawerPortal>
         </Drawer>
     );
-}; 
+};
