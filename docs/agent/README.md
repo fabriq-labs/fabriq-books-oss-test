@@ -56,6 +56,7 @@ The docs are organized in three tracks:
 | Doc | Covers |
 |---|---|
 | [MCP.md](./MCP.md) | Fabriq's MCP server (`/api/mcp`) — lets external AI clients (Cursor, Claude Desktop) call Fabriq tools directly. Separate from, and unrelated to, the agent session/chat system above. Status: Work in Progress. |
+| [../CHAT_THREADS.md](../CHAT_THREADS.md) | Persistent chat thread UI (`chat_thread` table, `ChatShell`, thread sidebar). Summarized in [15-CONVERSATIONAL_CHAT.md — Thread Persistence](./15-CONVERSATIONAL_CHAT.md#thread-persistence-chat_thread); this doc has the full architecture diagram and manual test checklist. |
 
 ---
 

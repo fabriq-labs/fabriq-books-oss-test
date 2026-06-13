@@ -85,13 +85,31 @@ Navigate to **Settings → LLM Traces** (Super Admin only).
 
 1. List view — traces sorted by newest first, filterable by `query_type`,
    `status`, `llm_model`
-2. Click a trace row → detail page with `question`, `response_text`,
-   `error_message` (if any)
-3. Expand individual steps → `sql_queries` and `tool_calls`
+2. Click a trace row → `LLMTraceDetailPage.tsx` shows `question`,
+   `response_text`, `error_message` (if any)
+3. Expand individual steps → `sql_queries` and `tool_calls`, plus rendered
+   **tool invocation results** (see below)
 4. Add notes in the `feedback` field → Save
 
 `feedback` is the only editable field — everything else is a read-only
 record of what actually happened.
+
+### Tool Invocation Rendering in Trace Detail
+
+`LLMTraceDetailPage.tsx` reuses `ToolResponseRenderer` (the same component
+that renders tool results inline in conversational chat — see
+[15-CONVERSATIONAL_CHAT.md — Tool Invocation Rendering](./15-CONVERSATIONAL_CHAT.md#tool-invocation-rendering))
+to render each step's tool calls/results as they would have appeared to the
+user, not just as raw JSON.
+
+`frontend-1/src/lib/traceToolResults.ts` adapts `llm_trace_step` rows
+(`tool_calls`/`tool_results`/`sql_queries`) into the shape
+`ToolResponseRenderer` expects:
+
+- `parseTraceToolInvocations(step)` — tool invocations for a single step
+- `parseTraceStepsToolInvocations(steps)` — across all steps in a trace
+- `extractSqlQueriesFromStep(step)` — pulls `sql_queries` for display
+  alongside the tool result
 
 ---
 

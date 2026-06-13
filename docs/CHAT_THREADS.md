@@ -195,6 +195,6 @@ psql "${DATABASE_URL}" -c "
 
 ## Related docs
 
-- [Agent conversation system](./agent/CONVERSATION.md) — streaming, PageContext, session lifecycle
+- [Agent conversational chat](./agent/15-CONVERSATIONAL_CHAT.md) — streaming, PageContext, session lifecycle, tool invocation rendering
 - [Chat component internals](../frontend-1/src/components/chat/README.md) — `ChatUI`, tools, file attachments
 - [AI agent overview](./AI_AGENT.md)

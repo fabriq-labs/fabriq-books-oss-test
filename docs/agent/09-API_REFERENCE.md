@@ -180,6 +180,63 @@ session tracking. Prefer `/chat` or `/chat/stream` for new integrations.
 
 ---
 
+## Chat Thread Persistence
+
+**Router**: `backend/src/routes/chat.ts`, mounted at `/api/chat`. Backs the
+`chat_thread` table (see
+[08-DATA_MODELS.md — `chat_thread`](./08-DATA_MODELS.md#chat_thread)) and the
+`ChatShell`/thread-sidebar UI (see
+[15-CONVERSATIONAL_CHAT.md — Thread Persistence](./15-CONVERSATIONAL_CHAT.md#thread-persistence-chat_thread)).
+All routes require auth and scope by `req.context.auth.user.id` (not `org_id`).
+
+### `GET /api/chat`
+
+List the current user's threads that have at least one message.
+
+**Response**: `{ data: ChatThreadSummary[] }`
+
+### `POST /api/chat/threads`
+
+Create an empty thread (idempotent — if `chatId` already exists, returns the
+existing thread).
+
+**Request body**: `{ chatId?: string, metadata?: object }` — `chatId`
+defaults to a server-generated `chat_<uuid>` if omitted.
+
+**Response** (`201`): `{ data: { chatId, title, messages, metadata, createdAt, updatedAt } }`
+
+### `GET /api/chat/:chatId`
+
+Load a thread's full message history. `404` if not found, implicitly scoped
+to the requesting user via `loadChat(chatId, userId)`.
+
+**Response**: `{ chatId, title, messages, metadata, modelUsed, totalTokensUsed, createdAt, updatedAt }`
+
+### `PUT /api/chat/:chatId`
+
+Upsert the full `messages[]` for a thread — called by `ChatUI.onFinish` after
+each completed agent turn. Creates the thread if it doesn't exist yet.
+Returns `403` if the thread belongs to a different user.
+
+**Request body**: `{ messages: UIMessage[], metadata?: object, totalTokensUsed?: number }`
+
+**Response**: `{ success: true, chatId }`
+
+### `POST /api/chat`
+
+A **separate**, simpler streaming financial chat endpoint —
+`streamText()` with a fixed financial-advisory system prompt, persisting to
+`chat_thread` on finish via the same `saveChat()`. **Not used by the main
+`ChatUI`/`ChatShell`** (which streams via `/api/agent/chat/stream` and
+persists separately via `PUT /api/chat/:chatId`) — easy to confuse with that
+endpoint. `chatId` is required (`body.chatId` or `body.id`).
+
+**Request body**: `{ messages: UIMessage[], chatId or id: string, metadata?: object }`
+
+**Response**: `Content-Type: text/event-stream` (AI SDK data stream protocol).
+
+---
+
 ## Pending Actions
 
 ### `GET /api/agent/pending-actions`

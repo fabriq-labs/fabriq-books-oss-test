@@ -128,6 +128,12 @@ Remaining:
   the new numbered docs (01-15) and not at any deleted filenames as new docs
   are added in the future.
 
+`chatbot-ui-dev` (persistent chat threads + DB-driven
+`agent_model_tool_config`) has been merged and the 01-15 set updated to match
+(`08-DATA_MODELS.md`, `09-API_REFERENCE.md`, `02-ARCHITECTURE.md`,
+`05-TOOLS.md`, `13-EXTENDING.md`, `11-OBSERVABILITY.md`, `15-CONVERSATIONAL_CHAT.md`,
+and `docs/CHAT_THREADS.md`'s broken link to the old `CONVERSATION.md`).
+
 ---
 
 ## What's Next

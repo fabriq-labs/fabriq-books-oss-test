@@ -87,7 +87,9 @@ directives are assembled.
 | File / Directory | Purpose |
 |---|---|
 | `AgentService.ts` | Main orchestrator — `handleRequest`, `handleStreamingRequest`, auto-continuation, event emission |
-| `ToolManager.ts` | Tool set construction per model and template |
+| `ToolManager.ts` | Tool set construction per model and template — now DB-driven via `agentModelToolConfigCache` (async) — see [05-TOOLS.md — Tool Resolution](./05-TOOLS.md#tool-resolution-agent_model_tool_config) |
+| `agentModelToolConfigCache.ts` | Loads/caches `agent_model_tool_config` rows; `resolveModelToolNames`, `resolveIncludeAnalyticsTools`, `warmAgentModelToolCache` (called at startup from `index.ts`), admin CRUD helpers |
+| `toolRegistry.ts` | `AGENT_TOOL_CATALOG` — canonical tool name/label/description/category list for the admin "Model Tools" UI; `FALLBACK_MODEL_NAME = '_fallback'` |
 | `AgentTools.ts` | CRUD + search tool implementations (`createRecord`, `searchRecords`, `updateRecord`, etc.) plus `erpConnectorTool` dispatch — see [05-TOOLS.md](./05-TOOLS.md) |
 | `GenericFunctions.ts` | Zod parameter schemas for generic CRUD tools |
 | `routes.ts` | All `/api/agent/*` Express routes including SSE endpoint |
@@ -99,6 +101,8 @@ directives are assembled.
 | `tools/analyticsContext.ts` | `getAnalyticsContext` — schema + multi-tenancy rules for SQL writing |
 | `tools/categorizePostings.ts` | `categorizePostings` — ML prediction tool (posting model only) |
 | `tools/suggestReconciliationMatches.ts` | `suggestReconciliationMatches` — posting → receipt/invoice matching |
+| `tools/runFinancialReport.ts` | `runFinancialReport` — trial balance / monthly trial balance / income statement, with `financial_report` UI-hint enrichment — see [05-TOOLS.md](./05-TOOLS.md#runfinancialreport-display-enrichment) |
+| `tools/enrichPostingSearchResult.ts` | Adds `account_ledger` / `posting_journal` / `posting_dual` UI hints to `searchRecords` results for `modelName: 'posting'` — see [05-TOOLS.md](./05-TOOLS.md#searchrecords-posting-enrichment--enrichpostingsearchresult) |
 | `tools/index.ts` | Exports all tool factories |
 | **`prompt/`** | Prompt assembly — see [04-PROMPT_SYSTEM.md](./04-PROMPT_SYSTEM.md) |
 | `prompt/DynamicPromptManager.ts` | Loads and merges prompt templates from DB or local files |
@@ -130,6 +134,14 @@ directives are assembled.
 | **`slack/`** | Slack integration — **functional**, mounted at `/api/slack`, handles `app_mention` / `assistant_thread_started` / `message` events. Treated as an experimental entrypoint: it reuses the conversational chat path but is not covered by the Workbench session UI. |
 | **`schema/`** | `SchemaGenerator.ts` — derives Zod schemas for `createRecord`/`updateRecord` tool params from Prisma model metadata |
 | **`__tests__/`** | Test suite — see [12-TESTING.md](./12-TESTING.md) |
+
+### Adjacent: `backend/src/routes/chat.ts` and `backend/src/lib/chat-store.ts`
+
+Outside `backend/src/agent/`, but part of the conversational chat path:
+`routes/chat.ts` (mounted at `/api/chat` in `index.ts`) and `lib/chat-store.ts`
+implement `chat_thread` persistence — see
+[09-API_REFERENCE.md — Chat Thread Persistence](./09-API_REFERENCE.md#chat-thread-persistence)
+and [15-CONVERSATIONAL_CHAT.md — Thread Persistence](./15-CONVERSATIONAL_CHAT.md#thread-persistence-chat_thread).
 
 ---
 
@@ -235,6 +247,11 @@ Key files in `frontend-1/src/`:
 | `pages/settings/AITemplatesPage.tsx` | Settings page — Prompt Templates + Agent Templates tabs |
 | `components/forms/Masters/AgentTemplatesList.tsx` | Inline table for agent templates (name, goal model, mode, active) |
 | `components/forms/Masters/AgentTemplateForm.tsx` | Create/edit form for agent templates — `system_prompt` uses Monaco editor |
+| `components/forms/Masters/AgentModelToolsList.tsx` / `AgentModelToolsForm.tsx` | Settings → AI Templates → Model Tools — edit `agent_model_tool_config.model_tools` / `include_analytics_tools` per model, backed by `api/agentModelToolsApi.ts` and `AGENT_TOOL_CATALOG` |
+| `components/chat/ChatShell.tsx` | Thread sidebar + `ChatUI`; draft vs persisted threads, `fullPage`/`compact`/`sidebarMode` — see [15-CONVERSATIONAL_CHAT.md](./15-CONVERSATIONAL_CHAT.md#thread-persistence-chat_thread) |
+| `components/chat/ChatThreadSidebar.tsx` | Thread list, "New chat"/"New prompt", collapse |
+| `hooks/useChatThreads.ts` | Thread list state + `refresh`/`createThread`, backed by `lib/chatThreadApi.ts` |
+| `components/chat/tool-responses/` | `ToolResponseRenderer` + `FinancialReportDisplay`, `AccountLedgerDisplay`, `PostingJournalDisplay`, `PostingDualDisplay`, `MetricsDisplay` — see [15-CONVERSATIONAL_CHAT.md — Tool Invocation Rendering](./15-CONVERSATIONAL_CHAT.md#tool-invocation-rendering) |
 
 ---
 
@@ -258,7 +275,13 @@ Templates are the pre-defined task types shown in GoalSetter. See
 | `sort_order` | Int | Display order in GoalSetter (lower = first) |
 | `org_id` | String? | `null` = system template available to all orgs |
 | `focus_models` | String[] | Model schemas included in the system prompt. Empty = fall back to `RELATED_MODELS[goal_model]`, then all |
-| `allowed_tools` | String[] | Tools the LLM may call besides the always-present `createPlan` + `completeStep`. Empty = full tool set |
+| `allowed_tools` | String[] | Tools the LLM may call besides the always-present `createPlan` + `completeStep`. Empty = full tool set (per `goal_model`'s `agent_model_tool_config` row) |
+
+`AgentTemplateForm.tsx`'s `allowed_tools` checkbox list is populated from
+`fetchToolCatalog()` (`api/agentModelToolsApi.ts`), which returns
+`AGENT_TOOL_CATALOG` — the same catalog used by the Model Tools admin page —
+so template authors pick from the same canonical tool names as
+`agent_model_tool_config.model_tools`.
 
 ### Current Template Inventory
 

@@ -47,15 +47,30 @@ recipes apply.
    `suggestReconciliationMatches`).
 3. Export it from `tools/index.ts`.
 4. Register it:
-   - Always-available analytics tool → add alongside `getAnalyticsContext`/`analyticsQuery`
-     in `ToolManager.getUnifiedTools()`
-   - Model-specific tool → add to `ToolManager.getToolsForModel('posting')` (or
-     the relevant model) in the [model → tool table](./05-TOOLS.md#model--default-tool-set)
+   - Add a factory entry for it in `ToolManager.buildToolFactories()`
+     (`ToolManager.ts`) — this is what makes the tool name resolvable by
+     `buildToolsFromNames()`.
+   - Add it to `AGENT_TOOL_CATALOG` in `toolRegistry.ts` with a `label`,
+     `description`, and `category` — this is what makes the tool selectable
+     in the **Settings → AI Templates → Model Tools** admin UI and in
+     `AgentTemplateForm`'s `allowed_tools` picker. A tool not in the catalog
+     can still be assigned via raw SQL, but `buildToolsFromNames()` will warn
+     and skip any name not in `buildToolFactories()` regardless.
+   - Always-available analytics tool → also add it alongside
+     `getAnalyticsContext`/`analyticsQuery` in `ToolManager.getUnifiedTools()`
+     if it should bypass `include_analytics_tools` gating.
+   - Model-specific tool → add its name to the relevant model's
+     `agent_model_tool_config.model_tools` (update
+     `backend/prisma/seed-agent-model-tools.sql` and/or use the admin UI) —
+     see [05-TOOLS.md — Tool Resolution](./05-TOOLS.md#tool-resolution-agent_model_tool_config).
    - Session-only tool → add to the session tools block (alongside
-     `queueActions`, `requestClarification`)
+     `queueActions`, `requestClarification`) in `getUnifiedTools()`.
 5. If the tool should be restricted by template, add it to the relevant
    templates' `allowed_tools` in `backend/prisma/seed-agent-templates.sql`
    (e.g. `atpl_reconcile`'s `allowed_tools` would need `suggestWriteOffs`).
+   Remember `allowed_tools` only **filters down** from whatever
+   `agent_model_tool_config` already grants for that model — step 4's
+   `model_tools` entry is required even if the template also lists the tool.
 6. Write a test in `__tests__/` — at minimum, call the tool's `execute()`
    directly with a fixture `AuthContext` and assert the shape and `org_id`
    scoping of the result (per

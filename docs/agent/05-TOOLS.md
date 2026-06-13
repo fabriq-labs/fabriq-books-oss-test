@@ -27,10 +27,15 @@ tool result message for the next reasoning step.
 
 **File**: `ToolManager.ts`
 
+`getToolsForModel`, `getToolsForClassification`, and `getUnifiedTools` are
+all **async** — they read from `agent_model_tool_config` via
+`agentModelToolConfigCache` (in-memory, warmed at startup). Callers must
+`await` them; `AgentService.ts` does so at all three call sites.
+
 ```
 getUnifiedTools(modelName, auth, context, sessionId, allowedTools?)
-  → model-specific tools for modelName (from getToolsForModel())
-  + analyticsQuery + getAnalyticsContext (always)
+  → model-specific tools for modelName (from getToolsForModel(), DB-driven)
+  + analyticsQuery + getAnalyticsContext, if include_analytics_tools for modelName
   + [createPlan, completeStep, queueActions, requestClarification] if sessionId present
   → filter to [CORE_SESSION_TOOLS + allowedTools] if template.allowed_tools is non-empty
 ```
@@ -45,21 +50,63 @@ via `allowed_tools`.
 variant). New code uses `queueActions` only — see
 [14-SHORTFALLS_AND_ROADMAP.md](./14-SHORTFALLS_AND_ROADMAP.md).
 
-### Model → Default Tool Set
+### Tool Resolution: `agent_model_tool_config`
 
-| Model | Tools |
-|-------|-------|
-| `default` | `searchRecords`, `advancedSqlQuery`, `extractInvoiceFromFile`, `createRecord` |
-| `posting` | `searchRecords`, `createRecord`, `updateRecord`, `advancedSqlQuery`, `suggestReconciliationMatches`, `categorizePostings` |
-| `invoice` | `searchRecords`, `createRecord`, `updateRecord`, `processInvoiceFromPdf`, `extractInvoiceFromFile`, `advancedSqlQuery`, `erpConnector` |
-| `purchase_requisition` | Full CRUD + search for 11 related models + ERP connector |
-| `purchase_order` | `searchRecords`, `createRecord`, `updateRecord`, `advancedSqlQuery`, `erpConnector` |
+Per-model tool assignment is no longer a hardcoded switch in `ToolManager`.
+`getToolsForModel(modelName, auth, context)`:
 
-Analytics tools (`getAnalyticsContext`, `analyticsQuery`) are **always**
-added regardless of model.
+1. Calls `resolveModelToolNames(modelName)` (from
+   `agentModelToolConfigCache.ts`), which looks up the `agent_model_tool_config`
+   row for `modelName` — falling back to the `_fallback` row
+   (`FALLBACK_MODEL_NAME`) if no row matches or the row is `is_active = false`.
+2. Builds the requested tools via `buildToolsFromNames()`, which maps each
+   name in `model_tools` to a factory in `buildToolFactories()`. Unknown
+   names are logged and skipped.
+
+`getUnifiedTools` additionally calls `resolveIncludeAnalyticsTools(modelName)`
+to decide whether to add `getAnalyticsContext`/`analyticsQuery` — this is the
+`include_analytics_tools` column, not a hardcoded "always on".
+
+`getToolsForClassification(classification, auth, context)` is now a thin
+wrapper: `modelName = context?.modelName || 'default'`, then delegates to
+`getToolsForModel`. The query-classification result no longer changes which
+tools are returned at this layer.
+
+#### `AGENT_TOOL_CATALOG`
+
+`backend/src/agent/toolRegistry.ts` exports `AGENT_TOOL_CATALOG` — the
+canonical list of tool names assignable via `agent_model_tool_config.model_tools`,
+each with a `label`, `description`, and `category`
+(`crud | search | analytics | session | finance | erp | other`). This is the
+checkbox list shown in **Settings → AI Templates → Model Tools**
+(`AgentModelToolsForm.tsx`). `getCatalogToolNames()` returns just the names —
+used to validate `model_tools` entries.
+
+> **Note**: `getAnalyticsTools()` (a separate method that used to bundle
+> `getAnalyticsContext` + `analyticsQuery`) has been **removed**. Analytics
+> tools are now added directly inside `getUnifiedTools` based on
+> `include_analytics_tools`.
+
+### Default Tool Configs (seeded)
+
+Seeded by `backend/prisma/seed-agent-model-tools.sql` (re-runnable upsert by
+`model_name`). Editable per-org via the admin UI without redeploying.
+
+| `model_name` | `model_tools` | `include_analytics_tools` |
+|---|---|---|
+| `default` | `searchRecords`, `advancedSqlQuery`, `extractInvoiceFromFile`, `createRecord` | true |
+| `posting` | `searchRecords`, `createRecord`, `updateRecord`, `advancedSqlQuery`, `suggestReconciliationMatches`, `categorizePostings`, `runFinancialReport` | true |
+| `account` | `searchRecords`, `createRecord`, `updateRecord`, `advancedSqlQuery`, `runFinancialReport` | true |
+| `invoice` | `searchRecords`, `createRecord`, `updateRecord`, `processInvoiceFromPdf`, `extractInvoiceFromFile`, `advancedSqlQuery`, `erpConnector` | true |
+| `_fallback` | used when `model_name` has no matching row or the row is inactive | — |
+
+See `backend/prisma/seed-agent-model-tools.sql` for the full list (purchase
+orders/requisitions and other models), and the live `agent_model_tool_config`
+table for current values — the admin UI can change these without a deploy.
 
 Session tools (`createPlan`, `completeStep`, `queueActions`,
-`requestClarification`) are added **only when `sessionId` is present**.
+`requestClarification`) are added **only when `sessionId` is present**, and
+are not part of `agent_model_tool_config`.
 
 ### `allowed_tools` Template Filter
 
@@ -444,7 +491,51 @@ responses with UI hints:
 ```
 
 `uiHint` drives custom rendering in conversational chat — see
-[15-CONVERSATIONAL_CHAT.md](./15-CONVERSATIONAL_CHAT.md) (follow-up doc).
+[15-CONVERSATIONAL_CHAT.md](./15-CONVERSATIONAL_CHAT.md).
+
+### `searchRecords` posting enrichment — `enrichPostingSearchResult`
+
+**File**: `tools/enrichPostingSearchResult.ts`
+
+When `searchRecords` is called with `modelName: 'posting'` and returns data,
+`searchRecordsTool` calls `enrichPostingSearchResult(enrichedResult, auth,
+searchFilters, toolContext)` to pick a richer `uiHint` for the chat UI:
+
+- **`account_ledger`** — filters resolve to a single focus account
+  (`account_id` or `credit_account_id` equal to one `acco_...`). Rows are
+  sorted chronologically and annotated with whether the amount was
+  **received** (focus account debited, `account_id`) or **debited** (focus
+  account credited, `credit_account_id`) from that account's perspective —
+  see `isAmountReceived()`.
+- **`posting_journal`** — a journal-style view of the same rows when no single
+  focus account can be resolved.
+- **`posting_dual`** — fallback dual-column (debit/credit) view.
+
+These map to the `AccountLedgerDisplay`, `PostingJournalDisplay`, and
+`PostingDualDisplay` components in
+[15-CONVERSATIONAL_CHAT.md — Tool Invocation Rendering](./15-CONVERSATIONAL_CHAT.md#tool-invocation-rendering).
+
+### `runFinancialReport` display enrichment
+
+**File**: `tools/runFinancialReport.ts`
+
+The tool result now includes a `uiHint: 'financial_report'` payload built by
+`enrichFinancialReportResult()`:
+
+- For `report_id: 'trial_balance'`, zero-balance non-leaf rows are dropped via
+  `filterTrialBalanceRowsForDisplay()` (rows with `level === 0`, or any
+  nonzero `total_debits`/`total_credits`/`opening_balance`/`balance`/`total_balance`,
+  are kept).
+- `currencyCode` is resolved from the first row's `report_currency` or
+  `account_currency`, defaulting to `INR`.
+- `columns` are report-type-specific (`trial_balance`,
+  `monthly_trial_balance`, `income_statement` each have their own column set);
+  unrecognised `report_id` values fall back to the `trial_balance` columns.
+- Returns both `rowCount` (after filtering) and `totalRowCount` (before
+  filtering).
+
+Rendered by `FinancialReportDisplay` — see
+[15-CONVERSATIONAL_CHAT.md — Tool Invocation Rendering](./15-CONVERSATIONAL_CHAT.md#tool-invocation-rendering).
 
 ---
 

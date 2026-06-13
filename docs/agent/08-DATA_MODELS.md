@@ -88,6 +88,44 @@ cannot extend the tool list beyond what the template declares.
 
 ---
 
+## `agent_model_tool_config`
+
+DB-driven tool assignment per model, replacing the old hardcoded
+`getToolsForModel()` switch. Read via
+`backend/src/agent/agentModelToolConfigCache.ts` (in-memory cache, warmed at
+startup by `warmAgentModelToolCache()` in `index.ts`). See
+[05-TOOLS.md — Tool Resolution](./05-TOOLS.md#tool-resolution-agent_model_tool_config)
+for how `ToolManager` consumes this table.
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | String | `amtc_...` prefix |
+| `model_name` | String | Unique. Prisma model this config applies to (e.g. `posting`, `invoice`), or the special value `_fallback` |
+| `display_name` | String | Human-readable label for the admin UI |
+| `description` | String? | Admin-facing notes on what this config is for |
+| `model_tools` | String[] | Tool names (must exist in `AGENT_TOOL_CATALOG`, see [05-TOOLS.md](./05-TOOLS.md#agent_tool_catalog)) granted in addition to `CORE_SESSION_TOOLS` |
+| `include_analytics_tools` | Boolean | Whether to also grant `analyticsQuery`/`getAnalyticsContext` |
+| `is_active` | Boolean | Inactive rows are ignored by the resolver |
+| `sort_order` | Int | Display order in admin UI |
+| `created_at` / `modified_at` | DateTime | Audit timestamps |
+| `created_by` / `modified_by` / `assigned_to` | String? | Audit fields |
+
+### `_fallback` row
+
+A row with `model_name = '_fallback'` (constant `FALLBACK_MODEL_NAME` in
+`toolRegistry.ts`) is used by `resolveConfigRow()` when no row matches the
+requested `model_name`. Seeded by `seedDefaultModelToolConfigs()` /
+`backend/prisma/seed-agent-model-tools.sql`.
+
+### Admin UI
+
+**Settings → AI Templates → Model Tools** (`AgentModelToolsList.tsx` /
+`AgentModelToolsForm.tsx`, backed by `frontend-1/src/api/agentModelToolsApi.ts`
+and the `agent_model_tool_config_view`) lets admins edit `model_tools` and
+`include_analytics_tools` per model without a deploy.
+
+---
+
 ## `agent_session`
 
 One row per user goal. Central record tracking all session state. Full state
@@ -361,6 +399,33 @@ all tenants — do not add an `org_id` filter for currency queries.
 `payment_receipt`, `workflow_instance`, `workflow_history`,
 `employee_master`, `department`, `cost_center`, `location`,
 `project_master`, `budget_period`, `budget_line`, `coa`, `entity`.
+
+---
+
+## `chat_thread`
+
+Persists conversational chat history (the `useChat` UI in
+[15-CONVERSATIONAL_CHAT.md](./15-CONVERSATIONAL_CHAT.md)) across page reloads
+and devices. Read/written via `backend/src/lib/chat-store.ts` and
+`backend/src/routes/chat.ts` (`/api/chat/*`).
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | String | Chat/thread id, also used as the `useChat` `chatId` |
+| `user_id` | String | Owner of the thread |
+| `title` | String | Defaults to `"New Financial Inquiry"`; can be renamed |
+| `messages` | Json (JSONB) | Full message array (`UIMessage[]`), including tool invocations |
+| `metadata` | Json | Free-form (e.g. page context at thread creation) |
+| `model_used` | String? | Last model used for this thread |
+| `total_tokens_used` | Int | Running token count across the thread |
+| `created_at` / `updated_at` | DateTime | Audit timestamps |
+| `created_by` / `modified_by` / `assigned_to` | String? | Audit fields |
+
+**No `org_id` column** — `chat_thread` is **not** in `BUSINESS_TABLES` or the
+exempt-metadata list above; it is scoped by `user_id` instead (a thread
+belongs to one user, not shared within an org). `@@index([user_id])` backs
+the `GET /api/chat` "list my threads" query. This is a deliberate exception to
+the org-scoping convention — chat history is personal, not org-shared data.
 
 ---
 

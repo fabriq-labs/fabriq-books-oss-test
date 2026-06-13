@@ -140,19 +140,54 @@ Files are handled by `buildFileParts()` in `chatUtils.ts`:
 
 ### Tool invocations
 
-When the backend calls a tool (e.g. `createRecord`, `analyticsQuery`), the
-result comes back in the message's `toolInvocations` array.
-`ToolResponseRenderer.tsx` processes these and:
+When the backend calls a tool (e.g. `createRecord`, `analyticsQuery`,
+`searchRecords`, `runFinancialReport`), the result comes back in the
+message's `toolInvocations` array.
+`ToolResponseRenderer.tsx` (`frontend-1/src/components/chat/tool-responses/`)
+processes these and:
 - Renders structured tool results (tables, record cards) inline in the chat
 - When `createRecord` succeeds, updates `pageContext.recordId` with the new record's ID
 
+#### Tool Invocation Rendering
+
+`ToolResponseRenderer.tsx` dispatches on the result's `uiHint` (see
+[05-TOOLS.md — Tool Response Enrichment](./05-TOOLS.md#tool-response-enrichment))
+to one of several display components:
+
+| `uiHint` | Component | Used for |
+|---|---|---|
+| `card` / `table` | generic record/list rendering | `createRecord`, `updateRecord`, plain `searchRecords` |
+| `account_ledger` | `AccountLedgerDisplay` | `searchRecords` on `posting` scoped to one focus account — chronological ledger with received/debited annotation |
+| `posting_journal` | `PostingJournalDisplay` | `searchRecords` on `posting` with no single focus account — journal-style listing |
+| `posting_dual` | `PostingDualDisplay` | `searchRecords` on `posting` fallback dual debit/credit columns |
+| `financial_report` | `FinancialReportDisplay` | `runFinancialReport` (trial balance, monthly trial balance, income statement) |
+
+`MetricsDisplay` renders summary metric cards used by some analytics tool
+results. The `posting`-specific hints come from
+`enrichPostingSearchResult()` — see
+[05-TOOLS.md — `searchRecords` posting enrichment](./05-TOOLS.md#searchrecords-posting-enrichment--enrichpostingsearchresult).
+
+In **LLM trace detail pages** (`LLMTraceDetailPage.tsx`), the same
+`ToolResponseRenderer` is reused to render tool invocations from a completed
+trace, via `lib/traceToolResults.ts` (`parseTraceToolInvocations` /
+`parseTraceStepsToolInvocations` / `extractSqlQueriesFromStep`) — see
+[11-OBSERVABILITY.md](./11-OBSERVABILITY.md).
+
 ---
 
-## Conversation History: In-Memory Only
+## Conversation History: `ChatContext` (legacy) vs Thread Persistence
 
-**History is NOT persisted.** It is stored exclusively in React state.
+Two history mechanisms now coexist:
 
-### Mechanism
+- **`ChatContext.messagesAi`** (React state, in-memory only) — the original
+  mechanism, still used for chats that have **no `chatId`**.
+- **`chat_thread` table** (Postgres, via `/api/chat/*`) — used whenever
+  `ChatUI` is rendered with a `chatId` (i.e. via `ChatShell`, see "Thread
+  Persistence" below). When `chatId` is set, messages are saved to
+  `chat_thread` and **not** synced through `ChatContext.messagesAi` — this
+  avoids one thread's messages overwriting another's in the shared context.
+
+### `ChatContext.messagesAi` mechanism (no `chatId`)
 
 ```
 ChatContext.tsx
@@ -169,7 +204,7 @@ ChatUI.tsx (useChat hook)
     setMessagesAi(messages)    ← sync back to context
 ```
 
-### What "lost" means in practice
+### What "lost" means in practice (no `chatId`)
 
 | Event | History outcome |
 |-------|----------------|
@@ -178,10 +213,43 @@ ChatUI.tsx (useChat hook)
 | Refresh the browser | **Lost** |
 | Close the browser | **Lost** |
 
-This is by design — conversational chat is meant for quick contextual
-queries. Long-lived task sequences belong in a workbench session, where
-history is persisted to `agent_message` (see
+This remains the behaviour for any `ChatUI` instance that isn't wrapped in
+`ChatShell` (e.g. the legacy `ChatDrawer`, not currently wired into
+`App.tsx`). Long-lived task sequences still belong in a workbench session,
+where history is persisted to `agent_message` (see
 [08-DATA_MODELS.md](./08-DATA_MODELS.md)).
+
+---
+
+## Thread Persistence (`chat_thread`)
+
+**Full doc**: [docs/CHAT_THREADS.md](../CHAT_THREADS.md) — architecture
+diagram, DB schema, API table, UI/layout details, manual test checklist.
+
+Summary for this doc's purposes:
+
+- `ChatShell` (`frontend-1/src/components/chat/ChatShell.tsx`) wraps
+  `ChatThreadSidebar` + `ChatUI` and assigns every chat a `chatId`
+  (`chat_<uuid>`, generated client-side). `ChatShell` is what's now mounted
+  in `AppLayout`/`PageLayout` (replacing the bare `ChatUI` from earlier
+  versions of this doc) and on dashboards (`fullPage` mode).
+- On first message, `ChatUI` calls `POST /api/chat/threads` to create the
+  `chat_thread` row, then streams via the existing `/api/agent/chat/stream`
+  endpoint (unchanged — see [Request Flow](#request-flow-frontend-to-backend)
+  below). On `onFinish`, `PUT /api/chat/:chatId` persists the full
+  `messages[]` (JSONB) plus `metadata` (`pageContext`, `entityId`,
+  `entityName`).
+- `GET /api/chat` lists the current user's threads (only those with
+  messages), used by `ChatThreadSidebar` and `useChatThreads`.
+- **No `org_id` filtering** — `chat_thread` rows are scoped by `user_id`, not
+  org. See [08-DATA_MODELS.md — `chat_thread`](./08-DATA_MODELS.md#chat_thread)
+  for the multi-tenancy rationale.
+- `resetChat()` / `closeChat()` (`ChatContext.tsx`) and `chatSessionId`
+  (incremented by `resetChat`) let other parts of the UI force a fresh
+  `ChatShell` instance (new `activeChatId`) — wired via
+  `frontend-1/src/utils/chatSessionBridge.ts` (`registerChatReset`), so code
+  outside `ChatContext` (e.g. a "start new chat" button elsewhere in the
+  layout) can trigger a reset without prop-drilling.
 
 ---
 
@@ -352,15 +420,26 @@ Suggestions shown when chat opens (vary by page context):
 
 ## Chat Placement in the UI
 
-| Component | Where | Width |
+All placements below render `ChatShell` (thread sidebar + `ChatUI`), not a
+bare `ChatUI` — see [Thread Persistence](#thread-persistence-chat_thread).
+
+| Component | Where | Width / Mode |
 |-----------|-------|-------|
-| `AppLayout.tsx` | Main app layout — right sidebar | 20.666% of viewport |
-| `PageLayout.tsx` | Alternative layout — right sidebar | max(30vw, 420px) |
-| `ChatDrawer.tsx` | Slide-in drawer overlay | Full right panel |
+| `AppLayout.tsx` | Main app layout — right sidebar | `ChatShell` with `compact sidebarMode`, width `min(38vw, 560px)` (was `20.666%`) |
+| `PageLayout.tsx` | Alternative layout — right sidebar | `ChatShell` with `compact sidebarMode`, `max(30vw, 420px)` |
+| Dashboards (`FabriqDashboard`, `RequestDashboard`, `ProcurementDashboardApproval`) | Full-page chat when `isChatOpen` | `ChatShell` with `fullPage` — nav auto-collapses to icon rail, edge-to-edge content, wide (`w-72`) thread sidebar with "New prompt" |
+| `ChatDrawer.tsx` | Slide-in drawer overlay (not currently wired into `App.tsx`) | Default `ChatShell` props, full right panel |
 
 The chat is hidden by default. `toggleChat()` from `ChatContext` controls
-visibility. On dashboard pages, the sidebar is not rendered — the dashboard
-has its own layout.
+visibility. `resetChat()`/`closeChat()` and `chatSessionId` (see
+[Thread Persistence](#thread-persistence-chat_thread)) let other UI trigger a
+fresh chat session.
+
+On dashboard pages, opening chat switches to **full-page mode**
+(`isChatFullPage = isChatOpen && isDashboard` in `AppLayout.tsx`): the nav
+auto-collapses to an icon rail (previous expanded/collapsed state is restored
+when chat closes), and the main content area becomes edge-to-edge
+(`overflow-hidden p-0`).
 
 The `isChatOpen` flag persists in `ChatContext` for the lifetime of the React
 app (resets on full page refresh).
