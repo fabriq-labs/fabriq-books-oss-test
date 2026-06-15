@@ -31,6 +31,9 @@ import {
     formatCurrencyInMessage,
     getChatCurrencyCode,
     formatAssistantMessageForTableTools,
+    getMessageToolInvocations,
+    getAssistantTurnToolInvocations,
+    isLastAssistantMessageInTurn,
     type UserMessage,
     type MessagePart
 } from './chatUtils';
@@ -114,6 +117,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     } = useChat({
         id: effectiveChatId,
         api: `${import.meta.env.VITE_API_BASE_URL || ''}/api/agent/chat/stream`,
+        maxSteps: 8,
+        sendExtraMessageFields: true,
         headers: {
             'Accept': 'text/event-stream',
             'Authorization': `Bearer ${token}`,
@@ -181,17 +186,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({
             }
         },
         onFinish: (message) => {
-            if (message.toolInvocations && Array.isArray(message.toolInvocations)) {
-                message.toolInvocations.forEach((tool: ToolInvocation) => {
-                    if (tool.state === 'result') {
-                        addToolData({
-                            toolName: tool.toolName,
-                            state: tool.state,
-                            result: tool.result
-                        });
-                    }
-                });
-            }
+            getMessageToolInvocations(message as ChatMessage).forEach((tool: ToolInvocation) => {
+                if (tool.state === 'result') {
+                    addToolData({
+                        toolName: tool.toolName,
+                        state: tool.state,
+                        result: tool.result
+                    });
+                }
+            });
 
             // Persist full session (user + assistant + tool invocations) after each turn
             queueMicrotask(() => {
@@ -355,7 +358,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({
             chatContext?.modelContext as Record<string, unknown> | undefined
         ).forEach((name) => names.add(name));
         for (const msg of messages) {
-            extractAccountNamesFromTools(msg.toolInvocations).forEach((name) => names.add(name));
+            extractAccountNamesFromTools(getMessageToolInvocations(msg as ChatMessage)).forEach(
+                (name) => names.add(name)
+            );
         }
         return [...names];
     }, [chatContext?.modelContext, messages]);
@@ -379,21 +384,39 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     }
 
     // Render message content (text only, files are rendered separately)
-    const renderMessageContent = (msg: ChatMessage, isLastMessage: boolean = false) => {
-        const hasToolInvocations = msg.toolInvocations && Array.isArray(msg.toolInvocations);
+    const renderMessageContent = (
+        msg: ChatMessage,
+        messageIndex: number,
+        allMessages: ChatMessage[],
+        isLastMessage: boolean = false
+    ) => {
+        if (
+            msg.role === 'assistant' &&
+            !isLastAssistantMessageInTurn(allMessages, messageIndex)
+        ) {
+            return null;
+        }
+
+        const messageTools =
+            msg.role === 'assistant'
+                ? getAssistantTurnToolInvocations(allMessages, messageIndex)
+                : getMessageToolInvocations(msg);
+        const hasToolInvocations = messageTools.length > 0;
         const hasTextContent = msg.content && msg.content.trim().length > 0;
         const textForDisplay =
             msg.role === 'assistant' && hasTextContent
-                ? formatAssistantMessageForTableTools(msg.content, msg.toolInvocations)
+                ? formatAssistantMessageForTableTools(msg.content, messageTools)
                 : msg.content;
         const hasDisplayText = Boolean(textForDisplay?.trim());
         const assistantDisplayText =
             msg.role === 'assistant' && hasDisplayText ? textForDisplay : '';
 
         if (hasToolInvocations) {
-            const willShowToolResponses = (!isLoading || !isLastMessage);
-
-            // If no text content and tool responses won't show, return null
+            const hasCompletedToolResults = messageTools.some(
+                (tool) => tool.state === 'result' && tool.result
+            );
+            const willShowToolResponses =
+                hasCompletedToolResults || !isLoading || !isLastMessage;
             if (!hasDisplayText && !willShowToolResponses) {
                 return null;
             }
@@ -408,7 +431,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                     {/* Only show tool responses after loading completes */}
                     {willShowToolResponses && (
                         <ToolResponseRenderer
-                            toolInvocations={msg.toolInvocations}
+                            toolInvocations={messageTools}
                             sidebarMode={sidebarMode}
                             onSendMessage={async (text) => {
                                 if (isLoading) return;
@@ -869,7 +892,12 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                             {/* Message bubble with text content */}
                             {/* Only show bubble when there's actual content to display */}
                             {(() => {
-                                const content = renderMessageContent(msg, isLastMessage);
+                                const content = renderMessageContent(
+                                    msg,
+                                    idx,
+                                    messages as ChatMessage[],
+                                    isLastMessage
+                                );
                                 if (!content) return null;
 
                                 if (isUser) {

@@ -11,6 +11,7 @@ import {
 import { PageContext } from '@/contexts/ChatContext';
 import { formatCurrency } from '@/lib/formatters';
 import type { ToolInvocation } from '@/components/utils/helper';
+import { getMessageParts, type Message as AiSdkMessage } from '@ai-sdk/ui-utils';
 
 // ============================================================================
 // Types
@@ -232,6 +233,141 @@ export const buildFileParts = async (files: File[]): Promise<MessagePart[]> => {
 };
 
 // ============================================================================
+// Tool invocations (legacy toolInvocations + streaming parts)
+// ============================================================================
+
+export interface MessageWithToolInvocations {
+    role?: 'user' | 'assistant' | 'system' | 'data';
+    toolInvocations?: ToolInvocation[];
+    parts?: MessagePart[];
+    content?: string;
+}
+
+function parseToolResultPayload(raw: unknown): ToolInvocation['result'] | undefined {
+    if (raw == null) return undefined;
+    if (typeof raw === 'string') {
+        try {
+            return parseToolResultPayload(JSON.parse(raw));
+        } catch {
+            return undefined;
+        }
+    }
+    if (typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+    const obj = raw as Record<string, unknown>;
+    if (
+        'data' in obj ||
+        'uiHint' in obj ||
+        'model' in obj ||
+        'columns' in obj ||
+        'summary' in obj ||
+        'totalCount' in obj ||
+        'recordCount' in obj ||
+        'tool' in obj
+    ) {
+        return obj as unknown as ToolInvocation['result'];
+    }
+    if ('value' in obj) return parseToolResultPayload(obj.value);
+    return obj as unknown as ToolInvocation['result'];
+}
+
+function isCompletedToolState(state: unknown): boolean {
+    return state === 'result' || state === 'output-available' || state === 'done';
+}
+
+export function normalizeToolInvocation(tool: ToolInvocation): ToolInvocation | null {
+    if (!tool.toolName || !isCompletedToolState(tool.state)) return null;
+    const rawResult =
+        tool.result ?? (tool as ToolInvocation & { output?: unknown }).output;
+    const result = parseToolResultPayload(rawResult);
+    if (!result) return null;
+    return { ...tool, state: 'result', result };
+}
+
+/** Collect tools from message parts (AI SDK merges toolInvocations → parts). */
+export function getMessageToolInvocations(
+    message: MessageWithToolInvocations
+): ToolInvocation[] {
+    const collected: ToolInvocation[] = [];
+
+    for (const part of getMessageParts(message as AiSdkMessage)) {
+        if (part.type === 'tool-invocation') {
+            collected.push(part.toolInvocation);
+        }
+    }
+
+    const merged = new Map<string, ToolInvocation>();
+    for (const tool of collected) {
+        const normalized = normalizeToolInvocation(tool);
+        if (!normalized) continue;
+        const key =
+            normalized.toolCallId ??
+            `${normalized.toolName}:${JSON.stringify(normalized.args ?? {})}`;
+        merged.set(key, normalized);
+    }
+
+    return [...merged.values()];
+}
+
+/** True when this is the last assistant message before the next user turn. */
+export function isLastAssistantMessageInTurn(
+    messages: MessageWithToolInvocations[],
+    messageIndex: number
+): boolean {
+    if (messages[messageIndex]?.role !== 'assistant') {
+        return true;
+    }
+    for (let i = messageIndex + 1; i < messages.length; i++) {
+        const role = messages[i]?.role;
+        if (role === 'user') return true;
+        if (role === 'assistant') return false;
+    }
+    return true;
+}
+
+/** Tools from all assistant messages in the same turn (user → … assistant). */
+export function getAssistantTurnToolInvocations(
+    messages: MessageWithToolInvocations[],
+    messageIndex: number
+): ToolInvocation[] {
+    let turnStart = messageIndex;
+    while (turnStart > 0 && messages[turnStart - 1]?.role !== 'user') {
+        turnStart -= 1;
+    }
+
+    const collected: ToolInvocation[] = [];
+    for (let i = turnStart; i <= messageIndex; i++) {
+        if (messages[i]?.role === 'assistant') {
+            collected.push(...getMessageToolInvocations(messages[i]));
+        }
+    }
+
+    const merged = new Map<string, ToolInvocation>();
+    for (const tool of collected) {
+        const normalized = normalizeToolInvocation(tool);
+        if (!normalized) continue;
+        const key =
+            normalized.toolCallId ??
+            `${normalized.toolName}:${JSON.stringify(normalized.args ?? {})}`;
+        merged.set(key, normalized);
+    }
+
+    return [...merged.values()];
+}
+
+function isPostingSearchRowData(data: unknown[]): boolean {
+    const sample = data[0];
+    if (!sample || typeof sample !== 'object') return false;
+    const row = sample as Record<string, unknown>;
+    return (
+        typeof row.debit_account_name === 'string' ||
+        typeof row.credit_account_name === 'string' ||
+        typeof row.category_name === 'string' ||
+        row.signed_amount != null ||
+        row.running_balance != null
+    );
+}
+
+// ============================================================================
 // Assistant text when table tool results are present
 // ============================================================================
 
@@ -241,12 +377,14 @@ export function resolvePostingSearchDisplayHint(
     model: string | undefined,
     data: unknown[]
 ): 'account_ledger' | 'posting_journal' | 'posting_dual' | null {
-    if (model !== 'posting' || !Array.isArray(data) || data.length === 0) {
+    const isPostingData = model === 'posting' || isPostingSearchRowData(data);
+    if (!isPostingData || !Array.isArray(data) || data.length === 0) {
         return null;
     }
-    if (uiHint === 'posting_dual') {
-        return 'posting_dual';
-    }
+    if (uiHint === 'posting_dual') return 'posting_dual';
+    if (uiHint === 'posting_journal') return 'posting_journal';
+    if (uiHint === 'account_ledger') return 'account_ledger';
+    if (uiHint === 'table' && model === 'posting') return 'posting_journal';
 
     const sample = data[0] as Record<string, unknown>;
     const looksLikeJournal =
@@ -258,17 +396,9 @@ export function resolvePostingSearchDisplayHint(
             sample.signed_amount != null ||
             sample.running_balance != null);
 
-    // Journal rows always use PostingJournalDisplay (debit/credit account filters, general lists).
-    if (looksLikeJournal) {
-        return 'posting_journal';
-    }
-    if (uiHint === 'account_ledger' || looksLikeLedger) {
-        return 'account_ledger';
-    }
-    if (uiHint === 'posting_journal') {
-        return 'posting_journal';
-    }
-    return null;
+    if (looksLikeJournal) return 'posting_journal';
+    if (looksLikeLedger) return 'account_ledger';
+    return 'posting_journal';
 }
 
 /** True when completed tool results will render a data table in the chat UI. */

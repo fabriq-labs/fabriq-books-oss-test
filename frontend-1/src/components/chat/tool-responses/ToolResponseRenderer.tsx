@@ -14,7 +14,7 @@ import { PostingDualDisplay, type PostingDualTable } from './PostingDualDisplay'
 import { ToolInvocation as BaseToolInvocation, ToolResult as BaseToolResult } from '@/components/utils/helper';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
-import { resolvePostingSearchDisplayHint } from '../chatUtils';
+import { normalizeToolInvocation, resolvePostingSearchDisplayHint } from '../chatUtils';
 import { Wrench } from 'lucide-react';
 
 interface ExtendedToolResult extends BaseToolResult {
@@ -112,8 +112,12 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
     };
 
     // Filter and process tool invocations to show only the latest successful result per tool
-    const processedTools = toolInvocations.reduce((acc, tool) => {
-        if (tool.state !== 'result' || !tool.result) {
+    const normalizedInvocations = toolInvocations
+        .map((tool) => normalizeToolInvocation(tool))
+        .filter((tool): tool is ToolInvocation => tool != null);
+
+    const processedTools = normalizedInvocations.reduce((acc, tool) => {
+        if (!tool.result) {
             return acc;
         }
 
@@ -138,16 +142,16 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
         return acc;
     }, [] as typeof toolInvocations);
 
-    // Filter out tools with errors and no data
+    // Filter out tools with errors and no data (keep search tools for empty-state UI)
     const validTools = processedTools.filter(tool => {
         const hasError = tool.result?.error;
-        // Handle both array data and object data (for invoice extraction)
         const hasArrayData = tool.result?.data && Array.isArray(tool.result.data) && tool.result.data.length > 0;
         const hasObjectData = tool.result?.data && typeof tool.result.data === 'object' && !Array.isArray(tool.result.data);
         const hasData = hasArrayData || hasObjectData;
+        const isSearchTool =
+            tool.toolName === 'searchRecords' || /search/i.test(tool.toolName);
 
-        // Show tools that either have data OR don't have errors (for non-data tools)
-        return !hasError || hasData;
+        return !hasError || hasData || isSearchTool;
     });
 
     // Check if there were failed attempts
@@ -171,6 +175,9 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
 
             {validTools.map((tool, index) => {
                 const { uiHint, description, data, columns, resultType } = tool.result;
+                const postingModel =
+                    (tool.result?.model as string | undefined) ||
+                    (tool.args?.modelName as string | undefined);
 
                 const toolNameBadge = (
                     <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
@@ -217,11 +224,11 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                     (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) &&
                     Array.isArray(data) &&
                     data.length > 0 &&
-                    resolvePostingSearchDisplayHint(uiHint, tool.result.model, data) != null
+                    resolvePostingSearchDisplayHint(uiHint, postingModel, data) != null
                 ) {
                     const postingHint = resolvePostingSearchDisplayHint(
                         uiHint,
-                        tool.result.model,
+                        postingModel,
                         data
                     );
 
@@ -235,8 +242,7 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                     }
                                     currencyCode={tool.result.currencyCode as string | undefined}
                                     sidebarMode={sidebarMode}
-                                />,
-                                { hideToolBadge: true }
+                                />
                         );
                     }
                     if (postingHint === 'posting_journal') {
@@ -248,8 +254,7 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                     highlightAccountName={tool.result.journalFocusAccountName as string | undefined}
                                     currencyCode={tool.result.currencyCode as string | undefined}
                                     sidebarMode={sidebarMode}
-                                />,
-                                { hideToolBadge: true }
+                                />
                         );
                     }
                     if (postingHint === 'posting_dual' && Array.isArray(tool.result.tables)) {
@@ -258,10 +263,17 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                     tables={tool.result.tables as PostingDualTable[]}
                                     currencyCode={tool.result.currencyCode as string | undefined}
                                     sidebarMode={sidebarMode}
-                                />,
-                                { hideToolBadge: true }
+                                />
                         );
                     }
+                    return wrapToolResult(
+                        <PostingJournalDisplay
+                            rows={data}
+                            title={tool.result.journalTitle as string | undefined}
+                            currencyCode={tool.result.currencyCode as string | undefined}
+                            sidebarMode={sidebarMode}
+                        />
+                    );
                 }
 
                 // Handle searchRecords - generic table for non-posting models
