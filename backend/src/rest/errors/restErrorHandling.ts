@@ -183,7 +183,13 @@ export function handleRestControllerError(
   if (api.code) {
     meta.code = api.code;
   }
-  logger.error(`Error in ${operation}`, meta);
+
+  // 404 is routine for optional lookups (e.g. draft chat threads not yet persisted).
+  if (api instanceof NotFoundError || api.statusCode === 404) {
+    logger.debug(`Not found in ${operation}`, meta);
+  } else {
+    logger.error(`Error in ${operation}`, meta);
+  }
 
   sendApiErrorResponse(res, api);
 }

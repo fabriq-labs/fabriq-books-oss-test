@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { Router, Request, Response } from 'express';
 import {
   appendResponseMessages,
@@ -8,8 +7,9 @@ import {
   type Message as UIMessage,
 } from 'ai';
 import { authMiddleware } from '../auth/middleware';
+import type { AuthContext } from '../auth/types';
 import { getModel, getModelId } from '../lib/ai/modelProvider';
-import { createChatThread, deleteChat, listChats, loadChat, saveChat } from '../lib/chat-store';
+import { loadChat, saveChat } from '../lib/chat-store';
 import logger from '../utils/logger';
 
 const FINANCIAL_SYSTEM_PROMPT = `You are a financial advisory assistant for a business accounting platform.
@@ -30,166 +30,28 @@ function resolveTokenUsage(usage: {
   return (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0);
 }
 
+function getAuthContext(req: Request): AuthContext | null {
+  const auth = req.context?.auth;
+  if (!auth?.user?.id || !auth.permissions) {
+    return null;
+  }
+  return auth;
+}
+
 export function createChatRouter(): Router {
   const router = Router();
-
-  /** GET /api/chat — list persisted threads for the authenticated user */
-  router.get('/', authMiddleware, async (req: Request, res: Response) => {
-    try {
-      const userId = req.context?.auth?.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const threads = await listChats(userId);
-      return res.json({ data: threads });
-    } catch (error) {
-      logger.error('Failed to list chat threads', { error });
-      return res.status(500).json({ error: 'Failed to list chat threads' });
-    }
-  });
-
-  /**
-   * POST /api/chat/threads — create an empty chat thread when the user starts a chat.
-   */
-  router.post('/threads', authMiddleware, async (req: Request, res: Response) => {
-    try {
-      const userId = req.context?.auth?.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const { chatId: requestedChatId, metadata } = req.body as {
-        chatId?: string;
-        metadata?: Record<string, unknown>;
-      };
-
-      const chatId =
-        typeof requestedChatId === 'string' && requestedChatId.trim().length > 0
-          ? requestedChatId.trim()
-          : `chat_${randomUUID()}`;
-
-      const thread = await createChatThread({ chatId, userId, metadata });
-
-      return res.status(201).json({
-        data: {
-          chatId: thread.id,
-          title: thread.title,
-          messages: thread.messages,
-          metadata: thread.metadata,
-          createdAt: thread.created_at,
-          updatedAt: thread.updated_at,
-        },
-      });
-    } catch (error) {
-      logger.error('Failed to create chat thread', { error });
-      return res.status(500).json({ error: 'Failed to create chat thread' });
-    }
-  });
-
-  /**
-   * PUT /api/chat/:chatId — persist UIMessage[] from agent useChat (non-streaming save).
-   */
-  router.put('/:chatId', authMiddleware, async (req: Request, res: Response) => {
-    try {
-      const userId = req.context?.auth?.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const { messages, metadata, totalTokensUsed } = req.body as {
-        messages?: UIMessage[];
-        metadata?: Record<string, unknown>;
-        totalTokensUsed?: number;
-      };
-
-      if (!Array.isArray(messages)) {
-        return res.status(400).json({ error: 'messages must be an array' });
-      }
-
-      const chatId = req.params.chatId;
-      const existing = await loadChat(chatId, userId);
-      if (existing && existing.user_id !== userId) {
-        return res.status(403).json({ error: 'Forbidden' });
-      }
-
-      if (!existing) {
-        await createChatThread({ chatId, userId, metadata });
-      }
-
-      await saveChat({
-        chatId,
-        userId,
-        messages,
-        modelUsed: getModelId('agent'),
-        totalTokensUsed: typeof totalTokensUsed === 'number' ? totalTokensUsed : 0,
-        metadata,
-      });
-
-      return res.json({ success: true, chatId });
-    } catch (error) {
-      logger.error('Failed to save chat thread', { error, chatId: req.params.chatId });
-      return res.status(500).json({ error: 'Failed to save chat thread' });
-    }
-  });
-
-  /** DELETE /api/chat/:chatId — remove a persisted thread for the authenticated user */
-  router.delete('/:chatId', authMiddleware, async (req: Request, res: Response) => {
-    try {
-      const userId = req.context?.auth?.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const deleted = await deleteChat(req.params.chatId, userId);
-      if (!deleted) {
-        return res.status(404).json({ error: 'Chat thread not found' });
-      }
-
-      return res.json({ success: true });
-    } catch (error) {
-      logger.error('Failed to delete chat thread', { error, chatId: req.params.chatId });
-      return res.status(500).json({ error: 'Failed to delete chat thread' });
-    }
-  });
-
-  /** GET /api/chat/:chatId — load persisted UIMessage[] for the authenticated user */
-  router.get('/:chatId', authMiddleware, async (req: Request, res: Response) => {
-    try {
-      const userId = req.context?.auth?.user?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const thread = await loadChat(req.params.chatId, userId);
-      if (!thread) {
-        return res.status(404).json({ error: 'Chat thread not found' });
-      }
-
-      return res.json({
-        chatId: thread.id,
-        title: thread.title,
-        messages: thread.messages,
-        metadata: thread.metadata,
-        modelUsed: thread.model_used,
-        totalTokensUsed: thread.total_tokens_used,
-        createdAt: thread.created_at,
-        updatedAt: thread.updated_at,
-      });
-    } catch (error) {
-      logger.error('Failed to load chat thread', { error, chatId: req.params.chatId });
-      return res.status(500).json({ error: 'Failed to load chat thread' });
-    }
-  });
 
   /**
    * POST /api/chat — stream a financial chat turn and persist on finish.
    * Compatible with @ai-sdk/react useChat (data stream protocol).
+   *
+   * Thread CRUD uses the standard metadata API:
+   *   /api/chat_thread/view/chat_thread_view/...
    */
   router.post('/', authMiddleware, async (req: Request, res: Response) => {
     try {
-      const userId = req.context?.auth?.user?.id;
-      if (!userId) {
+      const context = getAuthContext(req);
+      if (!context) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
@@ -207,8 +69,8 @@ export function createChatRouter(): Router {
         return res.status(400).json({ error: 'chatId is required' });
       }
 
-      const existing = await loadChat(chatId, userId);
-      if (existing && existing.user_id !== userId) {
+      const existing = await loadChat(chatId, context);
+      if (existing && existing.user_id !== context.user.id) {
         return res.status(403).json({ error: 'Forbidden' });
       }
 
@@ -218,7 +80,6 @@ export function createChatRouter(): Router {
       const result = streamText({
         model: getModel('agent'),
         system: FINANCIAL_SYSTEM_PROMPT,
-        // Balances client/server arrays — v4 equivalent of AI SDK 5 `originalMessages`
         messages: convertToCoreMessages(originalMessages),
         experimental_generateMessageId: createIdGenerator({
           prefix: 'msg_fin',
@@ -233,7 +94,7 @@ export function createChatRouter(): Router {
 
             await saveChat({
               chatId,
-              userId,
+              context,
               messages: updatedMessages,
               modelUsed,
               totalTokensUsed: resolveTokenUsage(usage),
@@ -243,7 +104,7 @@ export function createChatRouter(): Router {
             logger.error('Failed to persist chat thread after stream', {
               error: persistError,
               chatId,
-              userId,
+              userId: context.user.id,
             });
           }
         },
@@ -251,12 +112,11 @@ export function createChatRouter(): Router {
           logger.error('streamText error in /api/chat', {
             error,
             chatId,
-            userId,
+            userId: context.user.id,
           });
         },
       });
 
-      // AI SDK v4 Express helper (v5: pipeUIMessageStreamToResponse)
       result.pipeDataStreamToResponse(res);
     } catch (error) {
       logger.error('Error in POST /api/chat', { error });

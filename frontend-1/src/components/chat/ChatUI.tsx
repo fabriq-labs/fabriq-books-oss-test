@@ -64,6 +64,8 @@ interface ChatUIProps {
     chatId?: string;
     threadTitle?: string;
     hideThreadControls?: boolean;
+    /** When false, skip GET by id (local draft not yet in DB). */
+    loadPersistedHistory?: boolean;
     onThreadSaved?: () => void;
 }
 
@@ -72,6 +74,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     chatId,
     threadTitle,
     hideThreadControls = false,
+    loadPersistedHistory = false,
     onThreadSaved,
 }) => {
     const [fallbackChatId] = useState(() => `chat_${uuidv4()}`);
@@ -100,7 +103,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     const token = Cookies.get("__session");
     const messagesRef = useRef<Message[]>([]);
     const persistThreadRef = useRef<(threadMessages: Message[]) => Promise<void>>(async () => {});
-    const [historyLoaded, setHistoryLoaded] = useState(!effectiveChatId);
+    const [historyLoaded, setHistoryLoaded] = useState(
+        !effectiveChatId || !loadPersistedHistory
+    );
 
     const chatCurrencyCode = useMemo(
         () => getChatCurrencyCode(pageContext, getBaseCurrencyCode()),
@@ -249,9 +254,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         messagesRef.current = messages;
     }, [messages]);
 
-    // Load persisted session when switching threads (ChatGPT-style history restore)
+    // Load persisted session when selecting a thread from the sidebar (not for local drafts).
     useEffect(() => {
-        if (!effectiveChatId) {
+        if (!effectiveChatId || !loadPersistedHistory) {
             setHistoryLoaded(true);
             return;
         }
@@ -277,7 +282,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         return () => {
             cancelled = true;
         };
-    }, [effectiveChatId, setMessages]);
+    }, [effectiveChatId, loadPersistedHistory, setMessages]);
 
     // Clear local messages only when auth session resets (logout/login), not on remount
     useEffect(() => {

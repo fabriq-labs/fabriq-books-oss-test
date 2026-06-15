@@ -1,16 +1,62 @@
-import Cookies from 'js-cookie';
 import type { Message } from '@ai-sdk/react';
+import { API_URL, getAuthToken } from '@/api/apiClient';
+import { viewAPI } from '@/api/metadataApi';
 
-function apiBaseUrl(): string {
-  return import.meta.env.VITE_API_BASE_URL || '';
+const MODEL = 'chat_thread';
+const VIEW = 'chat_thread_view';
+const DEFAULT_TITLE = 'New Financial Inquiry';
+const TITLE_MAX_LENGTH = 60;
+
+function extractMessageText(content: unknown): string {
+  if (typeof content === 'string') return content.trim();
+  if (Array.isArray(content)) {
+    return content
+      .filter((part): part is { type: string; text?: string } => typeof part === 'object' && part !== null)
+      .filter((part) => part.type === 'text' && typeof part.text === 'string')
+      .map((part) => part.text as string)
+      .join(' ')
+      .trim();
+  }
+  return '';
 }
 
-function authHeaders(extra?: Record<string, string>): Record<string, string> {
-  const token = Cookies.get('__session');
-  return {
-    ...(extra ?? {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+function deriveThreadTitle(messages: Message[]): string {
+  const firstUser = messages.find((message) => message.role === 'user');
+  if (!firstUser) return DEFAULT_TITLE;
+
+  const text = extractMessageText((firstUser as { content?: unknown }).content);
+  if (!text) return DEFAULT_TITLE;
+  if (text.length <= TITLE_MAX_LENGTH) return text;
+  return `${text.slice(0, TITLE_MAX_LENGTH - 3)}...`;
+}
+
+function threadPath(chatId: string): string {
+  return `/api/${MODEL}/${encodeURIComponent(chatId)}/view/${VIEW}`;
+}
+
+function listPath(): string {
+  return `/api/${MODEL}/view/${VIEW}`;
+}
+
+async function chatThreadRequest(
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  body?: Record<string, unknown>
+): Promise<Response> {
+  const token = getAuthToken();
+  return fetch(`${API_URL}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const body = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
+  return body.message || body.error || `Request failed (${response.status})`;
 }
 
 export interface ChatThreadSummary {
@@ -28,88 +74,139 @@ export interface ChatThreadDetail {
   metadata?: Record<string, unknown>;
 }
 
-export async function listChatThreads(): Promise<ChatThreadSummary[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/chat`, {
-    headers: authHeaders(),
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error || `Failed to list threads (${response.status})`);
-  }
-
-  const payload = (await response.json()) as { data?: ChatThreadSummary[] };
-  return Array.isArray(payload.data) ? payload.data : [];
+interface ChatThreadRecord {
+  id: string;
+  title?: string;
+  messages?: Message[];
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
 }
 
+function mapSummary(row: ChatThreadRecord): ChatThreadSummary {
+  const messages = Array.isArray(row.messages) ? row.messages : [];
+  return {
+    id: row.id,
+    title: row.title ?? DEFAULT_TITLE,
+    message_count: messages.length,
+    created_at: row.created_at ?? '',
+    updated_at: row.updated_at ?? '',
+  };
+}
+
+export async function listChatThreads(): Promise<ChatThreadSummary[]> {
+  const response = (await viewAPI.search(
+    MODEL,
+    VIEW,
+    1,
+    200,
+    undefined,
+    {},
+    { created_at: 'asc' }
+  )) as { data?: ChatThreadRecord[] };
+
+  const rows = Array.isArray(response.data) ? response.data : [];
+  return rows
+    .filter((row) => Array.isArray(row.messages) && row.messages.length > 0)
+    .map(mapSummary);
+}
+
+/**
+ * Create an empty thread row. Idempotent — returns chatId if the row already exists.
+ */
 export async function createChatThread(
   chatId: string,
   metadata?: Record<string, unknown>
 ): Promise<string> {
-  const response = await fetch(`${apiBaseUrl()}/api/chat/threads`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ chatId, metadata }),
+  const response = await chatThreadRequest('POST', listPath(), {
+    id: chatId,
+    title: DEFAULT_TITLE,
+    messages: [],
+    metadata: metadata ?? {},
+    total_tokens_used: 0,
   });
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error || `Failed to create thread (${response.status})`);
+  if (response.ok || response.status === 409) {
+    return chatId;
   }
 
-  const payload = (await response.json()) as { data?: { chatId: string } };
-  const createdChatId = payload.data?.chatId;
-  if (!createdChatId) {
-    throw new Error('Create thread response missing chatId');
-  }
-
-  return createdChatId;
+  throw new Error(await readErrorMessage(response));
 }
 
+/**
+ * Load a persisted thread. Returns null when the id is a local draft (not yet in DB).
+ */
 export async function loadChatThread(chatId: string): Promise<ChatThreadDetail | null> {
-  const response = await fetch(`${apiBaseUrl()}/api/chat/${encodeURIComponent(chatId)}`, {
-    headers: authHeaders(),
-  });
+  const response = await chatThreadRequest('GET', threadPath(chatId));
 
-  if (response.status === 404) return null;
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error || `Failed to load thread (${response.status})`);
+  if (response.status === 404) {
+    return null;
   }
 
-  return (await response.json()) as ChatThreadDetail;
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  const payload = (await response.json()) as { data?: ChatThreadRecord };
+  const row = payload.data;
+  if (!row?.id) return null;
+
+  return {
+    chatId: row.id,
+    title: row.title ?? DEFAULT_TITLE,
+    messages: Array.isArray(row.messages) ? row.messages : [],
+    metadata: row.metadata ?? {},
+  };
 }
 
+/**
+ * Persist messages — update-first upsert so we never POST twice for the same id.
+ */
 export async function saveChatThread(
   chatId: string,
   messages: Message[],
   metadata?: Record<string, unknown>
 ): Promise<void> {
-  const response = await fetch(`${apiBaseUrl()}/api/chat/${encodeURIComponent(chatId)}`, {
-    method: 'PUT',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ messages, metadata }),
-  });
+  const title = messages.length > 0 ? deriveThreadTitle(messages) : DEFAULT_TITLE;
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error || `Failed to save thread (${response.status})`);
-  }
-}
+  const payload = {
+    title,
+    messages,
+    metadata: metadata ?? {},
+  };
 
-export async function deleteChatThread(chatId: string): Promise<void> {
-  const response = await fetch(`${apiBaseUrl()}/api/chat/${encodeURIComponent(chatId)}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
-
-  if (response.status === 404) {
+  const updateResponse = await chatThreadRequest('PUT', threadPath(chatId), payload);
+  if (updateResponse.ok) {
     return;
   }
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error || `Failed to delete thread (${response.status})`);
+  if (updateResponse.status === 404) {
+    const createResponse = await chatThreadRequest('POST', listPath(), {
+      id: chatId,
+      ...payload,
+      total_tokens_used: 0,
+    });
+
+    if (createResponse.ok || createResponse.status === 409) {
+      if (createResponse.status === 409) {
+        const retryUpdate = await chatThreadRequest('PUT', threadPath(chatId), payload);
+        if (!retryUpdate.ok) {
+          throw new Error(await readErrorMessage(retryUpdate));
+        }
+      }
+      return;
+    }
+
+    throw new Error(await readErrorMessage(createResponse));
   }
+
+  throw new Error(await readErrorMessage(updateResponse));
+}
+
+export async function deleteChatThread(chatId: string): Promise<void> {
+  const response = await chatThreadRequest('DELETE', threadPath(chatId));
+  if (response.ok || response.status === 404) {
+    return;
+  }
+  throw new Error(await readErrorMessage(response));
 }

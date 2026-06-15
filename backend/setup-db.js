@@ -374,6 +374,33 @@ async function main() {
         );
         console.log("   Skipping agent model tool config seed...");
       }
+
+      // Step 3.7: Seed chat_thread view permissions
+      console.log("💬 Step 3.7: Seeding chat thread view permissions...");
+      const seedChatThreadViewSqlPath = path.join(
+        __dirname,
+        "prisma",
+        "seed-chat-thread-view.sql"
+      );
+
+      if (fs.existsSync(seedChatThreadViewSqlPath)) {
+        console.log(`Target: ${databaseTargetLog}`);
+        try {
+          runPrismaSqlFile(
+            seedChatThreadViewSqlPath,
+            "Chat thread view permissions seeded successfully"
+          );
+          console.log("✅ Chat thread view permissions seeded successfully");
+        } catch (error) {
+          console.error("⚠️  Error seeding chat thread view permissions:", error.message);
+          console.log("   Continuing setup...");
+        }
+      } else {
+        console.log(
+          `⚠️  Chat thread view SQL file not found at: ${seedChatThreadViewSqlPath}`
+        );
+        console.log("   Skipping chat thread view permission seed...");
+      }
       console.log("");
 
       console.log("🎉 Core database setup completed successfully!");
