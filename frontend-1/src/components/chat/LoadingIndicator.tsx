@@ -37,11 +37,11 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
 
     // Reset tool call tracking when status becomes ready or idle
     useEffect(() => {
-        if (status === 'ready' || status === 'idle') {
+        if (!isLoading && (status === 'ready' || status === 'idle' || status === 'error')) {
             setHasSeenToolCall(false);
             setLastToolName('');
         }
-    }, [status]);
+    }, [isLoading, status]);
 
     // Determine loading state and get messages
     const loadingState = useMemo<LoadingState>(() => {
@@ -90,50 +90,40 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         // Only check for tools that are ACTIVELY being called (state === 'call')
         // NOT tools that have completed (state === 'result') or failed (state === 'error')
         const activeToolCalls = allToolInvocations.filter(
-            (tool: ToolInvocation) => tool.state === 'call'
+            (tool: ToolInvocation) => tool.state === 'call' || tool.state === 'partial-call'
         );
 
-        // If we detect active tool calls, remember it and the tool name
-        if (activeToolCalls.length > 0) {
-            const toolNames = activeToolCalls
-                .map((tool: ToolInvocation) => tool.toolName)
-                .filter(Boolean)
-                .filter((name, index, arr) => arr.indexOf(name) === index);
-
-            if (toolNames.length > 0) {
-                setHasSeenToolCall(true);
-                setLastToolName(toolNames[0]);
-            }
-        }
+        const activeToolNames = activeToolCalls
+            .map((tool: ToolInvocation) => tool.toolName)
+            .filter(Boolean)
+            .filter((name, index, arr) => arr.indexOf(name) === index);
 
         // If we've seen a tool call and status is still streaming, keep showing "querying"
-        // This ensures we don't switch back to "thinking" if tool invocation state changes during streaming
-        if (hasSeenToolCall && (status === 'streaming' || isLoading)) {
+        if (
+            (hasSeenToolCall || activeToolNames.length > 0) &&
+            (status === 'streaming' || isLoading)
+        ) {
+            const toolLabel = activeToolNames[0] ?? lastToolName;
             return {
                 type: 'querying',
-                messages: lastToolName
-                    ? [`Querying ${lastToolName}...`, 'Fetching data...', 'Processing results...']
+                messages: toolLabel
+                    ? [`Querying ${toolLabel}...`, 'Fetching data...', 'Processing results...']
                     : ['Querying database...', 'Searching records...', 'Gathering information...'],
                 icon: Search
             };
         }
 
         // Check if tools are currently executing (for immediate detection)
-        const toolsAreExecuting = activeToolCalls.length > 0 && (
-            hasContent ||
-            activeToolCalls.some(tool => tool.args && Object.keys(tool.args).length > 0)
-        );
+        const toolsAreExecuting =
+            activeToolCalls.length > 0 &&
+            (hasContent ||
+                activeToolCalls.some((tool) => tool.args && Object.keys(tool.args).length > 0));
 
         if (toolsAreExecuting) {
-            const toolNames = activeToolCalls
-                .map((tool: ToolInvocation) => tool.toolName)
-                .filter(Boolean)
-                .filter((name, index, arr) => arr.indexOf(name) === index);
-
             return {
                 type: 'querying',
-                messages: toolNames.length > 0
-                    ? [`Querying ${toolNames[0]}...`, 'Fetching data...', 'Processing results...']
+                messages: activeToolNames.length > 0
+                    ? [`Querying ${activeToolNames[0]}...`, 'Fetching data...', 'Processing results...']
                     : ['Querying database...', 'Searching records...', 'Gathering information...'],
                 icon: Search
             };
@@ -146,6 +136,35 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             icon: Brain
         };
     }, [messages, isLoading, status, hasSeenToolCall, lastToolName]);
+
+    // Track active tool names outside useMemo (no setState during render)
+    useEffect(() => {
+        if (!isLoading && status !== 'streaming') {
+            setHasSeenToolCall(false);
+            setLastToolName('');
+            return;
+        }
+
+        const lastMessage = messages[messages.length - 1];
+        if (!lastMessage) return;
+
+        const fromParts: ToolInvocation[] = [];
+        if (lastMessage.parts && Array.isArray(lastMessage.parts)) {
+            lastMessage.parts.forEach((part) => {
+                if (part.type === 'tool-invocation' && part.toolInvocation) {
+                    fromParts.push(part.toolInvocation);
+                }
+            });
+        }
+        const allTools = [...(lastMessage.toolInvocations ?? []), ...fromParts];
+        const active = allTools.find(
+            (tool) => tool.state === 'call' || tool.state === 'partial-call'
+        );
+        if (active?.toolName) {
+            setHasSeenToolCall(true);
+            setLastToolName(active.toolName);
+        }
+    }, [messages, isLoading, status]);
 
     // Animated typing effect state
     const [displayedText, setDisplayedText] = useState('');

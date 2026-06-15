@@ -354,6 +354,37 @@ export function getAssistantTurnToolInvocations(
     return [...merged.values()];
 }
 
+/** Hide the bottom loader when the assistant reply is already visible. */
+export function shouldHideChatLoadingIndicator(
+    messages: MessageWithToolInvocations[]
+): boolean {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') {
+        return false;
+    }
+
+    const tools = getAssistantTurnToolInvocations(messages, messages.length - 1);
+    const hasPendingTools = tools.some(
+        (tool) => tool.state === 'call' || tool.state === 'partial-call'
+    );
+    if (hasPendingTools) {
+        return false;
+    }
+
+    const hasText = Boolean(last.content?.trim());
+    if (!hasText) {
+        return false;
+    }
+
+    // Text-only reply is complete
+    if (tools.length === 0) {
+        return true;
+    }
+
+    // Text + completed tool results — response is done
+    return tools.every((tool) => tool.state === 'result' && tool.result);
+}
+
 function isPostingSearchRowData(data: unknown[]): boolean {
     const sample = data[0];
     if (!sample || typeof sample !== 'object') return false;

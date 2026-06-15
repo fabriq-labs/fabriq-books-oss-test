@@ -34,6 +34,7 @@ import {
     getMessageToolInvocations,
     getAssistantTurnToolInvocations,
     isLastAssistantMessageInTurn,
+    shouldHideChatLoadingIndicator,
     type UserMessage,
     type MessagePart
 } from './chatUtils';
@@ -117,7 +118,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     } = useChat({
         id: effectiveChatId,
         api: `${import.meta.env.VITE_API_BASE_URL || ''}/api/agent/chat/stream`,
-        maxSteps: 8,
         sendExtraMessageFields: true,
         headers: {
             'Accept': 'text/event-stream',
@@ -412,11 +412,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({
             msg.role === 'assistant' && hasDisplayText ? textForDisplay : '';
 
         if (hasToolInvocations) {
-            const hasCompletedToolResults = messageTools.some(
-                (tool) => tool.state === 'result' && tool.result
-            );
-            const willShowToolResponses =
-                hasCompletedToolResults || !isLoading || !isLastMessage;
+            // Show tool tables only after the stream finishes (avoids duplicate loader + table)
+            const willShowToolResponses = !isLoading || !isLastMessage;
             if (!hasDisplayText && !willShowToolResponses) {
                 return null;
             }
@@ -921,7 +918,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                         </div>
                     );
                 })}
-                {isLoading && (
+                {isLoading &&
+                    !shouldHideChatLoadingIndicator(messages as ChatMessage[]) && (
                     <LoadingIndicator
                         messages={messages}
                         isLoading={isLoading}
