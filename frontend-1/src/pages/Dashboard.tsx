@@ -1,6 +1,6 @@
 import React from 'react';
 import { useChat } from '@/contexts/ChatContext';
-import { ChatUI } from '@/components/chat/ChatUI';
+import { ChatShell } from '@/components/chat/ChatShell';
 import { ActionCards } from '@/components/dashboard/ActionCards';
 import { TodoCard } from '@/components/dashboard/TodoCard';
 import { FeedCard } from '@/components/dashboard/FeedCard';
@@ -17,7 +17,7 @@ const Dashboard: React.FC = () => {
   return (
     <>
       {isChatOpen ? (
-        <ChatUI />
+        <ChatShell className="h-full" fullPage />
       ) : (
         <div className="space-y-8 pt-6">
           {/* Quick Actions */}

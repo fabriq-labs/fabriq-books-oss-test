@@ -12,8 +12,8 @@
 **Fabriq deep references**:
 
 - [docs/AI_AGENT.md](../AI_AGENT.md) — metadata and agent context
-- [docs/agent/RECONCILIATION_TOOL.md](../agent/RECONCILIATION_TOOL.md) — reconciliation flow
-- [docs/agent/AI_Categorizer.md](../agent/AI_Categorizer.md) — categorization batch handler used by the agent tool
+- [docs/agent/07-WORKED_EXAMPLES.md](../agent/07-WORKED_EXAMPLES.md) — reconciliation and categorization traces
+- [docs/agent/05-TOOLS.md](../agent/05-TOOLS.md#categorizepostings) — categorization batch handler used by the agent tool
 
 ---
 
@@ -213,7 +213,7 @@ When `modelName === 'posting'`, the tool set adds:
 
 | Tool | Purpose |
 |------|---------|
-| `suggestReconciliationMatches` | Suggests bank ↔ receipt/invoice matches; see [RECONCILIATION_TOOL.md](../agent/RECONCILIATION_TOOL.md) |
+| `suggestReconciliationMatches` | Suggests bank ↔ receipt/invoice matches; see [07-WORKED_EXAMPLES.md — Trace 2](../agent/07-WORKED_EXAMPLES.md#trace-2-reconciliation-atpl_reconcile) |
 | `categorizePostings` | Wraps `categorizeTransactionBatchHandler` with **`dry_run: true`** — returns predictions only (no DB writes). The agent then uses `queueAction` / `queueActionBatch` with `categorize_transaction` for human approval in the workbench |
 
 **Important**: `categorizePostings` is intentionally **non-destructive** in one shot. Writes happen after approval via **pending action executors** (`CategorizeTransactionExecutor` in `PendingActionExecutor.ts`).

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { registerChatReset } from '@/utils/chatSessionBridge';
 
 export interface PageContext {
     modelName: string;
@@ -22,6 +23,9 @@ export interface PageContext {
 interface ChatContextType {
     isChatOpen: boolean;
     toggleChat: () => void;
+    closeChat: () => void;
+    resetChat: () => void;
+    chatSessionId: number;
     pageContext: PageContext | null;
     setPageContext: (pageContext: PageContext | null) => void;
     messagesAi: any[];
@@ -35,19 +39,36 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [pageContext, setPageContext] = useState<PageContext | null>(null);
     const [messagesAi, setMessagesAi] = useState<any[]>([]);
+    const [chatSessionId, setChatSessionId] = useState(0);
 
     const toggleChat = () => {
         setIsChatOpen(prev => !prev);
+    };
+
+    const closeChat = () => {
+        setIsChatOpen(false);
     };
 
     const clearMessages = () => {
         setMessagesAi([]);
     };
 
+    const resetChat = useCallback(() => {
+        setIsChatOpen(false);
+        setMessagesAi([]);
+        setPageContext(null);
+        setChatSessionId((id) => id + 1);
+    }, []);
+
+    useEffect(() => registerChatReset(resetChat), [resetChat]);
+
     return (
         <ChatContext.Provider value={{
             isChatOpen,
             toggleChat,
+            closeChat,
+            resetChat,
+            chatSessionId,
             pageContext,
             setPageContext,
             messagesAi,

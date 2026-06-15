@@ -13,6 +13,7 @@ import { AuthContext } from './auth/types';
 import { setupRestRoutes } from './rest/routes';
 import { errorHandler } from './rest/middleware/errorHandler';
 import agentModule from './agent';
+import { createChatRouter } from './routes/chat';
 import { GracefulShutdown } from './utils/gracefulShutdown';
 import { ensureDatabaseViews } from './utils/setup/ensureDatabaseViews';
 import { initializeImportExtensions } from './lib/import-extensions';
@@ -71,6 +72,9 @@ async function startServer(): Promise<void> {
     // Setup Agent routes
     app.use('/api/agent', agentModule.createAgentRouter());
 
+    // Persisted financial chat (Vercel AI SDK useChat + chat_threads)
+    app.use('/api/chat', createChatRouter());
+
     // MCP endpoint
     app.use('/api/mcp', mcpRouter);
 
@@ -87,6 +91,10 @@ async function startServer(): Promise<void> {
 
     // Error handling middleware
     app.use(errorHandler);
+
+    // Load agent model tool config (Super Admin UI → ToolManager)
+    const { warmAgentModelToolCache } = await import('./agent/agentModelToolConfigCache');
+    await warmAgentModelToolCache();
 
     // Start HTTP server
     httpServer = app.listen(port, () => {

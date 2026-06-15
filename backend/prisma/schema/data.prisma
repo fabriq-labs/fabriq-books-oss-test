@@ -484,6 +484,25 @@ model llm_trace_step {
 
 // ── Agentic Sessions & Pending Actions ──────────────────────────
 
+/// Per-model agent tool assignment (Super Admin UI — Settings → AI Templates → Model Tools)
+model agent_model_tool_config {
+  id                      String   @id @default(dbgenerated("'amtc_' || gen_random_uuid()")) @db.VarChar(50)
+  model_name              String   @unique @db.VarChar(80)
+  display_name            String   @db.VarChar(120)
+  description             String?  @db.Text
+  model_tools             String[] @default([])
+  include_analytics_tools Boolean  @default(true)
+  is_active               Boolean  @default(true)
+  sort_order              Int      @default(0)
+  created_at              DateTime @default(now())
+  created_by              String?
+  modified_by             String?
+  assigned_to             String?
+  modified_at             DateTime @updatedAt
+
+  @@map("agent_model_tool_config")
+}
+
 model agent_template {
   id            String   @id @default(dbgenerated("'atpl_' || gen_random_uuid()")) @db.VarChar(50)
   org_id        String? // null = system-level template (available to all orgs)
@@ -613,4 +632,23 @@ model pending_action {
   @@index([session_id, status])
   @@index([batch_id])
   @@map("pending_action")
+}
+
+/// Persisted Vercel AI SDK useChat threads (UIMessage[] + audit metadata)
+model chat_thread {
+  id                String   @id @db.VarChar(255) // Maps to useChat / streamText chatId
+  user_id           String   @db.VarChar(255)
+  title             String   @default("New Financial Inquiry") @db.VarChar(255)
+  messages          Json     @default("[]") @db.JsonB
+  metadata          Json     @default("{}") @db.JsonB
+  model_used        String?  @db.VarChar(255)
+  total_tokens_used Int      @default(0)
+  created_by        String?
+  modified_by       String?
+  assigned_to       String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@index([user_id])
+  @@map("chat_thread")
 }

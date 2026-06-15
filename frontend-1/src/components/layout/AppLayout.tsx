@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
 import TopBar from './TopBar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocation, Outlet } from 'react-router-dom';
 import { useChat } from '@/contexts/ChatContext';
-import { ChatUI } from '@/components/chat/ChatUI';
+import { ChatShell } from '@/components/chat/ChatShell';
 import { useUserRoles } from '@/hooks/useUserRoles';
 
 // Route title mapping
@@ -138,7 +138,27 @@ export const AppLayout: React.FC = () => {
     const [currentTitle, setCurrentTitle] = useState('Dashboard');
 
     const isDashboard = location.pathname === '/';
+    const isChatFullPage = isChatOpen && isDashboard;
     const showChatSidebar = isChatOpen && !isDashboard;
+    const collapsedBeforeChat = useRef<boolean | null>(null);
+    const wasChatFullPage = useRef(false);
+
+    // Minimize dashboard nav when full-page chat is open (icon rail + chat history + messages)
+    useEffect(() => {
+        if (isMobile) return;
+
+        if (isChatFullPage && !wasChatFullPage.current) {
+            collapsedBeforeChat.current = collapsed;
+            setCollapsed(true);
+        } else if (!isChatFullPage && wasChatFullPage.current) {
+            if (collapsedBeforeChat.current !== null) {
+                setCollapsed(collapsedBeforeChat.current);
+                collapsedBeforeChat.current = null;
+            }
+        }
+
+        wasChatFullPage.current = isChatFullPage;
+    }, [isChatFullPage, isMobile, collapsed]);
 
     // Update title when route changes
     useEffect(() => {
@@ -167,24 +187,27 @@ export const AppLayout: React.FC = () => {
             {/* Main Content Area - 10 columns (or 9 if chat sidebar shown) */}
             <main
                 className={cn(
-                    'fixed top-16 bottom-0 overflow-y-auto transition-all duration-500 ease-in-out p-4 md:p-6',
+                    'fixed top-16 bottom-0 transition-all duration-500 ease-in-out',
+                    isChatFullPage ? 'overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-6',
                     isMobile
                         ? 'left-0 right-0'
                         : [
                             collapsed ? 'left-[4.5rem]' : 'left-[16.666%]',
-                            showChatSidebar ? 'right-[20.666%]' : 'right-0'
+                            showChatSidebar ? 'right-[min(38vw,560px)]' : 'right-0'
                         ]
                 )}
             >
-                <Outlet />
+                <div className={cn(isChatFullPage && 'h-full min-h-0')}>
+                    <Outlet />
+                </div>
             </main>
 
-            {/* Fixed Right Chat Sidebar - 2 columns out of 12, only on non-dashboard routes */}
+            {/* Fixed Right Chat Sidebar */}
             {showChatSidebar && !isMobile && (
                 <aside
-                    className="fixed right-0 top-16 bottom-0 z-40 w-[20.666%] bg-white border-l shadow-lg flex flex-col transition-transform duration-500 ease-in-out overflow-hidden"
+                    className="fixed right-0 top-16 bottom-0 z-40 w-[min(38vw,560px)] bg-white border-l shadow-lg flex flex-col transition-transform duration-500 ease-in-out overflow-hidden"
                 >
-                    <ChatUI sidebarMode={true} />
+                    <ChatShell className="h-full" compact sidebarMode />
                 </aside>
             )}
         </div>
