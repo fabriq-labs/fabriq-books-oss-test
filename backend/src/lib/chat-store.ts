@@ -1,5 +1,10 @@
 import type { Message as UIMessage } from 'ai';
-import prisma from './prisma';
+import type { AuthContext } from '../auth/types';
+import { ModelService } from '../services/core/ModelService';
+
+const MODEL_NAME = 'chat_thread';
+const VIEW_NAME = 'chat_thread_view';
+const modelService = ModelService.getInstance();
 
 export interface ChatThreadRow {
   id: string;
@@ -25,7 +30,7 @@ export interface ChatThreadSummary {
 
 export interface SaveChatParams {
   chatId: string;
-  userId: string;
+  context: AuthContext;
   messages: UIMessage[];
   modelUsed: string;
   totalTokensUsed: number;
@@ -70,37 +75,47 @@ function parseJsonColumn<T>(value: unknown, fallback: T): T {
   return value as T;
 }
 
+function mapRow(row: Record<string, unknown>): ChatThreadRow {
+  return {
+    id: String(row.id),
+    user_id: String(row.user_id),
+    title: String(row.title ?? DEFAULT_TITLE),
+    messages: parseJsonColumn<UIMessage[]>(row.messages, []),
+    metadata: parseJsonColumn<Record<string, unknown>>(row.metadata, {}),
+    model_used: (row.model_used as string | null) ?? null,
+    total_tokens_used: Number(row.total_tokens_used ?? 0),
+    created_at: row.created_at instanceof Date ? row.created_at : new Date(String(row.created_at)),
+    updated_at: row.updated_at instanceof Date ? row.updated_at : new Date(String(row.updated_at)),
+  };
+}
+
 /**
  * List chat threads for the authenticated user, oldest created first (stable order;
  * replying to a thread does not move it in the list).
  */
-export async function listChats(userId: string): Promise<ChatThreadSummary[]> {
-  const rows = await prisma.$queryRaw<
-    Array<{
-      id: string;
-      title: string;
-      message_count: number;
-      model_used: string | null;
-      total_tokens_used: number;
-      created_at: Date;
-      updated_at: Date;
-    }>
-  >`
-    SELECT
-      id,
-      title,
-      COALESCE(jsonb_array_length(messages), 0)::int AS message_count,
-      model_used,
-      total_tokens_used,
-      created_at,
-      updated_at
-    FROM chat_thread
-    WHERE user_id = ${userId}
-      AND COALESCE(jsonb_array_length(messages), 0) > 0
-    ORDER BY created_at ASC
-  `;
+export async function listChats(context: AuthContext): Promise<ChatThreadSummary[]> {
+  const result = await modelService.search(
+    MODEL_NAME,
+    context,
+    { page: 1, pageSize: 200, sortOption: { created_at: 'asc' } },
+    { viewName: VIEW_NAME }
+  );
 
-  return rows;
+  if (!result.success || !Array.isArray(result.data)) {
+    return [];
+  }
+
+  return result.data
+    .filter((row) => Array.isArray(row.messages) && row.messages.length > 0)
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      message_count: row.messages.length,
+      model_used: row.model_used ?? null,
+      total_tokens_used: row.total_tokens_used ?? 0,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
 }
 
 /**
@@ -108,50 +123,22 @@ export async function listChats(userId: string): Promise<ChatThreadSummary[]> {
  */
 export async function loadChat(
   chatId: string,
-  userId: string
+  context: AuthContext
 ): Promise<ChatThreadRow | null> {
-  const rows = await prisma.$queryRaw<
-    Array<{
-      id: string;
-      user_id: string;
-      title: string;
-      messages: unknown;
-      metadata: unknown;
-      model_used: string | null;
-      total_tokens_used: number;
-      created_at: Date;
-      updated_at: Date;
-    }>
-  >`
-    SELECT
-      id,
-      user_id,
-      title,
-      messages,
-      metadata,
-      model_used,
-      total_tokens_used,
-      created_at,
-      updated_at
-    FROM chat_thread
-    WHERE id = ${chatId}
-      AND user_id = ${userId}
-    LIMIT 1
-  `;
+  const result = await modelService.getById(MODEL_NAME, context, chatId, {
+    viewName: VIEW_NAME,
+  });
 
-  const row = rows[0];
-  if (!row) return null;
+  if (!result.success || !result.data) {
+    return null;
+  }
 
-  return {
-    ...row,
-    messages: parseJsonColumn<UIMessage[]>(row.messages, []),
-    metadata: parseJsonColumn<Record<string, unknown>>(row.metadata, {}),
-  };
+  return mapRow(result.data as Record<string, unknown>);
 }
 
 export interface CreateChatThreadParams {
   chatId: string;
-  userId: string;
+  context: AuthContext;
   metadata?: Record<string, unknown>;
 }
 
@@ -161,45 +148,32 @@ export interface CreateChatThreadParams {
  */
 export async function createChatThread({
   chatId,
-  userId,
+  context,
   metadata,
 }: CreateChatThreadParams): Promise<ChatThreadRow> {
-  const existing = await loadChat(chatId, userId);
+  const existing = await loadChat(chatId, context);
   if (existing) return existing;
 
-  const metadataJson = JSON.stringify(metadata ?? {});
+  const result = await modelService.create(
+    MODEL_NAME,
+    context,
+    {
+      id: chatId,
+      title: DEFAULT_TITLE,
+      messages: [],
+      metadata: metadata ?? {},
+      total_tokens_used: 0,
+    },
+    { viewName: VIEW_NAME }
+  );
 
-  await prisma.$executeRaw`
-    INSERT INTO chat_thread (
-      id,
-      user_id,
-      title,
-      messages,
-      metadata,
-      model_used,
-      total_tokens_used,
-      created_by,
-      modified_by,
-      created_at,
-      updated_at
-    )
-    VALUES (
-      ${chatId},
-      ${userId},
-      ${DEFAULT_TITLE},
-      '[]'::jsonb,
-      ${metadataJson}::jsonb,
-      NULL,
-      0,
-      ${userId},
-      ${userId},
-      NOW(),
-      NOW()
-    )
-    ON CONFLICT (id) DO NOTHING
-  `;
+  if (!result.success) {
+    const raced = await loadChat(chatId, context);
+    if (raced) return raced;
+    throw new Error(result.error || 'Failed to create chat thread');
+  }
 
-  const created = await loadChat(chatId, userId);
+  const created = await loadChat(chatId, context);
   if (!created) {
     throw new Error('Failed to create chat thread');
   }
@@ -213,59 +187,56 @@ export async function createChatThread({
  */
 export async function saveChat({
   chatId,
-  userId,
+  context,
   messages,
   modelUsed,
   totalTokensUsed,
   metadata,
 }: SaveChatParams): Promise<void> {
-  const existing = await loadChat(chatId, userId);
+  const existing = await loadChat(chatId, context);
   if (!existing) {
-    await createChatThread({ chatId, userId, metadata });
+    await createChatThread({ chatId, context, metadata });
   }
 
-  const messagesJson = JSON.stringify(messages);
-  const metadataJson = JSON.stringify(metadata ?? {});
   const title =
     messages.length > 0
       ? deriveThreadTitle(messages)
       : (existing?.title ?? DEFAULT_TITLE);
+  const mergedMetadata = {
+    ...(existing?.metadata ?? {}),
+    ...(metadata ?? {}),
+  };
+  const accumulatedTokens = (existing?.total_tokens_used ?? 0) + totalTokensUsed;
 
-  await prisma.$executeRaw`
-    INSERT INTO chat_thread (
-      id,
-      user_id,
+  const result = await modelService.update(
+    MODEL_NAME,
+    context,
+    chatId,
+    {
       title,
       messages,
-      metadata,
-      model_used,
-      total_tokens_used,
-      created_by,
-      modified_by,
-      created_at,
-      updated_at
-    )
-    VALUES (
-      ${chatId},
-      ${userId},
-      ${title},
-      ${messagesJson}::jsonb,
-      ${metadataJson}::jsonb,
-      ${modelUsed},
-      ${totalTokensUsed},
-      ${userId},
-      ${userId},
-      NOW(),
-      NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      title = EXCLUDED.title,
-      messages = EXCLUDED.messages,
-      model_used = EXCLUDED.model_used,
-      total_tokens_used = chat_thread.total_tokens_used + EXCLUDED.total_tokens_used,
-      metadata = COALESCE(chat_thread.metadata, '{}'::jsonb) || EXCLUDED.metadata,
-      modified_by = EXCLUDED.modified_by,
-      updated_at = NOW()
-    WHERE chat_thread.user_id = EXCLUDED.user_id
-  `;
+      metadata: mergedMetadata,
+      model_used: modelUsed,
+      total_tokens_used: accumulatedTokens,
+    },
+    { viewName: VIEW_NAME }
+  );
+
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to save chat thread');
+  }
+}
+
+/**
+ * Delete a chat thread owned by the authenticated user.
+ * @returns true if a row was deleted
+ */
+export async function deleteChat(chatId: string, context: AuthContext): Promise<boolean> {
+  const existing = await loadChat(chatId, context);
+  if (!existing) {
+    return false;
+  }
+
+  const result = await modelService.delete(MODEL_NAME, context, chatId);
+  return result.success;
 }

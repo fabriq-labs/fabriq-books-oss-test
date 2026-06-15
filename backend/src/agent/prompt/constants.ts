@@ -12,18 +12,33 @@ export const TOOL_RESPONSE_HANDLING_GUIDELINE = `
 
 #### TOOL RESPONSE HANDLING - STRUCTURED DATA DISPLAY
 
-**CRITICAL: When tool responses display structured data (tables, search results, lists):**
-- Provide only brief contextual introductions (1-2 sentences) in plain text
-- DO NOT repeat data that appears in the tool response table
-- DO NOT output markdown tables (pipe syntax like |Col|Val|) — the UI renders the table automatically
-- DO NOT use markdown code blocks, backticks, code formatting, or special characters
-- DO NOT include tool names, function names, or technical details
-- The UI automatically renders structured data - your text should be simple plain text that introduces it
+**CRITICAL: When tool responses display structured data (tables, search results, transaction lists):**
+- Provide only a brief contextual introduction (1-2 sentences) in plain text
+- DO NOT repeat row-level data that appears in the tool response table (descriptions, amounts, dates, account names per row)
+- DO NOT output markdown pipe tables (|Col|Val|) — the UI renders tables automatically
+- DO NOT use code blocks, backticks, or technical tool/function names
+- The UI automatically renders structured data — your text should introduce it only
 
-**Examples:**
-❌ BAD: "PO Number: PO000002, PR Number: PR000002, Total Price: 102500000, Status: Approved..."
-❌ BAD: "Found 3 suppliers: Supplier A (ID: abc123, City: New York), Supplier B (ID: def456)..."
-✅ GOOD: "Here are the accounts:" or "Found 3 suppliers matching your criteria:"
+**Examples (tool table will render below your text):**
+❌ BAD: "PO Number: PO000002, PR Number: PR000002, Total Price: 102500000..."
+❌ BAD: Listing each posting with description, amount, and date in your reply
+✅ GOOD: "Here are the postings for this week:" or "Found 3 suppliers matching your criteria:"
+
+#### CHAT RESPONSE FORMATTING — TEXT-ONLY ANSWERS (no tool table)
+
+When answering analytics, rankings, summaries, or explanations **without** a tool table (e.g. top vendors, spend breakdowns, balance explanations):
+- Use **markdown bold** (\`**text**\`) for entity names, account names, periods, and key monetary amounts
+- Use **numbered lists** for rankings: \`1. **Vendor Name** (short description): **$12,345.67** spent across 24 transactions\`
+- Start with a friendly one-sentence intro; end with a short offer to drill down
+- Allowed markdown: \`**bold**\` and numbered lists only — no pipe tables, code blocks, or backticks
+
+**Example (top vendors — no tool table):**
+✅ GOOD: "I'd be happy to walk you through your top 5 vendors for 2025, ranked by total spend:
+
+1. **Gusto** (Cloud-based HR): **$471,703.88** spent across 648 transactions
+2. **UnitedHealthcare** (Health care): **$49,467.76** spent over 24 transactions
+
+These amounts represent your total outbound payments in 2025. Let me know if you'd like more details!"
 
 #### ID DISPLAY RESTRICTION - USER-FACING RESPONSES
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatThreads } from '@/hooks/useChatThreads';
+import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { ChatThreadSidebar } from './ChatThreadSidebar';
 import { ChatUI } from './ChatUI';
 import { cn } from '@/lib/utils';
@@ -26,8 +27,11 @@ export const ChatShell: React.FC<ChatShellProps> = ({
   sidebarMode = true,
   fullPage = false,
 }) => {
-  const { threads, loading, error, refresh } = useChatThreads(fullPage);
-  const [activeChatId, setActiveChatId] = useState(() => `chat_${uuidv4()}`);
+  const { threads, loading, error, refresh, deleteThread } = useChatThreads(fullPage);
+  const { clearMessages } = useChatContext();
+  const [isDraft, setIsDraft] = useState(true);
+  const [draftChatId, setDraftChatId] = useState(() => `chat_${uuidv4()}`);
+  const [activeChatId, setActiveChatId] = useState('');
   const chatSidebarMode = fullPage ? false : sidebarMode;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -44,15 +48,34 @@ export const ChatShell: React.FC<ChatShellProps> = ({
   );
 
   const startNewChat = useCallback(() => {
-    setActiveChatId(`chat_${uuidv4()}`);
-  }, []);
+    clearMessages();
+    setIsDraft(true);
+    setActiveChatId('');
+    setDraftChatId(`chat_${uuidv4()}`);
+  }, [clearMessages]);
 
   const handleSelectThread = (chatId: string) => {
+    setIsDraft(false);
     setActiveChatId(chatId);
   };
 
-  const activeThreadTitle =
-    visibleThreads.find((thread) => thread.id === activeChatId)?.title ?? DEFAULT_DRAFT_TITLE;
+  const handleDeleteThread = useCallback(
+    async (chatId: string) => {
+      const isViewingDeletedThread = !isDraft && chatId === activeChatId;
+      await deleteThread(chatId);
+      if (isViewingDeletedThread) {
+        startNewChat();
+      }
+    },
+    [activeChatId, deleteThread, isDraft, startNewChat]
+  );
+
+  const activeThreadTitle = isDraft
+    ? DEFAULT_DRAFT_TITLE
+    : (visibleThreads.find((thread) => thread.id === activeChatId)?.title ?? DEFAULT_DRAFT_TITLE);
+
+  const chatInstanceKey = isDraft ? draftChatId : activeChatId;
+  const resolvedChatId = isDraft ? draftChatId : activeChatId;
 
   return (
     <div className={cn('flex h-full min-h-0 bg-white', className)}>
@@ -61,22 +84,24 @@ export const ChatShell: React.FC<ChatShellProps> = ({
           threads={visibleThreads}
           loading={loading}
           error={error}
-          activeChatId={activeChatId ?? ''}
+          activeChatId={isDraft ? '' : activeChatId}
           collapsed={sidebarCollapsed}
           onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
           onSelect={handleSelectThread}
           onNewChat={startNewChat}
+          onDelete={handleDeleteThread}
           showHistoryTitle
         />
       )}
 
       <div className="min-h-0 min-w-0 flex-1 flex flex-col">
         <ChatUI
-          key={activeChatId}
-          chatId={activeChatId}
+          key={chatInstanceKey}
+          chatId={resolvedChatId}
           threadTitle={fullPage ? activeThreadTitle : undefined}
           sidebarMode={chatSidebarMode}
           hideThreadControls
+          loadPersistedHistory={!isDraft}
           onThreadSaved={fullPage ? () => void refresh() : undefined}
         />
       </div>

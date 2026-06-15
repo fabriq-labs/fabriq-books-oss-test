@@ -18,6 +18,16 @@ export function resolvePostingLegalEntity(
   };
 }
 
+/** Chat header entity — only the global selector; no HQ fallback (null = org-wide). */
+export function resolveChatLegalEntity(
+  currentEntity: Entity | null
+): { legalEntityId: string | null; legalEntityName: string | null } {
+  return {
+    legalEntityId: currentEntity?.id ?? null,
+    legalEntityName: currentEntity?.legal_name ?? null,
+  };
+}
+
 /** posting_type applied when creating a posting through the UI form. */
 export const DEFAULT_POSTING_TYPE = 'JOURNAL';
 
@@ -46,6 +56,19 @@ export function buildPostingModelContext(
   };
 }
 
+/** Agent chat context — respects global entity selector only (no HQ default). */
+export function buildChatModelContext(
+  currentEntity: Entity | null,
+  extra?: Record<string, unknown>
+): Record<string, unknown> {
+  const { legalEntityId, legalEntityName } = resolveChatLegalEntity(currentEntity);
+  return {
+    ...extra,
+    legalEntityId,
+    legalEntityName,
+  };
+}
+
 /** Models exposed in finance chat (postings + chart of accounts). */
 export const FINANCE_FOCUS_MODELS = ['posting', 'account'] as const;
 
@@ -64,7 +87,7 @@ export function buildDefaultPostingChatContext(
     currentPath: '/chat',
     promptTypes: ['analytics', 'default'],
     focusModels: [...FINANCE_FOCUS_MODELS],
-    modelContext: buildPostingModelContext(currentEntity, entities),
+    modelContext: buildChatModelContext(currentEntity),
   };
 }
 
@@ -72,7 +95,7 @@ export function buildDefaultPostingChatContext(
 export function enrichFinanceChatContext(
   base: PageContext,
   currentEntity: Entity | null,
-  entities: Entity[]
+  _entities: Entity[]
 ): PageContext {
   const modelName = base.modelName as string | undefined;
   if (modelName !== 'posting' && modelName !== 'account') {
@@ -88,9 +111,8 @@ export function enrichFinanceChatContext(
       (base.focusModels as string[] | undefined)?.length
         ? base.focusModels
         : [...FINANCE_FOCUS_MODELS],
-    modelContext: buildPostingModelContext(
+    modelContext: buildChatModelContext(
       currentEntity,
-      entities,
       base.modelContext as Record<string, unknown> | undefined
     ),
   };

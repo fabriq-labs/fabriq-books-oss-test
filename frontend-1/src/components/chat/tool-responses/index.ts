@@ -7,4 +7,5 @@ export { FinancialReportDisplay } from './FinancialReportDisplay';
 export { AccountLedgerDisplay } from './AccountLedgerDisplay';
 export { PostingJournalDisplay } from './PostingJournalDisplay';
 export { PostingDualDisplay } from './PostingDualDisplay';
+export { PostingTransactionList } from './PostingTransactionList';
 export { SearchResultsTable } from '../SearchResultsTable'; 

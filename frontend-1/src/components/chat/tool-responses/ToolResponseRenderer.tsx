@@ -14,6 +14,7 @@ import { PostingDualDisplay, type PostingDualTable } from './PostingDualDisplay'
 import { ToolInvocation as BaseToolInvocation, ToolResult as BaseToolResult } from '@/components/utils/helper';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
+import { normalizeToolInvocation, resolvePostingSearchDisplayHint } from '../chatUtils';
 import { Wrench } from 'lucide-react';
 
 interface ExtendedToolResult extends BaseToolResult {
@@ -26,6 +27,9 @@ interface ExtendedToolResult extends BaseToolResult {
     success?: boolean;
     focusAccountName?: string;
     focusAccountId?: string;
+    journalFocusSide?: 'debit' | 'credit';
+    journalFocusAccountName?: string;
+    journalTitle?: string;
     tables?: PostingDualTable[];
 }
 
@@ -108,8 +112,12 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
     };
 
     // Filter and process tool invocations to show only the latest successful result per tool
-    const processedTools = toolInvocations.reduce((acc, tool) => {
-        if (tool.state !== 'result' || !tool.result) {
+    const normalizedInvocations = toolInvocations
+        .map((tool) => normalizeToolInvocation(tool))
+        .filter((tool): tool is ToolInvocation => tool != null);
+
+    const processedTools = normalizedInvocations.reduce((acc, tool) => {
+        if (!tool.result) {
             return acc;
         }
 
@@ -134,16 +142,16 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
         return acc;
     }, [] as typeof toolInvocations);
 
-    // Filter out tools with errors and no data
+    // Filter out tools with errors and no data (keep search tools for empty-state UI)
     const validTools = processedTools.filter(tool => {
         const hasError = tool.result?.error;
-        // Handle both array data and object data (for invoice extraction)
         const hasArrayData = tool.result?.data && Array.isArray(tool.result.data) && tool.result.data.length > 0;
         const hasObjectData = tool.result?.data && typeof tool.result.data === 'object' && !Array.isArray(tool.result.data);
         const hasData = hasArrayData || hasObjectData;
+        const isSearchTool =
+            tool.toolName === 'searchRecords' || /search/i.test(tool.toolName);
 
-        // Show tools that either have data OR don't have errors (for non-data tools)
-        return !hasError || hasData;
+        return !hasError || hasData || isSearchTool;
     });
 
     // Check if there were failed attempts
@@ -167,6 +175,9 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
 
             {validTools.map((tool, index) => {
                 const { uiHint, description, data, columns, resultType } = tool.result;
+                const postingModel =
+                    (tool.result?.model as string | undefined) ||
+                    (tool.args?.modelName as string | undefined);
 
                 const toolNameBadge = (
                     <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
@@ -181,10 +192,10 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
 
                 const wrapToolResult = (
                     content: React.ReactNode,
-                    options?: { showDescription?: boolean }
+                    options?: { showDescription?: boolean; hideToolBadge?: boolean }
                 ) => (
                     <div key={index} className="space-y-2">
-                        {toolNameBadge}
+                        {!options?.hideToolBadge && toolNameBadge}
                         {options?.showDescription !== false && descriptionElement}
                         {content}
                     </div>
@@ -212,9 +223,16 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                 if (
                     (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) &&
                     Array.isArray(data) &&
-                    data.length > 0
+                    data.length > 0 &&
+                    resolvePostingSearchDisplayHint(uiHint, postingModel, data) != null
                 ) {
-                    if (uiHint === 'account_ledger') {
+                    const postingHint = resolvePostingSearchDisplayHint(
+                        uiHint,
+                        postingModel,
+                        data
+                    );
+
+                    if (postingHint === 'account_ledger') {
                         return wrapToolResult(
                                 <AccountLedgerDisplay
                                     rows={data}
@@ -227,16 +245,19 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                 />
                         );
                     }
-                    if (uiHint === 'posting_journal') {
+                    if (postingHint === 'posting_journal') {
                         return wrapToolResult(
                                 <PostingJournalDisplay
                                     rows={data}
+                                    title={tool.result.journalTitle as string | undefined}
+                                    highlightSide={tool.result.journalFocusSide as 'debit' | 'credit' | undefined}
+                                    highlightAccountName={tool.result.journalFocusAccountName as string | undefined}
                                     currencyCode={tool.result.currencyCode as string | undefined}
                                     sidebarMode={sidebarMode}
                                 />
                         );
                     }
-                    if (uiHint === 'posting_dual' && Array.isArray(tool.result.tables)) {
+                    if (postingHint === 'posting_dual' && Array.isArray(tool.result.tables)) {
                         return wrapToolResult(
                                 <PostingDualDisplay
                                     tables={tool.result.tables as PostingDualTable[]}
@@ -245,9 +266,17 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                 />
                         );
                     }
+                    return wrapToolResult(
+                        <PostingJournalDisplay
+                            rows={data}
+                            title={tool.result.journalTitle as string | undefined}
+                            currencyCode={tool.result.currencyCode as string | undefined}
+                            sidebarMode={sidebarMode}
+                        />
+                    );
                 }
 
-                // Handle searchRecords - always render as table
+                // Handle searchRecords - generic table for non-posting models
                 if (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) {
                     if (Array.isArray(data) && data.length > 0) {
                         return wrapToolResult(

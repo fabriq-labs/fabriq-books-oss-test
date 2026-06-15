@@ -11,6 +11,16 @@ import { ToolResponseRenderer } from './tool-responses';
 import { FileAttachment } from './FileAttachment';
 import { FileInputDisplay } from './FileInputDisplay';
 import { LoadingIndicator } from './LoadingIndicator';
+import { AssistantMessageRenderer } from './AssistantMessageRenderer';
+import {
+    ChatAssistantMessageLayout,
+    ChatUserMessageLayout,
+    getUserImageUrl,
+} from './ChatMessageLayout';
+import {
+    extractAccountNamesFromPageContext,
+    extractAccountNamesFromTools,
+} from './financeMessageHighlights';
 import {
     transformUserMessage,
     extractUserMessageText,
@@ -21,6 +31,10 @@ import {
     formatCurrencyInMessage,
     getChatCurrencyCode,
     formatAssistantMessageForTableTools,
+    getMessageToolInvocations,
+    getAssistantTurnToolInvocations,
+    isLastAssistantMessageInTurn,
+    shouldHideChatLoadingIndicator,
     type UserMessage,
     type MessagePart
 } from './chatUtils';
@@ -50,6 +64,8 @@ interface ChatUIProps {
     chatId?: string;
     threadTitle?: string;
     hideThreadControls?: boolean;
+    /** When false, skip GET by id (local draft not yet in DB). */
+    loadPersistedHistory?: boolean;
     onThreadSaved?: () => void;
 }
 
@@ -58,6 +74,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     chatId,
     threadTitle,
     hideThreadControls = false,
+    loadPersistedHistory = false,
     onThreadSaved,
 }) => {
     const [fallbackChatId] = useState(() => `chat_${uuidv4()}`);
@@ -72,17 +89,23 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     const { addToolData } = useTool();
     const { pageContext, messagesAi, setMessagesAi, clearMessages, chatSessionId } = useChatContext();
     const prevChatSessionId = useRef<number | null>(null);
-    const { getBaseCurrencyCode } = useUserData();
+    const { getBaseCurrencyCode, getUserInitials, user } = useUserData();
     const { currentEntityId, currentEntity, entities } = useEntity();
 
     const chatContext = useMemo(() => {
         const base = pageContext ?? buildDefaultPostingChatContext(currentEntity, entities);
         return enrichFinanceChatContext(base, currentEntity, entities);
     }, [pageContext, currentEntity, entities, currentEntityId, currentEntity?.legal_name]);
+    const chatContextRef = useRef(chatContext);
+    useEffect(() => {
+        chatContextRef.current = chatContext;
+    }, [chatContext]);
     const token = Cookies.get("__session");
     const messagesRef = useRef<Message[]>([]);
     const persistThreadRef = useRef<(threadMessages: Message[]) => Promise<void>>(async () => {});
-    const [historyLoaded, setHistoryLoaded] = useState(!effectiveChatId);
+    const [historyLoaded, setHistoryLoaded] = useState(
+        !effectiveChatId || !loadPersistedHistory
+    );
 
     const chatCurrencyCode = useMemo(
         () => getChatCurrencyCode(pageContext, getBaseCurrencyCode()),
@@ -104,6 +127,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     } = useChat({
         id: effectiveChatId,
         api: `${import.meta.env.VITE_API_BASE_URL || ''}/api/agent/chat/stream`,
+        sendExtraMessageFields: true,
         headers: {
             'Accept': 'text/event-stream',
             'Authorization': `Bearer ${token}`,
@@ -139,9 +163,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                 ? extractUserMessageText(lastUserMessage as UserMessage)
                 : '';
 
-            if (chatContext) {
+            if (chatContextRef.current) {
                 preparedBody.context = {
-                    ...chatContext,
+                    ...chatContextRef.current,
                     searchAllEntities: userRequestedAllEntities(userQuestion),
                     userQuestion,
                 };
@@ -171,17 +195,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({
             }
         },
         onFinish: (message) => {
-            if (message.toolInvocations && Array.isArray(message.toolInvocations)) {
-                message.toolInvocations.forEach((tool: ToolInvocation) => {
-                    if (tool.state === 'result') {
-                        addToolData({
-                            toolName: tool.toolName,
-                            state: tool.state,
-                            result: tool.result
-                        });
-                    }
-                });
-            }
+            getMessageToolInvocations(message as ChatMessage).forEach((tool: ToolInvocation) => {
+                if (tool.state === 'result') {
+                    addToolData({
+                        toolName: tool.toolName,
+                        state: tool.state,
+                        result: tool.result
+                    });
+                }
+            });
 
             // Persist full session (user + assistant + tool invocations) after each turn
             queueMicrotask(() => {
@@ -232,9 +254,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         messagesRef.current = messages;
     }, [messages]);
 
-    // Load persisted session when switching threads (ChatGPT-style history restore)
+    // Load persisted session when selecting a thread from the sidebar (not for local drafts).
     useEffect(() => {
-        if (!effectiveChatId) {
+        if (!effectiveChatId || !loadPersistedHistory) {
             setHistoryLoaded(true);
             return;
         }
@@ -260,7 +282,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         return () => {
             cancelled = true;
         };
-    }, [effectiveChatId, setMessages]);
+    }, [effectiveChatId, loadPersistedHistory, setMessages]);
 
     // Clear local messages only when auth session resets (logout/login), not on remount
     useEffect(() => {
@@ -339,50 +361,83 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     const formatAssistantText = (content: string) =>
         formatCurrencyInMessage(content, chatCurrencyCode);
 
+    const knownAccountNames = useMemo(() => {
+        const names = new Set<string>();
+        extractAccountNamesFromPageContext(
+            chatContext?.modelContext as Record<string, unknown> | undefined
+        ).forEach((name) => names.add(name));
+        for (const msg of messages) {
+            extractAccountNamesFromTools(getMessageToolInvocations(msg as ChatMessage)).forEach(
+                (name) => names.add(name)
+            );
+        }
+        return [...names];
+    }, [chatContext?.modelContext, messages]);
+
+    const renderAssistantText = (content: string) => (
+        <AssistantMessageRenderer
+            content={formatAssistantText(content)}
+            knownAccountNames={knownAccountNames}
+        />
+    );
+
     if (effectiveChatId && !historyLoaded) {
         return (
             <div className={cn(
                 "flex h-full items-center justify-center bg-white",
                 sidebarMode ? "" : "min-h-[calc(100vh-8rem)]"
             )}>
-                <p className="text-sm text-gray-500">Loading conversation…</p>
+                <p className="text-sm text-muted-foreground">Loading conversation…</p>
             </div>
         );
     }
 
     // Render message content (text only, files are rendered separately)
-    const renderMessageContent = (msg: ChatMessage, isLastMessage: boolean = false) => {
-        const hasToolInvocations = msg.toolInvocations && Array.isArray(msg.toolInvocations);
+    const renderMessageContent = (
+        msg: ChatMessage,
+        messageIndex: number,
+        allMessages: ChatMessage[],
+        isLastMessage: boolean = false
+    ) => {
+        if (
+            msg.role === 'assistant' &&
+            !isLastAssistantMessageInTurn(allMessages, messageIndex)
+        ) {
+            return null;
+        }
+
+        const messageTools =
+            msg.role === 'assistant'
+                ? getAssistantTurnToolInvocations(allMessages, messageIndex)
+                : getMessageToolInvocations(msg);
+        const hasToolInvocations = messageTools.length > 0;
         const hasTextContent = msg.content && msg.content.trim().length > 0;
         const textForDisplay =
             msg.role === 'assistant' && hasTextContent
-                ? formatAssistantMessageForTableTools(msg.content, msg.toolInvocations)
+                ? formatAssistantMessageForTableTools(msg.content, messageTools)
                 : msg.content;
         const hasDisplayText = Boolean(textForDisplay?.trim());
-        const displayContent =
-            msg.role === 'assistant' && hasDisplayText
-                ? formatAssistantText(textForDisplay)
-                : msg.content;
+        const assistantDisplayText =
+            msg.role === 'assistant' && hasDisplayText ? textForDisplay : '';
 
         if (hasToolInvocations) {
-            const willShowToolResponses = (!isLoading || !isLastMessage);
-
-            // If no text content and tool responses won't show, return null
+            // Show tool tables only after the stream finishes (avoids duplicate loader + table)
+            const willShowToolResponses = !isLoading || !isLastMessage;
             if (!hasDisplayText && !willShowToolResponses) {
                 return null;
             }
 
             return (
                 <div className="space-y-3">
-                    {hasDisplayText && (
+                    {hasDisplayText && assistantDisplayText && (
                         <div className="mb-3">
-                            {displayContent}
+                            {renderAssistantText(assistantDisplayText)}
                         </div>
                     )}
                     {/* Only show tool responses after loading completes */}
                     {willShowToolResponses && (
                         <ToolResponseRenderer
-                            toolInvocations={msg.toolInvocations}
+                            toolInvocations={messageTools}
                             sidebarMode={sidebarMode}
                             onSendMessage={async (text) => {
                                 if (isLoading) return;
@@ -402,7 +457,13 @@ export const ChatUI: React.FC<ChatUIProps> = ({
             );
         }
 
-        return hasDisplayText ? <div>{displayContent}</div> : null;
+        if (hasDisplayText && assistantDisplayText) {
+            return renderAssistantText(assistantDisplayText);
+        }
+        if (hasDisplayText && msg.role === 'user') {
+            return <div className="whitespace-pre-wrap">{msg.content}</div>;
+        }
+        return null;
     };
 
     // Handle new chat
@@ -588,7 +649,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
             )}
 
             <div className={cn(
-                "shadow-md border border-gray-200 bg-white rounded-3xl",
+                "shadow-md border border-border bg-card rounded-3xl",
                 !sidebarMode && paddingClasses
             )}>
                 <div className={cn(
@@ -607,7 +668,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                     <input
                         ref={chatInputRef}
                         type="text"
-                        className="flex-1 min-w-0 border-none outline-none bg-transparent text-base placeholder-gray-400"
+                        className="flex-1 min-w-0 border-none outline-none bg-transparent text-base placeholder:text-muted-foreground"
                         placeholder={inputPlaceholder}
                         value={input}
                         onChange={handleInputChange}
@@ -624,7 +685,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => reload()}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                className="text-primary hover:text-primary/80 hover:bg-primary/10"
                                 title="Regenerate response"
                             >
                                 <RotateCw className="h-5 w-5" />
@@ -649,7 +710,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                                 onClick={() => void submitMessageWithAttachments()}
                                 disabled={(!input.trim() && selectedFiles.length === 0)}
                                 className={`${(!input.trim() && selectedFiles.length === 0)
-                                    ? 'text-gray-400 cursor-not-allowed rounded-full hover:bg-transparent hover:text-gray-400'
+                                    ? 'text-muted-foreground cursor-not-allowed rounded-full hover:bg-transparent hover:text-muted-foreground'
                                     : 'text-primary bg-primary/10 rounded-full hover:bg-primary/20 hover:text-primary/80'
                                     }`}
                                 title="Send message"
@@ -671,7 +732,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
             {suggestions.map((suggestion) => (
                 <button
                     key={suggestion}
-                    className="px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition-colors border border-gray-200"
+                    className="px-4 py-2 rounded-full bg-muted hover:bg-accent text-foreground text-sm transition-colors border border-border"
                     onClick={() => void handleSuggestionSubmit(suggestion)}
                     type="button"
                 >
@@ -708,7 +769,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         )}>
             <div className="flex items-center gap-3">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <h3 className="text-base font-medium text-gray-700 truncate max-w-[min(100%,20rem)]">
+                <h3 className="text-base font-medium text-foreground truncate max-w-[min(100%,20rem)]">
                     {threadTitle ?? 'Chat'}
                 </h3>
             </div>
@@ -719,7 +780,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                         size={sidebarMode ? "icon" : "sm"}
                         onClick={() => reload()}
                         className={cn(
-                            "text-blue-600 border-blue-200 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors",
+                            "text-primary border-primary/30 hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-colors",
                             sidebarMode ? "h-8 w-8" : "text-xs"
                         )}
                         title="Regenerate last response"
@@ -734,7 +795,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                         size={sidebarMode ? "icon" : "sm"}
                         onClick={handleNewChat}
                         className={cn(
-                            "text-blue-600 border-blue-200 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors",
+                            "text-primary border-primary/30 hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-colors",
                             sidebarMode ? "h-8 w-8" : "text-xs"
                         )}
                         title="New Chat"
@@ -764,7 +825,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                     <div className="flex w-full flex-col items-center py-4">
                         <h1
                             className={cn(
-                                "mb-6 font-medium text-gray-800 text-center",
+                                "mb-6 font-medium text-foreground text-center",
                                 sidebarMode ? "text-xl" : "text-2xl md:text-3xl"
                             )}
                         >
@@ -775,11 +836,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                 </div>
 
                 {isDragging && (
-                    <div className="absolute inset-0 z-50 bg-blue-50/95 border-4 border-dashed border-blue-400 rounded-lg flex flex-col items-center justify-center backdrop-blur-sm">
+                    <div className="absolute inset-0 z-50 bg-accent/95 border-4 border-dashed border-primary/40 rounded-lg flex flex-col items-center justify-center backdrop-blur-sm">
                         <div className="text-center">
-                            <Upload className="h-16 w-16 text-blue-500 mx-auto mb-4" />
-                            <p className="text-2xl font-semibold text-blue-700 mb-2">Drop any file here</p>
-                            <p className="text-lg text-blue-600">Add files to your conversation</p>
+                            <Upload className="h-16 w-16 text-primary mx-auto mb-4" />
+                            <p className="text-2xl font-semibold text-foreground mb-2">Drop any file here</p>
+                            <p className="text-lg text-muted-foreground">Add files to your conversation</p>
                         </div>
                     </div>
                 )}
@@ -810,16 +871,16 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         >
             {/* Drag and drop overlay */}
             {isDragging && (
-                <div className="absolute inset-0 z-50 bg-blue-50/95 border-4 border-dashed border-blue-400 rounded-lg flex flex-col items-center justify-center backdrop-blur-sm">
+                <div className="absolute inset-0 z-50 bg-accent/95 border-4 border-dashed border-primary/40 rounded-lg flex flex-col items-center justify-center backdrop-blur-sm">
                     <div className="text-center">
-                        <Upload className="h-16 w-16 text-blue-500 mx-auto mb-4" />
-                        <p className="text-2xl font-semibold text-blue-700 mb-2">Drop any file here</p>
-                        <p className="text-lg text-blue-600">Add files to your conversation</p>
+                        <Upload className="h-16 w-16 text-primary mx-auto mb-4" />
+                        <p className="text-2xl font-semibold text-foreground mb-2">Drop any file here</p>
+                        <p className="text-lg text-muted-foreground">Add files to your conversation</p>
                     </div>
                 </div>
             )}
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-6 max-w-3xl mx-auto w-full">
                 {messages.map((msg, idx) => {
                     const isUser = msg.role === 'user';
                     const hasFileParts = msg.parts && msg.parts.some(part => part.type === 'file');
@@ -837,23 +898,37 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                             {/* Message bubble with text content */}
                             {/* Only show bubble when there's actual content to display */}
                             {(() => {
-                                const content = renderMessageContent(msg, isLastMessage);
-                                // Only render bubble if there's actual content to show
-                                return content ? (
-                                    <div
-                                        className={`max-w-[95%] rounded-xl px-5 py-3 text-base ${isUser
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-gray-100 text-gray-900'
-                                            }`}
-                                    >
+                                const content = renderMessageContent(
+                                    msg,
+                                    idx,
+                                    messages as ChatMessage[],
+                                    isLastMessage
+                                );
+                                if (!content) return null;
+
+                                if (isUser) {
+                                    return (
+                                        <ChatUserMessageLayout
+                                            userName="You"
+                                            userInitials={getUserInitials()}
+                                            userImage={getUserImageUrl(user)}
+                                        >
+                                            {content}
+                                        </ChatUserMessageLayout>
+                                    );
+                                }
+
+                                return (
+                                    <ChatAssistantMessageLayout>
                                         {content}
-                                    </div>
-                                ) : null;
+                                    </ChatAssistantMessageLayout>
+                                );
                             })()}
                         </div>
                     );
                 })}
-                {isLoading && (
+                {isLoading &&
+                    !shouldHideChatLoadingIndicator(messages as ChatMessage[]) && (
                     <LoadingIndicator
                         messages={messages}
                         isLoading={isLoading}

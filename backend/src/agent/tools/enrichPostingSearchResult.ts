@@ -101,15 +101,62 @@ export function isPostingTransferBetweenAccountsSearch(filters: SearchFilterEntr
   );
 }
 
-function resolveLedgerFocusAccountId(
+function resolveJournalHighlightMeta(
   filters: SearchFilterEntry[],
-  toolContext?: PostingSearchToolContext
-): string | null {
-  const fromContext = toolContext?.modelContext?.selectedAccountId;
-  if (typeof fromContext === 'string' && fromContext.startsWith('acco_')) {
-    return fromContext;
+  journalRows: ReturnType<typeof transformJournalRows>
+): {
+  journalFocusSide?: 'debit' | 'credit';
+  journalFocusAccountName?: string;
+  journalTitle?: string;
+} {
+  const debitId = filters.find((f) => f.field === 'account_id' && f.operator === 'eq')?.value;
+  const creditId = filters.find(
+    (f) => f.field === 'credit_account_id' && f.operator === 'eq'
+  )?.value;
+
+  if (
+    typeof debitId === 'string' &&
+    typeof creditId === 'string' &&
+    debitId.startsWith('acco_') &&
+    creditId.startsWith('acco_') &&
+    debitId !== creditId
+  ) {
+    return {};
   }
-  return extractLedgerFocusAccountId(filters);
+
+  const sample = journalRows[0];
+  if (typeof debitId === 'string' && debitId.startsWith('acco_') && (!creditId || creditId === debitId)) {
+    const name = sample?.debit_account_name;
+    return {
+      journalFocusSide: 'debit',
+      journalFocusAccountName: name,
+      journalTitle: name ? `Debit account: ${name}` : 'Debit account postings',
+    };
+  }
+  if (typeof creditId === 'string' && creditId.startsWith('acco_') && !debitId) {
+    const name = sample?.credit_account_name;
+    return {
+      journalFocusSide: 'credit',
+      journalFocusAccountName: name,
+      journalTitle: name ? `Credit account: ${name}` : 'Credit account postings',
+    };
+  }
+  return {};
+}
+
+function resolvePostingDisplayMode(
+  filters: SearchFilterEntry[],
+  _toolContext?: PostingSearchToolContext
+): PostingDisplayUiHint {
+  // Bank register (+/− ledger): OR filter with the same account on debit and credit sides.
+  if (extractLedgerFocusAccountId(filters)) {
+    return 'account_ledger';
+  }
+  if (isPostingTransferBetweenAccountsSearch(filters)) {
+    return 'posting_dual';
+  }
+  // Debit-only, credit-only, period lists, and general posting searches.
+  return 'posting_journal';
 }
 
 function extractValueDateRange(filters: SearchFilterEntry[]): {
@@ -236,19 +283,6 @@ function transformJournalRows(records: PostingRow[], focusAccountId?: string | n
     });
 }
 
-function resolvePostingDisplayMode(
-  filters: SearchFilterEntry[],
-  toolContext?: PostingSearchToolContext
-): PostingDisplayUiHint {
-  if (resolveLedgerFocusAccountId(filters, toolContext)) {
-    return 'account_ledger';
-  }
-  if (isPostingTransferBetweenAccountsSearch(filters)) {
-    return 'posting_dual';
-  }
-  return 'posting_journal';
-}
-
 /**
  * Enrich posting searchRecords results with chat UI hints and pre-shaped row data.
  */
@@ -271,10 +305,8 @@ export async function enrichPostingSearchResult(
       | undefined);
 
   if (uiHint === 'account_ledger') {
-    const focusAccountId = resolveLedgerFocusAccountId(filters, toolContext)!;
-    let focusAccountName = toolContext?.modelContext?.selectedAccountName as
-      | string
-      | undefined;
+    const focusAccountId = extractLedgerFocusAccountId(filters)!;
+    let focusAccountName = toolContext?.modelContext?.selectedAccountName as string | undefined;
     if (!focusAccountName) {
       const match = records.find(
         (r) => r.account_id === focusAccountId || r.credit_account_id === focusAccountId
@@ -320,6 +352,7 @@ export async function enrichPostingSearchResult(
 
   const journalFocusAccountId = resolveJournalFocusAccountId(filters);
   const journalRows = transformJournalRows(records, journalFocusAccountId);
+  const journalHighlight = resolveJournalHighlightMeta(filters, journalRows);
 
   if (uiHint === 'posting_dual') {
     const debitId = filters.find((f) => f.field === 'account_id' && f.operator === 'eq')
@@ -370,6 +403,7 @@ export async function enrichPostingSearchResult(
     uiHint: 'posting_journal',
     currencyCode: journalRows[0]?.currency ?? 'INR',
     data: journalRows,
+    ...journalHighlight,
     columns: [
       { field: 'description', label: 'Transaction' },
       { field: 'debit_account_name', label: 'Debit Account' },
