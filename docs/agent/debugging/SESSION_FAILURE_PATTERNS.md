@@ -303,9 +303,18 @@ Update `SESSION_DIRECTIVE` in `backend/src/agent/prompt/constants.ts` to explici
 
 For the `{{org_id}}` sub-variant, add a guard in `advancedSqlQuery` to detect and strip unsubstituted `{{...}}` placeholders before execution, or reject the query with a clear error.
 
-**Fix (future — user clarification flow)**
+**Fix (longer-term — user clarification flow)**
 
-The `requestClarification` tool is already implemented — see [../TOOLS_REFERENCE.md](../TOOLS_REFERENCE.md#requestclarification) for details.
+For genuinely ambiguous cases (not just malformed SQL), the LLM should call
+`requestClarification` instead of giving up in plain text — this is fully
+implemented (`status` becomes `awaiting_input`, the watchdog is cancelled, and
+the session resumes via `POST /sessions/:id/clarify` once the user responds).
+See [../05-TOOLS.md — requestClarification](../05-TOOLS.md#requestclarification)
+and [../03-SESSION_LIFECYCLE.md — Phase 2b](../03-SESSION_LIFECYCLE.md#phase-2b-awaiting-input-requestclarification).
+If a session matching this pattern shows the LLM describing an ambiguous
+choice (not a 0-row query) without calling `requestClarification`, that's a
+prompt gap — strengthen the relevant template's `system_prompt` per the
+"When to use vs when NOT to use" table in 05-TOOLS.md.
 
 **Files to change**
 - `backend/src/agent/prompt/constants.ts` — add `completeStep`-on-failure rule to `SESSION_DIRECTIVE`
@@ -513,8 +522,8 @@ When you encounter a session failure not covered above:
 
 ## Related Docs
 
-- [../SESSION_LIFECYCLE.md](../SESSION_LIFECYCLE.md) — full session lifecycle and state machine
-- [../ARCHITECTURE.md](../ARCHITECTURE.md) — system architecture and file map
-- [../DATA_MODELS.md](../DATA_MODELS.md) — session table schemas
-- [../OBSERVABILITY.md](../OBSERVABILITY.md) — trace review UI and diagnostic SQL
+- [../03-SESSION_LIFECYCLE.md](../03-SESSION_LIFECYCLE.md) — full session lifecycle and state machine
+- [../02-ARCHITECTURE.md](../02-ARCHITECTURE.md) — system architecture and file map
+- [../08-DATA_MODELS.md](../08-DATA_MODELS.md) — session table schemas
+- [../11-OBSERVABILITY.md](../11-OBSERVABILITY.md) — trace review UI and diagnostic SQL
 - Session tables: `agent_session`, `agent_message`, `llm_trace`, `pending_action`

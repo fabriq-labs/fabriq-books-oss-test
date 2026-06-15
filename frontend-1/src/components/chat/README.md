@@ -474,7 +474,7 @@ The `status` from `useChat` controls UI behavior:
 
 **Endpoint:**
 ```
-${VITE_API_BASE_URL || 'http://localhost:4000'}/api/agent/chat/stream
+${VITE_API_BASE_URL || ''}/api/agent/chat/stream
 ```
 
 **Headers:**

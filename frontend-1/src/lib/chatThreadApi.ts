@@ -2,7 +2,7 @@ import Cookies from 'js-cookie';
 import type { Message } from '@ai-sdk/react';
 
 function apiBaseUrl(): string {
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  return import.meta.env.VITE_API_BASE_URL || '';
 }
 
 function authHeaders(extra?: Record<string, string>): Record<string, string> {

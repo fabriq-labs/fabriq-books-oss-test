@@ -282,7 +282,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ className }) => {
   const [activeChatId, setActiveChatId] = useState(() => `chat_${uuidv4()}`);
   const [retryKey, setRetryKey] = useState(0);
 
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
   const authToken = Cookies.get('__session');
 
   const fetchThreads = useCallback(async () => {

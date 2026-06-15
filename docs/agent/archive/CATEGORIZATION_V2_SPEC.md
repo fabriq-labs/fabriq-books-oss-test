@@ -1,8 +1,11 @@
 # Spec: Categorization V2 — Smarter Historical Matching + Per-Account Extraction Hints
 
-**Status**: Draft  
-**Last Updated**: 2026-04-21  
-**Related existing doc**: [`docs/agent/features/CATEGORIZATION.md`](../CATEGORIZATION.md)
+**Status**: Archived (Draft) — historical design spec, kept for reference
+alongside [`CATEGORIZATION_V2.md`](./CATEGORIZATION_V2.md). For current
+behaviour see [../05-TOOLS.md — categorizePostings](../05-TOOLS.md#categorizepostings)
+and [../07-WORKED_EXAMPLES.md](../07-WORKED_EXAMPLES.md).
+
+**Last Updated**: 2026-04-21
 
 ---
 
