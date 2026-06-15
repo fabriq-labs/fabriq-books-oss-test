@@ -100,7 +100,28 @@ Workflow: **Docker build and push (GHCR)**.
 
 **Image:** `ghcr.io/<owner-lowercase>/<repo-lowercase>:<tag>` (human-readable tag includes branch/ref + timestamp). Find packages under the repository on GitHub.
 
+**Tags pushed per build:**
+- `<branch>-<UTC timestamp>` — unique, immutable tag for this build (e.g. `demo-20260615-180530`); used for rollback/traceability
+- `<branch>-latest` — stable tag that always points at the most recent build for that branch (e.g. `demo-latest`); use this for Railway's "Automatically update to latest tag" or any other tag-polling deploy
+
 This workflow does **not** deploy to any cloud by itself. Pull the image from GHCR on your host (Railway, Fly, raw VM, Cloud Run with GHCR auth, etc.) and set runtime env vars there.
+
+### Build + deploy to Railway
+
+Workflow: **Build and deploy (Railway)** (`.github/workflows/deploy-railway.yml`).
+Calls `docker-ghcr.yml` as a reusable workflow (`workflow_call`) for the build
+step — no duplicated build logic — then points a Railway service at the
+freshly built `<branch>-<timestamp>` image tag via Railway's GraphQL API and
+triggers a redeploy.
+
+Requires these repo secrets: `RAILWAY_TOKEN`, `RAILWAY_PROJECT_ID`,
+`RAILWAY_SERVICE_ID`, `RAILWAY_ENVIRONMENT_ID`. The Railway service must be
+configured as **"Deploy from Docker Image"** pointing at
+`ghcr.io/<owner-lowercase>/<repo-lowercase>`.
+
+If you'd rather rely on Railway's built-in **"Automatically update to latest
+tag"** toggle instead of this workflow's explicit deploy step, point that
+toggle at the `<branch>-latest` tag described above.
 
 ---
 
