@@ -14,6 +14,7 @@ import { PostingDualDisplay, type PostingDualTable } from './PostingDualDisplay'
 import { ToolInvocation as BaseToolInvocation, ToolResult as BaseToolResult } from '@/components/utils/helper';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
+import { resolvePostingSearchDisplayHint } from '../chatUtils';
 import { Wrench } from 'lucide-react';
 
 interface ExtendedToolResult extends BaseToolResult {
@@ -26,6 +27,9 @@ interface ExtendedToolResult extends BaseToolResult {
     success?: boolean;
     focusAccountName?: string;
     focusAccountId?: string;
+    journalFocusSide?: 'debit' | 'credit';
+    journalFocusAccountName?: string;
+    journalTitle?: string;
     tables?: PostingDualTable[];
 }
 
@@ -181,10 +185,10 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
 
                 const wrapToolResult = (
                     content: React.ReactNode,
-                    options?: { showDescription?: boolean }
+                    options?: { showDescription?: boolean; hideToolBadge?: boolean }
                 ) => (
                     <div key={index} className="space-y-2">
-                        {toolNameBadge}
+                        {!options?.hideToolBadge && toolNameBadge}
                         {options?.showDescription !== false && descriptionElement}
                         {content}
                     </div>
@@ -212,9 +216,16 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                 if (
                     (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) &&
                     Array.isArray(data) &&
-                    data.length > 0
+                    data.length > 0 &&
+                    resolvePostingSearchDisplayHint(uiHint, tool.result.model, data) != null
                 ) {
-                    if (uiHint === 'account_ledger') {
+                    const postingHint = resolvePostingSearchDisplayHint(
+                        uiHint,
+                        tool.result.model,
+                        data
+                    );
+
+                    if (postingHint === 'account_ledger') {
                         return wrapToolResult(
                                 <AccountLedgerDisplay
                                     rows={data}
@@ -224,30 +235,36 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                     }
                                     currencyCode={tool.result.currencyCode as string | undefined}
                                     sidebarMode={sidebarMode}
-                                />
+                                />,
+                                { hideToolBadge: true }
                         );
                     }
-                    if (uiHint === 'posting_journal') {
+                    if (postingHint === 'posting_journal') {
                         return wrapToolResult(
                                 <PostingJournalDisplay
                                     rows={data}
+                                    title={tool.result.journalTitle as string | undefined}
+                                    highlightSide={tool.result.journalFocusSide as 'debit' | 'credit' | undefined}
+                                    highlightAccountName={tool.result.journalFocusAccountName as string | undefined}
                                     currencyCode={tool.result.currencyCode as string | undefined}
                                     sidebarMode={sidebarMode}
-                                />
+                                />,
+                                { hideToolBadge: true }
                         );
                     }
-                    if (uiHint === 'posting_dual' && Array.isArray(tool.result.tables)) {
+                    if (postingHint === 'posting_dual' && Array.isArray(tool.result.tables)) {
                         return wrapToolResult(
                                 <PostingDualDisplay
                                     tables={tool.result.tables as PostingDualTable[]}
                                     currencyCode={tool.result.currencyCode as string | undefined}
                                     sidebarMode={sidebarMode}
-                                />
+                                />,
+                                { hideToolBadge: true }
                         );
                     }
                 }
 
-                // Handle searchRecords - always render as table
+                // Handle searchRecords - generic table for non-posting models
                 if (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) {
                     if (Array.isArray(data) && data.length > 0) {
                         return wrapToolResult(

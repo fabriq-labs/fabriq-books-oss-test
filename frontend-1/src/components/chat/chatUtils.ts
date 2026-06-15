@@ -235,6 +235,42 @@ export const buildFileParts = async (files: File[]): Promise<MessagePart[]> => {
 // Assistant text when table tool results are present
 // ============================================================================
 
+/** Infer posting chat table type from enriched row shape (journal vs ledger). */
+export function resolvePostingSearchDisplayHint(
+    uiHint: string | undefined,
+    model: string | undefined,
+    data: unknown[]
+): 'account_ledger' | 'posting_journal' | 'posting_dual' | null {
+    if (model !== 'posting' || !Array.isArray(data) || data.length === 0) {
+        return null;
+    }
+    if (uiHint === 'posting_dual') {
+        return 'posting_dual';
+    }
+
+    const sample = data[0] as Record<string, unknown>;
+    const looksLikeJournal =
+        typeof sample.debit_account_name === 'string' &&
+        typeof sample.credit_account_name === 'string';
+    const looksLikeLedger =
+        !looksLikeJournal &&
+        (typeof sample.category_name === 'string' ||
+            sample.signed_amount != null ||
+            sample.running_balance != null);
+
+    // Journal rows always use PostingJournalDisplay (debit/credit account filters, general lists).
+    if (looksLikeJournal) {
+        return 'posting_journal';
+    }
+    if (uiHint === 'account_ledger' || looksLikeLedger) {
+        return 'account_ledger';
+    }
+    if (uiHint === 'posting_journal') {
+        return 'posting_journal';
+    }
+    return null;
+}
+
 /** True when completed tool results will render a data table in the chat UI. */
 export function hasTableToolResults(toolInvocations?: ToolInvocation[]): boolean {
     if (!toolInvocations?.length) return false;

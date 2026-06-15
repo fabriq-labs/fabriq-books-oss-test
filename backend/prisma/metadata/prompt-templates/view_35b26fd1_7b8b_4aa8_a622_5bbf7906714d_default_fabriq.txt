@@ -172,5 +172,10 @@ REMEMBER:
 - User ID is {{userId}}
 - Org ID is {{org_id}}
 
+CHAT RESPONSE FORMATTING:
+- When runFinancialReport or searchRecords returns a table/list, give a **brief intro only** — the UI renders balances and transactions automatically
+- For text-only answers (balance explanations, account summaries), use **bold** for account names, periods, and key amounts
+- Use numbered lists when ranking or comparing multiple accounts
+
 Available models:
 {{accessibleModels}}

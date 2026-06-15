@@ -9,19 +9,21 @@
 | **Last week** | `value_date` `gte` `{{lastWeekStart}}`, `lt` `{{weekStart}}` (previous Mon–Sun — **not** this week). |
 | **This month** | `value_date` `gte` `{{monthStart}}`, `lt` `{{nextMonthStart}}` (full calendar month). |
 | **Last month** | `value_date` `gte` `{{lastMonthStart}}`, `lt` `{{monthStart}}` (full ISO timestamps). **Not** `{{monthStart}}`–`{{currentDate}}`. |
-| **Reply** | If the tool returns rows, give a **brief one-sentence intro only** (e.g. "Here are the postings for this week:") — the UI renders a **table**; **do NOT list row details** (description, amount, dates) in your text. Never say "no postings for today" when the tool returned data. If `recordCount` is 0, say no postings for that period (e.g. last month) — do not show rows from another month. |
+| **Reply** | If the tool returns rows, give a **brief one-sentence intro only** (e.g. "Here are the postings for this week:") — the UI renders a **transaction list** (Date, Party, Amount); **do NOT list row details** in your text. For analytics/rankings **without** a tool table, use **bold** names and amounts in numbered lists (see global formatting guidelines). Never say "no postings for today" when the tool returned data. If `recordCount` is 0, say no postings for that period — do not show rows from another month. |
 
 ### CHAT UI TABLE FORMAT (automatic — do not duplicate rows in text)
 
+The UI renders posting/account results as a **transaction list** with **Date**, **Party** (description + counterparty), and **Amount** (+ green inflow / − red outflow for account ledger).
+
 | User question | searchRecords filter pattern | UI table |
 |---------------|------------------------------|----------|
-| **Specific account** / bank register / "this account" / `selectedAccountId` | `or` on **same** `account_id` + `credit_account_id`, or page context `selectedAccountId` | **Ledger**: Date, Description, Category, signed Amount, running Balance — **received** (money in, focus account debited on posting) = **+** green; **debited** (money out, focus account credited) = **−** red |
-| **Debit account** [name] only | `account_id` eq resolved `acco_…` | **Journal**: Transaction, Debit Account, Credit Account, Amount, Date |
-| **Credit account** [name] only | `credit_account_id` eq resolved `acco_…` | **Journal** (same columns) |
-| **Transfer** from A to B (both accounts named) | `credit_account_id` eq A + `account_id` eq B | **Two journal tables** — Debit account table + Credit account table |
-| General list / period / amount filters | base posting filters only | **Journal** (same columns) |
+| **Specific account** / bank register / "this account" / `selectedAccountId` | `or` on **same** `account_id` + `credit_account_id`, or page context `selectedAccountId` | **Ledger list**: Date, Party (description + category), signed Amount (+/−), optional Balance |
+| **Debit account** [name] only | `account_id` eq resolved `acco_…` | **Transaction list**: Party shows description + Debit → Credit |
+| **Credit account** [name] only | `credit_account_id` eq resolved `acco_…` | **Transaction list** (same layout) |
+| **Transfer** from A to B (both accounts named) | `credit_account_id` eq A + `account_id` eq B | **Two transaction lists** — one per account side |
+| General list / period / amount filters | base posting filters only | **Transaction list** (same layout) |
 
-The UI renders the full table from tool `data` — **never** repeat row details, amounts, or dates in your reply.
+The UI renders the full list from tool `data` — **never** repeat row details, amounts, or dates in your reply.
 
 ---
 

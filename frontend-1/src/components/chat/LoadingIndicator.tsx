@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Brain, Sparkles, Search, LucideIcon } from 'lucide-react';
 import { ToolInvocation } from '@/components/utils/helper';
+import { ChatAssistantAvatar } from './ChatMessageLayout';
 
 interface ChatMessage {
     role: 'user' | 'assistant' | 'system' | 'data';
@@ -201,19 +202,20 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     const IconComponent = loadingState.icon;
 
     return (
-        <div className="flex w-full gap-3 animate-in fade-in duration-300">
-            <div className="break-words max-w-[80%] rounded-xl px-4 py-3 bg-gradient-to-br from-muted to-muted/80 border border-border/50 shadow-sm">
+        <div className="flex items-start gap-3 w-full max-w-[95%] animate-in fade-in duration-300">
+            <ChatAssistantAvatar className="mt-1" />
+            <div className="break-words rounded-2xl px-4 py-3 bg-muted border border-border shadow-sm">
                 <div className="flex items-center gap-3">
                     {/* Animated icon */}
                     <div className="relative">
                         <IconComponent
                             className={`h-4 w-4 ${loadingState.type === 'querying'
-                                ? 'text-blue-500 animate-spin'
-                                : 'text-purple-500 animate-pulse'
+                                ? 'text-primary animate-spin'
+                                : 'text-primary/70 animate-pulse'
                                 } transition-colors duration-300`}
                         />
                         {loadingState.type === 'querying' && (
-                            <Sparkles className="h-3 w-3 text-blue-400 absolute -top-1 -right-1 animate-ping" />
+                            <Sparkles className="h-3 w-3 text-primary/50 absolute -top-1 -right-1 animate-ping" />
                         )}
                     </div>
 

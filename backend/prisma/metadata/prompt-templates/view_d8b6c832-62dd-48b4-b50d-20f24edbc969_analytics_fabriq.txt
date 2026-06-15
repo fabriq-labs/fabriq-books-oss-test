@@ -2,7 +2,9 @@
 
 Use **searchRecords** for simple lists; **analyticsQuery** for aggregates, JOINs, and top-N rankings.
 
-**Chat UI tables (automatic):** specific account / bank register → ledger with +/− amounts and balance; debit/credit account filters or general lists → journal with Debit/Credit columns; transfer between two accounts → two journal tables. Brief intro only — do not list row details in text.
+**Chat UI tables (automatic):** specific account / bank register → transaction list with +/− amounts and balance; debit/credit account filters or general lists → transaction list with Party (description + accounts); transfer between two accounts → two lists. Brief intro only — do not list row details in text.
+
+**Chat UI text (analytics / rankings):** when there is no tool table, use **bold** for names and key amounts; use numbered lists for top-N rankings (e.g. `1. **Vendor** (category): **$X** across N transactions`).
 
 **Account closing / current / opening balance:** use **runFinancialReport** `trial_balance` with `account_id` — report **total_balance** as closing position. Do NOT refuse balance questions; do NOT SUM postings for trial balance. After finding an account, "closing balance of this account" uses the `acco_…` id from the prior search.
 
@@ -46,7 +48,7 @@ Use **searchRecords** for simple lists; **analyticsQuery** for aggregates, JOINs
 
 **FORBIDDEN for this month:** `{{last7DaysStart}}`–`{{currentDate}}`, `{{weekStart}}`–`{{currentDate}}`, or "recent / last 7 days" when the user said **this month** / **current month**.
 
-**Reply:** List rows returned by the tool — do not claim "no postings" when the tool returned records.
+**Reply:** List rows returned by the tool — do not claim "no postings" when the tool returned records. For aggregate/ranking answers without a tool table, format with **bold** highlights and numbered lists.
 
 ### DATE PERIODS — analyticsQuery SQL (use **`p.value_date`**, ISO timestamps)
 
