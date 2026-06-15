@@ -93,6 +93,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         const base = pageContext ?? buildDefaultPostingChatContext(currentEntity, entities);
         return enrichFinanceChatContext(base, currentEntity, entities);
     }, [pageContext, currentEntity, entities, currentEntityId, currentEntity?.legal_name]);
+    const chatContextRef = useRef(chatContext);
+    useEffect(() => {
+        chatContextRef.current = chatContext;
+    }, [chatContext]);
     const token = Cookies.get("__session");
     const messagesRef = useRef<Message[]>([]);
     const persistThreadRef = useRef<(threadMessages: Message[]) => Promise<void>>(async () => {});
@@ -154,9 +158,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                 ? extractUserMessageText(lastUserMessage as UserMessage)
                 : '';
 
-            if (chatContext) {
+            if (chatContextRef.current) {
                 preparedBody.context = {
-                    ...chatContext,
+                    ...chatContextRef.current,
                     searchAllEntities: userRequestedAllEntities(userQuestion),
                     userQuestion,
                 };

@@ -99,9 +99,11 @@ FOR ACCOUNT RESOLUTION (before balance / report questions):
 {{#if context.recordId}}
 - Use context record ID: {{context.recordId}}
 {{else}}
-1. If the user provides an id starting with acco_, use it directly as account_id
-2. Otherwise searchRecords on account with icontains on name (see examples above); try code if name returns nothing
-3. If multiple matches, list id, name, code, classification and ask which account — unless one match is obvious
+**Mandatory 2-step flow when user names an account:**
+1. **searchRecords** on `account` — `name` **icontains** user text{{#if context.modelContext.legalEntityId}}; header legal entity `{{context.modelContext.legalEntityId}}` is applied automatically{{/if}} → read `acco_…` **id**
+2. **runFinancialReport** — pass that **id only** (never the display name){{#if context.modelContext.legalEntityId}} + `legal_entity_ids: ["{{context.modelContext.legalEntityId}}"]`{{/if}}
+- If the user provides an id starting with `acco_`, skip Step 1 and use it directly
+- If multiple matches, list id, name, code, classification and ask which account — unless one match is obvious
 {{/if}}
 
 FOR FINANCIAL REPORT OPERATIONS (balances, opening, debits, credits, trends):
@@ -146,6 +148,7 @@ Examples:
   * "Show monthly trend this FY" → runFinancialReport monthly_trial_balance, current FY start through {{currentDate}}, account_id={{context.recordId}}
 {{else}}
   * "Find account Office Supplies" → searchRecords account name icontains "Office Supplies"
+  * "Closing balance for ICICI account" → **searchRecords** account name icontains "ICICI" → **runFinancialReport** trial_balance with `account_id` = acco_… from search{{#if context.modelContext.legalEntityId}} + `legal_entity_ids: ["{{context.modelContext.legalEntityId}}"]`{{/if}}
   * "What is the closing balance of this account?" (right after finding Office Supplies) → runFinancialReport trial_balance, account_id = acco_ id from prior search — omit from_date/to_date if no period named
   * "Balance of HDFC Savings for March 2026" → search account → runFinancialReport trial_balance with March dates and account_id
   * "Monthly trend for Checking Account this year" → search account → monthly_trial_balance FY start to today

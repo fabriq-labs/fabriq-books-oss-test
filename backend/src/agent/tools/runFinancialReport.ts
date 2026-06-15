@@ -13,6 +13,11 @@ import {
 } from '../../lib/financialYear';
 import prisma from '../../lib/prisma';
 import logger from '../../utils/logger';
+import { resolvePostingHeaderLegalEntityId } from '../postingCreateHelpers';
+
+function isAccountId(value: string | undefined): boolean {
+  return Boolean(value && String(value).trim().startsWith('acco_'));
+}
 
 export const runFinancialReportSchema = z.object({
   report_id: z
@@ -35,7 +40,13 @@ export const runFinancialReportSchema = z.object({
   account_id: z
     .string()
     .optional()
-    .describe('Filter to a single account (trial_balance, monthly_trial_balance, and income_statement).'),
+    .refine((v) => !v || isAccountId(v), {
+      message:
+        'account_id must be acco_… from a prior searchRecords on account — never pass the display name (e.g. "ICICI account"). Search first, then call this tool with the id.',
+    })
+    .describe(
+      'acco_… id from searchRecords on account. When the user names an account, call searchRecords first (name icontains + header legal_entity_id), then pass the returned id here.'
+    ),
   currency_id: z.string().optional().describe('Reporting currency id or ISO code override.'),
   legal_entity_ids: z
     .array(z.string())
@@ -47,11 +58,12 @@ export const runFinancialReportSchema = z.object({
 type ReportPageContext = {
   recordId?: string | null;
   modelContext?: {
+    legalEntityId?: string;
+    legal_entity_id?: string;
     from_date?: string;
     to_date?: string;
     startDate?: string;
     endDate?: string;
-    legal_entity_id?: string;
     financial_year_label?: string;
   };
 };
@@ -150,7 +162,7 @@ async function resolveFinancialYearType(
 export function runFinancialReportTool(auth: AuthContext, pageContext?: ReportPageContext) {
   const mc = pageContext?.modelContext;
   const defaultAccountId = pageContext?.recordId ?? undefined;
-  const defaultLegalEntityId = mc?.legal_entity_id;
+  const defaultLegalEntityId = mc?.legalEntityId ?? mc?.legal_entity_id;
 
   const contextHints: string[] = [];
   contextHints.push(
@@ -167,6 +179,7 @@ export function runFinancialReportTool(auth: AuthContext, pageContext?: ReportPa
     description: `Run a canonical financial report (same logic as Balance Sheet / Monthly Trial Balance UI).
 Use trial_balance for account balance, opening balance, debits, credits, and total_balance for a date range.
 Use monthly_trial_balance for month-by-month movement and cumulative balance (pass account_id to scope to one account).
+When the user names an account (e.g. "closing balance for ICICI account"): Step 1 — searchRecords on account (name icontains; header legal_entity_id is applied automatically). Step 2 — this tool with account_id = acco_… from that search and legal_entity_ids from header when set. NEVER pass account display names as account_id.
 Do NOT reimplement trial balance logic in raw SQL — use this tool.
 ${contextHints.join(' ')}`,
     parameters: runFinancialReportSchema,
@@ -184,16 +197,29 @@ ${contextHints.join(' ')}`,
         return { tool: 'runFinancialReport', success: false, error: 'Missing org context' };
       }
 
+      const headerLegalEntityId =
+        (await resolvePostingHeaderLegalEntityId(auth, pageContext)) ?? undefined;
+
       const resolvedAccountId = account_id || defaultAccountId || undefined;
+      if (resolvedAccountId && !isAccountId(resolvedAccountId)) {
+        return {
+          tool: 'runFinancialReport',
+          success: false,
+          error: `account_id must be acco_…, not "${resolvedAccountId}". Call searchRecords on account first (name icontains + header legal_entity_id), then runFinancialReport with the id from that result.`,
+        };
+      }
+
       const resolvedLegalEntityIds =
         legal_entity_ids?.length
           ? legal_entity_ids
-          : defaultLegalEntityId
-            ? [defaultLegalEntityId]
-            : undefined;
+          : headerLegalEntityId
+            ? [headerLegalEntityId]
+            : defaultLegalEntityId
+              ? [defaultLegalEntityId]
+              : undefined;
 
       const legalEntityId =
-        resolvedLegalEntityIds?.[0] ?? defaultLegalEntityId ?? undefined;
+        resolvedLegalEntityIds?.[0] ?? headerLegalEntityId ?? defaultLegalEntityId ?? undefined;
 
       let resolvedFromDate = from_date;
       let resolvedToDate = to_date;
