@@ -11,6 +11,22 @@ on:
         description: Skip Docker layer cache (fresh build)
         default: false
         type: boolean
+  workflow_call:
+    inputs:
+      no_cache:
+        description: Skip Docker layer cache (fresh build)
+        default: false
+        type: boolean
+    outputs:
+      image:
+        description: GHCR image repository (without tag), e.g. ghcr.io/fabriq-labs/fabriq-ws-setup
+        value: ${{ jobs.build-push.outputs.image }}
+      image_tag:
+        description: Unique timestamped tag for this build, e.g. demo-20260615-180530
+        value: ${{ jobs.build-push.outputs.image_tag }}
+      stable_tag:
+        description: Stable per-branch tag that always points at the latest build for this ref, e.g. demo-latest
+        value: ${{ jobs.build-push.outputs.stable_tag }}
 
 permissions:
   contents: read
@@ -24,6 +40,11 @@ jobs:
   build-push:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+      image_tag: ${{ steps.build_meta.outputs.image_tag }}
+      stable_tag: ${{ steps.build_meta.outputs.stable_tag }}
 
     steps:
       - name: Checkout
@@ -47,6 +68,7 @@ jobs:
           SAFE_REF=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
           echo "build_time=${BUILD_TIME}" >> "$GITHUB_OUTPUT"
           echo "image_tag=${SAFE_REF}-${TAG_TS}" >> "$GITHUB_OUTPUT"
+          echo "stable_tag=${SAFE_REF}-latest" >> "$GITHUB_OUTPUT"
 
       - name: Image name (GHCR requires lowercase)
         id: image
@@ -72,6 +94,7 @@ jobs:
           images: ${{ steps.image.outputs.image }}
           tags: |
             type=raw,value=${{ steps.build_meta.outputs.image_tag }}
+            type=raw,value=${{ steps.build_meta.outputs.stable_tag }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -88,7 +111,7 @@ jobs:
             BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
             IMAGE_TAG=${{ steps.build_meta.outputs.image_tag }}
             CACHEBUST=${{ github.sha }}
-          no-cache: ${{ github.event_name == 'workflow_dispatch' && inputs.no_cache || false }}
+          no-cache: ${{ inputs.no_cache || false }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
