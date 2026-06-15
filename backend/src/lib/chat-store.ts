@@ -269,3 +269,17 @@ export async function saveChat({
     WHERE chat_thread.user_id = EXCLUDED.user_id
   `;
 }
+
+/**
+ * Delete a chat thread owned by the authenticated user.
+ * @returns true if a row was deleted
+ */
+export async function deleteChat(chatId: string, userId: string): Promise<boolean> {
+  const deleted = await prisma.$executeRaw`
+    DELETE FROM chat_thread
+    WHERE id = ${chatId}
+      AND user_id = ${userId}
+  `;
+
+  return Number(deleted) > 0;
+}

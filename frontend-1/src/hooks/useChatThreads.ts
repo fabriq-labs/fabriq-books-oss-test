@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   createChatThread,
+  deleteChatThread,
   listChatThreads,
   type ChatThreadSummary,
 } from '@/lib/chatThreadApi';
@@ -47,5 +48,13 @@ export function useChatThreads(enabled = true) {
     [refresh]
   );
 
-  return { threads, loading, error, refresh, createThread };
+  const deleteThread = useCallback(
+    async (chatId: string) => {
+      await deleteChatThread(chatId);
+      setThreads((prev) => prev.filter((thread) => thread.id !== chatId));
+    },
+    []
+  );
+
+  return { threads, loading, error, refresh, createThread, deleteThread };
 }

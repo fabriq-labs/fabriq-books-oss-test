@@ -26,7 +26,7 @@ export const ChatShell: React.FC<ChatShellProps> = ({
   sidebarMode = true,
   fullPage = false,
 }) => {
-  const { threads, loading, error, refresh } = useChatThreads(fullPage);
+  const { threads, loading, error, refresh, deleteThread } = useChatThreads(fullPage);
   const [activeChatId, setActiveChatId] = useState(() => `chat_${uuidv4()}`);
   const chatSidebarMode = fullPage ? false : sidebarMode;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -51,6 +51,16 @@ export const ChatShell: React.FC<ChatShellProps> = ({
     setActiveChatId(chatId);
   };
 
+  const handleDeleteThread = useCallback(
+    async (chatId: string) => {
+      await deleteThread(chatId);
+      if (chatId === activeChatId) {
+        startNewChat();
+      }
+    },
+    [activeChatId, deleteThread, startNewChat]
+  );
+
   const activeThreadTitle =
     visibleThreads.find((thread) => thread.id === activeChatId)?.title ?? DEFAULT_DRAFT_TITLE;
 
@@ -66,6 +76,7 @@ export const ChatShell: React.FC<ChatShellProps> = ({
           onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
           onSelect={handleSelectThread}
           onNewChat={startNewChat}
+          onDelete={handleDeleteThread}
           showHistoryTitle
         />
       )}

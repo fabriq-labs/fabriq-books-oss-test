@@ -9,7 +9,7 @@ import {
 } from 'ai';
 import { authMiddleware } from '../auth/middleware';
 import { getModel, getModelId } from '../lib/ai/modelProvider';
-import { createChatThread, listChats, loadChat, saveChat } from '../lib/chat-store';
+import { createChatThread, deleteChat, listChats, loadChat, saveChat } from '../lib/chat-store';
 import logger from '../utils/logger';
 
 const FINANCIAL_SYSTEM_PROMPT = `You are a financial advisory assistant for a business accounting platform.
@@ -130,6 +130,26 @@ export function createChatRouter(): Router {
     } catch (error) {
       logger.error('Failed to save chat thread', { error, chatId: req.params.chatId });
       return res.status(500).json({ error: 'Failed to save chat thread' });
+    }
+  });
+
+  /** DELETE /api/chat/:chatId — remove a persisted thread for the authenticated user */
+  router.delete('/:chatId', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const userId = req.context?.auth?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const deleted = await deleteChat(req.params.chatId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Chat thread not found' });
+      }
+
+      return res.json({ success: true });
+    } catch (error) {
+      logger.error('Failed to delete chat thread', { error, chatId: req.params.chatId });
+      return res.status(500).json({ error: 'Failed to delete chat thread' });
     }
   });
 

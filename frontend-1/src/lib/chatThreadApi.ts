@@ -97,3 +97,19 @@ export async function saveChatThread(
     throw new Error(body.error || `Failed to save thread (${response.status})`);
   }
 }
+
+export async function deleteChatThread(chatId: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl()}/api/chat/${encodeURIComponent(chatId)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+
+  if (response.status === 404) {
+    return;
+  }
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error || `Failed to delete thread (${response.status})`);
+  }
+}
