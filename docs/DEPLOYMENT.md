@@ -547,12 +547,6 @@ cd backend
 npx ts-node prisma/setup-IN/setup-indian-demo.ts --reset-postings
 ```
 
-**Sync demo invoices only** (refresh `invoice_net_total` and related fields from `invoice.csv`; does not re-seed postings):
-
-```bash
-cd backend
-npx ts-node prisma/setup-IN/setup-indian-demo.ts --sync-invoices
-```
 
 **Sync demo invoices only** (e.g. refresh `invoice_net_total` from `invoice.csv` without re-seeding postings):
 
@@ -562,6 +556,7 @@ npx ts-node prisma/setup-IN/setup-indian-demo.ts --sync-invoices
 ```
 
 Use this after running reconciliations/confirmations in the UI when you want the posting list back to the initial demo state. See [RECONCILIATION_TOOL.md](./agent/RECONCILIATION_TOOL.md#seed-data--demo-indian-demo) for details.
+Use this after running reconciliations/confirmations in the UI when you want the posting list back to the initial demo state. See [docs/agent/07-WORKED_EXAMPLES.md](./agent/07-WORKED_EXAMPLES.md#trace-2-reconciliation-atpl_reconcile) for the reconciliation flow.
 
 ### 2. US-CA Demo Data 🇺🇸
 

@@ -1,0 +1,94 @@
+# Build the GHCR image (via docker-ghcr.yml) and point a Railway service at it.
+#
+# Required repo secrets:
+#   RAILWAY_TOKEN          - Railway API token (Project or Account token with deploy access)
+#   RAILWAY_PROJECT_ID     - Railway project ID
+#   RAILWAY_SERVICE_ID     - Railway service ID to update/redeploy
+#   RAILWAY_ENVIRONMENT_ID - Railway environment ID (e.g. the "demo" environment)
+#
+# The Railway service must be configured as "Deploy from Docker Image"
+# pointing at ghcr.io/<owner>/<repo> (any tag - this workflow overwrites it).
+
+name: Build and deploy (Railway)
+
+on:
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: Skip Docker layer cache (fresh build)
+        default: false
+        type: boolean
+
+concurrency:
+  group: deploy-railway-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/docker-ghcr.yml
+    with:
+      no_cache: ${{ inputs.no_cache }}
+    permissions:
+      contents: read
+      packages: write
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Update Railway service image and redeploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+          IMAGE: ${{ needs.build.outputs.image }}:${{ needs.build.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          echo "Deploying ${IMAGE} to Railway service ${RAILWAY_SERVICE_ID}"
+
+          update_payload=$(jq -n \
+            --arg serviceId "$RAILWAY_SERVICE_ID" \
+            --arg environmentId "$RAILWAY_ENVIRONMENT_ID" \
+            --arg image "$IMAGE" \
+            '{
+              query: "mutation($serviceId: String!, $environmentId: String!, $image: String!) { serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, input: { source: { image: $image } }) }",
+              variables: { serviceId: $serviceId, environmentId: $environmentId, image: $image }
+            }')
+
+          update_response=$(curl -sS --fail-with-body \
+            --request POST \
+            --url https://backboard.railway.com/graphql/v2 \
+            --header "Authorization: Bearer ${RAILWAY_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data "$update_payload")
+
+          echo "serviceInstanceUpdate response: ${update_response}"
+          if echo "$update_response" | jq -e '.errors' >/dev/null; then
+            echo "Railway API returned errors during serviceInstanceUpdate" >&2
+            exit 1
+          fi
+
+          deploy_payload=$(jq -n \
+            --arg serviceId "$RAILWAY_SERVICE_ID" \
+            --arg environmentId "$RAILWAY_ENVIRONMENT_ID" \
+            '{
+              query: "mutation($serviceId: String!, $environmentId: String!) { serviceInstanceDeploy(serviceId: $serviceId, environmentId: $environmentId) }",
+              variables: { serviceId: $serviceId, environmentId: $environmentId }
+            }')
+
+          deploy_response=$(curl -sS --fail-with-body \
+            --request POST \
+            --url https://backboard.railway.com/graphql/v2 \
+            --header "Authorization: Bearer ${RAILWAY_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data "$deploy_payload")
+
+          echo "serviceInstanceDeploy response: ${deploy_response}"
+          if echo "$deploy_response" | jq -e '.errors' >/dev/null; then
+            echo "Railway API returned errors during serviceInstanceDeploy" >&2
+            exit 1
+          fi

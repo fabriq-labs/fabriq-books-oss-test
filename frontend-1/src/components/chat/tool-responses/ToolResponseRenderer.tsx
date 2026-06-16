@@ -7,14 +7,30 @@ import { SqlResultsTable } from '.';
 import { MetricsDisplay } from './MetricsDisplay';
 import { InvoiceMapPreview } from './InvoiceMapPreview';
 import { ReconciliationSuggestions } from './ReconciliationSuggestions';
+import { FinancialReportDisplay } from './FinancialReportDisplay';
+import { AccountLedgerDisplay } from './AccountLedgerDisplay';
+import { PostingJournalDisplay } from './PostingJournalDisplay';
+import { PostingDualDisplay, type PostingDualTable } from './PostingDualDisplay';
 import { ToolInvocation as BaseToolInvocation, ToolResult as BaseToolResult } from '@/components/utils/helper';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
+import { normalizeToolInvocation, resolvePostingSearchDisplayHint } from '../chatUtils';
+import { Wrench } from 'lucide-react';
 
 interface ExtendedToolResult extends BaseToolResult {
-    error?: boolean;
+    error?: boolean | string;
     description?: string;
     message?: string;
+    report_id?: string;
+    filters?: Record<string, unknown>;
+    currencyCode?: string;
+    success?: boolean;
+    focusAccountName?: string;
+    focusAccountId?: string;
+    journalFocusSide?: 'debit' | 'credit';
+    journalFocusAccountName?: string;
+    journalTitle?: string;
+    tables?: PostingDualTable[];
 }
 
 interface ToolInvocation extends Omit<BaseToolInvocation, 'result'> {
@@ -96,8 +112,12 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
     };
 
     // Filter and process tool invocations to show only the latest successful result per tool
-    const processedTools = toolInvocations.reduce((acc, tool) => {
-        if (tool.state !== 'result' || !tool.result) {
+    const normalizedInvocations = toolInvocations
+        .map((tool) => normalizeToolInvocation(tool))
+        .filter((tool): tool is ToolInvocation => tool != null);
+
+    const processedTools = normalizedInvocations.reduce((acc, tool) => {
+        if (!tool.result) {
             return acc;
         }
 
@@ -122,16 +142,16 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
         return acc;
     }, [] as typeof toolInvocations);
 
-    // Filter out tools with errors and no data
+    // Filter out tools with errors and no data (keep search tools for empty-state UI)
     const validTools = processedTools.filter(tool => {
         const hasError = tool.result?.error;
-        // Handle both array data and object data (for invoice extraction)
         const hasArrayData = tool.result?.data && Array.isArray(tool.result.data) && tool.result.data.length > 0;
         const hasObjectData = tool.result?.data && typeof tool.result.data === 'object' && !Array.isArray(tool.result.data);
         const hasData = hasArrayData || hasObjectData;
+        const isSearchTool =
+            tool.toolName === 'searchRecords' || /search/i.test(tool.toolName);
 
-        // Show tools that either have data OR don't have errors (for non-data tools)
-        return !hasError || hasData;
+        return !hasError || hasData || isSearchTool;
     });
 
     // Check if there were failed attempts
@@ -155,186 +175,226 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
 
             {validTools.map((tool, index) => {
                 const { uiHint, description, data, columns, resultType } = tool.result;
+                const postingModel =
+                    (tool.result?.model as string | undefined) ||
+                    (tool.args?.modelName as string | undefined);
 
-                // Render tool name as a small badge above content
                 const toolNameBadge = (
-                    <div className="mb-2">
-                        <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                            <svg
-                                className="w-3 h-3 mr-1.5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                                />
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                            </svg>
-                            {tool.toolName}
-                        </div>
+                    <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        <Wrench className="w-3 h-3 mr-1.5 shrink-0" />
+                        {tool.toolName}
                     </div>
                 );
 
-                // Render description separately if available
-                const descriptionElement = description && (
-                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-700">{description}</p>
+                const descriptionElement = description ? (
+                    <p className="text-sm text-slate-600">{description}</p>
+                ) : null;
+
+                const wrapToolResult = (
+                    content: React.ReactNode,
+                    options?: { showDescription?: boolean; hideToolBadge?: boolean }
+                ) => (
+                    <div key={index} className="space-y-2">
+                        {!options?.hideToolBadge && toolNameBadge}
+                        {options?.showDescription !== false && descriptionElement}
+                        {content}
                     </div>
                 );
 
-                // Handle searchRecords - always render as table
-                if (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) {
-                    if (Array.isArray(data) && data.length > 0) {
-                        return (
-                            <div key={index} className="space-y-3">
-                                <SearchResultsTable
-                                    data={data}
-                                    columns={columns}
-                                    modelName={tool.result.model}
-                                    metadata={tool.result.metaData}
+                // Financial reports (trial balance, etc.)
+                if (
+                    tool.toolName === 'runFinancialReport' ||
+                    uiHint === 'financial_report'
+                ) {
+                    return wrapToolResult(
+                        <FinancialReportDisplay
+                            reportId={String(tool.result.report_id ?? 'trial_balance')}
+                            data={Array.isArray(data) ? data : []}
+                            filters={tool.result.filters as Record<string, unknown> | undefined}
+                            description={description ?? (tool.result.description as string | undefined)}
+                            currencyCode={tool.result.currencyCode as string | undefined}
+                            sidebarMode={sidebarMode}
+                        />,
+                        { showDescription: false }
+                    );
+                }
+
+                // Posting search — ledger (+/−) or journal (debit/credit columns)
+                if (
+                    (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) &&
+                    Array.isArray(data) &&
+                    data.length > 0 &&
+                    resolvePostingSearchDisplayHint(uiHint, postingModel, data) != null
+                ) {
+                    const postingHint = resolvePostingSearchDisplayHint(
+                        uiHint,
+                        postingModel,
+                        data
+                    );
+
+                    if (postingHint === 'account_ledger') {
+                        return wrapToolResult(
+                                <AccountLedgerDisplay
+                                    rows={data}
+                                    focusAccountName={
+                                        (tool.result.focusAccountName as string | undefined) ??
+                                        undefined
+                                    }
+                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    sidebarMode={sidebarMode}
                                 />
-                            </div>
-                        );
-                    } else {
-                        // Show message when no results found
-                        return (
-                            <div key={index} className="space-y-3">
-                                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                                    <p className="text-sm text-gray-700">
-                                        No records found matching your search criteria.
-                                    </p>
-                                </div>
-                            </div>
                         );
                     }
+                    if (postingHint === 'posting_journal') {
+                        return wrapToolResult(
+                                <PostingJournalDisplay
+                                    rows={data}
+                                    title={tool.result.journalTitle as string | undefined}
+                                    highlightSide={tool.result.journalFocusSide as 'debit' | 'credit' | undefined}
+                                    highlightAccountName={tool.result.journalFocusAccountName as string | undefined}
+                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    sidebarMode={sidebarMode}
+                                />
+                        );
+                    }
+                    if (postingHint === 'posting_dual' && Array.isArray(tool.result.tables)) {
+                        return wrapToolResult(
+                                <PostingDualDisplay
+                                    tables={tool.result.tables as PostingDualTable[]}
+                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    sidebarMode={sidebarMode}
+                                />
+                        );
+                    }
+                    return wrapToolResult(
+                        <PostingJournalDisplay
+                            rows={data}
+                            title={tool.result.journalTitle as string | undefined}
+                            currencyCode={tool.result.currencyCode as string | undefined}
+                            sidebarMode={sidebarMode}
+                        />
+                    );
+                }
+
+                // Handle searchRecords - generic table for non-posting models
+                if (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) {
+                    if (Array.isArray(data) && data.length > 0) {
+                        return wrapToolResult(
+                            <SearchResultsTable
+                                data={data}
+                                columns={columns}
+                                modelName={tool.result.model}
+                                metadata={tool.result.metaData}
+                            />
+                        );
+                    }
+                    return wrapToolResult(
+                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <p className="text-sm text-gray-700">
+                                No records found matching your search criteria.
+                            </p>
+                        </div>
+                    );
                 }
 
                 // Switch case based on uiHint
                 switch (uiHint) {
                     case 'table':
                         if (resultType === 'sql_result') {
-                            return (
-                                <div key={index} className="space-y-3">
-                                    <SqlResultsTable
-                                        data={data}
-                                        columns={columns}
-                                        resultType={resultType}
-                                    />
-                                </div>
-                            );
-                        } else {
-                            // Fallback to SearchResultsTable for other table types
-                            return (
-                                <div key={index} className="space-y-3">
-                                    <SearchResultsTable
-                                        data={data}
-                                        columns={columns}
-                                        modelName={tool.result.model}
-                                        metadata={tool.result.metaData}
-                                    />
-                                </div>
+                            return wrapToolResult(
+                                <SqlResultsTable
+                                    data={data}
+                                    columns={columns}
+                                    resultType={resultType}
+                                />
                             );
                         }
+                        return wrapToolResult(
+                            <SearchResultsTable
+                                data={data}
+                                columns={columns}
+                                modelName={tool.result.model}
+                                metadata={tool.result.metaData}
+                            />
+                        );
 
                     case 'chart':
-                        return (
-                            <div key={index} className="space-y-3">
-                                {toolNameBadge}
-                                {descriptionElement}
+                        return wrapToolResult(
                                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                                     <p className="text-sm text-yellow-800">
                                         Chart visualization for {tool.toolName} - Coming soon
                                     </p>
                                 </div>
-                            </div>
                         );
 
                     case 'form':
-                        return (
-                            <div key={index} className="space-y-3">
-                                {toolNameBadge}
-                                {descriptionElement}
+                        return wrapToolResult(
                                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                                     <p className="text-sm text-green-800">
                                         Form interface for {tool.toolName} - Coming soon
                                     </p>
                                 </div>
-                            </div>
                         );
 
                     case 'list':
-                        return (
-                            <div key={index} className="space-y-3">
-                                {toolNameBadge}
-                                {descriptionElement}
+                        return wrapToolResult(
                                 <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                                     <p className="text-sm text-purple-800">
                                         List view for {tool.toolName} - Coming soon
                                     </p>
                                 </div>
-                            </div>
                         );
 
                     case 'metrics':
-                        return (
-                            <div key={index} className="space-y-3">
-                                <MetricsDisplay
-                                    data={data}
-                                    columns={columns}
-                                    toolName={tool.toolName}
-                                    description={description}
-                                />
-                            </div>
+                        return wrapToolResult(
+                            <MetricsDisplay
+                                data={data}
+                                columns={columns}
+                                toolName={tool.toolName}
+                                description={description}
+                                hideToolBadge
+                            />
                         );
 
                     case 'reconciliation_suggestions':
-                        return (
-                            <div key={index} className="space-y-3">
-                                {toolNameBadge}
-                                {descriptionElement}
+                        return wrapToolResult(
                                 <ReconciliationSuggestions
                                     data={Array.isArray(data) ? data : []}
                                     onSendMessage={onSendMessage}
                                     sidebarMode={sidebarMode}
                                 />
-                            </div>
+                        );
+
+                    case 'financial_report':
+                        return wrapToolResult(
+                            <FinancialReportDisplay
+                                reportId={String(tool.result.report_id ?? 'trial_balance')}
+                                data={Array.isArray(data) ? data : []}
+                                filters={tool.result.filters as Record<string, unknown> | undefined}
+                                description={description ?? tool.result.description as string | undefined}
+                                currencyCode={tool.result.currencyCode as string | undefined}
+                                sidebarMode={sidebarMode}
+                            />,
+                            { showDescription: false }
                         );
 
                     case 'invoice map':
                         // Handle invoice extraction result
                         if (tool.result.data && typeof tool.result.data === 'object' && !Array.isArray(tool.result.data)) {
-                            return (
-                                <div key={index} className="space-y-3">
-                                    {toolNameBadge}
-                                    {descriptionElement}
+                            return wrapToolResult(
                                     <InvoiceMapPreview
                                         data={tool.result.data}
                                         message={tool.result.message}
                                         sidebarMode={sidebarMode}
                                     />
-                                </div>
                             );
                         }
-                        // Fallback if data structure is unexpected
-                        return (
-                            <div key={index} className="space-y-3">
-                                {toolNameBadge}
-                                {descriptionElement}
+                        return wrapToolResult(
                                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                                     <p className="text-sm text-yellow-800">
                                         Invoice data structure is unexpected
                                     </p>
                                 </div>
-                            </div>
                         );
 
                     default: {
@@ -353,10 +413,7 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                         const modelDisplayName = model ? getModelDisplayName(model) : null;
                         const isCreateRecord = tool.toolName === 'createRecord' && modelDisplayName;
 
-                        return (
-                            <div key={index} className="space-y-3">
-                                {toolNameBadge}
-                                {descriptionElement}
+                        return wrapToolResult(
                                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex-1">
@@ -394,7 +451,6 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                         )}
                                     </div>
                                 </div>
-                            </div>
                         );
                     }
                 }

@@ -1,0 +1,92 @@
+{
+  "id": "view_chat_thread_001",
+  "name": "chat_thread_view",
+  "model_name": "chat_thread",
+  "description": "Persisted financial chat threads (Vercel AI SDK UIMessage history)",
+  "data_graph": {
+    "id": {
+      "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "displayName": "Thread ID",
+      "isColumnShow": false
+    },
+    "user_id": {
+      "dataType": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "User",
+      "isColumnShow": false
+    },
+    "title": {
+      "orderNo": 1,
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "280",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Title",
+      "isColumnShow": true
+    },
+    "messages": {
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "displayName": "Messages",
+      "isColumnShow": false
+    },
+    "metadata": {
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "displayName": "Metadata",
+      "isColumnShow": false
+    },
+    "model_used": {
+      "dataType": "string",
+      "required": false,
+      "permission": "update",
+      "displayName": "Model",
+      "isColumnShow": false
+    },
+    "total_tokens_used": {
+      "dataType": "int",
+      "required": false,
+      "permission": "update",
+      "displayName": "Tokens",
+      "isColumnShow": false
+    },
+    "created_at": {
+      "orderNo": 2,
+      "dataType": "datetime",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "180",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Created",
+      "isColumnShow": true
+    },
+    "updated_at": {
+      "orderNo": 3,
+      "dataType": "datetime",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "180",
+        "columnType": "date",
+        "defaultValue": ""
+      },
+      "displayName": "Updated",
+      "isColumnShow": false
+    }
+  },
+  "org_id": null,
+  "created_by": null,
+  "modified_by": null
+}

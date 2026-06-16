@@ -347,6 +347,60 @@ async function main() {
         );
         console.log("   Skipping agent template seed...");
       }
+
+      // Step 3.6: Seed per-model agent tool configs
+      console.log("🛠️  Step 3.6: Seeding agent model tool configs...");
+      const seedAgentModelToolsSqlPath = path.join(
+        __dirname,
+        "prisma",
+        "seed-agent-model-tools.sql"
+      );
+
+      if (fs.existsSync(seedAgentModelToolsSqlPath)) {
+        console.log(`Target: ${databaseTargetLog}`);
+        try {
+          runPrismaSqlFile(
+            seedAgentModelToolsSqlPath,
+            "Agent model tool configs seeded successfully"
+          );
+          console.log("✅ Agent model tool configs seeded successfully");
+        } catch (error) {
+          console.error("⚠️  Error seeding agent model tool configs:", error.message);
+          console.log("   Continuing setup...");
+        }
+      } else {
+        console.log(
+          `⚠️  Agent model tools SQL file not found at: ${seedAgentModelToolsSqlPath}`
+        );
+        console.log("   Skipping agent model tool config seed...");
+      }
+
+      // Step 3.7: Seed chat_thread view permissions
+      console.log("💬 Step 3.7: Seeding chat thread view permissions...");
+      const seedChatThreadViewSqlPath = path.join(
+        __dirname,
+        "prisma",
+        "seed-chat-thread-view.sql"
+      );
+
+      if (fs.existsSync(seedChatThreadViewSqlPath)) {
+        console.log(`Target: ${databaseTargetLog}`);
+        try {
+          runPrismaSqlFile(
+            seedChatThreadViewSqlPath,
+            "Chat thread view permissions seeded successfully"
+          );
+          console.log("✅ Chat thread view permissions seeded successfully");
+        } catch (error) {
+          console.error("⚠️  Error seeding chat thread view permissions:", error.message);
+          console.log("   Continuing setup...");
+        }
+      } else {
+        console.log(
+          `⚠️  Chat thread view SQL file not found at: ${seedChatThreadViewSqlPath}`
+        );
+        console.log("   Skipping chat thread view permission seed...");
+      }
       console.log("");
 
       console.log("🎉 Core database setup completed successfully!");

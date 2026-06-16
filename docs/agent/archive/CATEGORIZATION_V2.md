@@ -1,8 +1,13 @@
 # Fabriq Agent — Transaction Categorization (Current Implementation)
 
+**Status**: Archived — implementation detail referenced from
+[../05-TOOLS.md — categorizePostings](../05-TOOLS.md#categorizepostings) and
+[../07-WORKED_EXAMPLES.md — Trace 1](../07-WORKED_EXAMPLES.md#trace-1-categorization-atpl_categorise).
+For the current agent session walkthrough, tool contracts, and executor, see
+those docs plus [../06-BUILDERS_AND_EXECUTORS.md](../06-BUILDERS_AND_EXECUTORS.md).
+
 **Last Updated**: 2026-04-21  
-**Spec**: [`docs/agent/features/specs/CATEGORIZATION_V2.md`](./specs/CATEGORIZATION_V2.md)  
-**Companion doc**: [`CATEGORIZATION.md`](./CATEGORIZATION.md) — agent session walkthrough, `categorizePostings` tool contract, batch API overview, pending-action executor, and frontend action type
+**Spec**: [`CATEGORIZATION_V2_SPEC.md`](./CATEGORIZATION_V2_SPEC.md)
 
 ---
 
@@ -10,7 +15,7 @@
 
 This page describes **how categorization works today** in code: historical corpus, description normalization, fuzzy matching, LLM batching by direction, and per-account extraction notes at import time.
 
-For **who calls what** (agent template `atpl_categorise`, `queueActions`, human review, `POST /api/agent/erp/categorize-transaction-batch`), use [`CATEGORIZATION.md`](./CATEGORIZATION.md). The mental model is unchanged: categorization predicts the **counter-account** (expense/income/etc.) for postings where the bank side is known and the category side is null.
+For **who calls what** (agent template `atpl_categorise`, `queueActions`, human review, `POST /api/agent/erp/categorize-transaction-batch`), see [../07-WORKED_EXAMPLES.md](../07-WORKED_EXAMPLES.md) and [../06-BUILDERS_AND_EXECUTORS.md](../06-BUILDERS_AND_EXECUTORS.md). The mental model is unchanged: categorization predicts the **counter-account** (expense/income/etc.) for postings where the bank side is known and the category side is null.
 
 ---
 
@@ -41,7 +46,7 @@ For **who calls what** (agent template `atpl_categorise`, `queueActions`, human 
 | `skipped_count` | Already categorized or below confidence threshold |
 | `error_count` | Invalid account ID from LLM or handler failure |
 
-Counter-account direction (money in vs money out, including credit-card cases) matches the rules summarized in [`CATEGORIZATION.md`](./CATEGORIZATION.md#ml-prediction-logic).
+Counter-account direction (money in vs money out, including credit-card cases) matches the [Money Direction Cheat Sheet](../01-OVERVIEW.md#money-direction-cheat-sheet).
 
 ---
 
@@ -156,7 +161,8 @@ INT.PD entries are savings account interest credits, not expense payments.
 | Extractor options typing | `backend/src/lib/extractors/types.ts` |
 | Account field | `account.extraction_notes` in Prisma schema |
 
-Agent tool and API entry points remain as listed in [`CATEGORIZATION.md`](./CATEGORIZATION.md#key-code-pointers).
+Agent tool and API entry points: [../05-TOOLS.md — categorizePostings](../05-TOOLS.md#categorizepostings)
+and [../09-API_REFERENCE.md — ERP / Direct Pipeline Endpoints](../09-API_REFERENCE.md#erp--direct-pipeline-endpoints).
 
 ---
 

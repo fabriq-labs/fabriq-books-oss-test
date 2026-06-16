@@ -49,8 +49,10 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Authentication provider setup / implementation | [docs/AUTHENTICATION.md](./AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
-| Bank reconciliation (posting → receipt/invoice), Reconcile/Confirm flow | [docs/agent/RECONCILIATION_TOOL.md](./docs/agent/RECONCILIATION_TOOL.md) |
-| Transaction categorization (AI), batch categorize | [docs/agent/AI_Categorizer.md](./docs/agent/AI_Categorizer.md) |
+| Agent docs index + reading order | [docs/agent/README.md](./agent/README.md) |
+| Bank reconciliation (posting → receipt/invoice), Reconcile/Confirm flow | [docs/agent/07-WORKED_EXAMPLES.md](./agent/07-WORKED_EXAMPLES.md) |
+| Transaction categorization (AI), batch categorize | [docs/agent/05-TOOLS.md](./agent/05-TOOLS.md#categorizepostings) |
+| In-app conversational chat | [docs/agent/15-CONVERSATIONAL_CHAT.md](./agent/15-CONVERSATIONAL_CHAT.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Railway sync button implementation (backend + frontend) | [docs/RAILWAY_SYNC_SERVICE_IMPLEMENTATION.md](./docs/RAILWAY_SYNC_SERVICE_IMPLEMENTATION.md) |
@@ -109,10 +111,7 @@ fabriq/
 │   ├── AUTHENTICATION.md        # Auth system
 │   ├── WORKFLOWS.md             # Workflow engine
 │   ├── AI_AGENT.md              # AI/LLM integration
-│   ├── agent/                   # Agent: reconciliation, categorizer, conversation flow
-│   │   ├── RECONCILIATION_TOOL.md  # Bank reconciliation (Reconcile/Confirm, seed data, tests)
-│   │   ├── AI_Categorizer.md       # Transaction categorization
-│   │   └── END_USER_CONVERSATION_FLOW.md
+│   ├── agent/                   # Agent system docs — see docs/agent/README.md
 │   ├── BUSINESS_DOMAIN.md       # Business context
 │   └── INTEGRATIONS.md          # ERP integration architecture
 ├── backend/                     # Node.js/Express backend

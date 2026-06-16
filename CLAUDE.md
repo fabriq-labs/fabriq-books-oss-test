@@ -49,21 +49,23 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
-| In-app conversational chat (history, PageContext, SDK, prompt selection) | [docs/agent/CONVERSATION.md](./docs/agent/CONVERSATION.md) |
 | **Agent docs index + reading order** | [docs/agent/README.md](./docs/agent/README.md) |
-| Agent system architecture + file map | [docs/agent/ARCHITECTURE.md](./docs/agent/ARCHITECTURE.md) |
-| Agent database schema (session, message, pending_action) | [docs/agent/DATA_MODELS.md](./docs/agent/DATA_MODELS.md) |
-| Session states, auto-continuation, completion paths | [docs/agent/SESSION_LIFECYCLE.md](./docs/agent/SESSION_LIFECYCLE.md) |
-| All agent tools: parameters, returns, side effects | [docs/agent/TOOLS_REFERENCE.md](./docs/agent/TOOLS_REFERENCE.md) |
-| Prompt assembly, template merging, DynamicPromptManager | [docs/agent/PROMPT_SYSTEM.md](./docs/agent/PROMPT_SYSTEM.md) |
-| Builders, executors, hybrid dispatcher | [docs/agent/BUILDERS_EXECUTORS.md](./docs/agent/BUILDERS_EXECUTORS.md) |
-| All agent HTTP endpoints | [docs/agent/API_REFERENCE.md](./docs/agent/API_REFERENCE.md) |
-| LLM traces, token usage, feedback workflow | [docs/agent/OBSERVABILITY.md](./docs/agent/OBSERVABILITY.md) |
-| Running tests, prompt harness, E2E patterns | [docs/agent/TESTING.md](./docs/agent/TESTING.md) |
+| Agent system motivation, bookkeeping domain primer | [docs/agent/01-OVERVIEW.md](./docs/agent/01-OVERVIEW.md) |
+| Agent system architecture + file map | [docs/agent/02-ARCHITECTURE.md](./docs/agent/02-ARCHITECTURE.md) |
+| Session states, auto-continuation, completion paths | [docs/agent/03-SESSION_LIFECYCLE.md](./docs/agent/03-SESSION_LIFECYCLE.md) |
+| Prompt assembly, template merging, DynamicPromptManager | [docs/agent/04-PROMPT_SYSTEM.md](./docs/agent/04-PROMPT_SYSTEM.md) |
+| All agent tools: parameters, returns, side effects | [docs/agent/05-TOOLS.md](./docs/agent/05-TOOLS.md) |
+| Builders, executors, hybrid dispatcher | [docs/agent/06-BUILDERS_AND_EXECUTORS.md](./docs/agent/06-BUILDERS_AND_EXECUTORS.md) |
+| Worked examples (categorization, reconciliation, write-off traces) | [docs/agent/07-WORKED_EXAMPLES.md](./docs/agent/07-WORKED_EXAMPLES.md) |
+| Agent database schema (session, message, pending_action) | [docs/agent/08-DATA_MODELS.md](./docs/agent/08-DATA_MODELS.md) |
+| All agent HTTP endpoints | [docs/agent/09-API_REFERENCE.md](./docs/agent/09-API_REFERENCE.md) |
+| Vercel AI SDK usage, model providers, maxSteps | [docs/agent/10-LIBRARIES_AND_PROVIDERS.md](./docs/agent/10-LIBRARIES_AND_PROVIDERS.md) |
+| LLM traces, token usage, feedback workflow | [docs/agent/11-OBSERVABILITY.md](./docs/agent/11-OBSERVABILITY.md) |
+| Running tests, prompt harness, E2E patterns | [docs/agent/12-TESTING.md](./docs/agent/12-TESTING.md) |
+| Adding a new tool/handler/builder/executor | [docs/agent/13-EXTENDING.md](./docs/agent/13-EXTENDING.md) |
+| Known agent gaps and roadmap | [docs/agent/14-SHORTFALLS_AND_ROADMAP.md](./docs/agent/14-SHORTFALLS_AND_ROADMAP.md) |
 | Diagnose a failed/stuck agent session | [docs/agent/debugging/SESSION_FAILURE_PATTERNS.md](./docs/agent/debugging/SESSION_FAILURE_PATTERNS.md) |
-| Bank reconciliation feature (pipeline, confirm, frontend) | [docs/agent/features/RECONCILIATION.md](./docs/agent/features/RECONCILIATION.md) |
-| Transaction categorization feature (ML, batch, executor) | [docs/agent/features/CATEGORIZATION.md](./docs/agent/features/CATEGORIZATION.md) |
-| Posting domain model, contra-account as category | [docs/agent/features/POSTING_DOMAIN.md](./docs/agent/features/POSTING_DOMAIN.md) |
+| In-app conversational chat (history, PageContext, SDK, prompt selection) | [docs/agent/15-CONVERSATIONAL_CHAT.md](./docs/agent/15-CONVERSATIONAL_CHAT.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |

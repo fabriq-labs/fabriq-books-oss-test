@@ -24,8 +24,13 @@ export class DataAccessLayer {
     'permission',
     'role_view',
     'prompt_template',
+    'agent_model_tool_config', // Global agent tool assignment per model (no org_id)
     'currency', // Global platform data — seeded once, shared across all tenants
+    'chat_thread', // Scoped by user_id, not org_id
   ];
+
+  // Models scoped to the authenticated user (not org)
+  private static readonly USER_SCOPED_MODELS = ['chat_thread'];
 
   private constructor(prisma: PrismaClient) {
     this.prisma = prisma;
@@ -139,9 +144,35 @@ export class DataAccessLayer {
     return PermissionService.validatePermissions(context, modelName, operation);
   }
 
+  private addUserScopeFilter(options: any, context: AuthContext): any {
+    if (!context.user?.id) {
+      return options;
+    }
+
+    const newOptions = { ...options };
+    if (newOptions.where) {
+      newOptions.where = {
+        ...newOptions.where,
+        user_id: context.user.id,
+      };
+    } else {
+      newOptions.where = {
+        user_id: context.user.id,
+      };
+    }
+
+    return newOptions;
+  }
+
   private addOrgFilter(modelName: string, options: any, context: AuthContext): any {
+    const normalizedModel = modelName.toLowerCase();
+
+    if (DataAccessLayer.USER_SCOPED_MODELS.includes(normalizedModel)) {
+      return this.addUserScopeFilter(options, context);
+    }
+
     // Skip org filtering for metadata models that don't use org_id
-    if (DataAccessLayer.METADATA_MODELS_WITHOUT_ORG_FILTER.includes(modelName.toLowerCase())) {
+    if (DataAccessLayer.METADATA_MODELS_WITHOUT_ORG_FILTER.includes(normalizedModel)) {
       return options;
     }
 
@@ -166,6 +197,28 @@ export class DataAccessLayer {
     }
 
     return newOptions;
+  }
+
+  private applyWriteScopeDefaults(
+    modelName: string,
+    filteredData: Record<string, unknown>,
+    context: AuthContext
+  ): void {
+    filteredData.created_by = context.user!.id;
+    filteredData.modified_by = context.user!.id;
+
+    const normalizedModel = modelName.toLowerCase();
+    if (DataAccessLayer.USER_SCOPED_MODELS.includes(normalizedModel)) {
+      filteredData.user_id = context.user!.id;
+      delete filteredData.org_id;
+      return;
+    }
+
+    if (!DataAccessLayer.METADATA_MODELS_WITHOUT_ORG_FILTER.includes(normalizedModel)) {
+      filteredData.org_id = context.user!.org_id;
+    } else {
+      delete filteredData.org_id;
+    }
   }
 
   public async findMany<T = any>(
@@ -427,9 +480,7 @@ export class DataAccessLayer {
 
       // Filter input data based on permissions
       const filteredData = PermissionService.filterFieldsByPermission(data, permissions);
-      filteredData.created_by = context.user.id;
-      filteredData.modified_by = context.user.id;
-      filteredData.org_id = context.user.org_id; // Add org_id to created data
+      this.applyWriteScopeDefaults(modelName, filteredData, context);
 
       const createArgs = { data: filteredData, ...options };
 
@@ -905,12 +956,8 @@ export class DataAccessLayer {
       // Filter input data based on permissions and add metadata
       filteredData = data.map((item) => {
         const filtered = PermissionService.filterFieldsByPermission(item, permissions);
-        return {
-          ...filtered,
-          created_by: context.user?.id,
-          modified_by: context.user?.id,
-          org_id: context.user?.org_id // Add org_id to each record
-        };
+        this.applyWriteScopeDefaults(modelName, filtered, context);
+        return filtered;
       });
 
       // Execute batch create
