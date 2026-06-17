@@ -56,7 +56,6 @@ model account {
   item_master_purchase  item_master[]           @relation("ItemMaster_PurchaseAccount")
   project_masters       project_master[]
   invoices              invoice[]
-  source_system         source_system?          @relation("AccountSourceSystem", fields: [source_system_id], references: [id])
 
   @@unique([inst_id, org_id])
   @@index([source_system_id, source_record_id])

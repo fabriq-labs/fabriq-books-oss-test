@@ -320,7 +320,6 @@ model source_system {
   modified_by                   String?   @db.VarChar(255)
 
   // Back-relations for forward sync lineage (broker sync)
-  synced_accounts  account[]  @relation("AccountSourceSystem")
   synced_holdings  holding[]  @relation("HoldingSourceSystem")
   synced_trades    trade[]    @relation("TradeSourceSystem")
 
