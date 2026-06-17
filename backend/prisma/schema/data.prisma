@@ -56,7 +56,9 @@ model account {
   item_master_purchase  item_master[]           @relation("ItemMaster_PurchaseAccount")
   project_masters       project_master[]
   invoices              invoice[]
+  source_system         source_system?          @relation("AccountSourceSystem", fields: [source_system_id], references: [id])
 
+  @@unique([inst_id, org_id])
   @@index([source_system_id, source_record_id])
   @@index([source_updated_at])
   @@map("account")
@@ -159,6 +161,7 @@ model trade {
   exchange           String?
   value_date         DateTime
   name               String?
+  source_system_id   String?
 
   // Posting relationship - one-to-one (reverse relation)
   posting_id String?  @unique
@@ -169,6 +172,7 @@ model trade {
   target_account  account?    @relation("target_account", fields: [target_account_id], references: [id])
   reference_trade trade?      @relation("transfer_pair", fields: [reference_trade_id], references: [id])
   related_trades  trade[]     @relation("transfer_pair")
+  source_system   source_system? @relation("TradeSourceSystem", fields: [source_system_id], references: [id])
 
   @@map("trade")
 }
@@ -203,10 +207,14 @@ model holding {
   notes           String?
   tags            String[]
 
+  // Lineage: source broker connection this holding was synced from
+  source_system_id String?
+
   // Relationships
-  account    account    @relation(fields: [account_id], references: [id])
-  instrument instrument @relation(fields: [instrument_id], references: [id])
-  postings   posting[]
+  account       account        @relation(fields: [account_id], references: [id])
+  instrument    instrument     @relation(fields: [instrument_id], references: [id])
+  postings      posting[]
+  source_system source_system? @relation("HoldingSourceSystem", fields: [source_system_id], references: [id])
 
   // Unique constraint ensures one holding per instrument per account
   @@unique([instrument_id, account_id])

@@ -14,6 +14,7 @@ import { setupRestRoutes } from './rest/routes';
 import { errorHandler } from './rest/middleware/errorHandler';
 import agentModule from './agent';
 import { createChatRouter } from './routes/chat';
+import { createBrokerSyncRouter } from './routes/broker-sync';
 import { GracefulShutdown } from './utils/gracefulShutdown';
 import { ensureDatabaseViews } from './utils/setup/ensureDatabaseViews';
 import { initializeImportExtensions } from './lib/import-extensions';
@@ -74,6 +75,9 @@ async function startServer(): Promise<void> {
 
     // Persisted financial chat (Vercel AI SDK useChat + chat_threads)
     app.use('/api/chat', createChatRouter());
+
+    // Broker forward sync (Questrade)
+    app.use('/api/broker-sync', createBrokerSyncRouter());
 
     // MCP endpoint
     app.use('/api/mcp', mcpRouter);

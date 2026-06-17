@@ -319,6 +319,11 @@ model source_system {
   created_by                    String?   @db.VarChar(255)
   modified_by                   String?   @db.VarChar(255)
 
+  // Back-relations for forward sync lineage (broker sync)
+  synced_accounts  account[]  @relation("AccountSourceSystem")
+  synced_holdings  holding[]  @relation("HoldingSourceSystem")
+  synced_trades    trade[]    @relation("TradeSourceSystem")
+
   @@unique([org_id, system_type]) // One connection per org per ERP type
   @@map("source_system")
 }
