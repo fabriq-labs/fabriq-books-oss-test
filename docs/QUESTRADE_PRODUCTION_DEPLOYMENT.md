@@ -58,6 +58,7 @@ ALTER TABLE public.source_system
 
 **Verification:**
 ```sql
+-- Constraints on holding, trade, account
 SELECT conname, contype
 FROM pg_constraint
 WHERE conrelid IN ('public.holding'::regclass, 'public.trade'::regclass, 'public.account'::regclass)
@@ -68,12 +69,21 @@ WHERE conrelid IN ('public.holding'::regclass, 'public.trade'::regclass, 'public
     'account_source_record_uniq'
   )
 ORDER BY conname;
+-- Expected: 4 rows
 
--- Verify source_system column
-SELECT column_name, data_type FROM information_schema.columns
+-- FK constraint on source_system → entity
+SELECT conname, contype
+FROM pg_constraint
+WHERE conrelid = 'public.source_system'::regclass
+  AND conname = 'source_system_legal_entity_id_fkey';
+-- Expected: 1 row
+
+-- Column exists on source_system
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
 WHERE table_name = 'source_system' AND column_name = 'legal_entity_id';
+-- Expected: 1 row, is_nullable = YES
 ```
-Expected: 4 constraint rows + 1 column row.
 
 ---
 
@@ -176,4 +186,4 @@ GROUP BY type;
 | Questrade token expiry | Refresh tokens expire after a period of inactivity. User must paste a new PAT via Settings → Connections → Edit. The portfolio page does not yet surface a re-auth warning. | Medium |
 | Exchange rate staleness | The USD/CAD rate in `exchange_rate` is static. Portfolio totals will drift as the real rate moves. Consider a daily rate update job. | Low |
 | Second Questrade account | Only one Questrade connection per org (unique constraint). UI shows a generic error if user tries to add a second. | Low |
-| `client_id`/`client_secret` now optional in `ConnectionConfig` | Made optional to support Questrade (no OAuth app credentials needed). This loosens type safety for Zoho/QB — tighten with a discriminated union in a future refactor. | Low |
+| Legal entity not retroactively applied | Existing accounts created before a legal entity was set on the connection won't be updated until the next sync. Run a manual sync after setting the legal entity to backfill. | Low |
