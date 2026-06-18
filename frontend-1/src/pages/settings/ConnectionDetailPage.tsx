@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { erpConnectionsAPI } from "@/api/api";
+import { fetchAPI } from "@/api/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ interface SourceSystem {
 }
 
 const SYNCABLE_SYSTEM_TYPES = new Set(["zoho_books", "quickbooks"]);
+const BROKER_SYSTEM_TYPES = new Set(["questrade"]);
 type SyncMode = "full_sync" | "transform_only" | "extract_only";
 
 // System type configurations (matching backend)
@@ -83,6 +85,19 @@ const SYSTEM_TYPE_CONFIGS: Record<string, { name: string; fields: any[] }> = {
         default: 'https://accounts.zoho.com',
         placeholder: 'https://accounts.zoho.com',
         helpText: 'OAuth accounts domain for your region',
+      },
+    ],
+  },
+  questrade: {
+    name: 'Questrade',
+    fields: [
+      {
+        name: 'refresh_token',
+        label: 'Personal Access Token',
+        required: true,
+        type: 'password',
+        placeholder: 'Paste your Questrade Personal Access Token',
+        helpText: 'Generate at questrade.com → App Hub → Personal Access Token. Tokens expire after 3 days without a sync.',
       },
     ],
   },
@@ -146,6 +161,7 @@ const ConnectionDetailPage: React.FC = () => {
   const [decryptedConfig, setDecryptedConfig] = useState<any>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMode, setSyncMode] = useState<SyncMode>("full_sync");
+  const [brokerSyncing, setBrokerSyncing] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -214,6 +230,20 @@ const ConnectionDetailPage: React.FC = () => {
   const handleCancel = () => {
     setIsEditing(false);
     fetchConnection(); // Reset to original data
+  };
+
+  const handleBrokerSync = async () => {
+    if (!connection) return;
+    setBrokerSyncing(true);
+    try {
+      await fetchAPI('/api/broker-sync/run', { method: 'POST', body: JSON.stringify({ connection_id: connection.id }) });
+      toast({ title: 'Sync complete', description: 'Portfolio updated from Questrade.' });
+      fetchConnection();
+    } catch {
+      // fetchAPI shows error toast
+    } finally {
+      setBrokerSyncing(false);
+    }
   };
 
   const handleSync = async () => {
@@ -352,6 +382,16 @@ const ConnectionDetailPage: React.FC = () => {
                     >
                       <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
                       {syncing ? "Syncing…" : "Sync"}
+                    </Button>
+                  )}
+                  {BROKER_SYSTEM_TYPES.has(connection.system_type) && (
+                    <Button
+                      variant="secondary"
+                      disabled={brokerSyncing || !connection.is_active}
+                      onClick={() => void handleBrokerSync()}
+                    >
+                      <RefreshCw className={`mr-2 h-4 w-4 ${brokerSyncing ? "animate-spin" : ""}`} />
+                      {brokerSyncing ? "Syncing…" : "Sync Now"}
                     </Button>
                   )}
                   <Button onClick={() => setIsEditing(true)}>

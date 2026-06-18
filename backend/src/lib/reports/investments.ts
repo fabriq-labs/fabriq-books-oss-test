@@ -16,9 +16,10 @@ export interface PortfolioHoldingRow {
   instrument_name: string;
   instrument_type: string;
   quantity: number;
-  average_cost: number;        // in report currency
-  current_price: number | null; // in report currency
-  market_value: number | null;  // in report currency
+  average_cost: number;          // in report currency
+  current_price: number | null;  // in report currency
+  market_value: number | null;   // in report currency
+  unrealized_pnl: number | null; // in report currency
   native_currency_code: string | null;
   conversion_rate: number;
   source_system_id: string | null;
@@ -139,6 +140,7 @@ export async function getPortfolioSummary(
       average_cost: Number(h.average_cost) * rate,
       current_price: h.current_price != null ? Number(h.current_price) * rate : null,
       market_value: h.market_value != null ? Number(h.market_value) * rate : null,
+      unrealized_pnl: h.unrealized_pnl != null ? Number(h.unrealized_pnl) * rate : null,
       native_currency_code: h.currency?.code ?? null,
       conversion_rate: rate,
       source_system_id: h.source_system_id,

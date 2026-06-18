@@ -25,6 +25,12 @@ const SYSTEM_TYPES: SystemTypeConfig[] = [
     description: 'Connect to QuickBooks Online for accounting and invoicing',
   },
   {
+    id: 'questrade',
+    name: 'Questrade',
+    enabled: true,
+    description: 'Connect to your Questrade brokerage account to sync holdings and trades',
+  },
+  {
     id: 'xero',
     name: 'Xero',
     enabled: false,

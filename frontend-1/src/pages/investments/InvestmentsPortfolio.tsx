@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { reportAPI } from "@/api/postingApi";
 import { fetchAPI } from "@/api/api";
@@ -11,6 +10,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { Loader2, RefreshCw, TrendingUp, BarChart3 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import dayjs from "dayjs";
+import { cn } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -21,9 +21,10 @@ interface HoldingRow {
   symbol: string;
   instrument_name: string;
   quantity: number;
-  average_cost: number;
-  current_price: number | null;
-  market_value: number | null;
+  average_cost: number;          // in report currency
+  current_price: number | null;  // in report currency
+  market_value: number | null;   // in report currency
+  unrealized_pnl: number | null; // in report currency
   native_currency_code: string | null;
   conversion_rate: number;
 }
@@ -33,7 +34,7 @@ interface AccountSummary {
   account_name: string;
   questrade_account_id: string | null;
   holdings_count: number;
-  total_market_value: number;
+  total_market_value: number; // in report currency
 }
 
 interface PortfolioData {
@@ -57,12 +58,12 @@ function usePortfolio(reportCurrency: string) {
     const seq = ++fetchSeq.current;
     setLoading(true);
     try {
-      const result = await reportAPI.getReport("portfolio_summary", {
+      const result = (await reportAPI.getReport("portfolio_summary", {
         report_currency: reportCurrency,
-      }) as any;
+      })) as any;
       if (seq !== fetchSeq.current) return;
       setData(result?.data ?? null);
-    } catch (err) {
+    } catch {
       if (seq !== fetchSeq.current) return;
       toast({ title: "Error", description: "Failed to load portfolio", variant: "destructive" });
     } finally {
@@ -94,19 +95,67 @@ function fmtQty(n: number) {
   return n % 1 === 0 ? n.toLocaleString() : n.toFixed(4);
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+/** Convert a value from report currency back to native using the stored rate. */
+function toNative(converted: number | null, rate: number): number | null {
+  if (converted == null || rate === 0) return null;
+  return converted / rate;
+}
 
-function HoldingsTable({
-  rows,
+// ── Account Cards ──────────────────────────────────────────────────────────────
+
+function AccountCards({
+  accounts,
+  allTotal,
+  selected,
   currency,
+  loading,
+  onSelect,
 }: {
-  rows: HoldingRow[];
+  accounts: AccountSummary[];
+  allTotal: number;
+  selected: string;
   currency: string;
+  loading: boolean;
+  onSelect: (id: string) => void;
 }) {
+  const cards = [
+    { id: "__all__", label: "All Accounts", value: allTotal, count: accounts.reduce((s, a) => s + a.holdings_count, 0) },
+    ...accounts.map(a => ({ id: a.account_id, label: a.account_name, value: a.total_market_value, count: a.holdings_count })),
+  ];
+
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {cards.map(card => (
+        <button
+          key={card.id}
+          disabled={loading}
+          onClick={() => onSelect(card.id)}
+          className={cn(
+            "flex-shrink-0 rounded-lg border px-4 py-3 text-left transition-all",
+            "min-w-[140px] focus:outline-none focus:ring-2 focus:ring-blue-400",
+            selected === card.id
+              ? "border-blue-500 bg-blue-50 shadow-sm"
+              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+          )}
+        >
+          <p className={cn("text-xs font-semibold truncate", selected === card.id ? "text-blue-700" : "text-slate-700")}>
+            {card.label}
+          </p>
+          <p className={cn("text-sm font-bold mt-0.5 font-mono", selected === card.id ? "text-blue-900" : "text-slate-900")}>
+            {loading ? "—" : formatCurrency(card.value, currency)}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{card.count} position{card.count !== 1 ? "s" : ""}</p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Holdings Table ─────────────────────────────────────────────────────────────
+
+function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
   if (rows.length === 0) {
-    return (
-      <div className="py-8 text-center text-sm text-slate-500">No positions found.</div>
-    );
+    return <div className="py-8 text-center text-sm text-slate-500">No positions found.</div>;
   }
 
   return (
@@ -115,37 +164,60 @@ function HoldingsTable({
         <TableHeader>
           <TableRow className="bg-slate-50 border-b border-slate-200">
             <TableHead className="py-2 px-3 text-xs font-semibold text-slate-700">Symbol</TableHead>
-            <TableHead className="py-2 px-3 text-xs font-semibold text-slate-700">Account</TableHead>
             <TableHead className="py-2 px-3 text-xs font-semibold text-slate-700 text-right">Qty</TableHead>
             <TableHead className="py-2 px-3 text-xs font-semibold text-slate-700 text-right">Avg Cost</TableHead>
             <TableHead className="py-2 px-3 text-xs font-semibold text-slate-700 text-right">Current Price</TableHead>
             <TableHead className="py-2 px-3 text-xs font-semibold text-slate-700 text-right">Market Value</TableHead>
+            <TableHead className="py-2 px-3 text-xs font-semibold text-slate-700 text-right">Unrealized P&L</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row, i) => (
-            <TableRow key={`${row.account_id}-${row.symbol}-${i}`} className="border-b border-slate-100 hover:bg-slate-50">
-              <TableCell className="py-2 px-3">
-                <div className="flex flex-col">
+          {rows.map((row, i) => {
+            const currency = row.native_currency_code ?? "USD";
+            const rate = row.conversion_rate || 1;
+            const avgCost    = toNative(row.average_cost, rate);
+            const curPrice   = toNative(row.current_price, rate);
+            const mktValue   = toNative(row.market_value, rate);
+            const unrPnl     = toNative(row.unrealized_pnl, rate);
+            const pnlPositive = (unrPnl ?? 0) >= 0;
+
+            return (
+              <TableRow key={`${row.account_id}-${row.symbol}-${i}`} className="border-b border-slate-100 hover:bg-slate-50">
+                {/* Symbol + currency + account stacked */}
+                <TableCell className="py-2 px-3">
                   <span className="text-xs font-semibold text-slate-900">{row.symbol}</span>
-                  {row.native_currency_code && row.native_currency_code !== currency && (
-                    <span className="text-[10px] text-slate-400">{row.native_currency_code} × {row.conversion_rate.toFixed(4)}</span>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell className="py-2 px-3 text-xs text-slate-600">{row.account_name}</TableCell>
-              <TableCell className="py-2 px-3 text-xs text-right font-mono text-slate-700">{fmtQty(row.quantity)}</TableCell>
-              <TableCell className="py-2 px-3 text-xs text-right font-mono text-slate-700">
-                {formatCurrency(row.average_cost, currency)}
-              </TableCell>
-              <TableCell className="py-2 px-3 text-xs text-right font-mono text-slate-700">
-                {row.current_price != null ? formatCurrency(row.current_price, currency) : "—"}
-              </TableCell>
-              <TableCell className={`py-2 px-3 text-xs text-right font-mono font-semibold ${(row.market_value ?? 0) < 0 ? "text-red-600" : "text-slate-900"}`}>
-                {row.market_value != null ? formatCurrency(row.market_value, currency) : "—"}
-              </TableCell>
-            </TableRow>
-          ))}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[10px] text-slate-400 font-medium">{currency}</span>
+                    <span className="text-[10px] text-slate-300">·</span>
+                    <span className="text-[10px] text-slate-400 truncate max-w-[120px]">{row.account_name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2 px-3 text-xs text-right font-mono text-slate-700">
+                  {fmtQty(row.quantity)}
+                </TableCell>
+                <TableCell className="py-2 px-3 text-xs text-right font-mono text-slate-600">
+                  {avgCost != null ? formatCurrency(avgCost, currency) : "—"}
+                </TableCell>
+                <TableCell className="py-2 px-3 text-xs text-right font-mono text-slate-600">
+                  {curPrice != null ? formatCurrency(curPrice, currency) : "—"}
+                </TableCell>
+                <TableCell className={cn(
+                  "py-2 px-3 text-xs text-right font-mono font-semibold",
+                  (mktValue ?? 0) < 0 ? "text-red-600" : "text-slate-900"
+                )}>
+                  {mktValue != null ? formatCurrency(mktValue, currency) : "—"}
+                </TableCell>
+                <TableCell className={cn(
+                  "py-2 px-3 text-xs text-right font-mono font-semibold",
+                  unrPnl == null ? "text-slate-400" : pnlPositive ? "text-emerald-600" : "text-red-600"
+                )}>
+                  {unrPnl != null
+                    ? `${pnlPositive ? "+" : ""}${formatCurrency(unrPnl, currency)}`
+                    : "—"}
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -160,7 +232,6 @@ export default function InvestmentsPortfolio() {
 
   const { data, loading, syncing, syncNow } = usePortfolio(reportCurrency);
 
-  // Reset account filter when currency changes (data refreshes)
   const handleCurrencyChange = (val: string) => {
     setReportCurrency(val);
     setAccountFilter("__all__");
@@ -170,7 +241,6 @@ export default function InvestmentsPortfolio() {
     ? dayjs(data.last_sync_at).format("MMM D, YYYY h:mm A")
     : null;
 
-  // Total reflects the current account filter (long equity positions only)
   const visibleEquity = (data?.equity ?? []).filter(
     h => accountFilter === "__all__" || h.account_id === accountFilter
   );
@@ -193,54 +263,41 @@ export default function InvestmentsPortfolio() {
               <p className="text-xs text-slate-500 mt-0.5">Last synced: {lastSynced}</p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {/* Account filter */}
-            <Select value={accountFilter} onValueChange={setAccountFilter} disabled={loading}>
-              <SelectTrigger className="w-[180px] h-9 border-slate-300 text-sm">
-                <SelectValue placeholder="All Accounts" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Accounts</SelectItem>
-                {(data?.accounts ?? []).map(a => (
-                  <SelectItem key={a.account_id} value={a.account_id}>
-                    {a.account_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={syncNow}
+            disabled={syncing || loading}
+            className="border-slate-300 hover:bg-slate-50"
+          >
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RefreshCw className="h-4 w-4 mr-1.5" />}
+            Sync Now
+          </Button>
+        </div>
 
-            {/* Currency selector */}
-            <Select value={reportCurrency} onValueChange={handleCurrencyChange} disabled={loading}>
-              <SelectTrigger className="w-[90px] h-9 border-slate-300 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="CAD">CAD</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Sync Now */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={syncNow}
-              disabled={syncing || loading}
-              className="border-slate-300 hover:bg-slate-50"
-            >
-              {syncing ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-1.5" />
-              )}
-              Sync Now
-            </Button>
-          </div>
+        {/* ── Account card selector ── */}
+        <div className="mt-3">
+          {loading && !data ? (
+            <div className="flex gap-2">
+              {[1, 2, 3].map(n => (
+                <div key={n} className="h-16 w-36 rounded-lg border border-slate-200 bg-white animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <AccountCards
+              accounts={data?.accounts ?? []}
+              allTotal={data?.total_net_worth ?? 0}
+              selected={accountFilter}
+              currency={reportCurrency}
+              loading={loading}
+              onSelect={setAccountFilter}
+            />
+          )}
         </div>
       </div>
 
       <div className="p-3 space-y-3">
-        {/* ── Total card ── */}
+        {/* ── Total card with inline currency toggle ── */}
         <Card className="shadow-sm border-slate-200">
           <CardContent className="p-4">
             {loading && !data ? (
@@ -251,9 +308,30 @@ export default function InvestmentsPortfolio() {
             ) : (
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">
-                    {accountFilter === "__all__" ? "Total Portfolio Value" : (data?.accounts.find(a => a.account_id === accountFilter)?.account_name ?? "Account Value")}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">
+                      {accountFilter === "__all__"
+                        ? "Total Portfolio Value"
+                        : (data?.accounts.find(a => a.account_id === accountFilter)?.account_name ?? "Account Value")}
+                    </p>
+                    {/* Inline currency toggle */}
+                    <div className="flex rounded-md border border-slate-200 overflow-hidden text-[10px] font-semibold">
+                      {["CAD", "USD"].map(c => (
+                        <button
+                          key={c}
+                          onClick={() => handleCurrencyChange(c)}
+                          className={cn(
+                            "px-2 py-0.5 transition-colors",
+                            reportCurrency === c
+                              ? "bg-slate-700 text-white"
+                              : "bg-white text-slate-500 hover:bg-slate-50"
+                          )}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <p className="text-3xl font-bold text-slate-900 mt-1">
                     {formatCurrency(filteredTotal, reportCurrency)}
                   </p>
@@ -280,7 +358,7 @@ export default function InvestmentsPortfolio() {
                 <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
               </div>
             ) : (
-              <HoldingsTable rows={visibleEquity} currency={reportCurrency} />
+              <HoldingsTable rows={visibleEquity} />
             )}
           </CardContent>
         </Card>
@@ -292,7 +370,7 @@ export default function InvestmentsPortfolio() {
               <CardTitle className="text-sm font-semibold text-slate-700">Options</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <HoldingsTable rows={visibleOptions} currency={reportCurrency} />
+              <HoldingsTable rows={visibleOptions} />
             </CardContent>
           </Card>
         )}

@@ -160,18 +160,30 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
         systemType,
         formData.connection_config.oauth,
         initialData?.id
-      ) as { success: boolean; message?: string };
+      ) as { success: boolean; message?: string; data?: { new_refresh_token?: string } };
 
       if (result.success) {
-        setTestResult({
-          success: true,
-          message: result.message || 'Connection test successful!',
-        });
+        // Questrade rotates the refresh token on every use. If the backend returns a new token
+        // (new connection flow — no connectionId to persist to), update the form field directly
+        // without going through handleFieldChange, which would reset testPassed.
+        const newToken = result.data?.new_refresh_token;
+        if (newToken) {
+          setFormData((prev: any) => ({
+            ...prev,
+            connection_config: {
+              ...prev.connection_config,
+              oauth: { ...prev.connection_config.oauth, refresh_token: newToken },
+            },
+          }));
+        }
+
+        const successMessage = newToken
+          ? `${result.message || 'Connection test successful!'} The token in this form has been updated with the refreshed value — click Save to store it.`
+          : result.message || 'Connection test successful!';
+
+        setTestResult({ success: true, message: successMessage });
         setTestPassed(true);
-        toast({
-          title: "Success",
-          description: result.message || 'Connection test passed',
-        });
+        toast({ title: "Success", description: result.message || 'Connection test passed' });
       } else {
         setTestResult({
           success: false,

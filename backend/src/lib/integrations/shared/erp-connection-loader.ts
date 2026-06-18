@@ -13,8 +13,8 @@ import logger from '../../../utils/logger';
 
 export interface ConnectionConfig {
   oauth: {
-    client_id: string;
-    client_secret: string;
+    client_id?: string;
+    client_secret?: string;
     refresh_token: string;
     organization_id?: string;  // Zoho/Xero specific
     realm_id?: string;         // QuickBooks specific (Company ID)
@@ -22,6 +22,8 @@ export interface ConnectionConfig {
     accounts_domain?: string;  // Zoho specific
     tenant_id?: string;        // Xero specific
     environment?: 'sandbox' | 'production'; // QuickBooks specific
+    token_endpoint?: string;   // Questrade specific
+    api_server?: string;       // Questrade specific
   };
 }
 
