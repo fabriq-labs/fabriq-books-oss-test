@@ -156,6 +156,67 @@ function AccountCards({
   );
 }
 
+// ── Cash Section ──────────────────────────────────────────────────────────────
+
+function CashSection({ rows }: { rows: HoldingRow[] }) {
+  if (rows.length === 0) return null;
+
+  // Group by native currency code
+  const byCurrency = new Map<string, HoldingRow[]>();
+  for (const row of rows) {
+    const key = row.native_currency_code ?? row.symbol;
+    if (!byCurrency.has(key)) byCurrency.set(key, []);
+    byCurrency.get(key)!.push(row);
+  }
+
+  return (
+    <div className="p-3 flex flex-wrap gap-3">
+      {Array.from(byCurrency.entries()).map(([currency, holdings]) => {
+        const total = holdings.reduce((sum, h) => {
+          return sum + ((h.market_value ?? 0) / (h.conversion_rate || 1));
+        }, 0);
+
+        return (
+          <div
+            key={currency}
+            className="flex-1 min-w-[180px] rounded-lg border border-slate-200 bg-slate-50 overflow-hidden"
+          >
+            {/* Currency header */}
+            <div className="px-3 py-2 border-b border-slate-200 bg-white flex items-center gap-2">
+              <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{currency}</span>
+            </div>
+
+            {/* Account rows */}
+            <div className="px-3 py-2 space-y-2">
+              {holdings.map((h, i) => {
+                const amount = (h.market_value ?? 0) / (h.conversion_rate || 1);
+                return (
+                  <div key={i} className="flex items-baseline justify-between gap-3">
+                    <span className="text-[11px] text-slate-500 truncate">{h.account_name}</span>
+                    <span className={`text-xs font-mono font-semibold whitespace-nowrap ${amount < 0 ? "text-red-600" : "text-slate-800"}`}>
+                      {formatCurrency(amount, currency)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Total */}
+            {holdings.length > 1 && (
+              <div className="px-3 py-2 border-t border-slate-200 flex justify-between items-center bg-white">
+                <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Total</span>
+                <span className={`text-xs font-mono font-bold ${total < 0 ? "text-red-600" : "text-slate-700"}`}>
+                  {formatCurrency(total, currency)}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Holdings Table ─────────────────────────────────────────────────────────────
 
 function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
@@ -398,7 +459,7 @@ export default function InvestmentsPortfolio() {
               <CardTitle className="text-sm font-semibold text-slate-700">Cash</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <HoldingsTable rows={visibleCash} />
+              <CashSection rows={visibleCash} />
             </CardContent>
           </Card>
         )}
