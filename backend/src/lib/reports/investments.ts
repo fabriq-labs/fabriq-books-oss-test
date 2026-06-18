@@ -30,15 +30,20 @@ export interface AccountSummaryRow {
   account_name: string;
   questrade_account_id: string | null;
   holdings_count: number;
-  total_market_value: number;  // long positions only, in report currency
+  total_market_value: number;  // equity long positions only, in report currency
+  total_cash: number;          // cash balance, in report currency
+  total_equity: number;        // total_market_value + total_cash (matches Questrade "Total equity")
 }
 
 export interface PortfolioSummaryResult {
   report_currency: string;
   equity: PortfolioHoldingRow[];
   options: PortfolioHoldingRow[];
+  cash: PortfolioHoldingRow[];
   accounts: AccountSummaryRow[];
-  total_net_worth: number;     // long positions only, in report currency
+  total_market_value: number;  // equity long positions, in report currency
+  total_cash: number;          // cash, in report currency
+  total_equity: number;        // total_market_value + total_cash
   last_sync_at: string | null;
 }
 
@@ -125,6 +130,7 @@ export async function getPortfolioSummary(
 
   const equity: PortfolioHoldingRow[] = [];
   const options: PortfolioHoldingRow[] = [];
+  const cash: PortfolioHoldingRow[] = [];
 
   for (const h of holdingRows) {
     const rate = await getRate(h.currency?.id ?? null);
@@ -146,20 +152,22 @@ export async function getPortfolioSummary(
       source_system_id: h.source_system_id,
     };
 
-    if (isOption(h.instrument.symbol)) {
+    if (h.instrument.type === 'CASH') {
+      cash.push(row);
+    } else if (isOption(h.instrument.symbol)) {
       options.push(row);
     } else {
       equity.push(row);
     }
   }
 
-  // Sort equity desc by market value; options by symbol
   equity.sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0));
   options.sort((a, b) => a.symbol.localeCompare(b.symbol));
+  cash.sort((a, b) => a.symbol.localeCompare(b.symbol));
 
-  // Account summaries — long equity positions only
+  // Account summaries: equity + cash per account
   const accountMap = new Map<string, AccountSummaryRow>();
-  for (const h of equity) {
+  const ensureAccount = (h: PortfolioHoldingRow) => {
     if (!accountMap.has(h.account_id)) {
       accountMap.set(h.account_id, {
         account_id: h.account_id,
@@ -167,14 +175,28 @@ export async function getPortfolioSummary(
         questrade_account_id: h.questrade_account_id,
         holdings_count: 0,
         total_market_value: 0,
+        total_cash: 0,
+        total_equity: 0,
       });
     }
-    const acct = accountMap.get(h.account_id)!;
+    return accountMap.get(h.account_id)!;
+  };
+
+  for (const h of equity) {
+    const acct = ensureAccount(h);
     acct.holdings_count += 1;
     acct.total_market_value += h.market_value ?? 0;
   }
+  for (const h of cash) {
+    const acct = ensureAccount(h);
+    acct.total_cash += h.market_value ?? 0;
+  }
+  for (const acct of accountMap.values()) {
+    acct.total_equity = acct.total_market_value + acct.total_cash;
+  }
 
-  const total_net_worth = equity.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
+  const total_market_value = equity.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
+  const total_cash = cash.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
 
   const connection = connectionId
     ? await prisma.source_system.findFirst({
@@ -191,10 +213,13 @@ export async function getPortfolioSummary(
     report_currency: reportCurrencyCode,
     equity,
     options,
+    cash,
     accounts: Array.from(accountMap.values()).sort(
-      (a, b) => b.total_market_value - a.total_market_value
+      (a, b) => b.total_equity - a.total_equity
     ),
-    total_net_worth,
+    total_market_value,
+    total_cash,
+    total_equity: total_market_value + total_cash,
     last_sync_at: connection?.last_sync_at?.toISOString() ?? null,
   };
 }

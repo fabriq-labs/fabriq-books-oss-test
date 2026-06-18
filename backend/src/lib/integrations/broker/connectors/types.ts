@@ -36,7 +36,7 @@ export interface BrokerBalanceDTO {
 export interface BrokerInstrumentDTO {
   symbol: string;
   name: string;
-  type: 'STOCK' | 'BOND' | 'MUTUAL_FUND' | 'ETF' | 'FOREX';
+  type: 'STOCK' | 'BOND' | 'MUTUAL_FUND' | 'ETF' | 'FOREX' | 'CASH';
   isin?: string;
   currencyCode?: string;
 }

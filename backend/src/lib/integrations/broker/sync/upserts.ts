@@ -2,6 +2,7 @@ import prisma from '../../../prisma';
 import logger from '../../../../utils/logger';
 import {
   BrokerAccountDTO,
+  BrokerBalanceDTO,
   BrokerInstrumentDTO,
   BrokerPositionDTO,
   BrokerTradeDTO,
@@ -197,4 +198,72 @@ export async function upsertTrade(
       name: trade.description ?? null,
     },
   });
+}
+
+/** Find or create a global cash instrument for a given currency code (e.g. "CAD", "USD"). */
+async function upsertCashInstrument(currencyCode: string): Promise<string> {
+  const symbol = currencyCode.toUpperCase();
+  const existing = await prisma.instrument.findFirst({
+    where: { symbol, type: 'CASH' },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+  const created = await prisma.instrument.create({
+    data: { symbol, name: `${symbol} Cash`, type: 'CASH' },
+  });
+  return created.id;
+}
+
+/**
+ * Sync cash balances as CASH-type holdings (one per currency per account).
+ * Returns the instrument IDs upserted so the caller can keep them out of
+ * the stale-holding deactivation list.
+ */
+export async function syncCashBalances(
+  balances: BrokerBalanceDTO[],
+  accountId: string,
+  orgId: string,
+  sourceSystemId: string
+): Promise<string[]> {
+  const activeInstrumentIds: string[] = [];
+
+  for (const balance of balances) {
+    if (!balance.cash) continue;
+
+    const currencyCode = balance.currencyCode.toUpperCase();
+    const currencyId = await resolveCurrencyId(currencyCode);
+    const instrumentId = await upsertCashInstrument(currencyCode);
+    activeInstrumentIds.push(instrumentId);
+
+    await prisma.holding.upsert({
+      where: { instrument_id_account_id: { instrument_id: instrumentId, account_id: accountId } },
+      create: {
+        org_id: orgId,
+        account_id: accountId,
+        instrument_id: instrumentId,
+        quantity: balance.cash,
+        average_cost: 1,
+        current_price: 1,
+        market_value: balance.cash,
+        unrealized_pnl: 0,
+        realized_pnl: 0,
+        currency_id: currencyId,
+        is_active: true,
+        last_updated: new Date(),
+        source_system_id: sourceSystemId,
+      },
+      update: {
+        quantity: balance.cash,
+        current_price: 1,
+        market_value: balance.cash,
+        unrealized_pnl: 0,
+        currency_id: currencyId,
+        is_active: true,
+        last_updated: new Date(),
+        source_system_id: sourceSystemId,
+      },
+    });
+  }
+
+  return activeInstrumentIds;
 }

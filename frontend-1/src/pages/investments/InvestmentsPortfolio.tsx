@@ -34,15 +34,20 @@ interface AccountSummary {
   account_name: string;
   questrade_account_id: string | null;
   holdings_count: number;
-  total_market_value: number; // in report currency
+  total_market_value: number; // equity only, in report currency
+  total_cash: number;         // cash, in report currency
+  total_equity: number;       // total_market_value + total_cash
 }
 
 interface PortfolioData {
   report_currency: string;
   equity: HoldingRow[];
   options: HoldingRow[];
+  cash: HoldingRow[];
   accounts: AccountSummary[];
-  total_net_worth: number;
+  total_market_value: number;
+  total_cash: number;
+  total_equity: number;
   last_sync_at: string | null;
 }
 
@@ -120,7 +125,7 @@ function AccountCards({
 }) {
   const cards = [
     { id: "__all__", label: "All Accounts", value: allTotal, count: accounts.reduce((s, a) => s + a.holdings_count, 0) },
-    ...accounts.map(a => ({ id: a.account_id, label: a.account_name, value: a.total_market_value, count: a.holdings_count })),
+    ...accounts.map(a => ({ id: a.account_id, label: a.account_name, value: a.total_equity, count: a.holdings_count })),
   ];
 
   return (
@@ -247,7 +252,12 @@ export default function InvestmentsPortfolio() {
   const visibleOptions = (data?.options ?? []).filter(
     h => accountFilter === "__all__" || h.account_id === accountFilter
   );
-  const filteredTotal = visibleEquity.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
+  const visibleCash = (data?.cash ?? []).filter(
+    h => accountFilter === "__all__" || h.account_id === accountFilter
+  );
+  const filteredMarketValue = visibleEquity.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
+  const filteredCash = visibleCash.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
+  const filteredTotalEquity = filteredMarketValue + filteredCash;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -286,7 +296,7 @@ export default function InvestmentsPortfolio() {
           ) : (
             <AccountCards
               accounts={data?.accounts ?? []}
-              allTotal={data?.total_net_worth ?? 0}
+              allTotal={data?.total_equity ?? 0}
               selected={accountFilter}
               currency={reportCurrency}
               loading={loading}
@@ -307,12 +317,12 @@ export default function InvestmentsPortfolio() {
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex-1">
                   <div className="flex items-center gap-3">
                     <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">
                       {accountFilter === "__all__"
-                        ? "Total Portfolio Value"
-                        : (data?.accounts.find(a => a.account_id === accountFilter)?.account_name ?? "Account Value")}
+                        ? "Total Equity"
+                        : (data?.accounts.find(a => a.account_id === accountFilter)?.account_name ?? "Account")}
                     </p>
                     {/* Inline currency toggle */}
                     <div className="flex rounded-md border border-slate-200 overflow-hidden text-[10px] font-semibold">
@@ -333,15 +343,21 @@ export default function InvestmentsPortfolio() {
                     </div>
                   </div>
                   <p className="text-3xl font-bold text-slate-900 mt-1">
-                    {formatCurrency(filteredTotal, reportCurrency)}
+                    {formatCurrency(filteredTotalEquity, reportCurrency)}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {visibleEquity.length} equity position{visibleEquity.length !== 1 ? "s" : ""}
-                    {visibleOptions.length > 0 && ` · ${visibleOptions.length} option contract${visibleOptions.length !== 1 ? "s" : ""}`}
-                    &nbsp;· Long positions only
-                  </p>
+                  {/* Market value + Cash breakdown, matching Questrade's display */}
+                  <div className="mt-2 flex flex-col gap-0.5 border-t border-slate-100 pt-2">
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Market value</span>
+                      <span className="font-mono text-slate-700">{formatCurrency(filteredMarketValue, reportCurrency)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Cash</span>
+                      <span className="font-mono text-slate-700">{formatCurrency(filteredCash, reportCurrency)}</span>
+                    </div>
+                  </div>
                 </div>
-                <TrendingUp className="h-10 w-10 text-blue-200" />
+                <TrendingUp className="h-10 w-10 text-blue-200 ml-4" />
               </div>
             )}
           </CardContent>
@@ -371,6 +387,18 @@ export default function InvestmentsPortfolio() {
             </CardHeader>
             <CardContent className="p-0">
               <HoldingsTable rows={visibleOptions} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Cash ── */}
+        {visibleCash.length > 0 && (
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="bg-gradient-to-r from-slate-50 to-emerald-50 border-b border-slate-200 py-2 px-3">
+              <CardTitle className="text-sm font-semibold text-slate-700">Cash</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <HoldingsTable rows={visibleCash} />
             </CardContent>
           </Card>
         )}

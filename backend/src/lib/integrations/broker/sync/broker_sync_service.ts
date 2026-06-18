@@ -9,6 +9,7 @@ import {
   upsertHolding,
   upsertInstrument,
   upsertTrade,
+  syncCashBalances,
 } from './upserts';
 
 const FIRST_SYNC_BACKFILL_DAYS = 90;
@@ -81,6 +82,13 @@ export async function runBrokerSync(connectionId: string, orgId: string): Promis
           report.holdingsUpserted += 1;
           activeInstrumentIds.push(instrumentId);
         }
+
+        // Sync cash balances as CASH-type holdings; include their instrument IDs
+        // in the active list so deactivateStaleHoldings doesn't remove them
+        const balances = await connector.getBalances(accountDto.externalId);
+        const cashInstrumentIds = await syncCashBalances(balances, accountId, orgId, connectionId);
+        activeInstrumentIds.push(...cashInstrumentIds);
+
         await deactivateStaleHoldings(accountId, activeInstrumentIds, connectionId);
 
         const activities = await connector.getActivities(accountDto.externalId, activityStart, startedAt);

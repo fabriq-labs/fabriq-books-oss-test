@@ -227,6 +227,7 @@ enum instrument_type {
   MUTUAL_FUND
   ETF
   FOREX
+  CASH
 }
 
 enum trade_type {

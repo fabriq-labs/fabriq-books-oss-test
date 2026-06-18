@@ -179,6 +179,96 @@ GROUP BY type;
 
 ---
 
+## Phase 2 — Cash balances & legal entity on connections
+
+**Deployed separately after Phase 1. Apply these changes in order.**
+
+### Phase 2 — Step 1: DDL
+
+```sql
+-- 1. Add CASH to the instrument_type enum
+--    IF NOT EXISTS prevents an error if the value was added manually.
+ALTER TYPE instrument_type ADD VALUE IF NOT EXISTS 'CASH';
+
+-- 2. Legal entity on source_system connection
+--    Allows a broker connection to be associated with a legal entity.
+--    All accounts created by that connection's sync will be tagged with it.
+ALTER TABLE public.source_system
+  ADD COLUMN IF NOT EXISTS legal_entity_id text
+  REFERENCES public.entity(id) ON UPDATE CASCADE ON DELETE SET NULL;
+```
+
+**Verification:**
+
+```sql
+-- CASH should appear in the enum values
+SELECT enumlabel FROM pg_enum
+JOIN pg_type ON pg_type.oid = pg_enum.enumtypid
+WHERE pg_type.typname = 'instrument_type'
+ORDER BY enumsortorder;
+-- Expected: STOCK, BOND, MUTUAL_FUND, ETF, FOREX, CASH
+
+-- legal_entity_id column on source_system
+SELECT column_name, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'source_system' AND column_name = 'legal_entity_id';
+-- Expected: 1 row, is_nullable = YES
+```
+
+### Phase 2 — Step 2: Deploy application code
+
+1. Deploy backend and frontend (same pipeline as Phase 1)
+2. Regenerate Prisma client on the server:
+   ```bash
+   cd backend && npx prisma generate
+   ```
+
+### Phase 2 — Step 3: Set legal entity on the Questrade connection
+
+1. Go to **Settings → Connections** → open the Questrade connection → **Edit**
+2. Select the appropriate **Legal Entity** from the dropdown
+3. Click **Test Connection**, then **Save Connection**
+4. The next sync will write `legal_entity_id` onto all four Questrade accounts
+
+### Phase 2 — Step 4: Re-sync to populate cash balances
+
+Cash balances are now synced as `CASH`-type holdings (one per currency per account). They are **not** back-populated automatically — a fresh sync is required.
+
+Click **Sync Now** on the Portfolio page (or via **Settings → Connections → Sync Now**).
+
+After the sync, verify:
+
+```sql
+-- Confirm cash holdings created
+SELECT i.symbol, h.quantity, h.market_value, c.code as currency, a.name as account
+FROM holding h
+JOIN instrument i ON i.id = h.instrument_id
+JOIN account a ON a.id = h.account_id
+LEFT JOIN currency c ON c.id = h.currency_id
+WHERE i.type = 'CASH'
+  AND a.source_system_id IN (
+    SELECT id FROM source_system WHERE system_type = 'questrade'
+  )
+ORDER BY a.name, i.symbol;
+
+-- Confirm legal entity was propagated to accounts
+SELECT a.name, e.legal_name
+FROM account a
+JOIN entity e ON e.id = a.legal_entity_id
+WHERE a.source_system_id IN (
+  SELECT id FROM source_system WHERE system_type = 'questrade'
+);
+```
+
+### Phase 2 — What changed in the UI
+
+- **Portfolio page total card** now shows **Total Equity** = Market value + Cash, with Market value and Cash broken out as sub-lines (matching Questrade's own display)
+- **Account cards** show Total Equity per account
+- **Cash section** appears below Options when cash balances are present
+- **Connections form** (Create and Edit) now has a **Legal Entity** dropdown
+
+---
+
 ## Known limitations and follow-up items
 
 | Item | Detail | Priority |
