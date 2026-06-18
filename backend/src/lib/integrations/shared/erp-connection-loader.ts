@@ -13,8 +13,8 @@ import logger from '../../../utils/logger';
 
 export interface ConnectionConfig {
   oauth: {
-    client_id?: string;
-    client_secret?: string;
+    client_id: string;         // required for OAuth-app integrations (Zoho, QuickBooks)
+    client_secret: string;     // required for OAuth-app integrations (Zoho, QuickBooks)
     refresh_token: string;
     organization_id?: string;  // Zoho/Xero specific
     realm_id?: string;         // QuickBooks specific (Company ID)
