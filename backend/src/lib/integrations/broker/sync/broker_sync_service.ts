@@ -57,6 +57,7 @@ export async function runBrokerSync(connectionId: string, orgId: string): Promis
   }
 
   const baseCurrencyId = await getOrgBaseCurrencyId(orgId);
+  const legalEntityId = connection.legal_entity_id ?? null;
   const lastSyncAt = connection.last_sync_at;
   const activityStart = lastSyncAt
     ? new Date(lastSyncAt)
@@ -69,7 +70,7 @@ export async function runBrokerSync(connectionId: string, orgId: string): Promis
 
     for (const accountDto of accounts) {
       try {
-        const accountId = await upsertAccount(accountDto, orgId, connectionId, baseCurrencyId);
+        const accountId = await upsertAccount(accountDto, orgId, connectionId, baseCurrencyId, legalEntityId);
 
         const positions = await connector.getPositions(accountDto.externalId);
         const activeInstrumentIds: string[] = [];

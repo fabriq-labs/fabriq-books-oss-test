@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEntity } from "@/contexts/EntityContext";
 import { erpConnectionsAPI } from "@/api/api";
 import { fetchAPI } from "@/api/api";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface SourceSystem {
   connector_version?: string;
   default_purchase_account_id?: string;
   default_purchase_account_name?: string;
+  legal_entity_id?: string | null;
   last_sync_at?: string | null;
   last_sync_status?: { status?: string; message?: string; synced_at?: string; detail?: unknown } | null;
 }
@@ -154,6 +156,7 @@ const ConnectionDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { entities } = useEntity();
 
   const [connection, setConnection] = useState<SourceSystem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -427,6 +430,12 @@ const ConnectionDetailPage: React.FC = () => {
                     {connection.default_purchase_account_name}
                   </div>
                 )}
+                <div className="col-span-2">
+                  <span className="font-semibold">Legal Entity:</span>{' '}
+                  {connection.legal_entity_id
+                    ? (entities.find(e => e.id === connection.legal_entity_id)?.legal_name ?? connection.legal_entity_id)
+                    : <span className="text-gray-400 italic">Not assigned</span>}
+                </div>
                 {connection.last_sync_at && (
                   <div>
                     <span className="font-semibold">Last sync:</span>{' '}

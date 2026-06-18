@@ -34,7 +34,8 @@ export async function upsertAccount(
   dto: BrokerAccountDTO,
   orgId: string,
   sourceSystemId: string,
-  baseCurrencyId: string | null
+  baseCurrencyId: string | null,
+  legalEntityId: string | null = null
 ): Promise<string> {
   const existing = await prisma.account.findFirst({
     where: { source_record_id: dto.externalId, source_system_id: sourceSystemId, org_id: orgId },
@@ -51,6 +52,7 @@ export async function upsertAccount(
     source_record_id: dto.externalId,
     source_updated_at: new Date(),
     ...(baseCurrencyId ? { base_currency_id: baseCurrencyId } : {}),
+    ...(legalEntityId ? { legal_entity_id: legalEntityId } : {}),
   };
 
   if (existing) {

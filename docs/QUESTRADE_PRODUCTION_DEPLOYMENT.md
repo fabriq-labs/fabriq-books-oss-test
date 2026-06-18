@@ -49,6 +49,11 @@ ALTER TABLE public.holding
 ALTER TABLE public.account
   ADD CONSTRAINT account_source_record_uniq
   UNIQUE (source_record_id, source_system_id, org_id);
+
+-- 7. Legal entity on source_system (optional — broker sync uses this to tag created accounts)
+ALTER TABLE public.source_system
+  ADD COLUMN legal_entity_id text
+  REFERENCES public.entity(id) ON UPDATE CASCADE ON DELETE SET NULL;
 ```
 
 **Verification:**
@@ -63,8 +68,12 @@ WHERE conrelid IN ('public.holding'::regclass, 'public.trade'::regclass, 'public
     'account_source_record_uniq'
   )
 ORDER BY conname;
+
+-- Verify source_system column
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'source_system' AND column_name = 'legal_entity_id';
 ```
-Expected: 4 rows returned.
+Expected: 4 constraint rows + 1 column row.
 
 ---
 
@@ -114,16 +123,17 @@ This is what the end user does — no developer action needed.
 2. Go to **Settings → Connections → Create Connection**
 3. Select **Questrade**
 4. Enter a connection name (e.g. "My Questrade")
-5. Go to [questrade.com](https://www.questrade.com) → App Hub → Generate a Personal Access Token
-6. Paste the token into the **Personal Access Token** field
-7. Click **Test Connection**
+5. Select the **Legal Entity** this Questrade account belongs to (optional — if set, synced accounts will be tagged with that entity)
+6. Go to [questrade.com](https://www.questrade.com) → App Hub → Generate a Personal Access Token
+7. Paste the token into the **Personal Access Token** field
+8. Click **Test Connection**
    - The token will be exchanged with Questrade. A success message confirms connectivity and lists your accounts
    - The form field is automatically updated with the refreshed token (Questrade rotates tokens on every use)
    - The message will say: *"The token in this form has been updated with the refreshed value — click Save to store it."*
-8. Click **Save Connection**
-9. Navigate to **Investments → Portfolio**
-10. Click **Sync Now** — all accounts, holdings, and 90 days of trades will be pulled from Questrade
-11. The portfolio page populates with live data
+9. Click **Save Connection**
+10. Navigate to **Investments → Portfolio**
+11. Click **Sync Now** — all accounts, holdings, and 90 days of trades will be pulled from Questrade
+12. The portfolio page populates with live data
 
 ---
 
