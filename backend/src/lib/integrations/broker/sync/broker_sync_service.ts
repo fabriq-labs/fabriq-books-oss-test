@@ -183,13 +183,14 @@ export async function getPortfolio(orgId: string): Promise<PortfolioSummary> {
     const marketValue = holding.market_value != null ? Number(holding.market_value) : null;
     let marketValueInBase: number | null = null;
 
-    if (marketValue != null && baseCurrencyId && holding.currency_id) {
+    if (marketValue != null && baseCurrencyId && holding.currency_id && holding.currency_id !== baseCurrencyId) {
       const rate = await getLatestRate(orgId, holding.currency_id, baseCurrencyId);
       if (rate != null) {
         marketValueInBase = marketValue * rate;
         totalNetWorthInBase += marketValueInBase;
       }
-    } else if (marketValue != null && (!baseCurrencyId || holding.currency_id === baseCurrencyId)) {
+    } else if (marketValue != null) {
+      // No currency on holding, or holding is already in base currency — treat as base
       marketValueInBase = marketValue;
       totalNetWorthInBase += marketValue;
     }

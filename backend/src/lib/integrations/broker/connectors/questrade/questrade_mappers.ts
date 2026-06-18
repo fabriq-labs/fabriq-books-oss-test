@@ -31,6 +31,7 @@ interface QtPosition {
   openPnl?: number;
   closedPnl?: number;
   totalCost?: number;
+  securityType?: string;
 }
 
 interface QtActivity {
@@ -83,17 +84,24 @@ export function mapBalance(balance: QtBalance): BrokerBalanceDTO {
   };
 }
 
+/** Infer trading currency from exchange suffix. TSX/.V = CAD, everything else = USD. */
+function inferCurrencyFromSymbol(symbol: string): string {
+  if (/\.(TO|V)$/i.test(symbol)) return 'CAD';
+  return 'USD';
+}
+
 export function mapPosition(position: QtPosition, currencyCode?: string): BrokerPositionDTO {
   const quantity = position.openQuantity ?? 0;
   const averageCost =
     position.averageEntryPrice ??
     (position.totalCost && quantity ? position.totalCost / quantity : 0);
+  const resolvedCurrency = currencyCode ?? inferCurrencyFromSymbol(position.symbol);
   return {
     instrument: {
       symbol: position.symbol,
       name: position.symbol,
-      type: 'STOCK',
-      currencyCode,
+      type: mapInstrumentType(position.securityType),
+      currencyCode: resolvedCurrency,
     },
     quantity,
     averageCost,
@@ -101,7 +109,7 @@ export function mapPosition(position: QtPosition, currencyCode?: string): Broker
     marketValue: position.currentMarketValue,
     unrealizedPnl: position.openPnl,
     realizedPnl: position.closedPnl,
-    currencyCode,
+    currencyCode: resolvedCurrency,
   };
 }
 
@@ -144,6 +152,10 @@ export function buildTradeId(accountExternalId: string, activity: QtActivity): s
 export function mapActivity(accountExternalId: string, activity: QtActivity): BrokerTradeDTO | null {
   const tradeDateStr = activity.tradeDate || activity.transactionDate;
   if (!tradeDateStr) {
+    return null;
+  }
+  // Skip non-trade entries (e.g. Questrade "Other" type rows with no action and no price)
+  if (!activity.action && !(activity.price)) {
     return null;
   }
   const type = resolveTradeType(activity);

@@ -11,7 +11,7 @@ import { BrokerOAuthConfig } from '../types';
 import { QuestradeAuth } from './questrade_auth';
 import { mapAccount, mapBalance, mapPosition, mapActivity } from './questrade_mappers';
 
-const MAX_ACTIVITY_WINDOW_DAYS = 31;
+const MAX_ACTIVITY_WINDOW_DAYS = 30;
 
 export class QuestradeConnector implements BrokerConnector {
   private readonly auth: QuestradeAuth;
@@ -54,11 +54,12 @@ export class QuestradeConnector implements BrokerConnector {
         });
         return response.data;
       }
-      logger.error(`Questrade API request failed: ${path}`, {
-        status: axiosError.response?.status,
-        data: axiosError.response?.data,
-      });
-      throw error;
+      const status = axiosError.response?.status;
+      const body = axiosError.response?.data;
+      logger.error(`Questrade API request failed: ${path}`, { status, body });
+      throw new Error(
+        `Questrade API ${path} failed with status ${status}: ${JSON.stringify(body ?? {})}`
+      );
     }
   }
 
@@ -88,10 +89,17 @@ export class QuestradeConnector implements BrokerConnector {
   ): Promise<BrokerTradeDTO[]> {
     const trades: BrokerTradeDTO[] = [];
     for (const [windowStart, windowEnd] of chunkWindows(startTime, endTime)) {
-      const data = await this.request<{ activities: any[] }>(
-        `v1/accounts/${accountExternalId}/activities`,
-        { startTime: windowStart.toISOString(), endTime: windowEnd.toISOString() }
-      );
+      let data: { activities: any[] };
+      try {
+        data = await this.request<{ activities: any[] }>(
+          `v1/accounts/${accountExternalId}/activities`,
+          { startTime: windowStart.toISOString(), endTime: windowEnd.toISOString() }
+        );
+      } catch (err) {
+        // Some account types return 400 for activity windows with no history — skip window
+        logger.warn(`Skipping activity window for account ${accountExternalId}: ${(err as Error).message}`);
+        continue;
+      }
       for (const activity of data.activities ?? []) {
         const mapped = mapActivity(accountExternalId, activity);
         if (mapped) {

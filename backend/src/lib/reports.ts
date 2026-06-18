@@ -2,6 +2,7 @@ import { AuthContext } from "../auth/types";
 import logger from '../utils/logger';
 import { get_my_feed } from './reports/zeiv';
 import { getIncomeStatement, getTrialBalance, getMonthlyTrialBalance, getNetworthForAssets, getNetworthForLiabilities, getSavingRatio, getFinancialRatios, getAssetsTotal, getClassificationBreakdown, getIncomeByType, getIncomeTotal, getLiabilitiesBreakdown, getLiabilitiesTotal, getAssetsBreakdown, getCashFlowStatement } from './reports/perfin';
+import { getPortfolioSummary, getInvestmentTrades } from './reports/investments';
 
 export const run_report = async (context: AuthContext, report_id: any, filters: any) => {
   logger.debug(`Running report ${report_id} with filters: ${JSON.stringify(filters)}`, context.user);
@@ -141,6 +142,21 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
       entityIds
     );
     return { breakdown };
+  }
+  else if (report_id === "portfolio_summary") {
+    return await getPortfolioSummary(
+      context.user.org_id,
+      filters.report_currency ?? 'CAD',
+      filters.connection_id
+    );
+  }
+  else if (report_id === "investment_trades") {
+    return await getInvestmentTrades(
+      context.user.org_id,
+      filters.from_date,
+      filters.to_date,
+      filters.connection_id
+    );
   }
   else {
     throw new Error(`Report not found: ${report_id}`);
