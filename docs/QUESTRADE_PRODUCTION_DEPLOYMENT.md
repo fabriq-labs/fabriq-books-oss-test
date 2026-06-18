@@ -42,10 +42,13 @@ ALTER TABLE public.holding
   ADD CONSTRAINT holding_account_instrument_uniq
   UNIQUE (account_id, instrument_id);
 
--- 6. Unique constraint on account (broker sync uses inst_id + org_id to find accounts)
+-- 6. Unique constraint on account
+--    Broker sync looks up accounts by (source_record_id, source_system_id, org_id).
+--    NULL source_record_id rows (internal accounts) are exempt — Postgres treats NULLs
+--    as distinct in unique indexes so multiple internal accounts are allowed.
 ALTER TABLE public.account
-  ADD CONSTRAINT account_inst_org_uniq
-  UNIQUE (inst_id, org_id);
+  ADD CONSTRAINT account_source_record_uniq
+  UNIQUE (source_record_id, source_system_id, org_id);
 ```
 
 **Verification:**
@@ -57,7 +60,7 @@ WHERE conrelid IN ('public.holding'::regclass, 'public.trade'::regclass, 'public
     'holding_source_system_fk',
     'trade_source_system_fk',
     'holding_account_instrument_uniq',
-    'account_inst_org_uniq'
+    'account_source_record_uniq'
   )
 ORDER BY conname;
 ```

@@ -59,5 +59,6 @@ VALUES (
   NOW(), NOW()
 )
 ON CONFLICT (id) DO UPDATE SET
+  org_id   = 'org_broker_test',  -- always restore to test org (may have been moved by live-data migration)
   is_active = true;
   -- Note: connection_config is NOT updated on conflict — preserve any real PAT already set

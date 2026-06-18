@@ -57,7 +57,7 @@ model account {
   project_masters       project_master[]
   invoices              invoice[]
 
-  @@unique([inst_id, org_id])
+  @@unique([source_record_id, source_system_id, org_id])
   @@index([source_system_id, source_record_id])
   @@index([source_updated_at])
   @@map("account")

@@ -26,8 +26,9 @@ export async function resolveCurrencyId(code?: string): Promise<string | null> {
 }
 
 /**
- * Upsert an account by (inst_id, org_id). inst_id holds the broker's external
- * account number for this connection.
+ * Upsert an account by (source_record_id, source_system_id, org_id).
+ * Using the source lineage fields as the key works across any broker —
+ * inst_id is still populated for display but is not the upsert key.
  */
 export async function upsertAccount(
   dto: BrokerAccountDTO,
@@ -36,7 +37,7 @@ export async function upsertAccount(
   baseCurrencyId: string | null
 ): Promise<string> {
   const existing = await prisma.account.findFirst({
-    where: { inst_id: dto.externalId, org_id: orgId },
+    where: { source_record_id: dto.externalId, source_system_id: sourceSystemId, org_id: orgId },
     select: { id: true },
   });
 
