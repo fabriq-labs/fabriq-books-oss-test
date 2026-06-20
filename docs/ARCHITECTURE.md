@@ -1,7 +1,7 @@
 # Fabriq Financial Suite - Architecture Guide
 
 **When to read**: Understanding how the system works, building new features, debugging issues
-**Related docs**: [BACKEND.md](./BACKEND.md), [FRONTEND.md](./FRONTEND.md), [PERMISSIONS.md](./PERMISSIONS.md)
+**Related docs**: [BACKEND.md](./BACKEND.md), [FRONTEND.md](./FRONTEND.md), [AUTHENTICATION_AND_AUTHORIZATION.md](./AUTHENTICATION_AND_AUTHORIZATION.md)
 
 ---
 
