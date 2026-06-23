@@ -12,6 +12,7 @@ const GLOBAL_MODELS = new Set([
   'role_view',
   'prompt_template',
   'currency',
+  'instrument',
 ]);
 
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;

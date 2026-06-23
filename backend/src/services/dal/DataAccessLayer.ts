@@ -26,6 +26,7 @@ export class DataAccessLayer {
     'prompt_template',
     'agent_model_tool_config', // Global agent tool assignment per model (no org_id)
     'currency', // Global platform data — seeded once, shared across all tenants
+    'instrument', // Global security master — shared across orgs; isolation via holding
     'chat_thread', // Scoped by user_id, not org_id
   ];
 
