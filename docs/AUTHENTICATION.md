@@ -1,6 +1,9 @@
 # Fabriq Authentication System - Complete Guide
 
 **When to read**: Authentication issues, implementing new auth providers, security fixes
+
+**Conceptual overview (auth + RBAC + tenancy):** [AUTHENTICATION_AND_AUTHORIZATION.md](./AUTHENTICATION_AND_AUTHORIZATION.md)
+
 **Related docs**: [BACKEND.md](./BACKEND.md), [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 **Last Updated**: 2026-01-02
