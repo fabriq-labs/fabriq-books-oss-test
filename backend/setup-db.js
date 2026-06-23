@@ -198,6 +198,30 @@ async function main() {
       console.log("✅ Database schema reset complete");
       console.log("");
 
+      // Step 1.3: Plaid tables + account.plaid_item_id (idempotent; matches plaid.prisma / data.prisma)
+      console.log("🏦 Step 1.3: Applying Plaid schema patches...");
+      const plaidSchemaSqlPath = path.join(
+        __dirname,
+        "prisma",
+        "migration",
+        "add_plaid_tables.sql"
+      );
+
+      if (fs.existsSync(plaidSchemaSqlPath)) {
+        console.log(`Target: ${databaseTargetLog}`);
+        try {
+          runPrismaSqlFile(plaidSchemaSqlPath, "Plaid schema patches applied");
+          console.log("✅ Plaid schema patches applied");
+        } catch (error) {
+          console.error("⚠️  Error applying Plaid schema patches:", error.message);
+          console.log("   Continuing setup...");
+        }
+      } else {
+        console.log(`⚠️  Plaid SQL file not found at: ${plaidSchemaSqlPath}`);
+        console.log("   Skipping Plaid schema patches...");
+      }
+      console.log("");
+
       // Step 1.25: Generate Prisma Client to ensure it's in sync with the database schema
       console.log("🔧 Step 1.25: Generating Prisma Client...");
       console.log("Command: npx prisma generate");

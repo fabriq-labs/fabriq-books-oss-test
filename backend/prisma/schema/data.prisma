@@ -21,6 +21,9 @@ model account {
   is_active             Boolean                 @default(true)
   last_sync_at          DateTime?
   inst_id               String?
+  // Plaid bank feed — set when a COA bank account is mapped to a Plaid sub-account
+  plaid_item_id         String?                 @db.VarChar(50)
+  plaid_item            plaid_item?             @relation(fields: [plaid_item_id], references: [id], onDelete: SetNull)
   classification        account_classification?
   import_id             String?
   // Fields merged from COA model
@@ -59,6 +62,7 @@ model account {
 
   @@index([source_system_id, source_record_id])
   @@index([source_updated_at])
+  @@index([plaid_item_id])
   @@map("account")
 }
 
