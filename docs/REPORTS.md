@@ -144,7 +144,7 @@ Follow the pattern in `frontend-1/src/pages/reports/IncomeStatement.tsx`:
 | `income_analysis_by_type` | perfin.ts | `from_date`, `to_date` | Work income vs investment income split |
 | `classification_breakdown` | perfin.ts | `from_date`, `to_date`, `classification` | Pattern-matched breakdown of any classification |
 | `my_feed` | zeiv.ts | _(none)_ | Workflow history for the current user |
-| `portfolio_summary` | investments.ts | `connection_id` _(optional)_ | `{ accounts, holdings, total_by_currency, last_sync_at }` |
+| `portfolio_summary` | investments.ts | `report_currency`, `legal_entity_id` / `legal_entity_ids` _(optional)_, `connection_id` _(optional)_ | `{ equity, options, cash, accounts, totals, last_sync_at }` |
 | `investment_trades` | investments.ts | `from_date`, `to_date`, `connection_id` _(optional)_ | Flat trade rows from broker sync |
 
 ---

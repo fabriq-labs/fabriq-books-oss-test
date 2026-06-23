@@ -232,8 +232,10 @@ SELECT concat('exr_usd_cad_', replace(gen_random_uuid()::text, '-', '')),
 The portfolio page calls:
 ```
 POST /api/report/portfolio_summary
-Body: { "filters": { "report_currency": "CAD", "connection_id": "<optional>" } }
+Body: { "filters": { "report_currency": "CAD", "legal_entity_id": "<optional>", "connection_id": "<optional>" } }
 ```
+
+When `legal_entity_id` is omitted (global entity selector set to **All Entities**), holdings for all brokerage accounts in the org are returned. When set, only accounts whose `account.legal_entity_id` matches are included.
 
 Response shape:
 ```typescript

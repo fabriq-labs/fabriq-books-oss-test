@@ -144,18 +144,24 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
     return { breakdown };
   }
   else if (report_id === "portfolio_summary") {
+    const entityId = filters.legal_entity_id;
+    const entityIds = filters.legal_entity_ids ?? (entityId ? [entityId] : undefined);
     return await getPortfolioSummary(
       context.user.org_id,
       filters.report_currency ?? 'CAD',
-      filters.connection_id
+      filters.connection_id,
+      entityIds
     );
   }
   else if (report_id === "investment_trades") {
+    const entityId = filters.legal_entity_id;
+    const entityIds = filters.legal_entity_ids ?? (entityId ? [entityId] : undefined);
     return await getInvestmentTrades(
       context.user.org_id,
       filters.from_date,
       filters.to_date,
-      filters.connection_id
+      filters.connection_id,
+      entityIds
     );
   }
   else {

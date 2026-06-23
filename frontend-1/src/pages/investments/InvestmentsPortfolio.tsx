@@ -11,6 +11,7 @@ import { Loader2, RefreshCw, TrendingUp, BarChart3 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import dayjs from "dayjs";
 import { cn } from "@/lib/utils";
+import { useEntity } from "@/contexts/EntityContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -53,7 +54,11 @@ interface PortfolioData {
 
 // ── Hook ───────────────────────────────────────────────────────────────────────
 
-function usePortfolio(reportCurrency: string) {
+function usePortfolio(
+  reportCurrency: string,
+  currentEntityId: string | null,
+  entityLoading: boolean
+) {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [data, setData] = useState<PortfolioData | null>(null);
@@ -63,9 +68,10 @@ function usePortfolio(reportCurrency: string) {
     const seq = ++fetchSeq.current;
     setLoading(true);
     try {
-      const result = (await reportAPI.getReport("portfolio_summary", {
-        report_currency: reportCurrency,
-      })) as any;
+      const filters: Record<string, string> = { report_currency: reportCurrency };
+      if (currentEntityId) filters.legal_entity_id = currentEntityId;
+
+      const result = (await reportAPI.getReport("portfolio_summary", filters)) as any;
       if (seq !== fetchSeq.current) return;
       setData(result?.data ?? null);
     } catch {
@@ -74,9 +80,11 @@ function usePortfolio(reportCurrency: string) {
     } finally {
       if (seq === fetchSeq.current) setLoading(false);
     }
-  }, [reportCurrency]);
+  }, [reportCurrency, currentEntityId]);
 
-  useEffect(() => { void fetchPortfolio(); }, [fetchPortfolio]);
+  useEffect(() => {
+    if (!entityLoading) void fetchPortfolio();
+  }, [entityLoading, fetchPortfolio]);
 
   const syncNow = useCallback(async () => {
     setSyncing(true);
@@ -293,10 +301,19 @@ function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function InvestmentsPortfolio() {
+  const { currentEntityId, loading: entityLoading } = useEntity();
   const [reportCurrency, setReportCurrency] = useState<string>("CAD");
   const [accountFilter, setAccountFilter] = useState<string>("__all__");
 
-  const { data, loading, syncing, syncNow } = usePortfolio(reportCurrency);
+  const { data, loading, syncing, syncNow } = usePortfolio(
+    reportCurrency,
+    currentEntityId,
+    entityLoading
+  );
+
+  useEffect(() => {
+    setAccountFilter("__all__");
+  }, [currentEntityId]);
 
   const handleCurrencyChange = (val: string) => {
     setReportCurrency(val);

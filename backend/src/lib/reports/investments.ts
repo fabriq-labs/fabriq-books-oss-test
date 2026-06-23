@@ -88,10 +88,44 @@ async function getConversionRate(
   return 1;
 }
 
+/** When legalEntityIds is set, returns matching account ids (may be empty). Otherwise null = no filter. */
+async function getAccountIdsForLegalEntities(
+  orgId: string,
+  legalEntityIds?: string[]
+): Promise<string[] | null> {
+  if (!legalEntityIds?.length) return null;
+  const rows = await prisma.account.findMany({
+    where: {
+      org_id: orgId,
+      legal_entity_id:
+        legalEntityIds.length === 1
+          ? legalEntityIds[0]
+          : { in: legalEntityIds },
+    },
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
+}
+
+async function getLastSyncAt(orgId: string, connectionId?: string): Promise<string | null> {
+  const connection = connectionId
+    ? await prisma.source_system.findFirst({
+        where: { id: connectionId },
+        select: { last_sync_at: true },
+      })
+    : await prisma.source_system.findFirst({
+        where: { org_id: orgId, system_type: 'questrade', is_active: true },
+        orderBy: { last_sync_at: 'desc' },
+        select: { last_sync_at: true },
+      });
+  return connection?.last_sync_at?.toISOString() ?? null;
+}
+
 export async function getPortfolioSummary(
   orgId: string,
   reportCurrency = 'CAD',
-  connectionId?: string
+  connectionId?: string,
+  legalEntityIds?: string[]
 ): Promise<PortfolioSummaryResult> {
   // Resolve report currency row (accept code or id)
   const reportCurrencyRow = await prisma.currency.findFirst({
@@ -101,6 +135,21 @@ export async function getPortfolioSummary(
   const reportCurrencyId = reportCurrencyRow?.id ?? null;
   const reportCurrencyCode = reportCurrencyRow?.code ?? reportCurrency.toUpperCase();
 
+  const accountIds = await getAccountIdsForLegalEntities(orgId, legalEntityIds);
+  if (accountIds !== null && accountIds.length === 0) {
+    return {
+      report_currency: reportCurrencyCode,
+      equity: [],
+      options: [],
+      cash: [],
+      accounts: [],
+      total_market_value: 0,
+      total_cash: 0,
+      total_equity: 0,
+      last_sync_at: await getLastSyncAt(orgId, connectionId),
+    };
+  }
+
   // Fetch all active holdings for this org/connection
   const holdingRows = await prisma.holding.findMany({
     where: {
@@ -109,6 +158,7 @@ export async function getPortfolioSummary(
       ...(connectionId
         ? { source_system_id: connectionId }
         : { source_system_id: { not: 'srcsys_fabriq' } }),
+      ...(accountIds !== null ? { account_id: { in: accountIds } } : {}),
     },
     include: {
       account: { select: { id: true, name: true, inst_id: true } },
@@ -198,17 +248,6 @@ export async function getPortfolioSummary(
   const total_market_value = equity.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
   const total_cash = cash.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
 
-  const connection = connectionId
-    ? await prisma.source_system.findFirst({
-        where: { id: connectionId },
-        select: { last_sync_at: true },
-      })
-    : await prisma.source_system.findFirst({
-        where: { org_id: orgId, system_type: 'questrade', is_active: true },
-        orderBy: { last_sync_at: 'desc' },
-        select: { last_sync_at: true },
-      });
-
   return {
     report_currency: reportCurrencyCode,
     equity,
@@ -220,7 +259,7 @@ export async function getPortfolioSummary(
     total_market_value,
     total_cash,
     total_equity: total_market_value + total_cash,
-    last_sync_at: connection?.last_sync_at?.toISOString() ?? null,
+    last_sync_at: await getLastSyncAt(orgId, connectionId),
   };
 }
 
@@ -228,8 +267,14 @@ export async function getInvestmentTrades(
   orgId: string,
   startDate: string,
   endDate: string,
-  connectionId?: string
+  connectionId?: string,
+  legalEntityIds?: string[]
 ): Promise<InvestmentTradeRow[]> {
+  const accountIds = await getAccountIdsForLegalEntities(orgId, legalEntityIds);
+  if (accountIds !== null && accountIds.length === 0) {
+    return [];
+  }
+
   const trades = await prisma.trade.findMany({
     where: {
       org_id: orgId,
@@ -240,6 +285,7 @@ export async function getInvestmentTrades(
       ...(connectionId
         ? { source_system_id: connectionId }
         : { source_system_id: { not: 'srcsys_fabriq' } }),
+      ...(accountIds !== null ? { account_id: { in: accountIds } } : {}),
     },
     include: {
       account: { select: { name: true } },
