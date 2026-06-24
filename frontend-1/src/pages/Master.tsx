@@ -25,13 +25,15 @@ import type { CustomRowRenderer, FilterEnhancements } from "@/types/customRowRen
 import ExportModal from "@/components/masters/ExportModal";
 import ColumnSelectorModal from "@/components/masters/ColumnSelectorModal";
 import {
-  applyVisibilityToMetaData,
+  applyColumnPreferencesToMetaData,
   clearColumnPreferences,
   getColumnPrefsStorageKey,
+  getDefaultColumnOrder,
   getDefaultVisibility,
   loadColumnPreferences,
   saveColumnPreferences,
   resolveVisibility,
+  resolveColumnOrder,
 } from "@/utils/columnPreferences";
 
 /**
@@ -192,6 +194,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
   const [clientSortField, setClientSortField] = useState<string | null>(null);
   const [clientSortDirection, setClientSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -790,6 +793,11 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
         ? resolveVisibility(meta, prefs.visibility)
         : getDefaultVisibility(meta),
     );
+    setColumnOrder(
+      prefs
+        ? resolveColumnOrder(meta, prefs.columnOrder)
+        : getDefaultColumnOrder(meta),
+    );
     setClientSortField(prefs?.sort?.field ?? null);
     setClientSortDirection(prefs?.sort?.direction ?? "asc");
   }, [masterList?.metaData, columnPrefsStorageKey, customRowRenderer, type, view]);
@@ -800,20 +808,35 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
       Object.keys(columnVisibility).length > 0
         ? columnVisibility
         : getDefaultVisibility(masterList.metaData);
+    const order =
+      columnOrder.length > 0
+        ? columnOrder
+        : getDefaultColumnOrder(masterList.metaData);
     return {
       ...masterList,
-      metaData: applyVisibilityToMetaData(masterList.metaData, visibility),
+      metaData: applyColumnPreferencesToMetaData(
+        masterList.metaData,
+        visibility,
+        order,
+      ),
     };
-  }, [masterList, columnVisibility, customRowRenderer]);
+  }, [masterList, columnVisibility, columnOrder, customRowRenderer]);
 
   const persistColumnPreferences = useCallback(
     (
       visibility: Record<string, boolean>,
+      order: string[],
       sort: { field: string; direction: "asc" | "desc" } | null,
     ) => {
       const meta = masterList?.metaData;
       if (!meta || !columnPrefsStorageKey) return;
-      saveColumnPreferences(columnPrefsStorageKey, meta, visibility, sort);
+      saveColumnPreferences(
+        columnPrefsStorageKey,
+        meta,
+        visibility,
+        order,
+        sort,
+      );
     },
     [masterList?.metaData, columnPrefsStorageKey],
   );
@@ -828,12 +851,18 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
         Object.keys(columnVisibility).length > 0
           ? columnVisibility
           : getDefaultVisibility(meta);
+      const order =
+        columnOrder.length > 0
+          ? columnOrder
+          : getDefaultColumnOrder(meta);
       persistColumnPreferences(
         visibility,
+        order,
         field ? { field, direction } : null,
       );
     },
     [
+      columnOrder,
       columnVisibility,
       customRowRenderer,
       masterList?.metaData,
@@ -842,10 +871,12 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   );
 
   const handleColumnSelectorSave = useCallback(
-    (visibility: Record<string, boolean>) => {
+    (visibility: Record<string, boolean>, order: string[]) => {
       setColumnVisibility(visibility);
+      setColumnOrder(order);
       persistColumnPreferences(
         visibility,
+        order,
         clientSortField
           ? { field: clientSortField, direction: clientSortDirection }
           : null,
@@ -866,6 +897,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
       clearColumnPreferences(columnPrefsStorageKey);
     }
     setColumnVisibility(getDefaultVisibility(meta));
+    setColumnOrder(getDefaultColumnOrder(meta));
     setClientSortField(null);
     setClientSortDirection("asc");
     setIsColumnSelectorOpen(false);
@@ -1036,6 +1068,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
           metaData={masterList.metaData}
           sampleRow={masterList.data?.[0]}
           appliedVisibility={columnVisibility}
+          appliedColumnOrder={columnOrder}
           onSave={handleColumnSelectorSave}
           onRestoreDefaults={handleColumnSelectorRestore}
         />

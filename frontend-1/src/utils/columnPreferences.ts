@@ -1,4 +1,4 @@
-export const COLUMN_PREFS_VERSION = 1 as const;
+export const COLUMN_PREFS_VERSION = 2 as const;
 export const COLUMN_PREFS_STORAGE_PREFIX = "fabriq:column-prefs:";
 
 export interface ColumnSortPreference {
@@ -10,6 +10,7 @@ export interface ColumnPreferences {
   v: typeof COLUMN_PREFS_VERSION;
   fingerprint: string;
   visibility: Record<string, boolean>;
+  columnOrder: string[];
   sort: ColumnSortPreference | null;
 }
 
@@ -32,6 +33,14 @@ export function getColumnPrefsStorageKey(
   view: string,
 ): string {
   return `${COLUMN_PREFS_STORAGE_PREFIX}${userId}:${model}:${view}`;
+}
+
+/** View default column order (matches generateColumns sort). */
+export function getDefaultColumnOrder(metaData: Record<string, any>): string[] {
+  return Object.entries(metaData)
+    .filter(([, meta]) => meta?.displayName)
+    .sort(([, a], [, b]) => (a.orderNo ?? Infinity) - (b.orderNo ?? Infinity))
+    .map(([key]) => key);
 }
 
 /** View defaults for column visibility (matches ExportModal). */
@@ -60,16 +69,52 @@ export function resolveVisibility(
   return result;
 }
 
-export function applyVisibilityToMetaData(
+export function resolveColumnOrder(
+  metaData: Record<string, any>,
+  saved?: string[] | null,
+): string[] {
+  const defaults = getDefaultColumnOrder(metaData);
+  if (!saved?.length) return defaults;
+
+  const eligible = new Set(getEligibleColumnKeys(metaData));
+  if (
+    saved.length !== eligible.size ||
+    saved.some((key) => !eligible.has(key))
+  ) {
+    return defaults;
+  }
+  return saved;
+}
+
+function isValidColumnOrder(
+  metaData: Record<string, any>,
+  columnOrder: string[] | undefined,
+): boolean {
+  if (!columnOrder?.length) return false;
+  const eligible = getEligibleColumnKeys(metaData);
+  if (columnOrder.length !== eligible.length) return false;
+  const eligibleSet = new Set(eligible);
+  return columnOrder.every((key) => eligibleSet.has(key));
+}
+
+export function applyColumnPreferencesToMetaData(
   metaData: Record<string, any>,
   visibility: Record<string, boolean>,
+  columnOrder: string[],
 ): Record<string, any> {
   const result: Record<string, any> = { ...metaData };
+
   for (const key of getEligibleColumnKeys(metaData)) {
-    if (key in visibility) {
-      result[key] = { ...metaData[key], isColumnShow: visibility[key] };
-    }
+    if (!(key in visibility)) continue;
+    result[key] = { ...metaData[key], isColumnShow: visibility[key] };
   }
+
+  columnOrder.forEach((key, index) => {
+    if (result[key]) {
+      result[key] = { ...result[key], orderNo: index + 1 };
+    }
+  });
+
   return result;
 }
 
@@ -88,6 +133,11 @@ export function loadColumnPreferences(
     }
 
     if (parsed.fingerprint !== computeColumnFingerprint(metaData)) {
+      localStorage.removeItem(storageKey);
+      return null;
+    }
+
+    if (!isValidColumnOrder(metaData, parsed.columnOrder)) {
       localStorage.removeItem(storageKey);
       return null;
     }
@@ -111,12 +161,14 @@ export function saveColumnPreferences(
   storageKey: string,
   metaData: Record<string, any>,
   visibility: Record<string, boolean>,
+  columnOrder: string[],
   sort: ColumnSortPreference | null,
 ): void {
   const payload: ColumnPreferences = {
     v: COLUMN_PREFS_VERSION,
     fingerprint: computeColumnFingerprint(metaData),
     visibility,
+    columnOrder,
     sort,
   };
   localStorage.setItem(storageKey, JSON.stringify(payload));
