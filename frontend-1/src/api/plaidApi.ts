@@ -11,6 +11,10 @@ export interface PlaidAccount {
   fabriq_account_name?: string | null;
   fabriq_account_code?: string | null;
   fabriq_classification?: string | null;
+  /** Fabriq `account.created_at` for this mapped account. */
+  fabriq_connected_at?: string | null;
+  /** Fabriq `account.last_sync_at` — per-account sync time. */
+  fabriq_last_sync_at?: string | null;
 }
 
 export interface PlaidItem {

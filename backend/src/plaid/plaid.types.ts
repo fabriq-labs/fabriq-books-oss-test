@@ -14,6 +14,10 @@ export interface StoredPlaidAccount {
   fabriq_account_name?: string | null;
   fabriq_account_code?: string | null;
   fabriq_classification?: string | null;
+  /** When the Fabriq account row was created (new Plaid import). For linked existing CoA accounts, this is the account creation date. */
+  fabriq_connected_at?: string | null;
+  /** Last transaction sync for this mapped account (`account.last_sync_at`). */
+  fabriq_last_sync_at?: string | null;
 }
 
 export interface PlaidItemSummary {

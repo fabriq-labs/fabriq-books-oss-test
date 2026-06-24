@@ -3,6 +3,13 @@ import { plaidAPI, PlaidAccount, PlaidItem } from '@/api/plaidApi';
 import { viewAPI } from '@/api/metadataApi';
 import { Button } from '@/components/ui/button';
 import {
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -209,23 +216,27 @@ export function PlaidAccountMappingStep({
 
   return (
     <>
-      <div className="px-6 pt-8 pb-4 text-center border-b border-slate-100 shrink-0">
-        <div className="flex items-center justify-center gap-1.5 mb-6">
+      <DialogHeader className="border-b px-6 py-5 text-center sm:text-center">
+        <div className="flex items-center justify-center gap-1.5 mb-4">
           <span className={plaidUi.progressDotActive} />
           <span className={plaidUi.progressDotActive} />
         </div>
-        <div className={plaidUi.institutionBadge}>{initial}</div>
-        <h2 className={plaidUi.title}>Map accounts</h2>
-        <p className={`mt-2 ${plaidUi.subtitle} px-2`}>
+        <div className={`${plaidUi.institutionAvatar} mx-auto mb-3`}>{initial}</div>
+        <DialogTitle>Map accounts</DialogTitle>
+        <DialogDescription>
           Bank accounts on the left map to Fabriq accounts on the right
-        </p>
-      </div>
+        </DialogDescription>
+      </DialogHeader>
 
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="hidden sm:grid grid-cols-[1fr_auto_1fr] gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50/80">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Plaid account</p>
+        <div className="hidden sm:grid grid-cols-[1fr_auto_1fr] gap-3 px-5 py-3 border-b bg-muted/40">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Plaid account
+          </p>
           <span className="w-5" />
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Fabriq account</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Fabriq account
+          </p>
         </div>
 
         <ul className={plaidUi.listDivide}>
@@ -237,25 +248,27 @@ export function PlaidAccountMappingStep({
             const isMapped = row.status === 'mapped';
             const coaDisplay = mapPlaidAccountToCoaDisplay(acct.type, acct.subtype);
             const mappedAccount = coaById.get(row.selectedFabriqId);
+            const selectedAccount =
+              row.status === 'mapped' ? mappedAccount : coaById.get(row.selectedFabriqId);
             const plaidLabel = formatPlaidAccountLabel(acct.name, acct.mask);
 
             return (
               <li key={row.plaidAccountId} className="px-5 py-4">
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 sm:items-start">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 sm:items-stretch">
                   {/* Left — Plaid account */}
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-2 sm:hidden">
+                  <div className="min-w-0 flex flex-col">
+                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2 sm:hidden">
                       Plaid account
                     </p>
-                    <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+                    <div className={plaidUi.panelBox}>
                       <div className={plaidUi.accountIcon}>
-                        <Building2 className="h-4 w-4 text-slate-500" />
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={plaidUi.accountName}>
                           {acct.name ?? 'Account'}
                           {acct.mask && (
-                            <span className="text-slate-500 font-normal"> · {acct.mask}</span>
+                            <span className="text-muted-foreground font-normal"> · {acct.mask}</span>
                           )}
                         </p>
                         <p className={plaidUi.accountMeta}>{accountSubtypeLabel(acct)}</p>
@@ -264,24 +277,23 @@ export function PlaidAccountMappingStep({
                     </div>
                   </div>
 
-                  {/* Arrow */}
-                  <div className="hidden sm:flex items-center justify-center pt-8 text-slate-300">
+                  <div className="hidden sm:flex items-center justify-center self-center text-muted-foreground/50">
                     <ArrowRight className="h-4 w-4" />
                   </div>
-                  <div className="flex sm:hidden items-center justify-center text-slate-300 py-1">
+                  <div className="flex sm:hidden items-center justify-center text-muted-foreground/50 py-1">
                     <ArrowRight className="h-4 w-4 rotate-90" />
                   </div>
 
                   {/* Right — Fabriq account */}
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-2 sm:hidden">
+                  <div className="min-w-0 flex flex-col gap-2">
+                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-0 sm:hidden">
                       Fabriq account
                     </p>
 
                     {isMapped ? (
-                      <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                      <div className={plaidUi.mappedBox}>
                         <div className={plaidUi.accountIcon}>
-                          <Landmark className="h-4 w-4 text-emerald-700" />
+                          <Landmark className="h-4 w-4 text-primary" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className={plaidUi.accountName}>
@@ -291,37 +303,47 @@ export function PlaidAccountMappingStep({
                             {mappedAccount?.code && <span>{mappedAccount.code} · </span>}
                             {row.mappedVia === 'create' ? 'New account' : 'Existing account'}
                           </p>
-                          <div className="flex items-center gap-1.5 mt-2 text-sm text-emerald-700">
-                            <Check className="h-4 w-4 shrink-0" />
+                          <Badge variant="secondary" className="mt-2 gap-1">
+                            <Check className="h-3 w-3" />
                             Mapped
-                          </div>
+                          </Badge>
                         </div>
                       </div>
                     ) : row.mode === 'existing' ? (
-                      <div className="space-y-2 rounded-lg border border-slate-200 p-3">
-                        <p className="text-xs text-slate-500">Map to an existing Fabriq account</p>
-                        <Select
-                          value={row.selectedFabriqId || undefined}
-                          disabled={row.saving}
-                          onValueChange={(val) =>
-                            updateRow(row.plaidAccountId, { selectedFabriqId: val })
-                          }
-                        >
-                          <SelectTrigger className="w-full h-9 border-slate-200 bg-white">
-                            <SelectValue placeholder="Select existing account" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {coaOptionsForRow(row).map((fa) => (
-                              <SelectItem key={fa.id} value={fa.id}>
-                                {fa.name ?? fa.code ?? fa.id}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="flex flex-wrap gap-2 pt-1">
+                      <>
+                        <div className={plaidUi.panelBox}>
+                          <div className={plaidUi.accountIcon}>
+                            <Landmark className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <Select
+                              value={row.selectedFabriqId || undefined}
+                              disabled={row.saving}
+                              onValueChange={(val) =>
+                                updateRow(row.plaidAccountId, { selectedFabriqId: val })
+                              }
+                            >
+                              <SelectTrigger className="w-full h-8 border-0 bg-transparent p-0 shadow-none focus:ring-0 text-sm font-medium">
+                                <SelectValue placeholder="Select Fabriq account" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {coaOptionsForRow(row).map((fa) => (
+                                  <SelectItem key={fa.id} value={fa.id}>
+                                    {fa.name ?? fa.code ?? fa.id}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {selectedAccount && (
+                              <p className={plaidUi.accountMeta}>
+                                {selectedAccount.code ?? selectedAccount.classification ?? '—'}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
-                            className="h-8 rounded-lg px-3 bg-[#111111] hover:bg-black text-white"
                             disabled={row.saving}
                             onClick={() => handleApprove(row.plaidAccountId)}
                           >
@@ -330,7 +352,6 @@ export function PlaidAccountMappingStep({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 rounded-lg px-3 border-slate-200"
                             disabled={row.saving}
                             onClick={() => updateRow(row.plaidAccountId, { mode: 'create' })}
                           >
@@ -338,20 +359,23 @@ export function PlaidAccountMappingStep({
                             Create new
                           </Button>
                         </div>
-                      </div>
+                      </>
                     ) : (
-                      <div className="space-y-2 rounded-lg border border-slate-200 p-3">
-                        <p className="text-xs text-slate-500">Create a new Fabriq account from this Plaid account</p>
-                        <div className="rounded-md border border-slate-100 bg-white px-3 py-2">
-                          <p className="text-sm font-medium text-slate-900">{plaidLabel}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {coaDisplay.classification} · {coaDisplay.types.join(', ')}
-                          </p>
+                      <>
+                        <div className={plaidUi.panelBox}>
+                          <div className={plaidUi.accountIcon}>
+                            <Landmark className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className={plaidUi.accountName}>{plaidLabel}</p>
+                            <p className={plaidUi.accountMeta}>
+                              {coaDisplay.classification} · {coaDisplay.types.join(', ')}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 pt-1">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
-                            className="h-8 rounded-lg px-3 bg-[#111111] hover:bg-black text-white"
                             disabled={row.saving}
                             onClick={() => handleCreateAndLink(row.plaidAccountId)}
                           >
@@ -360,14 +384,13 @@ export function PlaidAccountMappingStep({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 rounded-lg px-3 border-slate-200"
                             disabled={row.saving}
                             onClick={() => updateRow(row.plaidAccountId, { mode: 'existing' })}
                           >
                             Use existing
                           </Button>
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -377,22 +400,14 @@ export function PlaidAccountMappingStep({
         </ul>
       </div>
 
-      <div className="shrink-0 px-6 py-5 border-t border-slate-100 bg-white flex gap-3">
-        <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={onBack}>
+      <DialogFooter className="border-t px-6 py-4 gap-2 sm:gap-0">
+        <Button variant="outline" className="flex-1 sm:flex-none" onClick={onBack}>
           Back
         </Button>
-        <Button
-          className={`${plaidUi.primaryBtn} flex-1`}
-          disabled={!allMapped}
-          onClick={onComplete}
-        >
+        <Button className="flex-1 sm:flex-none" disabled={!allMapped} onClick={onComplete}>
           Done
         </Button>
-      </div>
-
-      <div className={plaidUi.footer}>
-        <p className={plaidUi.footerText}>Fabriq · map Plaid accounts to Fabriq accounts</p>
-      </div>
+      </DialogFooter>
     </>
   );
 }

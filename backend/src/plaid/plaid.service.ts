@@ -854,6 +854,8 @@ export class PlaidService {
         name: true,
         code: true,
         classification: true,
+        created_at: true,
+        last_sync_at: true,
       },
     });
     const fabriqByPlaidId = new Map(
@@ -866,6 +868,8 @@ export class PlaidService {
             name: m.name,
             code: m.code,
             classification: m.classification,
+            connectedAt: m.created_at,
+            lastSyncAt: m.last_sync_at,
           },
         ]),
     );
@@ -885,6 +889,8 @@ export class PlaidService {
         fabriq_account_name: mapped?.name ?? null,
         fabriq_account_code: mapped?.code ?? null,
         fabriq_classification: mapped?.classification ?? null,
+        fabriq_connected_at: mapped?.connectedAt?.toISOString() ?? null,
+        fabriq_last_sync_at: mapped?.lastSyncAt?.toISOString() ?? null,
       };
     });
   }
