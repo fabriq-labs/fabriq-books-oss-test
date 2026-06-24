@@ -65,6 +65,19 @@ const SYSTEM_TYPE_CONFIGS: Record<string, { name: string; fields: any[] }> = {
       },
     ],
   },
+  questrade: {
+    name: 'Questrade',
+    fields: [
+      {
+        name: 'refresh_token',
+        label: 'Personal Access Token',
+        required: true,
+        type: 'password',
+        placeholder: 'Paste your Questrade Personal Access Token',
+        helpText: 'Generate at questrade.com → App Hub → Personal Access Token. Tokens expire after 3 days without a sync.',
+      },
+    ],
+  },
   quickbooks: {
     name: 'QuickBooks Online',
     fields: [

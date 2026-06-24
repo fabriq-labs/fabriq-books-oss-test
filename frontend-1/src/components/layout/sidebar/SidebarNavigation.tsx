@@ -94,6 +94,7 @@ const topLevelNavItems: MasterNavItem[] = [
     icon: TrendingUp,
     label: 'Investments',
     subNav: [
+      { label: 'Portfolio', path: '/investments/portfolio' },
       { label: 'Instruments', path: '/investments/instruments' },
       { label: 'Holdings', path: '/investments/holdings' },
       { label: 'Trades', path: '/investments/trades' }

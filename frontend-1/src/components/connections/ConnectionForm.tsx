@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { erpConnectionsAPI } from "@/api/api";
+import { useEntity } from "@/contexts/EntityContext";
 import { Loader2, CheckCircle, XCircle, Check, ChevronsUpDown } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -52,6 +54,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
   onCancel,
 }) => {
   const { toast } = useToast();
+  const { entities } = useEntity();
   const [formData, setFormData] = useState(() => {
     const initial: any = {
       name: initialData?.name || `${systemTypeName} Connection`,
@@ -60,6 +63,7 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
       is_active: initialData?.is_active ?? true,
       default_purchase_account_id: initialData?.default_purchase_account_id || '',
       default_purchase_account_name: initialData?.default_purchase_account_name || '',
+      legal_entity_id: initialData?.legal_entity_id || null,
     };
 
     // Initialize OAuth fields
@@ -160,18 +164,30 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
         systemType,
         formData.connection_config.oauth,
         initialData?.id
-      ) as { success: boolean; message?: string };
+      ) as { success: boolean; message?: string; data?: { new_refresh_token?: string } };
 
       if (result.success) {
-        setTestResult({
-          success: true,
-          message: result.message || 'Connection test successful!',
-        });
+        // Questrade rotates the refresh token on every use. If the backend returns a new token
+        // (new connection flow — no connectionId to persist to), update the form field directly
+        // without going through handleFieldChange, which would reset testPassed.
+        const newToken = result.data?.new_refresh_token;
+        if (newToken) {
+          setFormData((prev: any) => ({
+            ...prev,
+            connection_config: {
+              ...prev.connection_config,
+              oauth: { ...prev.connection_config.oauth, refresh_token: newToken },
+            },
+          }));
+        }
+
+        const successMessage = newToken
+          ? `${result.message || 'Connection test successful!'} The token in this form has been updated with the refreshed value — click Save to store it.`
+          : result.message || 'Connection test successful!';
+
+        setTestResult({ success: true, message: successMessage });
         setTestPassed(true);
-        toast({
-          title: "Success",
-          description: result.message || 'Connection test passed',
-        });
+        toast({ title: "Success", description: result.message || 'Connection test passed' });
       } else {
         setTestResult({
           success: false,
@@ -356,6 +372,35 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
               className={errors.name ? 'border-red-500' : ''}
             />
             {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+          </div>
+
+          {/* Legal Entity */}
+          <div className="space-y-2">
+            <Label htmlFor="legal_entity_id">Legal Entity</Label>
+            <Select
+              value={formData.legal_entity_id || '__none__'}
+              onValueChange={(val) =>
+                setFormData((prev: any) => ({
+                  ...prev,
+                  legal_entity_id: val === '__none__' ? null : val,
+                }))
+              }
+            >
+              <SelectTrigger id="legal_entity_id" className="w-full">
+                <SelectValue placeholder="Not assigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Not assigned</SelectItem>
+                {entities.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.legal_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              Accounts created by this connection's sync will be assigned to this legal entity.
+            </p>
           </div>
 
           {/* OAuth Fields */}

@@ -1,7 +1,7 @@
 # Opening Balance & Balance Sheet — Developer Reference
 
 > **Status**: Living document — updated as features are built.
-> **Last updated**: 2026-05-12
+> **Last updated**: 2026-06-05
 
 ---
 
@@ -9,8 +9,8 @@
 
 1. [Opening Balance Data Model](#2-the-opening-balance-data-model)
 2. [Migration Journal — How Balances Are Imported](#3-migration-journal--how-balances-are-imported)
-3. [Opening Balances UI](#35-opening-balances-ui-redesign)
-4. [Account Form — Opening Balance Display](#36-account-form--opening-balance-display)
+3. [Opening Balances UI](#36-opening-balances-ui--design-and-behaviour)
+4. [Account Form — Opening Balance Display](#37-account-form--opening-balance-display)
 5. [How Reports Read Opening Balances](#4-how-reports-read-opening-balances)
 6. [Database Views](#5-database-views)
 7. [Trial Balance Reports](#6-trial-balance-reports)
@@ -105,58 +105,127 @@ Positive = normal balance direction; negative = abnormal.
 
 Account resolution: by `code` first, then `name` if code column absent. Unresolvable accounts are collected as parse errors but do not abort the import if at least one row succeeds.
 
+**Duplicate accounts in one file**: if the same account appears on multiple CSV rows, the **last row wins** (deduped by `account_id` before save).
+
 ### 3.3 API endpoints
 
-Registered as custom actions (self-registering via `register.ts`):
+Registered in `backend/src/services/book-keeping/migration-journal/register.ts` as custom actions:
 
 | Endpoint | Purpose |
 |---|---|
 | `POST /api/setup/custom/migration-journal` | JSON: `{ legal_entity_id, migration_date, rows, replace? }` |
-| `POST /api/setup/custom/migration-journal-csv` | Multipart CSV + same params |
-| `POST /api/setup/custom/migration-journal-status` | Check existing journals for an entity |
-| `POST /api/setup/custom/migration-journal-delete` | Hard-delete by entity + date |
+| `POST /api/setup/custom/migration-journal-csv` | Multipart: `file`, `legal_entity_id`, `migration_date`, `replace?` |
+| `POST /api/setup/custom/migration-journal-status` | Returns `{ dates[], postings_count }` for an entity |
+| `POST /api/setup/custom/migration-journal-delete` | Hard-delete all OPENING_BALANCE postings for `{ legal_entity_id, migration_date }` |
 
-`replace = true` deletes existing OPENING_BALANCE postings for the entity/date inside the same transaction before inserting new ones. Without it, a second submit returns a 409-style error.
+**Replace semantics** (`replace = true`):
 
-### 3.4 UI entry point
+- Deletes **all** `OPENING_BALANCE` postings for `(legal_entity_id, value_date)` inside the same transaction, then inserts the new batch.
+- Deletion runs whenever `replace=true` (not gated on a prior `findFirst` check).
+- Without `replace`, a second submit for the same entity/date returns an error (`already exist`).
 
-**Route**: `/accounting/opening-balances`
-**File**: `frontend-1/src/pages/accounting/OpeningBalances.tsx`
+**One row per account**: `createMigrationJournal` dedupes `rows` by `account_id` (last value wins) before creating postings.
 
-See §3.5 for the full UI design.
+**Partial batches**: replace is **all-or-nothing for that date** — the submitted `rows` become the full set after delete. The UI pre-loads existing accounts into the manual editor so a typical edit sends the complete list, not a single changed account in isolation.
 
----
+### 3.4 Demo seed data
 
-### 3.5 Opening Balances UI — design and behaviour
+Indian demo setup imports opening balances from CSV before FY journal activity:
+
+- **Files**: `backend/prisma/setup-IN/opening-balances/opening-balances-{india-hq,mumbai,bangalore,usa}.csv`
+- **Script**: `backend/prisma/setup-IN/setup-indian-demo.ts` → `importOpeningBalancesFromSeedCsv()`
+- **Dates**: `2025-03-31` for India entities (APR_MAR FY2024-25 close); `2024-12-31` for `org_us_office` (JAN_DEC CY2024 close)
+- **Re-seed**: `npx ts-node setup-indian-demo.ts` or `--reset-postings-full`
+
+### 3.5 UI entry point
 
 **Route**: `/accounting/opening-balances`  
 **File**: `frontend-1/src/pages/accounting/OpeningBalances.tsx`
 
-#### Layout (matches Master.tsx pattern)
+See §3.6 for the full UI design.
+
+---
+
+### 3.6 Opening Balances UI — design and behaviour
+
+**Route**: `/accounting/opening-balances`  
+**File**: `frontend-1/src/pages/accounting/OpeningBalances.tsx`
+
+#### User mental model
+
+One job: **set opening balances as of a date** for the entity selected in the global entity switcher.
+
+Two equivalent input methods:
+
+| Method | Use case |
+|---|---|
+| **Enter manually** / **Edit manually** | Build the same data as a CSV in-app — account picker, signed balances, live balance check |
+| **Import CSV** | Upload a Zoho-style export (or file based on the sample CSV) |
+
+Both use the same **Balances as of** date and the same backend migration journal APIs.
+
+#### Layout
 
 ```
-Opening Balances                    [+ Add Opening Balance]  [Import CSV]
-Imported as of 30 Mar 2025
+Opening Balances
+Current balances as of 31 Mar 2025          (when data exists)
 
-14 accounts · 30 Mar 2025                               [🗑 Remove all]
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Balances as of  [2025-03-31]                                            │
+│ Same date is used for manual entry and CSV import.                      │
+│                    [Download sample CSV] [Edit manually] [Import CSV]   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+⚠ Saving on 2025-04-01 will add a new batch; existing balances on 31 Mar 2025 stay…
+   (shown only when toolbar date ≠ saved batch date)
+
+14 accounts · as of 31 Mar 2025                              [Remove all]
 ─────────────────────────────────────────────────────────────────────────
-Account                                                          Balance
+Account                                              Balance (INR / USD)
 ─────────────────────────────────────────────────────────────────────────
-1102  Checking Account                              ₹45,00,000.00  Dr
-1105  Accounts Receivable                           ₹38,00,000.00  Dr
+1102  Checking Account                              ₹1,42,00,000.00  Dr
 2101  Accounts Payable                              ₹22,00,000.00  Cr
 ...
 ```
+
+When no data exists yet, the subtitle prompts the user to pick a date and enter manually or import CSV.
+
+#### Toolbar — balances-as-of date
+
+| Behaviour | Detail |
+|---|---|
+| Default | Last day of the **previous** financial year for the entity's `financial_year_type` (`buildFYOptions`) |
+| After load | If opening balances already exist, syncs to the saved batch date from `migration-journal-status` |
+| Shared | Same `migrationDate` state drives manual modal, CSV upload, and API `migration_date` |
+| Required | Import CSV and Enter/Edit manually are disabled until a date is set |
+
+Dates are formatted for display with the date-only portion of ISO strings (`YYYY-MM-DD` slice) to avoid timezone drift in labels.
+
+#### Currency display
+
+Amounts use the **entity base currency** from `EntityContext` (`currentEntity.currency.code`, fallback `basecurrency_id` → INR/USD). The table header shows `Balance (INR)` or `Balance (USD)` accordingly.
 
 #### Key design decisions
 
 | Decision | Rationale |
 |---|---|
-| Entity from global switcher, not page-level dropdown | The entity context is already global; a page-level selector would be redundant and inconsistent with all other pages. |
-| No standalone date field on the main page | The migration date only matters at import time; it lives inside the Add modal with a sensible default. |
-| Two columns only (Account + Amount with Dr/Cr badge) | A separate "Classification side" column is redundant — the Dr/Cr badge conveys the same information more compactly. |
-| No warning banner for existing entries | The table itself shows what exists. The modal surfaces the "X entries will be replaced" note inline when the user actively chooses to add. |
-| "Remove all" is low-prominence (small, destructive-coloured) | Deleting all opening balances is irreversible and rarely needed. The action is available but not prominent. |
+| Entity from global switcher, not page-level dropdown | Entity context is already global; consistent with other accounting pages. |
+| **Balances as of** on the main page (not only inside the modal) | CSV import had no visible date before; both paths must show the same as-of date explicitly. |
+| Manual entry ≡ CSV builder | Same `{ account_id, balance }[]` + one migration date; avoids two competing mental models. |
+| **Edit manually** pre-loads existing rows | Saving sends the **full** account list with `replace=true` (same date), so one account update does not duplicate or wipe others unintentionally. |
+| One row per account in the table | Display dedupes by `accountId`; backend dedupes on save. |
+| Two columns only (Account + Amount with Dr/Cr badge) | Classification side is implied by the Dr/Cr badge. |
+| **Download sample CSV** | Static file at `frontend-1/public/download_csv/opening_balances.csv`; fetched via `buildImportSampleCsvUrl("opening_balances")`. |
+| Warning when toolbar date ≠ saved batch date | Import/save on a different date creates a **second batch**; existing batch remains until **Remove all** for that date. |
+| **Remove all** is low-prominence | Deletes the whole batch for `existingDate` via `migration-journal-delete`; irreversible, rarely needed. |
+
+#### Replace flag (frontend)
+
+```ts
+replaceOnSave = existingCount > 0 && (!existingDate || migrationDate === existingDate)
+```
+
+Sent as `replace` on both JSON and CSV uploads. When `true`, the backend replaces the entire batch for that date. When the user picks a **new** date while old data exists, `replace=false` and the new import adds a separate batch (page warning explains this).
 
 #### How OBC is identified in the frontend
 
@@ -168,7 +237,7 @@ const isOBCDebit = posting.account?.code === '__OBC__';
 // Otherwise real account is on the debit side (asset)
 ```
 
-This avoids fetching account classifications — `code === '__OBC__'` is a reliable signal because OBC is always created with that exact code.
+OBC rows are excluded from the displayed account list.
 
 #### Sign convention for display
 
@@ -179,22 +248,39 @@ The amount in the table is the raw posting amount (always positive). The Dr/Cr b
 
 Contra-asset accounts (e.g. Accumulated Depreciation) naturally appear as **Cr** since they were entered in the Credit Balance column of the Zoho export.
 
-#### Add modal
+#### Manual entry modal
 
-Opens on "+ Add Opening Balance". Contains:
-- **Date field** — pre-filled to the last day of the previous FY (derived from the entity's `financial_year_type`)
-- **Account rows table** — searchable dropdown per row, grouped by Assets / Liabilities / Equity; duplicate accounts suppressed
-- **Live balance check** — shows Assets − (Liabilities + Equity) difference; green if balanced
-- **Inline replace warning** — "X existing entries will be replaced" when postings already exist, inside the modal (not a page-level banner)
-- **Save / Replace** button label changes based on whether entries exist
+Opens on **Enter manually** (empty entity) or **Edit manually** (existing batch).
+
+| Feature | Detail |
+|---|---|
+| Pre-load | When opening balances exist, all current accounts are loaded into editable rows (signed balances reconstructed from posting legs). |
+| Date field | Same `migrationDate` as the toolbar (editing either updates both). |
+| Account rows | Searchable dropdown per row, grouped by Assets / Liabilities / Equity; duplicate account selection suppressed in the picker. |
+| Live balance check | Assets − (Liabilities + Equity); green if balanced; otherwise shows difference and notes OBC will absorb it. |
+| Save | Dedupes rows by `account_id`, posts to `migration-journal` with `replace: replaceOnSave`. |
+| Copy | Explains that save replaces the **full list** for the date (one row per account). |
 
 #### Import CSV
 
-The "Import CSV" button at the top triggers a file picker directly. It uses the same `migrationDate` state as the modal (pre-filled from FY type). The import replaces existing entries if any exist (`replace = true` when `existingCount > 0`). Parse errors are logged to the console; successful rows are imported even if some fail to resolve.
+1. User sets **Balances as of** on the toolbar.
+2. **Import CSV** opens the file picker (toast if date missing).
+3. Uploads to `migration-journal-csv` with `migration_date`, `legal_entity_id`, `replace`.
+4. Parse errors are logged to the console; valid rows import even if some lines fail.
+
+Sample CSV columns: `Account Code`, `Account Name`, `Debit Balance`, `Credit Balance` (or signed `Balance` column — see §3.2).
 
 #### Data loading
 
-The imported entries table is populated via the metadata-driven search API — no custom endpoint:
+**Status** (posting count + saved dates):
+
+```ts
+POST /api/setup/custom/migration-journal-status
+{ legal_entity_id }
+// → { dates: string[], postings_count: number }  // dates ordered desc; UI uses dates[0]
+```
+
+**Imported entries table** — metadata search API (no custom list endpoint):
 
 ```ts
 viewAPI.search("posting", "posting_view", 1, 200, undefined, {
@@ -203,11 +289,13 @@ viewAPI.search("posting", "posting_view", 1, 200, undefined, {
 }, { value_date: "asc" })
 ```
 
-The response is processed in the frontend to extract real (non-OBC) accounts. Results are sorted: debit-side (assets) first, then credit-side (liabilities/equity), alphabetical within each group.
+The response is processed to extract real (non-OBC) accounts, deduped by `accountId`, sorted: debit-side first, then credit-side, alphabetical within each group.
+
+**Remove all** calls `migration-journal-delete` with `existingDate` from status (most recent batch date).
 
 ---
 
-### 3.6 Account Form — Opening Balance Display
+### 3.7 Account Form — Opening Balance Display
 
 **File**: `frontend-1/src/components/forms/Masters/AccountForm.tsx`
 
@@ -521,7 +609,14 @@ The test CSV is at `backend/test-data/verification-suite/zoho-trial-balance-fy20
 | Decision | Rationale |
 |---|---|
 | Entity from global switcher, not page-level dropdown | Entity context is already global; a page-level selector is redundant and inconsistent with all other pages. |
+| Balances-as-of date on main toolbar + modal | CSV and manual entry share one date; user must see it before import. |
+| Manual entry pre-loads existing batch | Edit is a full-snapshot replace for that date — prevents duplicate postings per account. |
+| `replace` only when saving on the same date as existing batch | Different date → new batch; same date → delete-all-then-create for that date. |
+| Dedupe by `account_id` on save (frontend + backend + CSV parser) | Same account twice in CSV or modal last row wins; table shows one row per account. |
+| Entity base currency for amount formatting | US entity shows USD; India entities show INR — from `EntityContext`, not hardcoded. |
+| Sample CSV at `public/download_csv/opening_balances.csv` | Gives users a copy-paste template without reading parser docs. |
 | Search API for imported entries display (no custom endpoint) | `viewAPI.search("posting", "posting_view", ...)` with `posting_type = 'OPENING_BALANCE'` returns exactly what's needed — paginated, permissioned, no extra backend code. |
 | OR filter in single search call for account form | `SearchQueryBuilder` supports native OR. One call with `OR: [{account_id}, {credit_account_id}]` replaces two calls and a merge. |
 | `balance` field removed from AccountForm UI | The static model field was never reliably maintained. The dynamic opening balance from the posting is authoritative. The schema field is retained but not surfaced. |
 | "Remove all" not "Remove row by row" | OPENING_BALANCE postings are atomic — the whole set for an entity/date is meaningful as a unit. Partial deletion would leave the balance sheet in an inconsistent state. |
+| `code = '__OBC__'` to skip OBC in the account list | Reliable without fetching OBC account IDs per entity. |

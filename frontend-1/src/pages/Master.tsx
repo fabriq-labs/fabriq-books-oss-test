@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle, us
 import { viewAPI, bulkEditAPI, workflowAPI } from "@/api/api";
 import DynamicTable from "@/components/masters/DynamicTable";
 import { Button } from "@/components/ui/button";
-import { Building, Import, Plus, Search, Edit, Trash2, Copy, Download } from "lucide-react";
+import { Building, Import, Plus, Search, Edit, Trash2, Copy, Download, Columns3 } from "lucide-react";
 import { Pagination, Modal } from "antd";
 import { ActionButtons } from "@/components/ui/action-buttons";
 import { useToast } from "@/hooks/use-toast";
@@ -16,12 +16,25 @@ import { BulkEdit } from "@/components/masters/BulkEdit";
 import { EnhancedFilterBadges } from "@/components/filter/EnhancedFilterBadges";
 import { useChat as useChatContext } from "@/contexts/ChatContext";
 import { useEntity } from "@/contexts/EntityContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
 import { buildPostingModelContext } from "@/utils/postingChatContext";
 import { BulkAction, MergeRow } from "@/types/bulkActions";
 import type { CellHighlightMap } from "@/components/masters/DynamicTable";
 import type { CustomRowRenderer, FilterEnhancements } from "@/types/customRowRenderer";
 import ExportModal from "@/components/masters/ExportModal";
+import ColumnSelectorModal from "@/components/masters/ColumnSelectorModal";
+import {
+  applyColumnPreferencesToMetaData,
+  clearColumnPreferences,
+  getColumnPrefsStorageKey,
+  getDefaultColumnOrder,
+  getDefaultVisibility,
+  loadColumnPreferences,
+  saveColumnPreferences,
+  resolveVisibility,
+  resolveColumnOrder,
+} from "@/utils/columnPreferences";
 
 /**
  * Handle exposed to parent components via ref.
@@ -162,6 +175,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   const location = useLocation();
   const { setPageContext } = useChatContext();
   const { currentEntity, entities } = useEntity();
+  const { user } = useAuth();
 
   interface MasterData {
     metaData?: any;
@@ -178,6 +192,11 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   const [searchParam, setSearchParam] = useState<string | undefined>(undefined);
   const [showImport, setShowImport] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
+  const [clientSortField, setClientSortField] = useState<string | null>(null);
+  const [clientSortDirection, setClientSortDirection] = useState<"asc" | "desc">("asc");
 
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   // Seeded from presetFilters on mount so drill-through filters appear as removable badges.
@@ -754,6 +773,187 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
     return enhancedMetaData;
   }, [masterList?.metaData, appliedFilters]);
 
+  const showColumnSelector = !customRowRenderer && !!masterList?.metaData;
+
+  const columnPrefsStorageKey = React.useMemo(() => {
+    if (!user?.id) return null;
+    return getColumnPrefsStorageKey(user.id, type, view);
+  }, [user?.id, type, view]);
+
+  useEffect(() => {
+    const meta = masterList?.metaData;
+    if (!meta || customRowRenderer) return;
+
+    const prefs = columnPrefsStorageKey
+      ? loadColumnPreferences(columnPrefsStorageKey, meta)
+      : null;
+
+    setColumnVisibility(
+      prefs
+        ? resolveVisibility(meta, prefs.visibility)
+        : getDefaultVisibility(meta),
+    );
+    setColumnOrder(
+      prefs
+        ? resolveColumnOrder(meta, prefs.columnOrder)
+        : getDefaultColumnOrder(meta),
+    );
+    setClientSortField(prefs?.sort?.field ?? null);
+    setClientSortDirection(prefs?.sort?.direction ?? "asc");
+  }, [masterList?.metaData, columnPrefsStorageKey, customRowRenderer, type, view]);
+
+  const tableListData = React.useMemo(() => {
+    if (!masterList?.metaData || customRowRenderer) return masterList;
+    const visibility =
+      Object.keys(columnVisibility).length > 0
+        ? columnVisibility
+        : getDefaultVisibility(masterList.metaData);
+    const order =
+      columnOrder.length > 0
+        ? columnOrder
+        : getDefaultColumnOrder(masterList.metaData);
+    return {
+      ...masterList,
+      metaData: applyColumnPreferencesToMetaData(
+        masterList.metaData,
+        visibility,
+        order,
+      ),
+    };
+  }, [masterList, columnVisibility, columnOrder, customRowRenderer]);
+
+  const persistColumnPreferences = useCallback(
+    (
+      visibility: Record<string, boolean>,
+      order: string[],
+      sort: { field: string; direction: "asc" | "desc" } | null,
+    ) => {
+      const meta = masterList?.metaData;
+      if (!meta || !columnPrefsStorageKey) return;
+      saveColumnPreferences(
+        columnPrefsStorageKey,
+        meta,
+        visibility,
+        order,
+        sort,
+      );
+    },
+    [masterList?.metaData, columnPrefsStorageKey],
+  );
+
+  const handleClientSortChange = useCallback(
+    (field: string | null, direction: "asc" | "desc") => {
+      setClientSortField(field);
+      setClientSortDirection(direction);
+      const meta = masterList?.metaData;
+      if (!meta || customRowRenderer) return;
+      const visibility =
+        Object.keys(columnVisibility).length > 0
+          ? columnVisibility
+          : getDefaultVisibility(meta);
+      const order =
+        columnOrder.length > 0
+          ? columnOrder
+          : getDefaultColumnOrder(meta);
+      persistColumnPreferences(
+        visibility,
+        order,
+        field ? { field, direction } : null,
+      );
+    },
+    [
+      columnOrder,
+      columnVisibility,
+      customRowRenderer,
+      masterList?.metaData,
+      persistColumnPreferences,
+    ],
+  );
+
+  const handleColumnSelectorSave = useCallback(
+    (visibility: Record<string, boolean>, order: string[]) => {
+      setColumnVisibility(visibility);
+      setColumnOrder(order);
+      persistColumnPreferences(
+        visibility,
+        order,
+        clientSortField
+          ? { field: clientSortField, direction: clientSortDirection }
+          : null,
+      );
+      setIsColumnSelectorOpen(false);
+    },
+    [
+      clientSortDirection,
+      clientSortField,
+      persistColumnPreferences,
+    ],
+  );
+
+  const handleColumnSelectorRestore = useCallback(() => {
+    const meta = masterList?.metaData;
+    if (!meta) return;
+    if (columnPrefsStorageKey) {
+      clearColumnPreferences(columnPrefsStorageKey);
+    }
+    setColumnVisibility(getDefaultVisibility(meta));
+    setColumnOrder(getDefaultColumnOrder(meta));
+    setClientSortField(null);
+    setClientSortDirection("asc");
+    setIsColumnSelectorOpen(false);
+  }, [columnPrefsStorageKey, masterList?.metaData]);
+
+  const renderListToolbarActions = () => (
+    <>
+      {masterList?.metaData && (
+        <FilterButton
+          onClick={() => setIsFilterModalOpen(true)}
+          filterCount={Object.keys(appliedFilters).length}
+          filterConfig={{
+            enableFilters: filterConfig?.enableFilters,
+            enableSearch: filterConfig?.enableSearch,
+          }}
+          setFilterSearchOutput={setFilterSearchOutput}
+          metaData={masterList?.metaData}
+        />
+      )}
+      {showColumnSelector && (
+        <Button
+          variant="outline"
+          onClick={() => setIsColumnSelectorOpen(true)}
+          className="flex items-center gap-2"
+        >
+          <Columns3 size={16} />
+          <span>Columns</span>
+        </Button>
+      )}
+      {isCreate !== false && (
+        <Button
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+          onClick={handleCreate}
+        >
+          <Plus size={16} />
+          <span>Add {displayName}</span>
+        </Button>
+      )}
+      {isImport !== false && (
+        <Button onClick={handleImport} className="flex items-center gap-2">
+          <Import size={16} />
+          <span>Import</span>
+        </Button>
+      )}
+      {enableExport && (
+        <Button
+          onClick={() => setIsExportModalOpen(true)}
+          className="flex items-center gap-2"
+        >
+          <Download size={16} />
+          <span>Export</span>
+        </Button>
+      )}
+    </>
+  );
+
   if (showImport) {
     // Type guard: ensure updateCSVData is a function with the correct signature
     const csvDataUpdater =
@@ -789,42 +989,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
               {titleExtra}
             </div>
             <div className="flex justify-end gap-2">
-              {masterList?.metaData && (
-                <FilterButton
-                  onClick={() => setIsFilterModalOpen(true)}
-                  filterCount={Object.keys(appliedFilters).length}
-                  filterConfig={{
-                    enableFilters: filterConfig?.enableFilters,
-                    enableSearch: filterConfig?.enableSearch,
-                  }}
-                  setFilterSearchOutput={setFilterSearchOutput}
-                  metaData={masterList?.metaData}
-                />
-              )}
-              {isCreate !== false && (
-                <Button
-                  className="flex items-center gap-2 bg-primary hover:bg-primary/90"
-                  onClick={handleCreate}
-                >
-                  <Plus size={16} />
-                  <span>Add {displayName}</span>
-                </Button>
-              )}
-              {isImport !== false && (
-                <Button onClick={handleImport} className="flex items-center gap-2">
-                  <Import size={16} />
-                  <span>Import</span>
-                </Button>
-              )}
-              {enableExport && (
-                <Button
-                  onClick={() => setIsExportModalOpen(true)}
-                  className="flex items-center gap-2"
-                >
-                  <Download size={16} />
-                  <span>Export</span>
-                </Button>
-              )}
+              {renderListToolbarActions()}
             </div>
           </div>
         ) : (
@@ -834,42 +999,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
               {displayName}
             </h2>
             <div className="flex gap-2">
-              {masterList?.metaData && (
-                <FilterButton
-                  onClick={() => setIsFilterModalOpen(true)}
-                  filterCount={Object.keys(appliedFilters).length}
-                  filterConfig={{
-                    enableFilters: filterConfig?.enableFilters,
-                    enableSearch: filterConfig?.enableSearch,
-                  }}
-                  setFilterSearchOutput={setFilterSearchOutput}
-                  metaData={masterList?.metaData}
-                />
-              )}
-              {isCreate !== false && (
-                <Button
-                  className="flex items-center gap-2 bg-primary hover:bg-primary/90"
-                  onClick={handleCreate}
-                >
-                  <Plus size={16} />
-                  <span>Add {displayName}</span>
-                </Button>
-              )}
-              {isImport !== false && (
-                <Button onClick={handleImport} className="flex items-center gap-2">
-                  <Import size={16} />
-                  <span>Import</span>
-                </Button>
-              )}
-              {enableExport && (
-                <Button
-                  onClick={() => setIsExportModalOpen(true)}
-                  className="flex items-center gap-2"
-                >
-                  <Download size={16} />
-                  <span>Export</span>
-                </Button>
-              )}
+              {renderListToolbarActions()}
             </div>
           </div>
         )}
@@ -929,6 +1059,18 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
           currentFilters={computedFilters}
           displayName={displayName}
           sortOption={defaultSortOption ? { [defaultSortOption.field]: defaultSortOption.direction } : {}}
+        />
+      )}
+      {showColumnSelector && masterList?.metaData && (
+        <ColumnSelectorModal
+          isOpen={isColumnSelectorOpen}
+          onClose={() => setIsColumnSelectorOpen(false)}
+          metaData={masterList.metaData}
+          sampleRow={masterList.data?.[0]}
+          appliedVisibility={columnVisibility}
+          appliedColumnOrder={columnOrder}
+          onSave={handleColumnSelectorSave}
+          onRestoreDefaults={handleColumnSelectorRestore}
         />
       )}
       <div className="w-full space-y-4">
@@ -1016,7 +1158,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
         )}
         <DynamicTable
           ref={tableRef}
-          data={masterList}
+          data={tableListData}
           isLoading={isLoading}
           renderActions={renderActions}
           enableMultiSelect={true}
@@ -1024,6 +1166,9 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
           cellHighlights={cellHighlights}
           renderRowExtra={renderRowExtra}
           customRowRenderer={customRowRenderer}
+          sortField={showColumnSelector ? clientSortField : undefined}
+          sortDirection={showColumnSelector ? clientSortDirection : undefined}
+          onSortChange={showColumnSelector ? handleClientSortChange : undefined}
         />
         <div
           style={{ marginBottom: "10px" }}

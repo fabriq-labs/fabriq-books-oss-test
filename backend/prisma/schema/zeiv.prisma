@@ -42,6 +42,7 @@ model entity {
   purchase_order       purchase_order[]
   invoice              invoice[]
   posting              posting[]
+  source_systems       source_system[]
   plaid_items          plaid_item[]
 }
 

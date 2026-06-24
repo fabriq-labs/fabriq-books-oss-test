@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEntity } from "@/contexts/EntityContext";
 import { erpConnectionsAPI } from "@/api/api";
+import { fetchAPI } from "@/api/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,11 +24,13 @@ interface SourceSystem {
   connector_version?: string;
   default_purchase_account_id?: string;
   default_purchase_account_name?: string;
+  legal_entity_id?: string | null;
   last_sync_at?: string | null;
   last_sync_status?: { status?: string; message?: string; synced_at?: string; detail?: unknown } | null;
 }
 
 const SYNCABLE_SYSTEM_TYPES = new Set(["zoho_books", "quickbooks"]);
+const BROKER_SYSTEM_TYPES = new Set(["questrade"]);
 type SyncMode = "full_sync" | "transform_only" | "extract_only";
 
 // System type configurations (matching backend)
@@ -86,6 +90,19 @@ const SYSTEM_TYPE_CONFIGS: Record<string, { name: string; fields: any[] }> = {
       },
     ],
   },
+  questrade: {
+    name: 'Questrade',
+    fields: [
+      {
+        name: 'refresh_token',
+        label: 'Personal Access Token',
+        required: true,
+        type: 'password',
+        placeholder: 'Paste your Questrade Personal Access Token',
+        helpText: 'Generate at questrade.com → App Hub → Personal Access Token. Tokens expire after 3 days without a sync.',
+      },
+    ],
+  },
   quickbooks: {
     name: 'QuickBooks Online',
     fields: [
@@ -139,6 +156,7 @@ const ConnectionDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { entities } = useEntity();
 
   const [connection, setConnection] = useState<SourceSystem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -146,6 +164,7 @@ const ConnectionDetailPage: React.FC = () => {
   const [decryptedConfig, setDecryptedConfig] = useState<any>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMode, setSyncMode] = useState<SyncMode>("full_sync");
+  const [brokerSyncing, setBrokerSyncing] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -214,6 +233,20 @@ const ConnectionDetailPage: React.FC = () => {
   const handleCancel = () => {
     setIsEditing(false);
     fetchConnection(); // Reset to original data
+  };
+
+  const handleBrokerSync = async () => {
+    if (!connection) return;
+    setBrokerSyncing(true);
+    try {
+      await fetchAPI('/api/broker-sync/run', { method: 'POST', body: JSON.stringify({ connection_id: connection.id }) });
+      toast({ title: 'Sync complete', description: 'Portfolio updated from Questrade.' });
+      fetchConnection();
+    } catch {
+      // fetchAPI shows error toast
+    } finally {
+      setBrokerSyncing(false);
+    }
   };
 
   const handleSync = async () => {
@@ -354,6 +387,16 @@ const ConnectionDetailPage: React.FC = () => {
                       {syncing ? "Syncing…" : "Sync"}
                     </Button>
                   )}
+                  {BROKER_SYSTEM_TYPES.has(connection.system_type) && (
+                    <Button
+                      variant="secondary"
+                      disabled={brokerSyncing || !connection.is_active}
+                      onClick={() => void handleBrokerSync()}
+                    >
+                      <RefreshCw className={`mr-2 h-4 w-4 ${brokerSyncing ? "animate-spin" : ""}`} />
+                      {brokerSyncing ? "Syncing…" : "Sync Now"}
+                    </Button>
+                  )}
                   <Button onClick={() => setIsEditing(true)}>
                     <Edit className="mr-2 h-4 w-4" />
                     Edit
@@ -387,6 +430,12 @@ const ConnectionDetailPage: React.FC = () => {
                     {connection.default_purchase_account_name}
                   </div>
                 )}
+                <div className="col-span-2">
+                  <span className="font-semibold">Legal Entity:</span>{' '}
+                  {connection.legal_entity_id
+                    ? (entities.find(e => e.id === connection.legal_entity_id)?.legal_name ?? connection.legal_entity_id)
+                    : <span className="text-gray-400 italic">Not assigned</span>}
+                </div>
                 {connection.last_sync_at && (
                   <div>
                     <span className="font-semibold">Last sync:</span>{' '}

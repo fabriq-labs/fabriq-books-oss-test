@@ -319,6 +319,14 @@ model source_system {
   created_by                    String?   @db.VarChar(255)
   modified_by                   String?   @db.VarChar(255)
 
+  // Legal entity this connection belongs to (optional — used by broker sync to set legal_entity_id on created accounts)
+  legal_entity_id  String?
+  legal_entity     entity?   @relation(fields: [legal_entity_id], references: [id])
+
+  // Back-relations for forward sync lineage (broker sync)
+  synced_holdings  holding[]  @relation("HoldingSourceSystem")
+  synced_trades    trade[]    @relation("TradeSourceSystem")
+
   @@unique([org_id, system_type]) // One connection per org per ERP type
   @@map("source_system")
 }

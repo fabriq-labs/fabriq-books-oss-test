@@ -10,6 +10,7 @@ import { ZohoBooksAPIClient } from '../zoho_books/zoho_api_client';
 import { QuickBooksAPIClient } from '../quickbooks/quickbooks_api_client';
 import { ConnectionConfig } from './erp-connection-loader';
 import logger from '../../../utils/logger';
+import { persistBrokerOAuth } from '../broker/shared/broker-connection-loader';
 
 export interface TestConnectionResult {
   success: boolean;
@@ -51,7 +52,11 @@ export async function testErpConnection(
       
       case 'quickbooks':
         return await testQuickBooksConnection(credentials, connectionId);
-      
+
+      case 'questrade':
+        return await testQuestradeConnection(credentials, connectionId);
+        // eslint-disable-next-line no-fallthrough
+
       default:
         return {
           success: false,
@@ -275,3 +280,86 @@ async function testQuickBooksConnection(
 }
 
 
+
+/**
+ * Test Questrade connection.
+ * Exchanges the Personal Access Token (PAT) for an access token, then calls
+ * GET v1/accounts — a read-only, non-mutating endpoint. If connectionId is
+ * supplied (editing an existing connection) the rotated refresh token is
+ * persisted back so the connection stays live.
+ */
+async function testQuestradeConnection(
+  credentials: ConnectionConfig['oauth'],
+  connectionId?: string
+): Promise<TestConnectionResult> {
+  const refreshToken = credentials.refresh_token;
+  const tokenEndpoint = credentials.token_endpoint || 'https://login.questrade.com/oauth2/token';
+
+  if (!refreshToken) {
+    return { success: false, message: 'Personal Access Token (refresh_token) is required' };
+  }
+
+  try {
+    const tokenResp = await axios.get<{
+      access_token: string;
+      refresh_token: string;
+      api_server: string;
+    }>(tokenEndpoint, {
+      params: { grant_type: 'refresh_token', refresh_token: refreshToken },
+      timeout: 15000,
+    });
+
+    const { access_token, refresh_token: newRefreshToken, api_server } = tokenResp.data;
+    if (!access_token || !api_server) {
+      return { success: false, message: 'Questrade returned an incomplete token response' };
+    }
+
+    const apiBase = api_server.endsWith('/') ? api_server : `${api_server}/`;
+
+    const accountsResp = await axios.get<{ accounts: Array<{ number: string; type: string; status: string }> }>(
+      `${apiBase}v1/accounts`,
+      { headers: { Authorization: `Bearer ${access_token}` }, timeout: 15000 }
+    );
+
+    const accounts = accountsResp.data.accounts ?? [];
+    const accountSummary = accounts.map(a => `${a.type} (${a.number})`).join(', ');
+
+    if (connectionId) {
+      // Editing existing connection: persist the rotated token immediately
+      await persistBrokerOAuth(connectionId, {
+        refresh_token: newRefreshToken,
+        api_server: apiBase,
+        token_endpoint: tokenEndpoint,
+      });
+      return {
+        success: true,
+        message: `Connected to Questrade. Found ${accounts.length} account${accounts.length !== 1 ? 's' : ''}: ${accountSummary}. Token refreshed and saved.`,
+        data: { accounts: accounts.map(a => ({ number: a.number, type: a.type, status: a.status })) },
+      };
+    }
+
+    // New connection: return the rotated token so the UI can update the form field before saving.
+    // The original PAT is now consumed — if the UI saves the original, the first sync will fail.
+    return {
+      success: true,
+      message: `Connected to Questrade. Found ${accounts.length} account${accounts.length !== 1 ? 's' : ''}: ${accountSummary}.`,
+      data: {
+        accounts: accounts.map(a => ({ number: a.number, type: a.type, status: a.status })),
+        new_refresh_token: newRefreshToken,
+      },
+    };
+  } catch (error: any) {
+    const axiosError = error as AxiosError<{ error?: string }>;
+    const status = axiosError.response?.status;
+    const body = axiosError.response?.data;
+    logger.error('Questrade connection test failed', { status, body, message: error.message });
+
+    if (status === 400 || body?.error === 'invalid_grant') {
+      return {
+        success: false,
+        message: 'Invalid or expired Personal Access Token. Generate a new one at the Questrade App Hub.',
+      };
+    }
+    return { success: false, message: error.message || 'Failed to connect to Questrade' };
+  }
+}

@@ -57,6 +57,7 @@ backend/src/mcp/
   createMcpServer.ts        Factory: given AuthContext, registers all tools on a McpServer
   tools/
     listAccounts.ts         list_accounts tool — DB query, pure function
+    getTrialBalance.ts      get_trial_balance tool — canonical trial balance report
 ```
 
 **Mount point**: `src/index.ts` → `app.use('/api/mcp', mcpRouter)`
@@ -88,6 +89,8 @@ Both params are optional and combinable. At least one should be provided for use
       "sub_type": null,
       "classification": "Assets",
       "currency": "USD",
+      "legal_entity_id": "org_techflow_us",
+      "legal_entity_name": "TechFlow Solutions Inc.",
       "is_active": true
     }
   ],
@@ -98,6 +101,59 @@ Both params are optional and combinable. At least one should be provided for use
 **Limits**: Maximum 10 results per call. Results are ordered by `code ASC, name ASC`.
 
 **Scope**: Results are filtered to the authenticated user's `org_id` — cross-org leakage is not possible.
+
+### `get_trial_balance`
+
+Generate a canonical trial balance report for a date range. This tool wraps the same `run_report(auth, 'trial_balance', filters)` path used by the in-app financial report tool; it does not reimplement report SQL.
+
+| Parameter | Type | Behaviour |
+|-----------|------|-----------|
+| `start_date` | `string` (optional) | Period start in `YYYY-MM-DD`. If omitted, current financial year start is used. |
+| `end_date` | `string` (optional) | Period end in `YYYY-MM-DD`. If omitted, current financial year end/today is used. |
+| `account_id` | `string` (optional) | Scope to one account. Use `list_accounts` first when the user gives a name like "ICICI". |
+| `currency_id` | `string` (optional) | Reporting currency id or ISO code override. If omitted, org base currency is used. |
+| `legal_entity_id` | `string` (optional) | Scope org-wide reports to one legal entity. When `account_id` is supplied, the account's legal entity is used for FY defaults and the account id scopes the report. |
+
+**Date defaults**:
+- If both dates are provided, the tool uses them as-is.
+- If either date is omitted, the tool resolves the current financial year from the account's legal entity, explicit `legal_entity_id`, or the org headquarters entity.
+
+**Account-name flow**:
+1. User asks "trial balance for ICICI".
+2. Client calls `list_accounts({ "name": "ICICI" })`.
+3. Client passes the returned `account_id` to `get_trial_balance`.
+
+**Returns** (as JSON string in `content[0].text`):
+```json
+{
+  "tool": "get_trial_balance",
+  "success": true,
+  "periodSource": "explicit",
+  "filters": {
+    "from_date": "2026-04-01",
+    "to_date": "2026-04-30",
+    "account_id": "acco_ent_f687b778_cfdf_4a7f_9883_c3a1217bb3e2_1101",
+    "currency_id": "INR"
+  },
+  "account": {
+    "id": "acco_ent_f687b778_cfdf_4a7f_9883_c3a1217bb3e2_1101",
+    "code": "1101",
+    "name": "ICICI Savings Account - IN",
+    "legal_entity_id": "ent_f687b778_cfdf_4a7f_9883_c3a1217bb3e2"
+  },
+  "rowCount": 1,
+  "data": [
+    {
+      "account_id": "acco_ent_f687b778_cfdf_4a7f_9883_c3a1217bb3e2_1101",
+      "account_name": "ICICI Savings Account - IN",
+      "total_debits": 1000,
+      "total_credits": 500,
+      "opening_balance": 2500,
+      "total_balance": 3000
+    }
+  ]
+}
+```
 
 ---
 
@@ -183,6 +239,15 @@ curl -s -X POST http://localhost:4000/api/mcp \
   -H "Accept: application/json, text/event-stream" \
   -H "X-API-Key: fabriq-us-ca-demo-user_daniel_lee" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_accounts","arguments":{"code":"1102"}}}'
+```
+
+**Call `get_trial_balance` (account-specific):**
+```bash
+curl -s -X POST http://localhost:4000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "X-API-Key: <key>" \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_trial_balance","arguments":{"start_date":"2026-04-01","end_date":"2026-04-30","account_id":"acco_ent_f687b778_cfdf_4a7f_9883_c3a1217bb3e2_1101"}}}'
 ```
 
 The response is an SSE-framed event even for simple queries:

@@ -25,6 +25,7 @@ node_modules/
 .idea/
 *.swp
 *.swo
+.cursor/mcp.json
 
 # OS files
 .DS_Store
@@ -48,8 +49,10 @@ venv/
 
 # User-specific IDE/AI folders
 
+.cursor/mcp.json
 
 trash/
+gitignore/
 
 # Local developer notes (not committed)
 docs/developer-docs/
