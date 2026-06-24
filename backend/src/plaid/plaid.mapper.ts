@@ -11,17 +11,11 @@ export function isPlaidTransactionNote(notes: string | null | undefined): boolea
   return typeof notes === 'string' && notes.startsWith(PLAID_TX_NOTE_PREFIX);
 }
 
-/**
- * Map a Plaid transaction to a Fabriq posting row.
- *
- * Uses the same double-entry convention as PostingImportService:
- *   Plaid positive amount = money leaving the bank (withdrawal)
- *   Plaid negative amount = money entering the bank (deposit)
- */
 export function mapPlaidTransactionToPosting(
   tx: Transaction,
   bankAccountId: string,
   orgId: string,
+  legalEntityId?: string | null,
 ): Record<string, unknown> {
   const isDebit = tx.amount > 0;
   const amount = Math.abs(tx.amount);
@@ -39,5 +33,30 @@ export function mapPlaidTransactionToPosting(
     status: tx.pending ? 'PENDING' : 'ACTIVE',
     posting_type: 'bank_feed',
     reconciliation_status: 'UNMATCHED',
+    ...(legalEntityId ? { legal_entity_id: legalEntityId } : {}),
   };
+}
+
+export function mapPlaidAccountToCoa(
+  type: string | null | undefined,
+  subtype: string | null | undefined,
+): { classification: 'Assets' | 'Liabilities'; types: string[] } {
+  const normalizedType = type?.toLowerCase() ?? '';
+  const normalizedSubtype = subtype?.toLowerCase() ?? '';
+
+  if (normalizedType === 'credit') {
+    return { classification: 'Liabilities', types: ['CREDIT_CARD', 'BANK'] };
+  }
+  if (normalizedSubtype === 'savings') {
+    return { classification: 'Assets', types: ['BANK', 'SAVINGS'] };
+  }
+  if (normalizedSubtype === 'checking') {
+    return { classification: 'Assets', types: ['BANK', 'CHECKING'] };
+  }
+  return { classification: 'Assets', types: ['BANK'] };
+}
+
+export function formatPlaidAccountName(name: string | null, mask: string | null): string {
+  const label = name?.trim() || 'Bank account';
+  return mask ? `${label} · ${mask}` : label;
 }

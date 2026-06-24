@@ -21,7 +21,7 @@ model account {
   is_active             Boolean                 @default(true)
   last_sync_at          DateTime?
   inst_id               String?
-  // Plaid bank feed — set when a COA bank account is mapped to a Plaid sub-account
+  // Plaid bank feed — plaid_item_id links to connection; inst_id holds Plaid sub-account id
   plaid_item_id         String?                 @db.VarChar(50)
   plaid_item            plaid_item?             @relation(fields: [plaid_item_id], references: [id], onDelete: SetNull)
   classification        account_classification?

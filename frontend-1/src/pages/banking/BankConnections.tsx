@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { PlaidLinkOnSuccessMetadata } from 'react-plaid-link';
 import { plaidAPI, PlaidItem } from '@/api/plaidApi';
-import { PlaidLinkButton } from '@/components/plaid/PlaidLinkButton';
+import { Button } from '@/components/ui/button';
+import { ConnectBankButton } from '@/components/plaid/ConnectBankDialog';
 import { ConnectedAccounts } from '@/components/plaid/ConnectedAccounts';
+import { PlaidAccountSelectPanel } from '@/components/plaid/PlaidAccountSelectPanel';
 import { useToast } from '@/hooks/use-toast';
 
 export default function BankConnectionsPage() {
   const { toast } = useToast();
-  const [linkToken, setLinkToken] = useState<string | null>(null);
   const [items, setItems] = useState<PlaidItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [connecting, setConnecting] = useState(false);
+  const [plaidConfigured, setPlaidConfigured] = useState(true);
+  const [importItem, setImportItem] = useState<PlaidItem | null>(null);
 
   const loadItems = useCallback(async () => {
     try {
@@ -27,52 +28,39 @@ export default function BankConnectionsPage() {
     }
   }, [toast]);
 
-  const loadLinkToken = useCallback(async () => {
-    try {
-      const res = await plaidAPI.createLinkToken();
-      setLinkToken(res.link_token);
-    } catch (err: any) {
-      setLinkToken(null);
-      if (!err.message?.includes('not configured')) {
-        toast({
-          title: 'Plaid unavailable',
-          description: err.message ?? 'Could not initialize Plaid Link',
-          variant: 'destructive',
-        });
-      }
-    }
-  }, [toast]);
-
   useEffect(() => {
     loadItems();
-    loadLinkToken();
-  }, [loadItems, loadLinkToken]);
+    plaidAPI.getConfig().catch((err: Error) => {
+      if (err.message?.includes('not configured')) {
+        setPlaidConfigured(false);
+      }
+    });
+  }, [loadItems]);
 
-  const handlePlaidSuccess = async (
-    publicToken: string,
-    metadata: PlaidLinkOnSuccessMetadata,
-  ) => {
-    setConnecting(true);
+  const openImportStep = async (item: PlaidItem) => {
     try {
-      await plaidAPI.exchangeToken(publicToken, {
-        institution: metadata.institution,
-      });
-      toast({
-        title: 'Bank connected',
-        description: `${metadata.institution?.name ?? 'Institution'} linked successfully.`,
-      });
-      await loadItems();
-      await loadLinkToken();
-    } catch (err: any) {
-      toast({
-        title: 'Connection failed',
-        description: err.message ?? 'Could not complete bank link',
-        variant: 'destructive',
-      });
-    } finally {
-      setConnecting(false);
+      const fresh = await plaidAPI.getItem(item.id);
+      setImportItem(fresh.data);
+    } catch {
+      setImportItem(item);
     }
   };
+
+  const handleImportComplete = async () => {
+    setImportItem(null);
+    await loadItems();
+  };
+
+  const handleConnected = (item: PlaidItem) => {
+    setImportItem(item);
+    loadItems();
+  };
+
+  const pendingImportItems = items.filter(
+    (item) =>
+      item.accounts.some((a) => !a.fabriq_account_id) &&
+      !item.accounts.some((a) => a.fabriq_account_id),
+  );
 
   return (
     <div className="container max-w-4xl py-6 space-y-6">
@@ -80,21 +68,45 @@ export default function BankConnectionsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Bank connections</h1>
           <p className="text-muted-foreground mt-1">
-            Connect bank accounts via Plaid to automatically import transactions into postings.
+            Connect your bank in Fabriq, choose which accounts to import, then map and sync
+            transactions.
           </p>
         </div>
-        <PlaidLinkButton
-          linkToken={linkToken}
-          onSuccess={handlePlaidSuccess}
-          disabled={connecting || !linkToken}
-        />
+        <ConnectBankButton onConnected={handleConnected} disabled={!plaidConfigured} />
       </div>
+
+      {pendingImportItems.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Finish importing accounts</p>
+          <ul className="mt-2 space-y-1">
+            {pendingImportItems.map((item) => (
+              <li key={item.id} className="flex items-center justify-between gap-3">
+                <span>{item.institution_name ?? 'Bank connection'}</span>
+                <Button variant="outline" size="sm" onClick={() => openImportStep(item)}>
+                  Select accounts
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-muted-foreground">Loading connections…</p>
       ) : (
-        <ConnectedAccounts items={items} onRefresh={loadItems} />
+        <ConnectedAccounts
+          items={items}
+          onRefresh={loadItems}
+          onImportAccounts={openImportStep}
+        />
       )}
+
+      <PlaidAccountSelectPanel
+        open={importItem !== null}
+        item={importItem}
+        onComplete={handleImportComplete}
+        onCancel={() => setImportItem(null)}
+      />
     </div>
   );
 }

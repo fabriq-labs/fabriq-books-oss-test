@@ -2,7 +2,7 @@ import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } fro
 
 export type PlaidEnv = 'sandbox' | 'development' | 'production';
 
-function getPlaidEnv(): PlaidEnv {
+export function getPlaidEnv(): PlaidEnv {
   const env = (process.env.PLAID_ENV ?? 'sandbox') as PlaidEnv;
   if (env === 'sandbox' || env === 'development' || env === 'production') {
     return env;

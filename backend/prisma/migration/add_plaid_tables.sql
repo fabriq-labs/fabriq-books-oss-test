@@ -56,7 +56,8 @@ BEGIN
         fabriq_id := acct->>'fabriq_account_id';
         IF fabriq_id IS NOT NULL THEN
           UPDATE account
-          SET plaid_item_id = rec.id
+          SET plaid_item_id = rec.id,
+              inst_id = COALESCE(acct->>'plaid_account_id', inst_id)
           WHERE id = fabriq_id
             AND org_id = rec.org_id
             AND plaid_item_id IS NULL;

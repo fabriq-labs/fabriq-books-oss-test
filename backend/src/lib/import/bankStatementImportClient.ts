@@ -11,6 +11,9 @@ export const POSTING_BANK_IMPORT_FIELD_KEYS = new Set([
   'credit_account_id',
   'legal_entity_id',
   'notes',
+  'status',
+  'posting_type',
+  'reconciliation_status',
 ]);
 
 /**
