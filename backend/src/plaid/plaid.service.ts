@@ -11,8 +11,14 @@ import {
   PLAID_PRODUCTS,
 } from './plaid.client';
 import { mapPlaidTransactionToPosting, plaidTransactionNote, mapPlaidAccountToCoa, formatPlaidAccountName } from './plaid.mapper';
-import type { PlaidItemSummary, PlaidSyncResult, PlaidImportAccountsResult, StoredPlaidAccount } from './plaid.types';
-import type { Transaction } from 'plaid';
+import type {
+  PlaidItemSummary,
+  PlaidSyncResult,
+  PlaidImportAccountsResult,
+  PlaidLinkAccountResult,
+  StoredPlaidAccount,
+} from './plaid.types';
+import type { AccountBase, Transaction } from 'plaid';
 
 function encryptAccessToken(token: string): string {
   return encryptConfig({ access_token: token });
@@ -303,6 +309,7 @@ export class PlaidService {
     }
 
     const createdIds: string[] = [];
+    const accounts: Array<{ plaid_account_id: string; fabriq_account_id: string }> = [];
     let skipped = 0;
 
     const { legalEntityId, baseCurrencyId } = await this.resolveEntityForImport(
@@ -349,6 +356,7 @@ export class PlaidService {
         },
       });
       createdIds.push(created.id);
+      accounts.push({ plaid_account_id: acct.account_id, fabriq_account_id: created.id });
     }
 
     logger.info('Plaid accounts imported', {
@@ -359,47 +367,94 @@ export class PlaidService {
       baseCurrencyId,
     });
 
-    return { created: createdIds.length, skipped, account_ids: createdIds };
+    return { created: createdIds.length, skipped, account_ids: createdIds, accounts };
   }
 
-  async updateAccountParentMapping(
+  async linkPlaidAccount(
     itemDbId: string,
     plaidAccountId: string,
-    parentAccountId: string | null,
+    fabriqAccountId: string,
+    auth: AuthContext,
+  ): Promise<PlaidLinkAccountResult> {
+    const { item } = await this.validatePlaidLinkContext(
+      itemDbId,
+      plaidAccountId,
+      auth.user.org_id,
+    );
+
+    const fabriqAccount = await prisma.account.findFirst({
+      where: { id: fabriqAccountId, org_id: auth.user.org_id },
+      select: { id: true, plaid_item_id: true, inst_id: true, legal_entity_id: true },
+    });
+    if (!fabriqAccount) {
+      throw new Error('Fabriq account not found');
+    }
+    if (fabriqAccount.plaid_item_id && fabriqAccount.inst_id) {
+      throw new Error('This Fabriq account is already linked to a Plaid account');
+    }
+
+    const updateData: {
+      plaid_item_id: string;
+      inst_id: string;
+      legal_entity_id?: string;
+      modified_by: string;
+    } = {
+      plaid_item_id: itemDbId,
+      inst_id: plaidAccountId,
+      modified_by: auth.user.id,
+    };
+
+    if (!fabriqAccount.legal_entity_id && item.legal_entity_id) {
+      updateData.legal_entity_id = item.legal_entity_id;
+    }
+
+    await prisma.account.update({
+      where: { id: fabriqAccount.id },
+      data: updateData,
+    });
+
+    logger.info('Plaid account linked to existing Fabriq account', {
+      itemId: itemDbId,
+      plaidAccountId,
+      fabriqAccountId,
+    });
+
+    return { plaid_account_id: plaidAccountId, fabriq_account_id: fabriqAccountId };
+  }
+
+  private async validatePlaidLinkContext(
+    itemDbId: string,
+    plaidAccountId: string,
     orgId: string,
-  ): Promise<void> {
+  ): Promise<{
+    item: { id: string; legal_entity_id: string | null; access_token: string };
+    plaidAccount: AccountBase;
+  }> {
     const item = await prisma.plaid_item.findFirst({
       where: { id: itemDbId, org_id: orgId },
+      select: { id: true, legal_entity_id: true, access_token: true },
     });
     if (!item) {
       throw new Error('Plaid connection not found');
     }
 
-    const fabriqAccount = await prisma.account.findFirst({
+    this.assertConfigured();
+    const accessToken = decryptAccessToken(item.access_token);
+    const response = await getPlaidClient().accountsGet({ access_token: accessToken });
+    const plaidAccount = response.data.accounts.find((a) => a.account_id === plaidAccountId);
+    if (!plaidAccount) {
+      throw new Error('Plaid account not found on this connection');
+    }
+
+    const existingLink = await prisma.account.findFirst({
       where: { plaid_item_id: itemDbId, inst_id: plaidAccountId, org_id: orgId },
       select: { id: true },
     });
-    if (!fabriqAccount) {
-      throw new Error('This account is not imported. Import it before mapping.');
+    if (existingLink) {
+      throw new Error('This Plaid account is already linked');
     }
 
-    if (parentAccountId) {
-      const parent = await prisma.account.findFirst({
-        where: { id: parentAccountId, org_id: orgId },
-        select: { id: true },
-      });
-      if (!parent) {
-        throw new Error('Parent account not found');
-      }
-      if (parentAccountId === fabriqAccount.id) {
-        throw new Error('An account cannot be its own parent');
-      }
-    }
-
-    await prisma.account.update({
-      where: { id: fabriqAccount.id },
-      data: { parent_account_id: parentAccountId },
-    });
+    return { item, plaidAccount };
   }
 
   async deleteItem(itemDbId: string, orgId: string): Promise<void> {
@@ -443,7 +498,6 @@ export class PlaidService {
           select: {
             id: true,
             inst_id: true,
-            parent_account_id: true,
             legal_entity_id: true,
             name: true,
             last_sync_at: true,
@@ -458,11 +512,8 @@ export class PlaidService {
       throw new Error('This account is not imported. Import it before syncing.');
     }
     const account = item.accounts[0];
-    if (!account.parent_account_id) {
-      throw new Error('Select a parent account in the chart of accounts before syncing.');
-    }
     if (!account.inst_id) {
-      throw new Error('Plaid account id missing on imported account.');
+      throw new Error('Plaid account id missing on linked account.');
     }
 
     const result = await this.syncSingleAccountTransactions(
@@ -493,7 +544,6 @@ export class PlaidService {
           select: {
             id: true,
             inst_id: true,
-            parent_account_id: true,
             legal_entity_id: true,
             name: true,
           },
@@ -504,11 +554,9 @@ export class PlaidService {
       throw new Error('Plaid connection not found');
     }
 
-    const readyAccounts = item.accounts.filter((a) => a.inst_id && a.parent_account_id);
+    const readyAccounts = item.accounts.filter((a) => a.inst_id);
     if (readyAccounts.length === 0) {
-      throw new Error(
-        'Map a parent account for at least one imported bank account before syncing.',
-      );
+      throw new Error('Link at least one bank account before syncing.');
     }
 
     const result = await this.syncItemRecord(
@@ -530,11 +578,10 @@ export class PlaidService {
       where: { item_id: plaidItemId },
       include: {
         accounts: {
-          where: { inst_id: { not: null }, parent_account_id: { not: null } },
+          where: { inst_id: { not: null } },
           select: {
             id: true,
             inst_id: true,
-            parent_account_id: true,
             legal_entity_id: true,
             name: true,
           },
@@ -568,7 +615,6 @@ export class PlaidService {
       accounts: {
         id: string;
         inst_id: string | null;
-        parent_account_id: string | null;
         legal_entity_id: string | null;
         name: string | null;
       }[];
@@ -589,7 +635,6 @@ export class PlaidService {
     for (const acct of item.accounts) {
       if (!acct.inst_id) continue;
       if (options?.plaidAccountIds && !options.plaidAccountIds.has(acct.inst_id)) continue;
-      if (!acct.parent_account_id) continue;
       accountMap.set(acct.inst_id, {
         fabriqAccountId: acct.id,
         legalEntityId: acct.legal_entity_id,
@@ -597,9 +642,7 @@ export class PlaidService {
     }
 
     if (accountMap.size === 0) {
-      throw new Error(
-        'No imported accounts ready to sync. Map a parent account for each imported bank account first.',
-      );
+      throw new Error('No linked accounts ready to sync.');
     }
 
     let cursor = item.cursor ?? undefined;
@@ -811,10 +854,6 @@ export class PlaidService {
         name: true,
         code: true,
         classification: true,
-        parent_account_id: true,
-        parent_account: {
-          select: { name: true, code: true },
-        },
       },
     });
     const fabriqByPlaidId = new Map(
@@ -827,9 +866,6 @@ export class PlaidService {
             name: m.name,
             code: m.code,
             classification: m.classification,
-            parentAccountId: m.parent_account_id,
-            coaParentName: m.parent_account?.name ?? null,
-            coaParentCode: m.parent_account?.code ?? null,
           },
         ]),
     );
@@ -849,9 +885,6 @@ export class PlaidService {
         fabriq_account_name: mapped?.name ?? null,
         fabriq_account_code: mapped?.code ?? null,
         fabriq_classification: mapped?.classification ?? null,
-        fabriq_parent_account_id: mapped?.parentAccountId ?? null,
-        fabriq_coa_parent_name: mapped?.coaParentName ?? null,
-        fabriq_coa_parent_code: mapped?.coaParentCode ?? null,
       };
     });
   }

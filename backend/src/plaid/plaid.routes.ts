@@ -211,31 +211,27 @@ export function createPlaidRouter(): Router {
     }
   });
 
-  router.put('/items/:itemId/accounts/:plaidAccountId/parent', authMiddleware, async (req: Request, res: Response) => {
+  router.put('/items/:itemId/accounts/:plaidAccountId/link', authMiddleware, async (req: Request, res: Response) => {
     try {
       const auth = getAuth(req);
       if (!auth?.user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      const { parent_account_id } = req.body ?? {};
-      if (
-        parent_account_id !== undefined &&
-        parent_account_id !== null &&
-        typeof parent_account_id !== 'string'
-      ) {
-        return res.status(400).json({ error: 'parent_account_id must be a string or null' });
+      const { fabriq_account_id } = req.body ?? {};
+      if (!fabriq_account_id || typeof fabriq_account_id !== 'string') {
+        return res.status(400).json({ error: 'fabriq_account_id is required' });
       }
-      await plaid.updateAccountParentMapping(
+      const result = await plaid.linkPlaidAccount(
         req.params.itemId,
         req.params.plaidAccountId,
-        parent_account_id ?? null,
-        auth.user.org_id,
+        fabriq_account_id,
+        auth,
       );
-      return res.json({ success: true });
+      return res.json({ data: result });
     } catch (err: any) {
-      logger.error('Plaid account parent mapping error', { err });
-      const status = err.message?.includes('not found') ? 404 : 500;
-      return res.status(status).json({ error: err.message ?? 'Failed to update mapping' });
+      logger.error('Plaid account link error', { err });
+      const status = err.message?.includes('not found') ? 404 : 400;
+      return res.status(status).json({ error: err.message ?? 'Failed to link account' });
     }
   });
 

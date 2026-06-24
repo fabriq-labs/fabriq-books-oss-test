@@ -14,10 +14,6 @@ export interface StoredPlaidAccount {
   fabriq_account_name?: string | null;
   fabriq_account_code?: string | null;
   fabriq_classification?: string | null;
-  /** Top-level COA parent (e.g. Current Assets). */
-  fabriq_parent_account_id?: string | null;
-  fabriq_coa_parent_name?: string | null;
-  fabriq_coa_parent_code?: string | null;
 }
 
 export interface PlaidItemSummary {
@@ -42,4 +38,10 @@ export interface PlaidImportAccountsResult {
   created: number;
   skipped: number;
   account_ids: string[];
+  accounts: Array<{ plaid_account_id: string; fabriq_account_id: string }>;
+}
+
+export interface PlaidLinkAccountResult {
+  plaid_account_id: string;
+  fabriq_account_id: string;
 }

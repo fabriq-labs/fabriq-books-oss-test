@@ -2,6 +2,8 @@
 export const plaidUi = {
   modal:
     'relative w-full max-w-[420px] max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden',
+  modalWide:
+    'relative w-full max-w-[720px] max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden',
   overlay: 'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-[2px]',
   progressDotActive: 'h-1 w-10 rounded-full bg-slate-900',
   progressDotInactive: 'h-1 w-10 rounded-full bg-slate-200',

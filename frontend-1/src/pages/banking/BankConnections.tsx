@@ -49,6 +49,10 @@ export default function BankConnectionsPage() {
   const handleImportComplete = async () => {
     setImportItem(null);
     await loadItems();
+    toast({
+      title: 'Accounts connected',
+      description: 'Bank accounts are mapped and ready to sync.',
+    });
   };
 
   const handleConnected = (item: PlaidItem) => {
@@ -100,7 +104,6 @@ export default function BankConnectionsPage() {
           onImportAccounts={openImportStep}
         />
       )}
-
       <PlaidAccountSelectPanel
         open={importItem !== null}
         item={importItem}

@@ -1,23 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { plaidAPI, PlaidAccount, PlaidItem } from '@/api/plaidApi';
-import { viewAPI } from '@/api/metadataApi';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { RefreshCw, Trash2, Building2, Plus } from 'lucide-react';
 import { plaidUi } from './plaidUi';
-
-interface FabriqAccount {
-  id: string;
-  name?: string;
-  code?: string;
-}
 
 interface ConnectedAccountsProps {
   items: PlaidItem[];
@@ -34,24 +20,15 @@ function accountSubtypeLabel(type: string | null, subtype: string | null): strin
   return (subtype ?? type ?? 'account').replace(/_/g, ' ');
 }
 
-function importedAccounts(item: PlaidItem): PlaidAccount[] {
+function linkedAccounts(item: PlaidItem): PlaidAccount[] {
   return item.accounts.filter((a) => Boolean(a.fabriq_account_id));
 }
 
 export function ConnectedAccounts({ items, onRefresh, onImportAccounts }: ConnectedAccountsProps) {
   const { toast } = useToast();
-  const [coaAccounts, setCoaAccounts] = useState<FabriqAccount[]>([]);
   const [syncingItemId, setSyncingItemId] = useState<string | null>(null);
   const [syncingAccountKey, setSyncingAccountKey] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [mappingKey, setMappingKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    viewAPI
-      .search('account', 'account_view', 1, 500)
-      .then((res: { data?: FabriqAccount[] }) => setCoaAccounts(res?.data ?? []))
-      .catch(() => setCoaAccounts([]));
-  }, []);
 
   const accountSyncKey = (itemId: string, plaidAccountId: string) =>
     `${itemId}:${plaidAccountId}`;
@@ -97,29 +74,6 @@ export function ConnectedAccounts({ items, onRefresh, onImportAccounts }: Connec
     }
   };
 
-  const handleParentMapping = async (
-    itemId: string,
-    plaidAccountId: string,
-    parentAccountId: string,
-  ) => {
-    const key = accountSyncKey(itemId, plaidAccountId);
-    setMappingKey(key);
-    try {
-      await plaidAPI.updateAccountParent(
-        itemId,
-        plaidAccountId,
-        parentAccountId === '__none__' ? null : parentAccountId,
-      );
-      toast({ title: 'Mapping updated', description: 'Chart of accounts parent saved.' });
-      onRefresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Could not update mapping';
-      toast({ title: 'Error', description: message, variant: 'destructive' });
-    } finally {
-      setMappingKey(null);
-    }
-  };
-
   const handleDelete = async (itemId: string) => {
     setDeletingId(itemId);
     try {
@@ -134,24 +88,14 @@ export function ConnectedAccounts({ items, onRefresh, onImportAccounts }: Connec
     }
   };
 
-  const importedFabriqIds = new Set(
-    items.flatMap((item) =>
-      item.accounts
-        .map((a) => a.fabriq_account_id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  );
-
-  const parentAccountOptions = coaAccounts.filter((fa) => !importedFabriqIds.has(fa.id));
-
   const visibleItems = items
-    .map((item) => ({ item, accounts: importedAccounts(item) }))
+    .map((item) => ({ item, accounts: linkedAccounts(item) }))
     .filter(({ accounts }) => accounts.length > 0);
 
   if (visibleItems.length === 0) {
     return (
       <div className={`${plaidUi.card} py-12 text-center text-slate-500 text-sm`}>
-        No imported bank accounts yet. Connect a bank and select accounts to import.
+        No connected bank accounts yet. Connect a bank and map accounts to your chart of accounts.
       </div>
     );
   }
@@ -161,8 +105,6 @@ export function ConnectedAccounts({ items, onRefresh, onImportAccounts }: Connec
       {visibleItems.map(({ item, accounts }) => {
         const institutionName = item.institution_name ?? 'Bank connection';
         const initial = institutionName.charAt(0).toUpperCase();
-        const allParentsMapped = accounts.every((a) => Boolean(a.fabriq_parent_account_id));
-        const hasReadyAccount = accounts.some((a) => Boolean(a.fabriq_parent_account_id));
 
         return (
           <div key={item.id} className={plaidUi.card}>
@@ -178,7 +120,7 @@ export function ConnectedAccounts({ items, onRefresh, onImportAccounts }: Connec
                   <p className="text-xs text-slate-500 mt-0.5">
                     Connected {new Date(item.created_at).toLocaleDateString()}
                     {' · '}
-                    {accounts.length} imported account{accounts.length === 1 ? '' : 's'}
+                    {accounts.length} account{accounts.length === 1 ? '' : 's'}
                     {item.last_synced_at && (
                       <> · Synced {new Date(item.last_synced_at).toLocaleString()}</>
                     )}
@@ -200,14 +142,7 @@ export function ConnectedAccounts({ items, onRefresh, onImportAccounts }: Connec
                   size="sm"
                   className="h-9 border-slate-200"
                   onClick={() => handleSyncAll(item.id)}
-                  disabled={!hasReadyAccount || syncingItemId === item.id}
-                  title={
-                    hasReadyAccount
-                      ? allParentsMapped
-                        ? undefined
-                        : 'Syncs accounts with a parent mapped; unmapped accounts are skipped'
-                      : 'Map a parent account for at least one account before syncing'
-                  }
+                  disabled={syncingItemId === item.id}
                 >
                   <RefreshCw
                     className={`h-4 w-4 mr-1 ${syncingItemId === item.id ? 'animate-spin' : ''}`}
@@ -231,11 +166,8 @@ export function ConnectedAccounts({ items, onRefresh, onImportAccounts }: Connec
               {accounts.map((acct) => {
                 const syncKey = accountSyncKey(item.id, acct.plaid_account_id);
                 const isSyncing = syncingAccountKey === syncKey;
-                const isMapping = mappingKey === syncKey;
                 const balance = formatBalance(acct.balance);
                 const displayName = acct.fabriq_account_name ?? acct.name ?? 'Account';
-                const parentValue = acct.fabriq_parent_account_id ?? '__none__';
-                const canSync = Boolean(acct.fabriq_parent_account_id);
 
                 return (
                   <li key={acct.plaid_account_id}>
@@ -260,42 +192,19 @@ export function ConnectedAccounts({ items, onRefresh, onImportAccounts }: Connec
                         )}
                       </div>
 
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
-                        <Select
-                          value={parentValue}
-                          disabled={isMapping}
-                          onValueChange={(val) =>
-                            handleParentMapping(item.id, acct.plaid_account_id, val)
-                          }
-                        >
-                          <SelectTrigger className="w-full sm:w-56 h-9 border-slate-200">
-                            <SelectValue placeholder="Parent account" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">— Select parent —</SelectItem>
-                            {parentAccountOptions.map((fa) => (
-                              <SelectItem key={fa.id} value={fa.id}>
-                                {fa.name ?? fa.code ?? fa.id}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <Button
-                          size="sm"
-                          className="h-9 shrink-0 rounded-lg px-4 bg-[#111111] hover:bg-black text-white disabled:opacity-50"
-                          disabled={!canSync || isSyncing || syncingItemId === item.id}
-                          title={canSync ? undefined : 'Select a parent account before syncing'}
-                          onClick={() =>
-                            handleSyncAccount(item.id, acct.plaid_account_id, displayName)
-                          }
-                        >
-                          <RefreshCw
-                            className={`h-4 w-4 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`}
-                          />
-                          {isSyncing ? 'Syncing…' : 'Sync'}
-                        </Button>
-                      </div>
+                      <Button
+                        size="sm"
+                        className="h-9 shrink-0 rounded-lg px-4 bg-[#111111] hover:bg-black text-white disabled:opacity-50 w-full sm:w-auto"
+                        disabled={isSyncing || syncingItemId === item.id}
+                        onClick={() =>
+                          handleSyncAccount(item.id, acct.plaid_account_id, displayName)
+                        }
+                      >
+                        <RefreshCw
+                          className={`h-4 w-4 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`}
+                        />
+                        {isSyncing ? 'Syncing…' : 'Sync'}
+                      </Button>
                     </div>
                   </li>
                 );

@@ -11,9 +11,6 @@ export interface PlaidAccount {
   fabriq_account_name?: string | null;
   fabriq_account_code?: string | null;
   fabriq_classification?: string | null;
-  fabriq_parent_account_id?: string | null;
-  fabriq_coa_parent_name?: string | null;
-  fabriq_coa_parent_code?: string | null;
 }
 
 export interface PlaidItem {
@@ -38,6 +35,12 @@ export interface PlaidImportAccountsResult {
   created: number;
   skipped: number;
   account_ids: string[];
+  accounts: Array<{ plaid_account_id: string; fabriq_account_id: string }>;
+}
+
+export interface PlaidLinkAccountResult {
+  plaid_account_id: string;
+  fabriq_account_id: string;
 }
 
 export interface PlaidInstitution {
@@ -107,16 +110,12 @@ export const plaidAPI = {
       body: JSON.stringify({ plaid_account_ids: plaidAccountIds }),
     }),
 
-  updateAccountParent: (
-    itemId: string,
-    plaidAccountId: string,
-    parentAccountId: string | null,
-  ) =>
-    fetchAPI<{ success: boolean }>(
-      `/api/plaid/items/${itemId}/accounts/${plaidAccountId}/parent`,
+  linkAccount: (itemId: string, plaidAccountId: string, fabriqAccountId: string) =>
+    fetchAPI<{ data: PlaidLinkAccountResult }>(
+      `/api/plaid/items/${itemId}/accounts/${plaidAccountId}/link`,
       {
         method: 'PUT',
-        body: JSON.stringify({ parent_account_id: parentAccountId }),
+        body: JSON.stringify({ fabriq_account_id: fabriqAccountId }),
       },
     ),
 };
