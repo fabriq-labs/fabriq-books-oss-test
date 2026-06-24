@@ -43,6 +43,10 @@ interface DynamicTableProps {
     renderRowExtra?: (row: any) => React.ReactNode | null;
     /** When provided, replaces metadata-generated columns and body rendering */
     customRowRenderer?: CustomRowRenderer;
+    /** Controlled client-side sort (e.g. persisted column preferences from Master) */
+    sortField?: string | null;
+    sortDirection?: 'asc' | 'desc';
+    onSortChange?: (field: string | null, direction: 'asc' | 'desc') => void;
 }
 
 const DynamicTable = forwardRef<any, DynamicTableProps>(({
@@ -56,9 +60,17 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
     cellHighlights,
     renderRowExtra,
     customRowRenderer,
+    sortField: controlledSortField,
+    sortDirection: controlledSortDirection,
+    onSortChange,
 }, ref) => {
-    const [sortField, setSortField] = useState<string | null>(null);
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [internalSortField, setInternalSortField] = useState<string | null>(null);
+    const [internalSortDirection, setInternalSortDirection] = useState<'asc' | 'desc'>('asc');
+    const isSortControlled = controlledSortField !== undefined;
+    const sortField = isSortControlled ? controlledSortField : internalSortField;
+    const sortDirection = isSortControlled
+        ? (controlledSortDirection ?? 'asc')
+        : internalSortDirection;
     const [selectedRows, setSelectedRows] = useState<any[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
@@ -154,11 +166,17 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
             if (!colDef?.sortKey) return; // column is not sortable
             field = colDef.sortKey;
         }
-        if (sortField === field) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        const nextDirection =
+            sortField === field
+                ? (sortDirection === 'asc' ? 'desc' : 'asc')
+                : 'asc';
+        const nextField = field;
+
+        if (onSortChange) {
+            onSortChange(nextField, nextDirection);
         } else {
-            setSortField(field);
-            setSortDirection('asc');
+            setInternalSortField(nextField);
+            setInternalSortDirection(nextDirection);
         }
     };
 
