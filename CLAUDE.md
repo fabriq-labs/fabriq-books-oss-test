@@ -68,6 +68,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | In-app conversational chat (history, PageContext, SDK, prompt selection) | [docs/agent/15-CONVERSATIONAL_CHAT.md](./docs/agent/15-CONVERSATIONAL_CHAT.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
+| Plaid bank feed integration | [docs/PLAID_README.md](./docs/PLAID_README.md) (implementation guide) · [docs/PLAID_INTEGRATION.md](./docs/PLAID_INTEGRATION.md) (design notes) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
 | Frontend filter system (defaultFilters, presetFilters, virtual OR keys, badge chips) | [docs/FILTER_SYSTEM.md](./docs/FILTER_SYSTEM.md) |
 | View data_graph / datagraph schema (properties, selectProps, relationName, list behaviour) | [docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md](./docs/datagraph-builder/DATAGRAPH_SCHEMA_REFERENCE.md) |

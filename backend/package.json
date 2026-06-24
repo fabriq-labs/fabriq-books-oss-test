@@ -51,6 +51,7 @@
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.30.1",
     "multer": "^2.0.0",
+    "plaid": "^42.2.0",
     "prisma": "^5.22.0",
     "reflect-metadata": "^0.2.2",
     "winston": "^3.17.0"

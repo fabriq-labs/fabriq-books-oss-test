@@ -43,6 +43,7 @@ model entity {
   invoice              invoice[]
   posting              posting[]
   source_systems       source_system[]
+  plaid_items          plaid_item[]
 }
 
 model budget_period {

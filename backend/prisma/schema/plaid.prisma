@@ -1,0 +1,26 @@
+// Plaid bank feed — one row per bank connection (Plaid "item")
+// Fabriq mappings: account.plaid_item_id + account.inst_id (Plaid sub-account id).
+
+model plaid_item {
+  id               String    @id @default(dbgenerated("'plaid_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id           String    @db.VarChar(50)
+  user_id          String    @db.VarChar(50)
+  legal_entity_id  String?   @db.VarChar(50)
+  institution_id   String?   @db.VarChar(255)
+  institution_name String?   @db.VarChar(255)
+  access_token     String    @db.Text // AES-encrypted via ERP_CONFIG_ENCRYPTION_KEY
+  item_id          String    @unique @db.VarChar(255)
+  cursor           String?   @db.Text
+  last_synced_at   DateTime?
+  created_at       DateTime  @default(now())
+  modified_at      DateTime  @default(now()) @updatedAt
+  created_by       String?   @db.VarChar(255)
+  modified_by      String?   @db.VarChar(255)
+  assigned_to      String?   @db.VarChar(255)
+  legal_entity     entity?   @relation(fields: [legal_entity_id], references: [id])
+  accounts         account[]
+
+  @@index([org_id])
+  @@index([legal_entity_id])
+  @@map("plaid_item")
+}

@@ -21,6 +21,7 @@ import { initializeImportExtensions } from './lib/import-extensions';
 import './rest/postingCustomActions'; // registers posting/import-bank-statement custom action
 import './services/book-keeping/migration-journal'; // registers setup/migration-journal custom actions
 import { mcpRouter } from './mcp/McpRouter';
+import { createPlaidRouter } from './plaid/plaid.routes';
 
 const app: Express = express();
 const port: number = parseInt(process.env.BACKEND_PORT || process.env.PORT || '4000', 10);
@@ -81,6 +82,9 @@ async function startServer(): Promise<void> {
 
     // MCP endpoint
     app.use('/api/mcp', mcpRouter);
+
+    // Plaid bank feed integration
+    app.use('/api/plaid', createPlaidRouter());
 
     // GraphQL endpoint with authentication
     app.use(

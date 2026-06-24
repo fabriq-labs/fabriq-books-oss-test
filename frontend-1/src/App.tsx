@@ -46,6 +46,7 @@ import WorkflowDetailPage from "./pages/settings/WorkflowDetailPage";
 import ConnectionsPage from "./pages/settings/ConnectionsPage";
 import CreateConnectionPage from "./pages/settings/CreateConnectionPage";
 import ConnectionDetailPage from "./pages/settings/ConnectionDetailPage";
+import BankConnectionsPage from "./pages/banking/BankConnections";
 import TenantOnboardingPage from "./pages/settings/TenantOnboardingPage";
 import DeveloperOptionsPage from "./pages/settings/DeveloperOptionsPage";
 import TenantAdministrationPage from "./pages/settings/TenantAdministrationPage";
@@ -358,6 +359,7 @@ const AppRoutes: React.FC = () => {
                   </SuperAdminGuard>
                 } />
                 <Route path="settings/connections" element={<ConnectionsPage />} />
+                <Route path="settings/bank-connections" element={<BankConnectionsPage />} />
                 <Route path="settings/connections/new" element={<CreateConnectionPage />} />
                 <Route path="settings/connections/new/:systemType" element={<CreateConnectionPage />} />
                 <Route path="settings/connections/:id" element={<ConnectionDetailPage />} />
