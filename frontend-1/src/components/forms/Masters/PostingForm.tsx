@@ -102,12 +102,27 @@ function PostingAiCategoryPanel({
     );
 }
 
+const emptyToUndefined = (val: unknown) => (val === '' || val == null ? undefined : val);
+
+const requiredDateField = z.preprocess(
+    emptyToUndefined,
+    z.date({
+        invalid_type_error: 'Please select a date',
+        required_error: 'Value date is required',
+    }),
+);
+
+const optionalDateField = z.preprocess(
+    emptyToUndefined,
+    z.date({ invalid_type_error: 'Please select a date' }).optional(),
+);
+
 const itemMasterSchema = z.object({
     account_name: z.string().optional(),
-    notes:z.string().optional(),
+    notes: z.string().optional(),
     description: z.string().min(1, { message: 'Description is required' }),
     legal_entity_id: z.string().optional(),
-    account_id: z.string().min(1, { message: 'Account is required' }),
+    account_id: z.string().optional(),
     amount: z.string().min(1, { message: 'Amount is required' }).refine(
         (value) => !isNaN(parseFloat(value)) && parseFloat(value) >= 0,
         { message: 'Amount must be a valid positive number' }
@@ -116,8 +131,23 @@ const itemMasterSchema = z.object({
     holding_id: z.string().optional(),
     income_type: z.string().optional(),
     income_source: z.string().optional(),
-    value_date: z.date().optional(),
-    posting_date: z.date().optional(),
+    value_date: requiredDateField,
+    posting_date: optionalDateField,
+}).superRefine((data, ctx) => {
+    const hasDebit = Boolean(data.account_id?.trim());
+    const hasCredit = Boolean(data.credit_account_id?.trim());
+    if (!hasDebit && !hasCredit) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Debit or credit account is required',
+            path: ['account_id'],
+        });
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Debit or credit account is required',
+            path: ['credit_account_id'],
+        });
+    }
 });
 
 type ItemMasterValues = z.infer<typeof itemMasterSchema>;
@@ -194,8 +224,8 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
             holding_id: '',
             income_type: '',
             income_source: '',
-            value_date: '',
-            posting_date: '',
+            value_date: undefined,
+            posting_date: undefined,
         },
     });
 
@@ -331,11 +361,14 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
             const submissionData = {
                 ...data,
                 amount: parseFloat(data.amount),
+                account_id: data.account_id || null,
                 credit_account_id: data.credit_account_id || null,
                 holding_id: data.holding_id || null,
                 income_type: data.income_type || null,
                 income_source: data.income_source || null,
                 legal_entity_id: data.legal_entity_id || null,
+                value_date: data.value_date ?? null,
+                posting_date: data.posting_date ?? null,
                 ...(!id ? { posting_type: DEFAULT_POSTING_TYPE } : {}),
             };
 
