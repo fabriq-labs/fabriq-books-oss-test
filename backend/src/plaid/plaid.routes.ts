@@ -235,18 +235,9 @@ export function createPlaidRouter(): Router {
     }
   });
 
-  // Webhook — no auth; Plaid calls this directly
-  router.post('/webhook', async (req: Request, res: Response) => {
-    const { webhook_type, webhook_code, item_id } = req.body ?? {};
-    logger.info('Plaid webhook received', { webhook_type, webhook_code, item_id });
-
-    if (webhook_type === 'TRANSACTIONS' && webhook_code === 'SYNC_UPDATES_AVAILABLE' && item_id) {
-      plaid.syncItemByPlaidItemId(item_id).catch((err) => {
-        logger.error('Plaid webhook sync failed', { item_id, err });
-      });
-    }
-
-    return res.sendStatus(200);
+  // Webhook — disabled; push sync not used (on-demand only). Reserved for future use.
+  router.post('/webhook', (_req: Request, res: Response) => {
+    return res.sendStatus(404);
   });
 
   return router;

@@ -113,9 +113,10 @@ model posting {
   matched_reference     String? // e.g. "payment_receipt:payr_demo_001" or "invoice:inv_demo_001"
   payment_receipt_id    String? @unique // FK to payment_receipt when matched (one-to-one)
 
-  account         account?         @relation("debit_account", fields: [account_id], references: [id])
-  credit_account  account?         @relation("credit_account", fields: [credit_account_id], references: [id])
-  payment_receipt payment_receipt? @relation("PostingToPaymentReceipt", fields: [payment_receipt_id], references: [id])
+  account              account?              @relation("debit_account", fields: [account_id], references: [id])
+  credit_account       account?              @relation("credit_account", fields: [credit_account_id], references: [id])
+  payment_receipt      payment_receipt?      @relation("PostingToPaymentReceipt", fields: [payment_receipt_id], references: [id])
+  plaid_transaction    plaid_transaction?
 
   @@map("posting")
 }

@@ -1,15 +1,11 @@
 import type { Transaction } from 'plaid';
 
-const PLAID_TX_NOTE_PREFIX = 'plaid_tx:';
-
-/** Stable note value used for deduplication when syncing Plaid transactions. */
-export function plaidTransactionNote(transactionId: string): string {
-  return `${PLAID_TX_NOTE_PREFIX}${transactionId}`;
-}
-
-export function isPlaidTransactionNote(notes: string | null | undefined): boolean {
-  return typeof notes === 'string' && notes.startsWith(PLAID_TX_NOTE_PREFIX);
-}
+const CONFIDENCE_SCORE: Record<string, number> = {
+  VERY_HIGH: 0.95,
+  HIGH: 0.80,
+  MEDIUM: 0.60,
+  LOW: 0.30,
+};
 
 export function mapPlaidTransactionToPosting(
   tx: Transaction,
@@ -19,20 +15,27 @@ export function mapPlaidTransactionToPosting(
 ): Record<string, unknown> {
   const isDebit = tx.amount > 0;
   const amount = Math.abs(tx.amount);
-  const txDate = tx.authorized_date ?? tx.date;
+  const now = new Date();
+
+  const category = tx.personal_finance_category;
+  const categoryName = category?.detailed ?? category?.primary ?? null;
+  const confidenceLevel = category?.confidence_level ?? null;
+  const aiCatScore =
+    confidenceLevel != null ? (CONFIDENCE_SCORE[confidenceLevel] ?? null) : null;
 
   return {
     org_id: orgId,
-    value_date: new Date(txDate),
-    posting_date: new Date(txDate),
+    value_date: new Date(tx.authorized_date ?? tx.date),
+    posting_date: new Date(tx.date),
     description: tx.merchant_name ?? tx.name,
     amount,
     account_id: isDebit ? null : bankAccountId,
     credit_account_id: isDebit ? bankAccountId : null,
-    notes: plaidTransactionNote(tx.transaction_id),
     status: tx.pending ? 'PENDING' : 'ACTIVE',
     posting_type: 'bank_feed',
     reconciliation_status: 'UNMATCHED',
+    ...(categoryName ? { category_name: categoryName } : {}),
+    ...(aiCatScore != null ? { ai_cat_score: aiCatScore, ai_categorized_at: now } : {}),
     ...(legalEntityId ? { legal_entity_id: legalEntityId } : {}),
   };
 }

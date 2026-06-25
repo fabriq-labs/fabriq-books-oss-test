@@ -17,10 +17,36 @@ model plaid_item {
   created_by       String?   @db.VarChar(255)
   modified_by      String?   @db.VarChar(255)
   assigned_to      String?   @db.VarChar(255)
-  legal_entity     entity?   @relation(fields: [legal_entity_id], references: [id])
-  accounts         account[]
+  legal_entity      entity?              @relation(fields: [legal_entity_id], references: [id])
+  accounts          account[]
+  plaid_transactions plaid_transaction[]
 
   @@index([org_id])
   @@index([legal_entity_id])
   @@map("plaid_item")
+}
+
+// One row per Plaid transaction — raw store + link to posting.
+// transaction_id is Plaid's stable ID and is the dedup key.
+model plaid_transaction {
+  id                     String    @id @default(dbgenerated("'plaidtx_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                 String    @db.VarChar(50)
+  plaid_item_id          String    @db.VarChar(50)
+  transaction_id         String    @unique @db.VarChar(255)
+  plaid_account_id       String    @db.VarChar(255)
+  posting_id             String?   @unique @db.VarChar(50)
+  pending                Boolean   @default(false)
+  pending_transaction_id String?   @db.VarChar(255)
+  raw                    Json
+  synced_at              DateTime?
+  created_at             DateTime  @default(now())
+  modified_at            DateTime  @default(now()) @updatedAt
+
+  plaid_item             plaid_item @relation(fields: [plaid_item_id], references: [id], onDelete: Cascade)
+  posting                posting?   @relation(fields: [posting_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([plaid_item_id])
+  @@index([pending_transaction_id])
+  @@map("plaid_transaction")
 }
