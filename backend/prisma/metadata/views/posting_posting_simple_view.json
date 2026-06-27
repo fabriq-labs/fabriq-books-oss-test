@@ -84,6 +84,20 @@
       "displayName": "Description",
       "isColumnShow": true
     },
+    "category_name": {
+      "datatype": "string",
+      "required": false,
+      "permission": "read",
+      "displayName": "Category",
+      "isColumnShow": false
+    },
+    "ai_cat_score": {
+      "datatype": "float",
+      "required": false,
+      "permission": "read",
+      "displayName": "AI Category Score",
+      "isColumnShow": false
+    },
     "credit_account": {
       "type": "table",
       "select": {

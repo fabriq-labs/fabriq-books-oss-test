@@ -30,13 +30,99 @@ import {
 } from '@/utils/postingChatContext';
 import { Badge } from '@/components/ui/badge';
 
+function formatAiCatScore(score: unknown): string | null {
+    if (score == null || score === '') return null;
+    const value = Number(score);
+    if (Number.isNaN(value)) return null;
+    return `${Math.round(value * 100)}%`;
+}
+
+function formatCategoryDisplay(name: string): string {
+    return name
+        .split('_')
+        .filter(Boolean)
+        .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+        .join(' · ');
+}
+
+function PostingAiCategoryPanel({
+    categoryName,
+    aiCatScore,
+}: {
+    categoryName?: string | null;
+    aiCatScore?: unknown;
+}) {
+    const scoreLabel = formatAiCatScore(aiCatScore);
+    if (!categoryName && !scoreLabel) return null;
+
+    const scoreValue = aiCatScore == null || aiCatScore === '' ? null : Number(aiCatScore);
+
+    return (
+        <div className="rounded-lg border bg-muted/30 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/50">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    AI Categorization
+                </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-3 py-3">
+                {categoryName && (
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                            Category
+                        </p>
+                        <Badge
+                            variant="outline"
+                            title={categoryName}
+                            className="text-xs font-normal text-foreground border-muted-foreground/30 bg-background/80 max-w-full truncate"
+                        >
+                            {formatCategoryDisplay(categoryName)}
+                        </Badge>
+                    </div>
+                )}
+                {scoreLabel && (
+                    <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+                            Confidence
+                        </p>
+                        <Badge
+                            variant="outline"
+                            className={`text-xs font-normal border-muted-foreground/30 bg-background/80 ${
+                                scoreValue != null && !Number.isNaN(scoreValue) && scoreValue >= 0.8
+                                    ? 'text-primary'
+                                    : 'text-muted-foreground'
+                            }`}
+                        >
+                            {scoreLabel}
+                        </Badge>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+const emptyToUndefined = (val: unknown) => (val === '' || val == null ? undefined : val);
+
+const requiredDateField = z.preprocess(
+    emptyToUndefined,
+    z.date({
+        invalid_type_error: 'Please select a date',
+        required_error: 'Value date is required',
+    }),
+);
+
+const optionalDateField = z.preprocess(
+    emptyToUndefined,
+    z.date({ invalid_type_error: 'Please select a date' }).optional(),
+);
+
 const itemMasterSchema = z.object({
     account_name: z.string().optional(),
-    category_name: z.string().optional(),
-    notes:z.string().optional(),
+    notes: z.string().optional(),
     description: z.string().min(1, { message: 'Description is required' }),
     legal_entity_id: z.string().optional(),
-    account_id: z.string().min(1, { message: 'Account is required' }),
+    account_id: z.string().optional(),
     amount: z.string().min(1, { message: 'Amount is required' }).refine(
         (value) => !isNaN(parseFloat(value)) && parseFloat(value) >= 0,
         { message: 'Amount must be a valid positive number' }
@@ -45,8 +131,23 @@ const itemMasterSchema = z.object({
     holding_id: z.string().optional(),
     income_type: z.string().optional(),
     income_source: z.string().optional(),
-    value_date: z.date().optional(),
-    posting_date: z.date().optional(),
+    value_date: requiredDateField,
+    posting_date: optionalDateField,
+}).superRefine((data, ctx) => {
+    const hasDebit = Boolean(data.account_id?.trim());
+    const hasCredit = Boolean(data.credit_account_id?.trim());
+    if (!hasDebit && !hasCredit) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Debit or credit account is required',
+            path: ['account_id'],
+        });
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Debit or credit account is required',
+            path: ['credit_account_id'],
+        });
+    }
 });
 
 type ItemMasterValues = z.infer<typeof itemMasterSchema>;
@@ -123,9 +224,8 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
             holding_id: '',
             income_type: '',
             income_source: '',
-            value_date: '',
-            posting_date: '',
-            category_name: ''
+            value_date: undefined,
+            posting_date: undefined,
         },
     });
 
@@ -206,7 +306,6 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                         income_source: toolResultData?.income_source || undefined,
                         value_date: toolResultData?.value_date ? new Date(toolResultData.value_date) : undefined,
                         posting_date: toolResultData?.posting_date ? new Date(toolResultData.posting_date) : undefined,
-                        category_name: toolResultData?.category?.name || '',
                     });
                 }
             }
@@ -231,7 +330,6 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                     income_source: res.data?.income_source || undefined,
                     value_date: res.data?.value_date ? new Date(res.data.value_date) : undefined,
                     posting_date: res.data?.posting_date ? new Date(res.data.posting_date) : undefined,
-                    category_name: res.data?.category?.name || '',
                 });
                 if (res.data?.reconciliation_status === 'MATCHED' && res.data?.payment_receipt) {
                     const pr = res.data.payment_receipt;
@@ -263,11 +361,14 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
             const submissionData = {
                 ...data,
                 amount: parseFloat(data.amount),
+                account_id: data.account_id || null,
                 credit_account_id: data.credit_account_id || null,
                 holding_id: data.holding_id || null,
                 income_type: data.income_type || null,
                 income_source: data.income_source || null,
                 legal_entity_id: data.legal_entity_id || null,
+                value_date: data.value_date ?? null,
+                posting_date: data.posting_date ?? null,
                 ...(!id ? { posting_type: DEFAULT_POSTING_TYPE } : {}),
             };
 
@@ -830,40 +931,47 @@ export const PostingForm: React.FC<ItemMasterFormProps> = ({
                                         />
                                     </div>
 
-                                    <FormField
-                                        control={form.control}
-                                        name="description"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Description</FormLabel>
-                                                <FormControl>
-                                                    <Textarea
-                                                        placeholder="Enter description..."
-                                                        className="resize-y min-h-[80px]"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        <FormField
+                                            control={form.control}
+                                            name="description"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Description</FormLabel>
+                                                    <FormControl>
+                                                        <Textarea
+                                                            placeholder="Enter description..."
+                                                            className="resize-y min-h-[80px]"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
 
-                                    <FormField
-                                        control={form.control}
-                                        name="notes"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Notes</FormLabel>
-                                                <FormControl>
-                                                    <Textarea
-                                                        placeholder="Enter notes..."
-                                                        className="resize-y min-h-[80px]"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
+                                        <FormField
+                                            control={form.control}
+                                            name="notes"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Notes</FormLabel>
+                                                    <FormControl>
+                                                        <Textarea
+                                                            placeholder="Enter notes..."
+                                                            className="resize-y min-h-[80px]"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+
+                                    <PostingAiCategoryPanel
+                                        categoryName={initialValues?.category_name}
+                                        aiCatScore={initialValues?.ai_cat_score}
                                     />
 
                                     {/* Attachments */}
