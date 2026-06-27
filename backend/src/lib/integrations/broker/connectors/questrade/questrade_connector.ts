@@ -113,8 +113,10 @@ export class QuestradeConnector implements BrokerConnector {
   }
 
   async getSymbol(symbolId: number): Promise<BrokerSymbolDTO | null> {
-    const data = await this.request<{ symbols: unknown[] }>(`v1/symbols/${symbolId}`);
-    const raw = data.symbols?.[0];
+    const data = await this.request<{ symbols?: unknown[]; symbol?: unknown }>(
+      `v1/symbols/${symbolId}`
+    );
+    const raw = data.symbols?.[0] ?? data.symbol;
     if (!raw || typeof raw !== 'object') return null;
     return mapSymbol(raw as Parameters<typeof mapSymbol>[0]);
   }
@@ -125,6 +127,22 @@ export class QuestradeConnector implements BrokerConnector {
       ids: symbolIds.join(','),
     });
     return (data.quotes ?? []).map((q) => mapQuote(q as Parameters<typeof mapQuote>[0]));
+  }
+
+  async searchSymbol(symbol: string): Promise<BrokerSymbolDTO | null> {
+    const data = await this.request<{ symbols: unknown[] }>('v1/symbols', {
+      names: symbol,
+    });
+    const rows = data.symbols ?? [];
+    const exact =
+      rows.find(
+        (row) =>
+          typeof row === 'object' &&
+          row != null &&
+          (row as { symbol?: string }).symbol?.toUpperCase() === symbol.toUpperCase()
+      ) ?? rows[0];
+    if (!exact || typeof exact !== 'object') return null;
+    return mapSymbol(exact as Parameters<typeof mapSymbol>[0]);
   }
 }
 

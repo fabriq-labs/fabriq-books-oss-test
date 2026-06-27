@@ -135,6 +135,7 @@ type InstrumentRow = {
   current_price: { toString(): string } | null;
   price_updated_at: Date | null;
   price_currency: { code: string } | null;
+  underlying_instrument_id?: string | null;
   underlying?: InstrumentRow | null;
 };
 
@@ -206,6 +207,7 @@ export async function getPortfolioSummary(
           type: true,
           current_price: true,
           price_updated_at: true,
+          underlying_instrument_id: true,
           price_currency: { select: { code: true } },
           underlying: {
             select: {

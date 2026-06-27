@@ -93,5 +93,6 @@ export interface BrokerConnector {
   getPositions(accountExternalId: string): Promise<BrokerPositionDTO[]>;
   getActivities(accountExternalId: string, startTime: Date, endTime: Date): Promise<BrokerTradeDTO[]>;
   getSymbol?(symbolId: number): Promise<BrokerSymbolDTO | null>;
+  searchSymbol?(symbol: string): Promise<BrokerSymbolDTO | null>;
   getQuotes?(symbolIds: number[]): Promise<BrokerQuoteDTO[]>;
 }

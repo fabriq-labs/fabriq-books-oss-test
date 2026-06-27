@@ -321,7 +321,7 @@ runBrokerSync(connectionId, orgId)
        ├─ getBalances()   → syncCashBalances()  (adds CASH-type holdings)
        ├─ deactivateStaleHoldings()  (sets is_active=false for sold positions)
        └─ getActivities() → upsertTrade()
-  ├─ linkOptionUnderlyings()  (GET /symbols/:id for new options)
+  ├─ enrichOptionUnderlyings()  (GET /symbols/:id; always backfills underlying external_symbol_id)
   └─ refreshUnderlyingQuotes()  (batched GET /markets/quotes for underlyings not directly held)
 ```
 

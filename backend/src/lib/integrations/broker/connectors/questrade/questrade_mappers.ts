@@ -194,6 +194,7 @@ interface QtSymbol {
   description?: string;
   securityType?: string;
   currency?: string;
+  optionRoot?: string;
   optionContractDeliverables?: Array<{
     underlyingSymbol?: string;
     underlyingSymbolId?: number | string;
@@ -203,13 +204,14 @@ interface QtSymbol {
 export function mapSymbol(raw: QtSymbol): BrokerSymbolDTO {
   const deliverable = raw.optionContractDeliverables?.[0];
   const underlyingSymbolId = deliverable?.underlyingSymbolId;
+  const underlyingSymbol = deliverable?.underlyingSymbol ?? raw.optionRoot;
   return {
     symbolId: raw.symbolId,
     symbol: raw.symbol,
     name: raw.description ?? raw.symbol,
     securityType: raw.securityType,
     currencyCode: raw.currency,
-    underlyingSymbol: deliverable?.underlyingSymbol,
+    underlyingSymbol,
     underlyingSymbolId:
       underlyingSymbolId != null && underlyingSymbolId !== ''
         ? Number(underlyingSymbolId)

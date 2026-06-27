@@ -2,7 +2,7 @@ import prisma from '../../../prisma';
 import logger from '../../../../utils/logger';
 import { BrokerConnector } from '../connectors/types';
 import { isOptionSymbol, parseUnderlyingSymbolFromOption } from '../option_symbol';
-import { upsertInstrument, updateInstrumentMarketData, resolveCurrencyId } from './upserts';
+import { upsertInstrument, resolveCurrencyId } from './upserts';
 
 export interface OptionLinkTask {
   instrumentId: string;
@@ -11,19 +11,17 @@ export interface OptionLinkTask {
   currencyCode?: string;
 }
 
-export async function linkOptionUnderlyings(
+/**
+ * Resolve option → underlying link and ensure underlying has external_symbol_id for quotes.
+ * Always re-runs enrichment (does not skip when underlying_instrument_id is already set).
+ */
+export async function enrichOptionUnderlyings(
   connector: BrokerConnector,
   tasks: OptionLinkTask[]
 ): Promise<void> {
   const uniqueByInstrument = new Map(tasks.map((t) => [t.instrumentId, t]));
 
   for (const task of uniqueByInstrument.values()) {
-    const existing = await prisma.instrument.findUnique({
-      where: { id: task.instrumentId },
-      select: { underlying_instrument_id: true },
-    });
-    if (existing?.underlying_instrument_id) continue;
-
     let underlyingSymbol: string | undefined;
     let underlyingSymbolId: number | undefined;
     let underlyingName: string | undefined;
@@ -32,10 +30,10 @@ export async function linkOptionUnderlyings(
     if (task.externalSymbolId && connector.getSymbol) {
       try {
         const sym = await connector.getSymbol(task.externalSymbolId);
-        if (sym?.underlyingSymbol) {
-          underlyingSymbol = sym.underlyingSymbol;
+        if (sym) {
+          underlyingSymbol = sym.underlyingSymbol ?? undefined;
           underlyingSymbolId = sym.underlyingSymbolId;
-          underlyingName = sym.underlyingSymbol;
+          underlyingName = sym.underlyingSymbol ?? sym.name;
           currencyCode = currencyCode ?? sym.currencyCode;
         }
       } catch (err) {
@@ -48,6 +46,19 @@ export async function linkOptionUnderlyings(
     }
     if (!underlyingSymbol) continue;
 
+    if (!underlyingSymbolId && connector.searchSymbol) {
+      try {
+        const found = await connector.searchSymbol(underlyingSymbol);
+        if (found) {
+          underlyingSymbolId = found.symbolId;
+          underlyingName = underlyingName ?? found.name ?? found.symbol;
+          currencyCode = currencyCode ?? found.currencyCode;
+        }
+      } catch (err) {
+        logger.warn(`Failed to search symbol for underlying ${underlyingSymbol}`, err);
+      }
+    }
+
     const underlyingId = await upsertInstrument(
       {
         symbol: underlyingSymbol,
@@ -59,10 +70,42 @@ export async function linkOptionUnderlyings(
       { externalSymbolId: underlyingSymbolId }
     );
 
+    if (underlyingSymbolId) {
+      await prisma.instrument.update({
+        where: { id: underlyingId },
+        data: { external_symbol_id: underlyingSymbolId },
+      });
+    }
+
     await prisma.instrument.update({
       where: { id: task.instrumentId },
       data: { underlying_instrument_id: underlyingId },
     });
+  }
+}
+
+async function ensureExternalSymbolIds(
+  connector: BrokerConnector,
+  instrumentIds: string[]
+): Promise<void> {
+  if (!connector.searchSymbol || instrumentIds.length === 0) return;
+
+  const instruments = await prisma.instrument.findMany({
+    where: { id: { in: instrumentIds }, external_symbol_id: null },
+    select: { id: true, symbol: true },
+  });
+
+  for (const instrument of instruments) {
+    try {
+      const found = await connector.searchSymbol!(instrument.symbol);
+      if (!found?.symbolId) continue;
+      await prisma.instrument.update({
+        where: { id: instrument.id },
+        data: { external_symbol_id: found.symbolId },
+      });
+    } catch (err) {
+      logger.warn(`Failed to resolve symbol id for ${instrument.symbol}`, err);
+    }
   }
 }
 
@@ -89,12 +132,12 @@ export async function refreshUnderlyingQuotes(
   for (const row of optionsWithUnderlying) {
     const underlyingId = row.underlying_instrument_id;
     if (!underlyingId || directlyHeldInstrumentIds.has(underlyingId)) continue;
-    if (row.underlying?.external_symbol_id != null) {
-      underlyingIdsToQuote.add(underlyingId);
-    }
+    underlyingIdsToQuote.add(underlyingId);
   }
 
   if (underlyingIdsToQuote.size === 0) return;
+
+  await ensureExternalSymbolIds(connector, Array.from(underlyingIdsToQuote));
 
   const underlyings = await prisma.instrument.findMany({
     where: {

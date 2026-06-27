@@ -13,7 +13,7 @@ import {
   updateInstrumentMarketData,
 } from './upserts';
 import {
-  linkOptionUnderlyings,
+  enrichOptionUnderlyings,
   refreshUnderlyingQuotes,
   type OptionLinkTask,
 } from './instrument_price_refresh';
@@ -141,7 +141,7 @@ export async function runBrokerSync(connectionId: string, orgId: string): Promis
       }
     }
 
-    await linkOptionUnderlyings(connector, optionLinkTasks);
+    await enrichOptionUnderlyings(connector, optionLinkTasks);
     await refreshUnderlyingQuotes(connector, directlyHeldInstrumentIds);
 
     report.status = report.accountsFailed > 0 ? 'partial' : 'success';
