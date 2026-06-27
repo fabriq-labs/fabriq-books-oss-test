@@ -52,6 +52,17 @@ export const QT_POSITIONS_TFSA = {
       openPnl: 500.0,
       closedPnl: 0,
     },
+    {
+      symbol: 'NVDA10Jul26P175.00',
+      symbolId: 9001,
+      openQuantity: 2,
+      currentPrice: 3.15,
+      currentMarketValue: 630.0,
+      averageEntryPrice: 2.5,
+      openPnl: 130.0,
+      closedPnl: 0,
+      securityType: 'Option',
+    },
   ],
 };
 

@@ -36,9 +36,10 @@ export interface BrokerBalanceDTO {
 export interface BrokerInstrumentDTO {
   symbol: string;
   name: string;
-  type: 'STOCK' | 'BOND' | 'MUTUAL_FUND' | 'ETF' | 'FOREX' | 'CASH';
+  type: 'STOCK' | 'BOND' | 'MUTUAL_FUND' | 'ETF' | 'FOREX' | 'CASH' | 'OPTION';
   isin?: string;
   currencyCode?: string;
+  externalSymbolId?: number;
 }
 
 export interface BrokerPositionDTO {
@@ -49,6 +50,23 @@ export interface BrokerPositionDTO {
   marketValue?: number;
   unrealizedPnl?: number;
   realizedPnl?: number;
+  currencyCode?: string;
+  externalSymbolId?: number;
+}
+
+export interface BrokerSymbolDTO {
+  symbolId: number;
+  symbol: string;
+  name?: string;
+  securityType?: string;
+  currencyCode?: string;
+  underlyingSymbol?: string;
+  underlyingSymbolId?: number;
+}
+
+export interface BrokerQuoteDTO {
+  symbolId: number;
+  lastTradePrice?: number;
   currencyCode?: string;
 }
 
@@ -74,4 +92,6 @@ export interface BrokerConnector {
   getBalances(accountExternalId: string): Promise<BrokerBalanceDTO[]>;
   getPositions(accountExternalId: string): Promise<BrokerPositionDTO[]>;
   getActivities(accountExternalId: string, startTime: Date, endTime: Date): Promise<BrokerTradeDTO[]>;
+  getSymbol?(symbolId: number): Promise<BrokerSymbolDTO | null>;
+  getQuotes?(symbolIds: number[]): Promise<BrokerQuoteDTO[]>;
 }

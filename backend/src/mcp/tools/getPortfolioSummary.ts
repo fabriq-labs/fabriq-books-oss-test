@@ -1,11 +1,19 @@
 import { z } from 'zod';
 import { AuthContext } from '../../auth/types';
+import { runBrokerSync } from '../../lib/integrations/broker/sync/broker_sync_service';
 import { run_report } from '../../lib/reports';
 import type { PortfolioSummaryResult } from '../../lib/reports/investments';
+import prisma from '../../lib/prisma';
 
 const DEFAULT_REPORT_CURRENCY = 'CAD';
 
 export const getPortfolioSummarySchema = {
+  latest: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, sync holdings from the broker before returning the portfolio. Defaults to false (use cached data from the last sync).'
+    ),
   report_currency: z
     .string()
     .optional()
@@ -18,22 +26,47 @@ export const getPortfolioSummarySchema = {
 
 export type GetPortfolioSummaryParams = z.infer<z.ZodObject<typeof getPortfolioSummarySchema>>;
 
+async function resolveBrokerConnection(orgId: string, connectionId?: string) {
+  return connectionId
+    ? prisma.source_system.findFirst({
+        where: { id: connectionId, org_id: orgId, is_active: true },
+      })
+    : prisma.source_system.findFirst({
+        where: { org_id: orgId, system_type: 'questrade', is_active: true },
+      });
+}
+
 export function getPortfolioSummaryHandler(auth: AuthContext) {
   return async (params: GetPortfolioSummaryParams) => {
     const orgId = auth.user?.org_id;
     if (!orgId) throw new Error('Auth context missing org_id');
 
+    const latest = params.latest === true;
     const reportCurrency = params.report_currency ?? DEFAULT_REPORT_CURRENCY;
+
+    let sync = null;
+    if (latest) {
+      const connection = await resolveBrokerConnection(orgId, params.connection_id);
+      if (!connection) {
+        throw new Error('No active broker connection found');
+      }
+      sync = await runBrokerSync(connection.id, orgId);
+    }
 
     const data = (await run_report(auth, 'portfolio_summary', {
       report_currency: reportCurrency,
       connection_id: params.connection_id,
     })) as PortfolioSummaryResult;
 
+    const syncFailed = sync != null && (sync.status === 'failed' || sync.status === 'reauth_required');
+
     return {
       tool: 'get_portfolio_summary',
-      success: true,
+      success: !syncFailed,
+      synced: latest,
+      sync,
       filters: {
+        latest,
         report_currency: reportCurrency,
         connection_id: params.connection_id ?? null,
       },

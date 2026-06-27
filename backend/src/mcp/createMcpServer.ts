@@ -60,10 +60,10 @@ export function createMcpServer(auth: AuthContext): McpServer {
     'get_portfolio_summary',
     {
       description:
-        'Current investment portfolio: equity holdings, options, cash balances, and per-account totals. Values are converted to report_currency (default CAD). Use for questions about portfolio value, position sizes, allocation, or specific symbols. Check last_sync_at for data freshness.',
+        'Investment portfolio: equity holdings, options, cash balances, and per-account totals in report_currency (default CAD). By default returns cached data from the last broker sync. Set latest=true to sync from Questrade first. Check last_sync_at for freshness; use latest=true when the user needs up-to-date prices or positions.',
       inputSchema: getPortfolioSummarySchema,
     },
-    async (params: { report_currency?: string; connection_id?: string }) => {
+    async (params: { latest?: boolean; report_currency?: string; connection_id?: string }) => {
       const result = await getPortfolioSummaryHandler(auth)(params);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     }

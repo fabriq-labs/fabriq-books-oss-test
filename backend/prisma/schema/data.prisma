@@ -135,9 +135,20 @@ model instrument {
   isin        String?         @unique
   details     Json?
 
+  current_price            Decimal?  @db.Decimal(19, 4)
+  price_updated_at         DateTime?
+  price_currency_id        String?   @db.VarChar(50)
+  external_symbol_id       Int?
+  underlying_instrument_id String?   @db.VarChar(50)
+
+  price_currency currency?    @relation("InstrumentPriceCurrency", fields: [price_currency_id], references: [id])
+  underlying     instrument?  @relation("InstrumentUnderlying", fields: [underlying_instrument_id], references: [id])
+  derivatives    instrument[] @relation("InstrumentUnderlying")
+
   trades   trade[]
   holdings holding[]
 
+  @@index([underlying_instrument_id])
   @@map("instrument")
 }
 
@@ -233,6 +244,7 @@ enum instrument_type {
   ETF
   FOREX
   CASH
+  OPTION
 }
 
 enum trade_type {
@@ -272,6 +284,7 @@ model currency {
   orgs              org[]
   accounts          account[]
   holdings          holding[]
+  instrumentPrices  instrument[]      @relation("InstrumentPriceCurrency")
   exchangeFromRates exchange_rate[]   @relation("ExchangeRateFromCurrency")
   exchangeToRates   exchange_rate[]   @relation("ExchangeRateToCurrency")
   created_by        String?

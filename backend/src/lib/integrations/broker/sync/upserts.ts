@@ -68,13 +68,27 @@ export async function upsertAccount(
  * Upsert an instrument (global master data, no org filter). Match by ISIN first,
  * then by symbol.
  */
-export async function upsertInstrument(dto: BrokerInstrumentDTO): Promise<string> {
+export async function upsertInstrument(
+  dto: BrokerInstrumentDTO,
+  options?: { externalSymbolId?: number; underlyingInstrumentId?: string }
+): Promise<string> {
+  const instrumentData = {
+    symbol: dto.symbol,
+    name: dto.name,
+    type: dto.type,
+    ...(options?.externalSymbolId != null ? { external_symbol_id: options.externalSymbolId } : {}),
+    ...(dto.externalSymbolId != null ? { external_symbol_id: dto.externalSymbolId } : {}),
+    ...(options?.underlyingInstrumentId
+      ? { underlying_instrument_id: options.underlyingInstrumentId }
+      : {}),
+  };
+
   if (dto.isin) {
     const byIsin = await prisma.instrument.findUnique({ where: { isin: dto.isin }, select: { id: true } });
     if (byIsin) {
       await prisma.instrument.update({
         where: { id: byIsin.id },
-        data: { symbol: dto.symbol, name: dto.name, type: dto.type },
+        data: instrumentData,
       });
       return byIsin.id;
     }
@@ -85,16 +99,40 @@ export async function upsertInstrument(dto: BrokerInstrumentDTO): Promise<string
     select: { id: true },
   });
   if (bySymbol) {
-    if (dto.isin) {
-      await prisma.instrument.update({ where: { id: bySymbol.id }, data: { isin: dto.isin } });
-    }
+    await prisma.instrument.update({
+      where: { id: bySymbol.id },
+      data: {
+        ...instrumentData,
+        ...(dto.isin ? { isin: dto.isin } : {}),
+      },
+    });
     return bySymbol.id;
   }
 
   const created = await prisma.instrument.create({
-    data: { symbol: dto.symbol, name: dto.name, type: dto.type, isin: dto.isin ?? null },
+    data: {
+      ...instrumentData,
+      isin: dto.isin ?? null,
+    },
   });
   return created.id;
+}
+
+export async function updateInstrumentMarketData(
+  instrumentId: string,
+  currentPrice: number | null | undefined,
+  currencyCode?: string
+): Promise<void> {
+  if (currentPrice == null) return;
+  const priceCurrencyId = currencyCode ? await resolveCurrencyId(currencyCode) : null;
+  await prisma.instrument.update({
+    where: { id: instrumentId },
+    data: {
+      current_price: currentPrice,
+      price_updated_at: new Date(),
+      ...(priceCurrencyId ? { price_currency_id: priceCurrencyId } : {}),
+    },
+  });
 }
 
 /** Upsert a holding by (account_id, instrument_id). Returns instrument_id for stale tracking. */
@@ -234,6 +272,7 @@ export async function syncCashBalances(
     const currencyId = await resolveCurrencyId(currencyCode);
     const instrumentId = await upsertCashInstrument(currencyCode);
     activeInstrumentIds.push(instrumentId);
+    await updateInstrumentMarketData(instrumentId, 1, currencyCode);
 
     await prisma.holding.upsert({
       where: { instrument_id_account_id: { instrument_id: instrumentId, account_id: accountId } },

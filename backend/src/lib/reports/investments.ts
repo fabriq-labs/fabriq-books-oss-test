@@ -1,10 +1,15 @@
 import prisma from '../prisma';
+import { isOptionSymbol } from '../integrations/broker/option_symbol';
 
-// Regex matches Questrade option symbols: e.g. NVDA10Jul26P175.00, GOOG10Jul26C405.00
-const OPTION_SYMBOL_RE = /\d{1,2}[A-Z][a-z]{2}\d{2}[CP]\d+(\.\d+)?$/;
-
-function isOption(symbol: string): boolean {
-  return OPTION_SYMBOL_RE.test(symbol);
+export interface PortfolioInstrumentSnapshot {
+  id: string;
+  symbol: string;
+  name: string;
+  type: string;
+  current_price: number | null;
+  price_updated_at: string | null;
+  native_currency_code: string | null;
+  underlying?: PortfolioInstrumentSnapshot;
 }
 
 export interface PortfolioHoldingRow {
@@ -17,12 +22,13 @@ export interface PortfolioHoldingRow {
   instrument_type: string;
   quantity: number;
   average_cost: number;          // in report currency
-  current_price: number | null;  // in report currency
+  current_price: number | null;  // in report currency (holding-level)
   market_value: number | null;   // in report currency
   unrealized_pnl: number | null; // in report currency
   native_currency_code: string | null;
   conversion_rate: number;
   source_system_id: string | null;
+  instrument: PortfolioInstrumentSnapshot;
 }
 
 export interface AccountSummaryRow {
@@ -121,6 +127,36 @@ async function getLastSyncAt(orgId: string, connectionId?: string): Promise<stri
   return connection?.last_sync_at?.toISOString() ?? null;
 }
 
+type InstrumentRow = {
+  id: string;
+  symbol: string;
+  name: string;
+  type: string;
+  current_price: { toString(): string } | null;
+  price_updated_at: Date | null;
+  price_currency: { code: string } | null;
+  underlying?: InstrumentRow | null;
+};
+
+function buildInstrumentSnapshot(instrument: InstrumentRow): PortfolioInstrumentSnapshot {
+  const snapshot: PortfolioInstrumentSnapshot = {
+    id: instrument.id,
+    symbol: instrument.symbol,
+    name: instrument.name,
+    type: instrument.type,
+    current_price:
+      instrument.current_price != null ? Number(instrument.current_price) : null,
+    price_updated_at: instrument.price_updated_at?.toISOString() ?? null,
+    native_currency_code: instrument.price_currency?.code ?? null,
+  };
+
+  if (instrument.underlying) {
+    snapshot.underlying = buildInstrumentSnapshot(instrument.underlying);
+  }
+
+  return snapshot;
+}
+
 export async function getPortfolioSummary(
   orgId: string,
   reportCurrency = 'CAD',
@@ -162,7 +198,28 @@ export async function getPortfolioSummary(
     },
     include: {
       account: { select: { id: true, name: true, inst_id: true } },
-      instrument: { select: { id: true, symbol: true, name: true, type: true } },
+      instrument: {
+        select: {
+          id: true,
+          symbol: true,
+          name: true,
+          type: true,
+          current_price: true,
+          price_updated_at: true,
+          price_currency: { select: { code: true } },
+          underlying: {
+            select: {
+              id: true,
+              symbol: true,
+              name: true,
+              type: true,
+              current_price: true,
+              price_updated_at: true,
+              price_currency: { select: { code: true } },
+            },
+          },
+        },
+      },
       currency: { select: { id: true, code: true } },
     },
     orderBy: { market_value: 'desc' },
@@ -184,6 +241,7 @@ export async function getPortfolioSummary(
 
   for (const h of holdingRows) {
     const rate = await getRate(h.currency?.id ?? null);
+    const instrumentSnapshot = buildInstrumentSnapshot(h.instrument as InstrumentRow);
     const row: PortfolioHoldingRow = {
       account_id: h.account_id,
       account_name: h.account?.name ?? h.account_id,
@@ -200,11 +258,12 @@ export async function getPortfolioSummary(
       native_currency_code: h.currency?.code ?? null,
       conversion_rate: rate,
       source_system_id: h.source_system_id,
+      instrument: instrumentSnapshot,
     };
 
     if (h.instrument.type === 'CASH') {
       cash.push(row);
-    } else if (isOption(h.instrument.symbol)) {
+    } else if (h.instrument.type === 'OPTION' || isOptionSymbol(h.instrument.symbol)) {
       options.push(row);
     } else {
       equity.push(row);

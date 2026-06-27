@@ -10,7 +10,14 @@ import {
   upsertInstrument,
   upsertTrade,
   syncCashBalances,
+  updateInstrumentMarketData,
 } from './upserts';
+import {
+  linkOptionUnderlyings,
+  refreshUnderlyingQuotes,
+  type OptionLinkTask,
+} from './instrument_price_refresh';
+import { isOptionSymbol } from '../option_symbol';
 
 const FIRST_SYNC_BACKFILL_DAYS = 90;
 
@@ -68,6 +75,8 @@ export async function runBrokerSync(connectionId: string, orgId: string): Promis
     const { connector } = await createBrokerConnector(connectionId);
     await connector.ensureAuth();
     const accounts = await connector.getAccounts();
+    const directlyHeldInstrumentIds = new Set<string>();
+    const optionLinkTasks: OptionLinkTask[] = [];
 
     for (const accountDto of accounts) {
       try {
@@ -76,11 +85,31 @@ export async function runBrokerSync(connectionId: string, orgId: string): Promis
         const positions = await connector.getPositions(accountDto.externalId);
         const activeInstrumentIds: string[] = [];
         for (const position of positions) {
-          const instrumentId = await upsertInstrument(position.instrument);
+          const instrumentId = await upsertInstrument(position.instrument, {
+            externalSymbolId: position.externalSymbolId ?? position.instrument.externalSymbolId,
+          });
           report.instrumentsUpserted += 1;
           await upsertHolding(position, accountId, instrumentId, orgId, connectionId);
+          await updateInstrumentMarketData(
+            instrumentId,
+            position.currentPrice,
+            position.currencyCode
+          );
           report.holdingsUpserted += 1;
           activeInstrumentIds.push(instrumentId);
+          directlyHeldInstrumentIds.add(instrumentId);
+
+          if (
+            position.instrument.type === 'OPTION' ||
+            isOptionSymbol(position.instrument.symbol)
+          ) {
+            optionLinkTasks.push({
+              instrumentId,
+              externalSymbolId: position.externalSymbolId ?? position.instrument.externalSymbolId,
+              optionSymbol: position.instrument.symbol,
+              currencyCode: position.currencyCode,
+            });
+          }
         }
 
         // Sync cash balances as CASH-type holdings; include their instrument IDs
@@ -111,6 +140,9 @@ export async function runBrokerSync(connectionId: string, orgId: string): Promis
         logger.error(`Broker sync failed for account ${accountDto.externalId}`, accountError);
       }
     }
+
+    await linkOptionUnderlyings(connector, optionLinkTasks);
+    await refreshUnderlyingQuotes(connector, directlyHeldInstrumentIds);
 
     report.status = report.accountsFailed > 0 ? 'partial' : 'success';
   } catch (error) {

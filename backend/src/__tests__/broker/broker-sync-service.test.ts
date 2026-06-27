@@ -62,6 +62,24 @@ function buildMockConnectorContext(_server: MockQuestradeServer): BrokerConnecto
       if (id === '12345678') return QT_ACTIVITIES_TFSA.activities.map(a => mapActivity(id, a)).filter(Boolean);
       return [];
     }),
+    getSymbol: jest.fn().mockImplementation(async (symbolId: number) => {
+      if (symbolId === 9001) {
+        return {
+          symbolId: 9001,
+          symbol: 'NVDA10Jul26P175.00',
+          underlyingSymbol: 'NVDA',
+          underlyingSymbolId: 8049,
+          currencyCode: 'USD',
+        };
+      }
+      return null;
+    }),
+    getQuotes: jest.fn().mockImplementation(async (ids: number[]) => {
+      if (ids.includes(8049)) {
+        return [{ symbolId: 8049, lastTradePrice: 142.5, currencyCode: 'USD' }];
+      }
+      return [];
+    }),
   };
   return { connector, connectionId: CONNECTION_ID, orgId: ORG_ID };
 }
@@ -125,12 +143,26 @@ describe('BrokerSyncService', () => {
       const count = await prisma.instrument.count();
       expect(count).toBeGreaterThan(0);
     } else {
-      const symbols = ['VFV.TO', 'XEQT.TO', 'XIC.TO', 'AAPL'];
+      const symbols = ['VFV.TO', 'XEQT.TO', 'XIC.TO', 'AAPL', 'NVDA10Jul26P175.00', 'NVDA'];
       for (const symbol of symbols) {
         const inst = await prisma.instrument.findFirst({ where: { symbol } });
         expect(inst).not.toBeNull();
       }
     }
+  });
+
+  it('links option underlyings and stores instrument current_price', async () => {
+    if (skipIfNoDb() && !USE_LIVE) return;
+    await runBrokerSync(connId, orgId);
+    const option = await prisma.instrument.findFirst({ where: { symbol: 'NVDA10Jul26P175.00' } });
+    expect(option?.type).toBe('OPTION');
+    expect(option?.underlying_instrument_id).not.toBeNull();
+    expect(option?.current_price).not.toBeNull();
+
+    const nvda = await prisma.instrument.findFirst({ where: { symbol: 'NVDA' } });
+    expect(nvda).not.toBeNull();
+    expect(nvda?.current_price).not.toBeNull();
+    expect(nvda?.external_symbol_id).toBe(8049);
   });
 
   it('upserts holdings with correct quantity and market value', async () => {

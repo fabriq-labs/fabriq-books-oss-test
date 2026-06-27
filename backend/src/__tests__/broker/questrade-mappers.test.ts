@@ -46,6 +46,13 @@ describe('questrade_mappers', () => {
       const dto = mapPosition({ ...QT_POSITIONS_TFSA.positions[0], securityType: 'ETF' });
       expect(dto.instrument.type).toBe('ETF');
     });
+
+    it('maps option positions to OPTION type with symbolId', () => {
+      const dto = mapPosition(QT_POSITIONS_TFSA.positions[2]);
+      expect(dto.instrument.symbol).toBe('NVDA10Jul26P175.00');
+      expect(dto.instrument.type).toBe('OPTION');
+      expect(dto.externalSymbolId).toBe(9001);
+    });
   });
 
   describe('mapActivity', () => {

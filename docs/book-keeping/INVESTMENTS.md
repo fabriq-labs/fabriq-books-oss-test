@@ -30,11 +30,18 @@ Represents a tradable security. Instruments are **global** (no `org_id`) — two
 | `id` | `varchar(50)` | `inst_` prefix |
 | `symbol` | `text` | Exchange ticker, e.g. `AMZN`, `ENB.TO`, `CAD` |
 | `name` | `text` | Human-readable name |
-| `type` | `instrument_type` enum | See Holding Types section |
+| `type` | `instrument_type` enum | `STOCK`, `ETF`, `OPTION`, `CASH`, etc. |
 | `isin` | `text UNIQUE` | International Securities Identification Number (nullable) |
 | `details` | `jsonb` | Free-form metadata |
+| `current_price` | `numeric` | Last known quote in native trading currency (updated on broker sync for active holdings) |
+| `price_updated_at` | `timestamptz` | When `current_price` was last set |
+| `price_currency_id` | FK → `currency` | Trading currency of `current_price` |
+| `external_symbol_id` | `integer` | Broker symbol id (Questrade `symbolId`) for quote refresh |
+| `underlying_instrument_id` | FK → `instrument` | For `OPTION` rows — links to underlying stock instrument |
 
 **Upsert strategy** (broker sync): match by `isin` first (precise), then fall back to `symbol` (approximate). If neither matches, create a new row.
+
+Option contracts link to their underlying stock via `underlying_instrument_id`. Underlying instruments are created during sync from Questrade `GET /symbols/:id` (with regex fallback).
 
 **Key rule**: Do not add `org_id` to instrument — it is intentionally global. Access control is via the holding.
 
@@ -310,9 +317,12 @@ runBrokerSync(connectionId, orgId)
   │
   └─ for each account:
        ├─ getPositions()  → upsertInstrument() + upsertHolding()
+       │                    update instrument.current_price from position
        ├─ getBalances()   → syncCashBalances()  (adds CASH-type holdings)
        ├─ deactivateStaleHoldings()  (sets is_active=false for sold positions)
        └─ getActivities() → upsertTrade()
+  ├─ linkOptionUnderlyings()  (GET /symbols/:id for new options)
+  └─ refreshUnderlyingQuotes()  (batched GET /markets/quotes for underlyings not directly held)
 ```
 
 ### Adding a second broker
@@ -378,7 +388,9 @@ Identical same-day fills at the same price could theoretically collide — accep
 
 | API endpoint | What it returns | Used for |
 |---|---|---|
-| `GET v1/accounts/{id}/positions` | Open equity/ETF/option positions | Holdings (STOCK, ETF, etc.) |
+| `GET v1/accounts/{id}/positions` | Open equity/ETF/option positions | Holdings (STOCK, ETF, OPTION, etc.) |
+| `GET v1/symbols/:id` | Option contract metadata + underlying symbol/id | Link option → underlying instrument |
+| `GET v1/markets/quotes?ids=…` | Level-1 quotes for symbol ids | Underlying spot price when not directly held |
 | `GET v1/accounts/{id}/balances` | Cash per currency + market totals | CASH-type holdings |
 | `GET v1/accounts/{id}/activities` | Trade history | `trade` rows |
 | `GET v1/accounts` | Account list | `account` rows |

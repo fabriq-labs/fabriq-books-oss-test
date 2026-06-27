@@ -158,19 +158,22 @@ Generate a canonical trial balance report for a date range. This tool wraps the 
 
 ### `get_portfolio_summary`
 
-Return the current investment portfolio — same `run_report(auth, 'portfolio_summary', filters)` path as the in-app Portfolio page.
+Return the investment portfolio — same `run_report(auth, 'portfolio_summary', filters)` path as the in-app Portfolio page. Optionally syncs from Questrade first when `latest=true`.
 
 | Parameter | Type | Behaviour |
 |-----------|------|-----------|
+| `latest` | `boolean` (optional) | When `true`, runs broker sync before returning portfolio data. Defaults to **`false`** (cached holdings from last sync). |
 | `report_currency` | `string` (optional) | ISO code or currency id for FX conversion. Defaults to **CAD**. |
-| `connection_id` | `string` (optional) | Scope to one broker `source_system` when the org has multiple connections. |
+| `connection_id` | `string` (optional) | Scope to one broker `source_system` when the org has multiple connections. Also selects which connection to sync when `latest=true`. |
 
 **Returns** (as JSON string in `content[0].text`):
 ```json
 {
   "tool": "get_portfolio_summary",
   "success": true,
-  "filters": { "report_currency": "CAD", "connection_id": null },
+  "synced": false,
+  "sync": null,
+  "filters": { "latest": false, "report_currency": "CAD", "connection_id": null },
   "equityCount": 12,
   "optionsCount": 2,
   "cashCount": 3,
@@ -184,8 +187,35 @@ Return the current investment portfolio — same `run_report(auth, 'portfolio_su
   },
   "data": {
     "report_currency": "CAD",
-    "equity": [],
-    "options": [],
+    "equity": [
+      {
+        "symbol": "VFV.TO",
+        "current_price": 128.4,
+        "instrument": {
+          "id": "inst_…",
+          "symbol": "VFV.TO",
+          "type": "ETF",
+          "current_price": 128.4,
+          "native_currency_code": "CAD"
+        }
+      }
+    ],
+    "options": [
+      {
+        "symbol": "NVDA10Jul26P175.00",
+        "instrument": {
+          "type": "OPTION",
+          "current_price": 3.15,
+          "native_currency_code": "USD",
+          "underlying": {
+            "symbol": "NVDA",
+            "type": "STOCK",
+            "current_price": 142.5,
+            "native_currency_code": "USD"
+          }
+        }
+      }
+    ],
     "cash": [],
     "accounts": [],
     "total_market_value": 125000,
@@ -196,7 +226,11 @@ Return the current investment portfolio — same `run_report(auth, 'portfolio_su
 }
 ```
 
-`data.equity` is sorted by market value descending. Options are detected by option symbol pattern; cash rows have `instrument_type === 'CASH'`.
+`data.equity` is sorted by market value descending. Options use `instrument.type === 'OPTION'` (regex fallback for legacy rows). Cash rows have `instrument_type === 'CASH'`.
+
+Each holding row includes flat fields (`symbol`, `current_price`, …) for backward compatibility plus a nested `instrument` object with native-currency `current_price`. Option rows may include `instrument.underlying` with the underlying stock quote.
+
+When `latest=true`, `sync` contains the broker sync report (`status`, `accountsOk`, `holdingsUpserted`, etc.). `success` is `false` if sync status is `failed` or `reauth_required` (portfolio data is still returned from the last successful sync).
 
 **Scope**: Holdings are filtered to the authenticated user's `org_id`.
 
@@ -295,13 +329,22 @@ curl -s -X POST http://localhost:4000/api/mcp \
   -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_trial_balance","arguments":{"start_date":"2026-04-01","end_date":"2026-04-30","account_id":"acco_ent_f687b778_cfdf_4a7f_9883_c3a1217bb3e2_1101"}}}'
 ```
 
-**Call `get_portfolio_summary`:**
+**Call `get_portfolio_summary` (cached):**
 ```bash
 curl -s -X POST http://localhost:4000/api/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "X-API-Key: <key>" \
   -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_portfolio_summary","arguments":{}}}'
+```
+
+**Call `get_portfolio_summary` (sync then return):**
+```bash
+curl -s -X POST http://localhost:4000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "X-API-Key: <key>" \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_portfolio_summary","arguments":{"latest":true}}}'
 ```
 
 The response is an SSE-framed event even for simple queries:

@@ -5,11 +5,13 @@ import {
   BrokerBalanceDTO,
   BrokerConnector,
   BrokerPositionDTO,
+  BrokerQuoteDTO,
+  BrokerSymbolDTO,
   BrokerTradeDTO,
 } from '../types';
 import { BrokerOAuthConfig } from '../types';
 import { QuestradeAuth } from './questrade_auth';
-import { mapAccount, mapBalance, mapPosition, mapActivity } from './questrade_mappers';
+import { mapAccount, mapBalance, mapPosition, mapActivity, mapSymbol, mapQuote } from './questrade_mappers';
 
 const MAX_ACTIVITY_WINDOW_DAYS = 30;
 
@@ -108,6 +110,21 @@ export class QuestradeConnector implements BrokerConnector {
       }
     }
     return trades;
+  }
+
+  async getSymbol(symbolId: number): Promise<BrokerSymbolDTO | null> {
+    const data = await this.request<{ symbols: unknown[] }>(`v1/symbols/${symbolId}`);
+    const raw = data.symbols?.[0];
+    if (!raw || typeof raw !== 'object') return null;
+    return mapSymbol(raw as Parameters<typeof mapSymbol>[0]);
+  }
+
+  async getQuotes(symbolIds: number[]): Promise<BrokerQuoteDTO[]> {
+    if (symbolIds.length === 0) return [];
+    const data = await this.request<{ quotes: unknown[] }>('v1/markets/quotes', {
+      ids: symbolIds.join(','),
+    });
+    return (data.quotes ?? []).map((q) => mapQuote(q as Parameters<typeof mapQuote>[0]));
   }
 }
 

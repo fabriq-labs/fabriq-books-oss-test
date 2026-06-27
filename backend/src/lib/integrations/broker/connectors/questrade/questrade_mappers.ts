@@ -1,10 +1,13 @@
 import { createHash } from 'crypto';
+import { isOptionSymbol } from '../../option_symbol';
 import {
   BrokerAccountDTO,
   BrokerBalanceDTO,
   BrokerInstrumentDTO,
   BrokerPositionDTO,
   BrokerTradeDTO,
+  BrokerQuoteDTO,
+  BrokerSymbolDTO,
 } from '../types';
 
 interface QtAccount {
@@ -51,7 +54,8 @@ interface QtActivity {
   description?: string;
 }
 
-function mapInstrumentType(securityType?: string): BrokerInstrumentDTO['type'] {
+function mapInstrumentType(securityType: string | undefined, symbol: string): BrokerInstrumentDTO['type'] {
+  if (isOptionSymbol(symbol)) return 'OPTION';
   switch ((securityType || '').toLowerCase()) {
     case 'bond':
       return 'BOND';
@@ -61,6 +65,8 @@ function mapInstrumentType(securityType?: string): BrokerInstrumentDTO['type'] {
       return 'ETF';
     case 'currency':
       return 'FOREX';
+    case 'option':
+      return 'OPTION';
     default:
       return 'STOCK';
   }
@@ -100,8 +106,9 @@ export function mapPosition(position: QtPosition, currencyCode?: string): Broker
     instrument: {
       symbol: position.symbol,
       name: position.symbol,
-      type: mapInstrumentType(position.securityType),
+      type: mapInstrumentType(position.securityType, position.symbol),
       currencyCode: resolvedCurrency,
+      externalSymbolId: position.symbolId,
     },
     quantity,
     averageCost,
@@ -110,6 +117,7 @@ export function mapPosition(position: QtPosition, currencyCode?: string): Broker
     unrealizedPnl: position.openPnl,
     realizedPnl: position.closedPnl,
     currencyCode: resolvedCurrency,
+    externalSymbolId: position.symbolId,
   };
 }
 
@@ -179,3 +187,46 @@ export function mapActivity(accountExternalId: string, activity: QtActivity): Br
 }
 
 export { mapInstrumentType };
+
+interface QtSymbol {
+  symbol: string;
+  symbolId: number;
+  description?: string;
+  securityType?: string;
+  currency?: string;
+  optionContractDeliverables?: Array<{
+    underlyingSymbol?: string;
+    underlyingSymbolId?: number | string;
+  }>;
+}
+
+export function mapSymbol(raw: QtSymbol): BrokerSymbolDTO {
+  const deliverable = raw.optionContractDeliverables?.[0];
+  const underlyingSymbolId = deliverable?.underlyingSymbolId;
+  return {
+    symbolId: raw.symbolId,
+    symbol: raw.symbol,
+    name: raw.description ?? raw.symbol,
+    securityType: raw.securityType,
+    currencyCode: raw.currency,
+    underlyingSymbol: deliverable?.underlyingSymbol,
+    underlyingSymbolId:
+      underlyingSymbolId != null && underlyingSymbolId !== ''
+        ? Number(underlyingSymbolId)
+        : undefined,
+  };
+}
+
+interface QtQuote {
+  symbolId: number;
+  lastTradePrice?: number;
+  currency?: string;
+}
+
+export function mapQuote(raw: QtQuote): BrokerQuoteDTO {
+  return {
+    symbolId: raw.symbolId,
+    lastTradePrice: raw.lastTradePrice,
+    currencyCode: raw.currency,
+  };
+}
