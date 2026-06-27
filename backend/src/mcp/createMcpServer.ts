@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AuthContext } from '../auth/types';
 import { listAccountsHandler } from './tools/listAccounts';
 import { getTrialBalanceHandler, getTrialBalanceSchema } from './tools/getTrialBalance';
+import { getPortfolioSummaryHandler, getPortfolioSummarySchema } from './tools/getPortfolioSummary';
 
 /**
  * Creates a new McpServer with all tools registered for the given auth context.
@@ -50,6 +51,20 @@ export function createMcpServer(auth: AuthContext): McpServer {
       legal_entity_id?: string;
     }) => {
       const result = await getTrialBalanceHandler(auth)(params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
+    }
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (server as any).registerTool(
+    'get_portfolio_summary',
+    {
+      description:
+        'Current investment portfolio: equity holdings, options, cash balances, and per-account totals. Values are converted to report_currency (default CAD). Use for questions about portfolio value, position sizes, allocation, or specific symbols. Check last_sync_at for data freshness.',
+      inputSchema: getPortfolioSummarySchema,
+    },
+    async (params: { report_currency?: string; connection_id?: string }) => {
+      const result = await getPortfolioSummaryHandler(auth)(params);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     }
   );

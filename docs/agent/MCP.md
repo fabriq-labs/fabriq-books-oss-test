@@ -1,7 +1,7 @@
 # Fabriq MCP Server
 
 **Status**: Work in Progress
-**Last Updated**: 2026-04-15
+**Last Updated**: 2026-06-26
 **Primary files**: `backend/src/mcp/`
 
 ---
@@ -58,6 +58,7 @@ backend/src/mcp/
   tools/
     listAccounts.ts         list_accounts tool — DB query, pure function
     getTrialBalance.ts      get_trial_balance tool — canonical trial balance report
+    getPortfolioSummary.ts  get_portfolio_summary tool — investment holdings report
 ```
 
 **Mount point**: `src/index.ts` → `app.use('/api/mcp', mcpRouter)`
@@ -155,6 +156,50 @@ Generate a canonical trial balance report for a date range. This tool wraps the 
 }
 ```
 
+### `get_portfolio_summary`
+
+Return the current investment portfolio — same `run_report(auth, 'portfolio_summary', filters)` path as the in-app Portfolio page.
+
+| Parameter | Type | Behaviour |
+|-----------|------|-----------|
+| `report_currency` | `string` (optional) | ISO code or currency id for FX conversion. Defaults to **CAD**. |
+| `connection_id` | `string` (optional) | Scope to one broker `source_system` when the org has multiple connections. |
+
+**Returns** (as JSON string in `content[0].text`):
+```json
+{
+  "tool": "get_portfolio_summary",
+  "success": true,
+  "filters": { "report_currency": "CAD", "connection_id": null },
+  "equityCount": 12,
+  "optionsCount": 2,
+  "cashCount": 3,
+  "summary": {
+    "report_currency": "CAD",
+    "total_market_value": 125000,
+    "total_cash": 8500,
+    "total_equity": 133500,
+    "last_sync_at": "2026-06-25T18:30:00.000Z",
+    "accounts": []
+  },
+  "data": {
+    "report_currency": "CAD",
+    "equity": [],
+    "options": [],
+    "cash": [],
+    "accounts": [],
+    "total_market_value": 125000,
+    "total_cash": 8500,
+    "total_equity": 133500,
+    "last_sync_at": "2026-06-25T18:30:00.000Z"
+  }
+}
+```
+
+`data.equity` is sorted by market value descending. Options are detected by option symbol pattern; cash rows have `instrument_type === 'CASH'`.
+
+**Scope**: Holdings are filtered to the authenticated user's `org_id`.
+
 ---
 
 ## Adding a New Tool
@@ -248,6 +293,15 @@ curl -s -X POST http://localhost:4000/api/mcp \
   -H "Accept: application/json, text/event-stream" \
   -H "X-API-Key: <key>" \
   -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_trial_balance","arguments":{"start_date":"2026-04-01","end_date":"2026-04-30","account_id":"acco_ent_f687b778_cfdf_4a7f_9883_c3a1217bb3e2_1101"}}}'
+```
+
+**Call `get_portfolio_summary`:**
+```bash
+curl -s -X POST http://localhost:4000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "X-API-Key: <key>" \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_portfolio_summary","arguments":{}}}'
 ```
 
 The response is an SSE-framed event even for simple queries:
