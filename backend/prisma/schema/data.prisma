@@ -237,6 +237,25 @@ model holding {
   @@map("holding")
 }
 
+/// Cached Questrade option chain skeleton (expiries/strikes/symbol IDs). Refreshed lazily once per calendar day (America/Toronto).
+model option_chain_cache {
+  id                   String   @id @default(dbgenerated("'optcache_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id               String   @db.VarChar(50)
+  connection_id        String   @db.VarChar(50)
+  underlying_symbol    String   @db.VarChar(50)
+  underlying_symbol_id Int
+  chain_json           Json     @db.JsonB
+  expiry_count         Int      @default(0)
+  strike_count         Int      @default(0)
+  refreshed_at         DateTime @default(now()) @updatedAt
+
+  source_system source_system @relation("OptionChainCacheSourceSystem", fields: [connection_id], references: [id], onDelete: Cascade)
+
+  @@unique([connection_id, underlying_symbol_id])
+  @@index([org_id])
+  @@map("option_chain_cache")
+}
+
 enum instrument_type {
   STOCK
   BOND

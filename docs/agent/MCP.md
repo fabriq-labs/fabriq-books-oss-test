@@ -1,14 +1,14 @@
 # Fabriq MCP Server
 
-**Status**: Work in Progress
-**Last Updated**: 2026-06-26
+**Status**: Active (investment tools complete for read-only portfolio + option chain analysis)
+**Last Updated**: 2026-06-28
 **Primary files**: `backend/src/mcp/`
 
 ---
 
 ## What This Is
 
-Fabriq exposes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server so that AI clients (Cursor, Claude Desktop, custom agents) can call Fabriq tools directly — searching accounts, querying data, and eventually triggering actions — without going through the chat UI or the agent session system.
+Fabriq exposes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server so that AI clients (Cursor, Claude Desktop, custom agents) can call Fabriq tools directly — searching accounts, trial balance, investment portfolio, and Questrade option chains — without going through the chat UI or the agent session system.
 
 MCP sits alongside the existing agent system, not inside it. It is a separate HTTP endpoint that speaks the MCP JSON-RPC wire format.
 
@@ -59,9 +59,21 @@ backend/src/mcp/
     listAccounts.ts         list_accounts tool — DB query, pure function
     getTrialBalance.ts      get_trial_balance tool — canonical trial balance report
     getPortfolioSummary.ts  get_portfolio_summary tool — investment holdings report
+    getOptionChain.ts       get_option_chain orchestration (cache, trim, quotes)
+    getOptionChainTool.ts   MCP schema + handler wiring for get_option_chain
+    brokerConnection.ts     Shared Questrade connection resolver
+
+backend/src/lib/integrations/broker/
+  option_chain/
+    option_chain_cache_service.ts   Same-day skeleton cache (option_chain_cache table)
+    option_chain_trim.ts            Strike/expiry caps + truncation metadata
+  connectors/questrade/
+    questrade_option_mappers.ts     Maps Questrade optionChain JSON → DTOs
 ```
 
 **Mount point**: `src/index.ts` → `app.use('/api/mcp', mcpRouter)`
+
+**Database**: `option_chain_cache` — lazy same-day cache of chain skeletons (see [INVESTMENTS.md](../book-keeping/INVESTMENTS.md#option-chain-cache-and-mcp)).
 
 ---
 
@@ -234,6 +246,147 @@ When `latest=true`, `sync` contains the broker sync report (`status`, `accountsO
 
 **Scope**: Holdings are filtered to the authenticated user's `org_id`.
 
+### `get_option_chain`
+
+Return a **trimmed** Questrade option chain for an underlying symbol with **live** option quotes (bid/ask, Greeks, open interest). Chain skeleton is cached **once per calendar day** (`America/Toronto`) per `(connection_id, underlying_symbol_id)`; quotes are never cached.
+
+Use after `get_portfolio_summary` for covered-call screening.
+
+| Parameter | Type | Behaviour |
+|-----------|------|-----------|
+| `symbol` | `string` | **Required.** Underlying ticker, e.g. `VFV.TO`, `AAPL`. |
+| `option_type` | `"Call"` \| `"Put"` | Default **`Call`**. |
+| `expiry_date` | `string` (optional) | Pin to one expiry (`YYYY-MM-DD`). Overrides expiry paging. |
+| `min_strike` | `number` (optional) | Default **ATM** for calls (= underlying last price). |
+| `max_strike` | `number` (optional) | Default **+20% OTM** for calls. User values are clamped to ±50% from last price. |
+| `expiry_offset` | `integer` (optional) | Fabriq pagination: skip first N expiries. Default `0`. |
+| `expiry_limit` | `integer` (optional) | Max expiries returned. Default **`4`**, hard max **`8`**. |
+| `strike_offset` | `integer` (optional) | Skip first N strikes in band. Default `0`. |
+| `strike_limit` | `integer` (optional) | Max strikes per expiry. Default **`15`**, hard max **`25`**. |
+| `include_quotes` | `boolean` (optional) | Default **`true`**. Set `false` for structure-only (no quote POST). |
+| `connection_id` | `string` (optional) | Scope to one Questrade `source_system`. |
+
+**Questrade APIs used** (live HTTP via org's `source_system` OAuth — not mocked):
+
+| Step | Endpoint | Cached? |
+|------|----------|---------|
+| Symbol lookup | `GET /v1/symbols?names=` | No |
+| Underlying price | `GET /v1/markets/quotes?ids=` | No |
+| Chain skeleton | `GET /v1/symbols/:id/options` | Yes — same calendar day (`America/Toronto`) in `option_chain_cache` |
+| Option quotes | `POST /v1/markets/quotes/options` `{ optionIds: [...] }` | No — always live; batched 50 IDs per request |
+
+**Questrade response shape**: the live API returns `optionChain` (not `options`). Fabriq maps both keys. Each root uses `optionRoot` (e.g. `"VFV"`).
+
+**Default caps** (always applied; broad user filters are clamped):
+
+| Dimension | Default | Hard max |
+|-----------|---------|----------|
+| Option type | `Call` | — |
+| Strike band (calls) | ATM → +20% OTM | ±50% from last price |
+| Expiries | Next 4 | 8 |
+| Strikes per expiry | 15 | 25 |
+| Quoted contracts | — | 100 total |
+
+Use `expiry_offset` / `strike_offset` for Fabriq-level pagination (Questrade has no chain pagination).
+
+**Returns** (as JSON string in `content[0].text`):
+```json
+{
+  "tool": "get_option_chain",
+  "success": true,
+  "underlying": {
+    "symbol": "VFV.TO",
+    "symbolId": 1001,
+    "lastPrice": 128.4,
+    "currency": "CAD"
+  },
+  "cache": {
+    "hit": true,
+    "refreshedAt": "2026-06-28T08:15:00.000Z",
+    "source": "db"
+  },
+  "filters": {
+    "optionType": "Call",
+    "minStrike": 128.4,
+    "maxStrike": 154.08,
+    "expiryOffset": 0,
+    "expiryLimit": 4,
+    "strikeOffset": 0,
+    "strikeLimit": 15,
+    "includeQuotes": true
+  },
+  "truncation": {
+    "applied": true,
+    "reasons": ["expiries_limited_to_4", "strikes_limited_to_15_per_expiry"],
+    "chainStats": {
+      "totalExpiriesAvailable": 12,
+      "totalStrikesInBand": 48,
+      "expiriesReturned": 4,
+      "strikesReturned": 52,
+      "quotesReturned": 52
+    },
+    "moreAvailable": true,
+    "pagination": {
+      "nextExpiryOffset": 4,
+      "hint": "Call again with expiry_offset or expiry_date for the next slice"
+    }
+  },
+  "chain": []
+}
+```
+
+**Errors:**
+
+| Code | Meaning |
+|------|---------|
+| `NO_BROKER_CONNECTION` | No active Questrade `source_system` for the org |
+| `SYMBOL_NOT_FOUND` | Ticker not resolved via Questrade symbol search |
+| `UNDERLYING_PRICE_UNAVAILABLE` | No quote for underlying (cannot compute default strike band) |
+| `NO_OPTIONS` | Questrade returned an empty chain (symbol has no listed options, e.g. some ETFs) |
+| `REAUTH_REQUIRED` | Refresh token invalid — reconnect in Settings → Connections |
+
+**Scope:** Broker connection and cache rows are scoped to the authenticated user's `org_id`.
+
+**Smoke test** (uses `backend/.env`, real Questrade):
+
+```bash
+cd backend && npx ts-node --transpile-only scripts/test-option-chain-live.ts VFV.TO
+```
+
+Requires the `option_chain_cache` table (see INVESTMENTS.md).
+
+---
+
+## Covered-call workflow (recommended agent flow)
+
+Typical analysis combines portfolio holdings with option chain data:
+
+```
+1. get_portfolio_summary({ latest: true, report_currency: "CAD" })
+     → data.equity     round lots (quantity >= 100)
+     → data.options    existing option positions (check instrument.underlying)
+
+2. For each eligible equity symbol with NO conflicting short call:
+     get_option_chain({ symbol: "VFV.TO" })   // defaults: Call, ATM→+20% OTM
+
+3. Rank strikes by premium yield, delta ~0.20–0.35, DTE ~30–45, open interest
+```
+
+Symbols with listed options on Questrade include many TSX names (e.g. `VFV.TO`, `RY.TO`) and US equities (e.g. `AAPL`). Some holdings (e.g. `XEQT.TO`) may return `NO_OPTIONS`.
+
+### MCP prompt: `covered_call_candidates`
+
+Built-in orchestration prompt (not a tool). In Cursor, list prompts via MCP or invoke by name. It instructs the client to:
+
+1. Call `get_portfolio_summary` with `latest=true`
+2. Filter equity holdings to round lots without existing short calls
+3. Call `get_option_chain` per eligible symbol
+4. Rank by premium yield, DTE (~30–45), delta (risk-dependent), and open interest
+
+Optional args: `report_currency`, `connection_id`, `risk_level` (`conservative` | `moderate` | `aggressive`).
+
+For finer control (e.g. skip symbols that already have covered calls), use explicit tool calls instead of the prompt alone.
+
 ---
 
 ## Adding a New Tool
@@ -347,6 +500,24 @@ curl -s -X POST http://localhost:4000/api/mcp \
   -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_portfolio_summary","arguments":{"latest":true}}}'
 ```
 
+**Call `get_option_chain` (default covered-call band):**
+```bash
+curl -s -X POST http://localhost:4000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "X-API-Key: <key>" \
+  -d '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_option_chain","arguments":{"symbol":"VFV.TO"}}}'
+```
+
+**Call `get_option_chain` (structure only, no live quotes):**
+```bash
+curl -s -X POST http://localhost:4000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "X-API-Key: <key>" \
+  -d '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_option_chain","arguments":{"symbol":"VFV.TO","include_quotes":false}}}'
+```
+
 The response is an SSE-framed event even for simple queries:
 ```
 event: message
@@ -360,6 +531,7 @@ data: {"result":{"content":[{"type":"text","text":"{...}"}]},"jsonrpc":"2.0","id
 | Feature | Notes |
 |---------|-------|
 | `import_bank_statement` tool | Deferred — requires document storage design (file-as-base64 in JSON is not a good pattern for large files) |
+| Order placement | MCP is read-only; no trade execution via Questrade |
 | More account tools | `get_account`, `list_transactions`, etc. — straightforward to add |
 | Write tools | `create_posting`, `update_record` — need careful permission scoping |
 | Stateful SSE streaming | For long-running tools (e.g. batch imports) that need progress events |

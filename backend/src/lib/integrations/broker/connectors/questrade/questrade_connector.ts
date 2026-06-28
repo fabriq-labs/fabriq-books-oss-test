@@ -4,6 +4,9 @@ import {
   BrokerAccountDTO,
   BrokerBalanceDTO,
   BrokerConnector,
+  BrokerOptionChainDTO,
+  BrokerOptionQuoteDTO,
+  BrokerOptionQuoteRequest,
   BrokerPositionDTO,
   BrokerQuoteDTO,
   BrokerSymbolDTO,
@@ -12,8 +15,11 @@ import {
 import { BrokerOAuthConfig } from '../types';
 import { QuestradeAuth } from './questrade_auth';
 import { mapAccount, mapBalance, mapPosition, mapActivity, mapSymbol, mapQuote } from './questrade_mappers';
+import { mapOptionChain, mapOptionQuote } from './questrade_option_mappers';
 
 const MAX_ACTIVITY_WINDOW_DAYS = 30;
+const RATE_LIMIT_LOW_THRESHOLD = 5;
+const RATE_LIMIT_BACKOFF_MS = 1000;
 
 export class QuestradeConnector implements BrokerConnector {
   private readonly auth: QuestradeAuth;
@@ -33,34 +39,81 @@ export class QuestradeConnector implements BrokerConnector {
   }
 
   private async request<T>(path: string, params?: Record<string, string>): Promise<T> {
+    const { data } = await this.requestWithHeaders<T>('GET', path, undefined, params);
+    return data;
+  }
+
+  private parseRateLimitRemaining(headers: unknown): number | null {
+    if (!headers || typeof headers !== 'object') return null;
+    const h = headers as Record<string, unknown>;
+    const raw = h['x-ratelimit-remaining'] ?? h['X-RateLimit-Remaining'];
+    if (raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  private async maybeBackoffForRateLimit(headers: unknown): Promise<void> {
+    const remaining = this.parseRateLimitRemaining(headers);
+    if (remaining != null && remaining <= RATE_LIMIT_LOW_THRESHOLD) {
+      logger.warn(`Questrade rate limit low (${remaining}); backing off ${RATE_LIMIT_BACKOFF_MS}ms`);
+      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_BACKOFF_MS));
+    }
+  }
+
+  private async requestWithHeaders<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+    params?: Record<string, string>
+  ): Promise<{ data: T; headers: unknown }> {
     if (!this.http) {
       await this.ensureAuth();
     }
     const session = await this.auth.ensureAuth();
-    try {
-      const response = await this.http!.get<T>(path, {
-        params,
-        headers: { Authorization: `Bearer ${session.accessToken}` },
+    const execute = async () => {
+      if (method === 'GET') {
+        return this.http!.get<T>(path, {
+          params,
+          headers: { Authorization: `Bearer ${session.accessToken}` },
+          baseURL: session.apiServer,
+        });
+      }
+      return this.http!.post<T>(path, body ?? {}, {
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+          'Content-Type': 'application/json',
+        },
         baseURL: session.apiServer,
       });
-      return response.data;
+    };
+
+    try {
+      const response = await execute();
+      await this.maybeBackoffForRateLimit(response.headers);
+      return { data: response.data, headers: response.headers };
     } catch (error) {
       const axiosError = error as AxiosError;
       if (axiosError.response?.status === 401) {
-        // Access token expired mid-sync: refresh once and retry.
         const retry = await this.auth.forceRefresh();
         this.http = axios.create({ baseURL: retry.apiServer, timeout: 30000 });
-        const response = await this.http.get<T>(path, {
+        const response = await this.http.request<T>({
+          method,
+          url: path,
           params,
-          headers: { Authorization: `Bearer ${retry.accessToken}` },
+          data: body,
+          headers: {
+            Authorization: `Bearer ${retry.accessToken}`,
+            ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
+          },
         });
-        return response.data;
+        await this.maybeBackoffForRateLimit(response.headers);
+        return { data: response.data, headers: response.headers };
       }
       const status = axiosError.response?.status;
-      const body = axiosError.response?.data;
-      logger.error(`Questrade API request failed: ${path}`, { status, body });
+      const responseBody = axiosError.response?.data;
+      logger.error(`Questrade API request failed: ${method} ${path}`, { status, body: responseBody });
       throw new Error(
-        `Questrade API ${path} failed with status ${status}: ${JSON.stringify(body ?? {})}`
+        `Questrade API ${method} ${path} failed with status ${status}: ${JSON.stringify(responseBody ?? {})}`
       );
     }
   }
@@ -143,6 +196,20 @@ export class QuestradeConnector implements BrokerConnector {
       ) ?? rows[0];
     if (!exact || typeof exact !== 'object') return null;
     return mapSymbol(exact as Parameters<typeof mapSymbol>[0]);
+  }
+
+  async getOptionChain(underlyingSymbolId: number, underlyingSymbol?: string): Promise<BrokerOptionChainDTO> {
+    const data = await this.request<{ options?: unknown[] }>(`v1/symbols/${underlyingSymbolId}/options`);
+    return mapOptionChain(underlyingSymbolId, data as Parameters<typeof mapOptionChain>[1], underlyingSymbol);
+  }
+
+  async getOptionQuotes(request: BrokerOptionQuoteRequest): Promise<BrokerOptionQuoteDTO[]> {
+    const { data } = await this.requestWithHeaders<{ optionQuotes?: unknown[] }>(
+      'POST',
+      'v1/markets/quotes/options',
+      request
+    );
+    return (data.optionQuotes ?? []).map((q) => mapOptionQuote(q as Parameters<typeof mapOptionQuote>[0]));
   }
 }
 

@@ -11,6 +11,7 @@ import { QuickBooksAPIClient } from '../quickbooks/quickbooks_api_client';
 import { ConnectionConfig } from './erp-connection-loader';
 import logger from '../../../utils/logger';
 import { persistBrokerOAuth } from '../broker/shared/broker-connection-loader';
+import { buildQuestradeAccessTokenCache } from '../broker/connectors/questrade/questrade_auth';
 
 export interface TestConnectionResult {
   success: boolean;
@@ -304,12 +305,13 @@ async function testQuestradeConnection(
       access_token: string;
       refresh_token: string;
       api_server: string;
+      expires_in: number;
     }>(tokenEndpoint, {
       params: { grant_type: 'refresh_token', refresh_token: refreshToken },
       timeout: 15000,
     });
 
-    const { access_token, refresh_token: newRefreshToken, api_server } = tokenResp.data;
+    const { access_token, refresh_token: newRefreshToken, api_server, expires_in } = tokenResp.data;
     if (!access_token || !api_server) {
       return { success: false, message: 'Questrade returned an incomplete token response' };
     }
@@ -330,6 +332,7 @@ async function testQuestradeConnection(
         refresh_token: newRefreshToken,
         api_server: apiBase,
         token_endpoint: tokenEndpoint,
+        ...buildQuestradeAccessTokenCache(access_token, apiBase, expires_in ?? 1800),
       });
       return {
         success: true,
