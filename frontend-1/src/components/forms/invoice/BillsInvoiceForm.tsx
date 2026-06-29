@@ -28,6 +28,16 @@ function DetailRow({ label, value }: { label: string; value?: string | number | 
     );
 }
 
+const formatPaymentTerms = (paymentTerms: unknown): string | undefined => {
+    if (!paymentTerms) return undefined;
+    if (typeof paymentTerms === 'string') return paymentTerms;
+    if (typeof paymentTerms === 'object' && paymentTerms !== null && 'payment_terms' in paymentTerms) {
+        const label = (paymentTerms as { payment_terms?: string }).payment_terms;
+        return label || undefined;
+    }
+    return undefined;
+};
+
 const BillsInvoiceForm: React.FC<BillsInvoiceFormProps> = ({
     onComplete,
     requisitionId,
@@ -383,7 +393,7 @@ const BillsInvoiceForm: React.FC<BillsInvoiceFormProps> = ({
                                         )}
                                     </div>
                                 )}
-                                {(details?.shipping_terms || details?.payment_terms) && (
+                                {(details?.shipping_terms || formatPaymentTerms(details?.payment_terms)) && (
                                     <div className="pt-2 space-y-1">
                                         {details?.shipping_terms && (
                                             <>
@@ -391,10 +401,10 @@ const BillsInvoiceForm: React.FC<BillsInvoiceFormProps> = ({
                                                 <p className="text-sm font-medium text-foreground">{details.shipping_terms}</p>
                                             </>
                                         )}
-                                        {details?.payment_terms && (
+                                        {formatPaymentTerms(details?.payment_terms) && (
                                             <>
                                                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">Payment terms</p>
-                                                <p className="text-sm font-medium text-foreground">{details.payment_terms}</p>
+                                                <p className="text-sm font-medium text-foreground">{formatPaymentTerms(details?.payment_terms)}</p>
                                             </>
                                         )}
                                     </div>

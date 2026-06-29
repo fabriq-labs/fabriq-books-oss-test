@@ -71,32 +71,6 @@
             "code": "read"
           }
         }
-      },
-      "payment_terms_id": {
-        "datatype": "string",
-        "permission": "update",
-        "tableProps": {
-          "columnType": "select",
-          "selectProps": {
-            "type": "invoice",
-            "limit": "10",
-            "instanceKey": "id",
-            "instanceType": "payment_terms",
-            "searchParams": "payment_terms",
-            "instanceLabel": "payment_terms",
-            "instanceSourceKey": "payment_terms_id"
-          },
-          "defaultValue": ""
-        },
-        "displayName": "Payment Terms",
-        "isColumnShow": false
-      },
-      "currency": {
-        "type": "table",
-        "select": {
-          "id": "read",
-          "code": "update"
-        }
       }
     },
     "misc_cost": {
@@ -394,6 +368,25 @@
         "payment_terms": "read"
       },
       "permission": "update",
+      "displayName": "Payment Terms",
+      "isColumnShow": false
+    },
+    "payment_terms_id": {
+      "dataType": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "payment_terms",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "payment_terms",
+          "searchParams": "payment_terms",
+          "instanceLabel": "payment_terms",
+          "instanceSourceKey": "payment_terms_id"
+        },
+        "defaultValue": ""
+      },
       "displayName": "Payment Terms",
       "isColumnShow": false
     },

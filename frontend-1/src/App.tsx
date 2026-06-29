@@ -82,6 +82,8 @@ import Dashboard from "./pages/Dashboard";
 import RequesterDashboard from "./pages/RequestDashboard";
 import ProcurementApproverDashboard from "./pages/ProcurementDashboardApproval";
 import InvoiceForm from "./components/InvoiceForm";
+import InvoiceList from "./pages/InvoiceList";
+import SalesInvoiceDuplicatePage from "./pages/Invoice/SalesInvoiceDuplicatePage";
 import { InvoiceUpload } from "./pages/Invoice/InvoiceUpload";
 import BalanceSheet from "./pages/reports/BalanceSheet";
 import IncomeStatement from "./pages/reports/IncomeStatement";
@@ -181,11 +183,12 @@ const AppRoutes: React.FC = () => {
                 <Route path="sales_order/:id/view/:viewId" element={<SalesOrderForm />} />
                 <Route path="sales_order/view/:viewId" element={<SalesOrderForm />} />
 
-                <Route path="sales/invoices" element={<Master type="invoice" view="invoice_view" displayName="Invoices" supportPath="sales" />} />
+                <Route path="sales/invoices" element={<InvoiceList />} />
                 <Route path="sales/invoices/upload" element={<InvoiceUpload />} />
-                <Route path="sales/invoices/state/:stateId" element={<Invoice />} />
+                <Route path="sales/invoices/state/:stateId" element={<InvoiceList />} />
                 <Route path="sales/invoices/:id/state/:stateId" element={<InvoiceDetailsPage />} />
                 <Route path="sales/invoice/:id/view/:viewId" element={<InvoiceForm />} />
+                <Route path="sales/invoice/view/:viewId" element={<SalesInvoiceDuplicatePage />} />
                 <Route path="invoice/view/:viewId" element={<InvoiceForm />} />
 
                 <Route path="sales/delivery-challans" element={<Master type="delivery_challan" view="delivery_challan_view" displayName="Delivery Challans" />} />

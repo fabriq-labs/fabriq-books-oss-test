@@ -8,11 +8,12 @@ import { ActionButtons } from '@/components/ui/action-buttons'
 interface InvoiceTableProps {
     data: any[];
     handleAction: (id: string, status: any) => void;
+    onDuplicate?: (id: string) => void;
     sortOption?: { field?: string; direction?: 'asc' | 'desc' };
     setSortOption?: (sort: { field?: string; direction?: 'asc' | 'desc' }) => void;
 }
 
-function InvoiceTable({ data, handleAction, sortOption = {}, setSortOption }: InvoiceTableProps) {
+function InvoiceTable({ data, handleAction, onDuplicate, sortOption = {}, setSortOption }: InvoiceTableProps) {
     const handleSort = (field: string) => {
         if (!setSortOption) return;
         
@@ -99,6 +100,11 @@ function InvoiceTable({ data, handleAction, sortOption = {}, setSortOption }: In
                                 <ActionButtons
                                     id={item.id}
                                     onView={(id) => handleAction(item?.invoices[0]?.id, item.current_state)}
+                                    onDuplicate={
+                                        onDuplicate
+                                            ? () => onDuplicate(item?.invoices[0]?.id)
+                                            : undefined
+                                    }
                                 />
                             </TableCell>
                         </TableRow>
