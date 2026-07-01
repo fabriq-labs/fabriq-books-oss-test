@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/formatters';
 import { aggregateTrialBalanceSectionRows } from '@/lib/aggregateTrialBalanceSectionRows';
+import { resolveToolLegalEntityLabel } from '@/utils/toolEntityLabel';
 
 export type FinancialReportRow = Record<string, unknown>;
 
@@ -21,6 +22,7 @@ export type FinancialReportFilters = {
   account_id?: string;
   currency_id?: string;
   legal_entity_ids?: string[];
+  legal_entity_names?: string[];
 };
 
 interface FinancialReportDisplayProps {
@@ -73,6 +75,11 @@ export const FinancialReportDisplay: React.FC<FinancialReportDisplayProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  const entityLabel = useMemo(
+    () => resolveToolLegalEntityLabel({ filters }),
+    [filters]
+  );
+
   const columns = useMemo(() => {
     if (reportId === 'monthly_trial_balance') {
       return [
@@ -120,6 +127,7 @@ export const FinancialReportDisplay: React.FC<FinancialReportDisplayProps> = ({
     return (
       <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
         <p className="font-medium">No trial balance rows for this period.</p>
+        {entityLabel && <p className="mt-1 text-amber-800">Entity: {entityLabel}</p>}
         {periodLabel && <p className="mt-1 text-amber-800">Period: {periodLabel}</p>}
         <p className="mt-2 text-xs text-amber-700">
           Try a different date range or check that postings exist for the selected legal entity.
@@ -135,6 +143,9 @@ export const FinancialReportDisplay: React.FC<FinancialReportDisplayProps> = ({
           <p className="text-sm font-semibold text-slate-800">
             {REPORT_TITLES[reportId] ?? 'Financial Report'}
           </p>
+          {entityLabel && (
+            <p className="text-xs text-slate-600 mt-0.5">Entity: {entityLabel}</p>
+          )}
           {description && <p className="text-xs text-slate-600 mt-0.5">{description}</p>}
           {periodLabel && <p className="text-xs text-slate-500 mt-0.5">{periodLabel}</p>}
         </div>

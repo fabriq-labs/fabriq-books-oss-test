@@ -62,10 +62,10 @@ export const ChatShell: React.FC<ChatShellProps> = ({
   const handleDeleteThread = useCallback(
     async (chatId: string) => {
       const isViewingDeletedThread = !isDraft && chatId === activeChatId;
-      await deleteThread(chatId);
       if (isViewingDeletedThread) {
         startNewChat();
       }
+      await deleteThread(chatId);
     },
     [activeChatId, deleteThread, isDraft, startNewChat]
   );

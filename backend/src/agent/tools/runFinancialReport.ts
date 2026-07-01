@@ -13,7 +13,11 @@ import {
 } from '../../lib/financialYear';
 import prisma from '../../lib/prisma';
 import logger from '../../utils/logger';
-import { resolvePostingHeaderLegalEntityId } from '../postingCreateHelpers';
+import {
+  resolveLegalEntityReportingCurrency,
+  resolvePostingHeaderLegalEntityId,
+  resolveLegalEntityNames,
+} from '../postingCreateHelpers';
 
 function isAccountId(value: string | undefined): boolean {
   return Boolean(value && String(value).trim().startsWith('acco_'));
@@ -88,14 +92,16 @@ function enrichFinancialReportResult(
   reportId: string,
   rows: ReportRow[],
   description: string,
-  filters: Record<string, unknown>
+  filters: Record<string, unknown>,
+  explicitCurrencyCode?: string
 ) {
   const displayRows =
     reportId === 'trial_balance' ? filterTrialBalanceRowsForDisplay(rows) : rows;
 
   const currencyCode =
-    (displayRows[0]?.report_currency as string | undefined) ??
-    (displayRows[0]?.account_currency as string | undefined) ??
+    explicitCurrencyCode?.trim().toUpperCase() ||
+    (displayRows[0]?.report_currency as string | undefined) ||
+    (displayRows[0]?.account_currency as string | undefined) ||
     'INR';
 
   const columnMap: Record<string, { field: string; label: string }[]> = {
@@ -221,6 +227,14 @@ ${contextHints.join(' ')}`,
       const legalEntityId =
         resolvedLegalEntityIds?.[0] ?? headerLegalEntityId ?? defaultLegalEntityId ?? undefined;
 
+      let resolvedCurrencyId = currency_id?.trim() || undefined;
+      let resolvedCurrencyCode: string | undefined;
+      if (!resolvedCurrencyId && legalEntityId) {
+        const entityCurrency = await resolveLegalEntityReportingCurrency(orgId, legalEntityId);
+        resolvedCurrencyId = entityCurrency.currencyId;
+        resolvedCurrencyCode = entityCurrency.currencyCode;
+      }
+
       let resolvedFromDate = from_date;
       let resolvedToDate = to_date;
       let periodSource = 'explicit';
@@ -264,26 +278,41 @@ ${contextHints.join(' ')}`,
           from_date: resolvedFromDate,
           to_date: resolvedToDate,
           account_id: resolvedAccountId,
-          currency_id,
+          currency_id: resolvedCurrencyId,
           legal_entity_ids: resolvedLegalEntityIds,
         };
 
         const data = await run_report(auth, report_id, filters);
         const rows: ReportRow[] = Array.isArray(data) ? (data as ReportRow[]) : [];
 
+        const legalEntityNames = await resolveLegalEntityNames(
+          orgId,
+          resolvedLegalEntityIds
+        );
+
         const resolvedFilters = {
           from_date: resolvedFromDate,
           to_date: resolvedToDate,
           account_id: resolvedAccountId,
-          currency_id,
+          currency_id: resolvedCurrencyId,
           legal_entity_ids: resolvedLegalEntityIds,
+          ...(legalEntityNames.length ? { legal_entity_names: legalEntityNames } : {}),
         };
+
+        const enriched = enrichFinancialReportResult(
+          report_id,
+          rows,
+          description,
+          resolvedFilters,
+          resolvedCurrencyCode
+        );
 
         return {
           tool: 'runFinancialReport',
           success: true,
           periodSource,
-          ...enrichFinancialReportResult(report_id, rows, description, resolvedFilters),
+          ...enriched,
+          ...(legalEntityNames.length ? { legal_entity_names: legalEntityNames } : {}),
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';

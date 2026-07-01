@@ -19,6 +19,16 @@ interface BillsInvoiceFormProps {
     onBack?: () => void;
 }
 
+function paymentTermsDisplay(value: unknown): string | undefined {
+    if (value == null) return undefined;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object' && value !== null && 'payment_terms' in value) {
+        const label = (value as { payment_terms?: string }).payment_terms;
+        return label || undefined;
+    }
+    return undefined;
+}
+
 function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
     return (
         <div className="flex flex-col gap-0.5 py-1">
@@ -125,7 +135,7 @@ const BillsInvoiceForm: React.FC<BillsInvoiceFormProps> = ({
                     : {}),
             };
             try {
-                const res = await viewAPI.update('invoice', requisitionId, 'invoice_view', updatedDetails);
+                const res: any = await viewAPI.update('invoice', requisitionId, 'invoice_view', updatedDetails);
                 console.log(res);
                 setDetails(res?.data ?? details);
             } catch (err: any) {

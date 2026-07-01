@@ -39,15 +39,17 @@ import {
     type MessagePart
 } from './chatUtils';
 import { useUserData } from '@/hooks/useUserData';
+import { useCurrencies } from '@/hooks/useCurrencies';
 import { useEntity } from '@/contexts/EntityContext';
 import {
     buildDefaultPostingChatContext,
     enrichFinanceChatContext,
+    resolveChatReportingEntity,
+    resolveEntityCurrencyCode,
 } from '@/utils/postingChatContext';
 import Cookies from 'js-cookie';
 import { v4 as uuidv4 } from 'uuid';
 import {
-    createChatThread,
     loadChatThread,
     saveChatThread,
 } from '@/lib/chatThreadApi';
@@ -91,11 +93,12 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     const prevChatSessionId = useRef<number | null>(null);
     const { getBaseCurrencyCode, getUserInitials, user } = useUserData();
     const { currentEntityId, currentEntity, entities } = useEntity();
+    const { currencyById } = useCurrencies();
 
     const chatContext = useMemo(() => {
-        const base = pageContext ?? buildDefaultPostingChatContext(currentEntity, entities);
-        return enrichFinanceChatContext(base, currentEntity, entities);
-    }, [pageContext, currentEntity, entities, currentEntityId, currentEntity?.legal_name]);
+        const base = pageContext ?? buildDefaultPostingChatContext(currentEntity, entities, currencyById);
+        return enrichFinanceChatContext(base, currentEntity, entities, currencyById);
+    }, [pageContext, currentEntity, entities, currencyById, currentEntityId, currentEntity?.legal_name]);
     const chatContextRef = useRef(chatContext);
     useEffect(() => {
         chatContextRef.current = chatContext;
@@ -108,8 +111,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     );
 
     const chatCurrencyCode = useMemo(
-        () => getChatCurrencyCode(pageContext, getBaseCurrencyCode()),
-        [pageContext, getBaseCurrencyCode]
+        () =>
+            getChatCurrencyCode(
+                chatContext,
+                resolveEntityCurrencyCode(
+                    resolveChatReportingEntity(currentEntity, entities),
+                    currencyById
+                ) ?? getBaseCurrencyCode()
+            ),
+        [chatContext, currentEntity, entities, currencyById, getBaseCurrencyCode]
     );
 
     const {
@@ -205,10 +215,12 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                 }
             });
 
-            // Persist full session (user + assistant + tool invocations) after each turn
-            queueMicrotask(() => {
-                void persistThreadRef.current(messagesRef.current);
-            });
+            // Persist after this turn — ref can lag one frame behind useChat state
+            const snapshot = messagesRef.current;
+            const threadMessages = snapshot.some((m) => m.id === message.id)
+                ? snapshot
+                : [...snapshot, message];
+            void persistThreadRef.current(threadMessages);
         },
         onError: (error) => {
             // Stream errors arrive as useChat error state; message comes from backend getErrorMessage
@@ -240,10 +252,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         },
         [buildThreadMetadata, effectiveChatId, onThreadSaved]
     );
-
-    const ensureThreadExists = useCallback(async () => {
-        await createChatThread(effectiveChatId, buildThreadMetadata());
-    }, [buildThreadMetadata, effectiveChatId]);
 
     useEffect(() => {
         persistThreadRef.current = persistThread;
@@ -439,10 +447,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({
                         <ToolResponseRenderer
                             toolInvocations={messageTools}
                             sidebarMode={sidebarMode}
+                            defaultCurrencyCode={chatCurrencyCode}
                             onSendMessage={async (text) => {
                                 if (isLoading) return;
                                 try {
-                                    await ensureThreadExists();
                                     await append(
                                         { role: 'user', content: text },
                                         { allowEmptySubmit: true }
@@ -563,8 +571,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         clearSelectedFiles();
 
         try {
-            await ensureThreadExists();
-
             const parts: MessagePart[] = [];
 
             if (trimmedInput) {
@@ -602,8 +608,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({
         clearSelectedFiles();
 
         try {
-            await ensureThreadExists();
-
             const parts: MessagePart[] = [];
             parts.push({ type: 'text', text: suggestion });
 

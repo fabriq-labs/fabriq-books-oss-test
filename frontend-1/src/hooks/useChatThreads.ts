@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  createChatThread,
   deleteChatThread,
   listChatThreads,
   type ChatThreadSummary,
@@ -39,15 +38,6 @@ export function useChatThreads(enabled = true) {
     void refresh();
   }, [enabled, refresh]);
 
-  const createThread = useCallback(
-    async (chatId: string, metadata?: Record<string, unknown>) => {
-      const createdId = await createChatThread(chatId, metadata);
-      await refresh();
-      return createdId;
-    },
-    [refresh]
-  );
-
   const deleteThread = useCallback(
     async (chatId: string) => {
       await deleteChatThread(chatId);
@@ -56,5 +46,5 @@ export function useChatThreads(enabled = true) {
     []
   );
 
-  return { threads, loading, error, refresh, createThread, deleteThread };
+  return { threads, loading, error, refresh, deleteThread };
 }

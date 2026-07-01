@@ -10,10 +10,11 @@ import {
   cleanupTestData,
 } from './purchase-requisition-test-fixtures';
 import { loadTestConfig, createTestContext, validateTestData, TestConfig } from '../test-configs/test-config-loader';
+import type { WorkflowAction } from '../../workflow-engine/types/workflow.types';
 
 describe('Purchase Requisition Workflow Tests', () => {
-  // Increase timeout for database operations
-  jest.setTimeout(30000); // 30 seconds
+  // Buyer approval → Delivery runs generate_po_from_pr; full suite needs headroom after prior tests
+  jest.setTimeout(60000);
 
   console.log('\n🚀 Starting Purchase Requisition Workflow Tests');
   const modelService = ModelService.getInstance();
@@ -793,7 +794,7 @@ describe('Purchase Requisition Workflow Tests', () => {
       const sendBackActions = wfContext2.availableActions.filter(a => a.name === 'Send Back');
       expect(sendBackActions.length).toBeGreaterThan(0);
       // Get target state for each Send Back action to find the one going to Draft
-      let sendBackAction = null;
+      let sendBackAction: WorkflowAction | null = null;
       for (const action of sendBackActions) {
         const targetState = await prisma.workflow_state.findUnique({
           where: { id: action.target_state_id },
@@ -851,7 +852,7 @@ describe('Purchase Requisition Workflow Tests', () => {
       // Find Send Back action that goes to Manager Review
       const sendBackActions = wfContext3.availableActions.filter(a => a.name === 'Send Back');
       expect(sendBackActions.length).toBeGreaterThan(0);
-      let sendBackAction = null;
+      let sendBackAction: WorkflowAction | null = null;
       for (const action of sendBackActions) {
         const targetState = await prisma.workflow_state.findUnique({
           where: { id: action.target_state_id },
@@ -909,7 +910,7 @@ describe('Purchase Requisition Workflow Tests', () => {
       // Find Send Back action that goes to Draft
       const sendBackActions = wfContext3.availableActions.filter(a => a.name === 'Send Back');
       expect(sendBackActions.length).toBeGreaterThan(0);
-      let sendBackAction = null;
+      let sendBackAction: WorkflowAction | null = null;
       for (const action of sendBackActions) {
         const targetState = await prisma.workflow_state.findUnique({
           where: { id: action.target_state_id },

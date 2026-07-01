@@ -18,19 +18,24 @@ const rest = process.argv.slice(2).filter((a) => a && !a.startsWith('--'));
 const ORG_ID_ARG = rest.find((a) => !a.includes('/') && !a.endsWith('.ts')) ?? rest[0];
 const CONFIRM = process.argv.includes('--confirm');
 
-/** Tables with org_id, in FK-safe deletion order (children before parents). */
+/**
+ * Tables with org_id, in FK-safe deletion order (children before parents).
+ * Excludes METADATA_MODELS_WITHOUT_ORG_FILTER (global / shared, not tenant-owned):
+ * role, workflow_flow, workflow_state, workflow_action, view, permission, role_view,
+ * prompt_template, agent_model_tool_config, currency, instrument.
+ */
 const ORG_TABLES = [
-  'pending_action', 'agent_session', 'llm_trace', 'ai_activity_log', 'expense_report',
+  'pending_action', 'agent_session', 'llm_trace', 'ai_activity_log', 'expense_report', 'import_run',
   'workflow_history', 'comment',
-  'posting', 'trade', 'holding', 'instrument',
+  'plaid_transaction', 'posting', 'trade', 'holding',
   'delivery_challan', 'credit_note', 'quote', 'sales_order', 'payment_receipt', 'invoice',
   'purchase_order_item', 'purchase_order', 'item', 'purchase_requisition', 'project_master',
   'general_ledger', 'budget_line', 'budget_period', 'employee_master', 'supplier_items',
-  'item_master', 'cost_center', 'department', 'business_unit', 'location', 'customers',
+  'item_master', 'item_category', 'uom', 'cost_center', 'department', 'business_unit', 'location', 'customers',
   'supplier', 'payment_terms', 'tax_master', 'shipping_terms', 'shipping_method',
-  'account', 'entity', 'base_model', 'workflow_instance', 'role_user', 'permission',
-  'role_view', 'view', 'role', 'prompt_template', 'source_system', 'user',
-  'workflow_action', 'workflow_state', 'workflow_flow', 'currency_master', 'exchange_rate',
+  'account', 'plaid_item', 'entity', 'base_model', 'workflow_instance', 'role_user',
+  'source_system', 'agent_template', 'user',
+  'exchange_rate','chat_thread',
   'instance_email_ingest', 'attachment', 'list_data', 'user_master',
 ] as const;
 
@@ -77,25 +82,26 @@ async function removeTenantData(orgId: string) {
     console.log('Run with --confirm to perform deletion.');
     const counts: Array<[string, number]> = [];
     for (const model of ORG_TABLES) {
+      let n = 0;
       try {
-        const n = await getCount(model, w);
-        if (n > 0) counts.push([model, n]);
+        n = await getCount(model, w);
       } catch {
         // model might not have org_id or might be named differently
       }
+      counts.push([model, n]);
     }
     for (const { parent, child, childFk } of CHILD_DELETES) {
+      let n = 0;
       try {
         const ids = await (prisma as any)[parent].findMany({ where: w, select: { id: true } }).then((r: { id: string }[]) => r.map((x) => x.id));
         if (ids.length > 0) {
-          const n = await (prisma as any)[child].count({ where: { [childFk]: { in: ids } } });
-          if (n > 0) counts.push([child, n]);
+          n = await (prisma as any)[child].count({ where: { [childFk]: { in: ids } } });
         }
       } catch {
         // ignore
       }
+      counts.push([child, n]);
     }
-    counts.sort((a, b) => b[1] - a[1]);
     for (const [name, c] of counts) console.log(`  ${name}: ${c}`);
     console.log('  org: 1');
     process.exit(0);

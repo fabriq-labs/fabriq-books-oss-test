@@ -42,6 +42,107 @@ function extractSearchRows(result: any): any[] {
   return [];
 }
 
+/** Reporting currency for a legal entity (matches Balance Sheet / report UI defaults). */
+export async function resolveLegalEntityReportingCurrency(
+  orgId: string,
+  legalEntityId: string | undefined | null
+): Promise<{ currencyId?: string; currencyCode?: string }> {
+  const entityId = legalEntityId?.trim();
+  if (!entityId) return {};
+
+  const entity = await prisma.entity.findFirst({
+    where: { id: entityId, org_id: orgId },
+    select: {
+      basecurrency_id: true,
+      currency: { select: { id: true, code: true } },
+    },
+  });
+  if (!entity) return {};
+
+  const currencyId = entity.basecurrency_id ?? entity.currency?.id ?? undefined;
+  const currencyCode = entity.currency?.code?.trim().toUpperCase() || undefined;
+  return { currencyId, currencyCode };
+}
+
+/** Resolve legal_name values for ids used in a tool step (e.g. legal_entity_ids). */
+export async function resolveLegalEntityNames(
+  orgId: string,
+  legalEntityIds: string[] | undefined
+): Promise<string[]> {
+  if (!legalEntityIds?.length) return [];
+  const uniqueIds = [...new Set(legalEntityIds.map((id) => id.trim()).filter(Boolean))];
+  if (!uniqueIds.length) return [];
+
+  const entities = await prisma.entity.findMany({
+    where: { id: { in: uniqueIds }, org_id: orgId },
+    select: { id: true, legal_name: true },
+  });
+  const nameById = new Map<string, string>(
+    entities
+      .map((e) => [e.id, e.legal_name?.trim() ?? ''] as const)
+      .filter(([, name]) => name)
+  );
+  return uniqueIds.map((id) => nameById.get(id)).filter((name): name is string => Boolean(name));
+}
+
+export function extractLegalEntityIdsFromSearch(search: unknown): string[] {
+  if (!Array.isArray(search)) return [];
+  const ids = new Set<string>();
+  for (const entry of search) {
+    if (!entry || typeof entry !== 'object') continue;
+    const row = entry as Record<string, unknown>;
+    if (
+      row.field === 'legal_entity_id' &&
+      row.operator === 'eq' &&
+      typeof row.value === 'string' &&
+      row.value.trim()
+    ) {
+      ids.add(row.value.trim());
+    }
+  }
+  return [...ids];
+}
+
+/** Attach legal_entity_ids + resolved legal_entity_names from the actual tool/search scope. */
+export async function attachLegalEntityScopeToToolResult(
+  auth: AuthContext,
+  result: Record<string, unknown>,
+  options?: {
+    legalEntityIds?: string[];
+    search?: unknown;
+  }
+): Promise<Record<string, unknown>> {
+  const orgId = auth.user?.org_id;
+  if (!orgId) return result;
+
+  const existingFilters = (result.filters as Record<string, unknown> | undefined) ?? {};
+  const ids = [
+    ...new Set(
+      [
+        ...(options?.legalEntityIds ?? []),
+        ...extractLegalEntityIdsFromSearch(options?.search),
+        ...((existingFilters.legal_entity_ids as string[] | undefined) ?? []),
+      ]
+        .map((id) => String(id).trim())
+        .filter(Boolean)
+    ),
+  ];
+  if (!ids.length) return result;
+
+  const names = await resolveLegalEntityNames(orgId, ids);
+  const filters = {
+    ...existingFilters,
+    legal_entity_ids: ids,
+    ...(names.length ? { legal_entity_names: names } : {}),
+  };
+
+  return {
+    ...result,
+    filters,
+    ...(names.length ? { legal_entity_names: names } : {}),
+  };
+}
+
 /** Same legal entity id used for createRecord and posting searchRecords. */
 export async function resolvePostingHeaderLegalEntityId(
   auth: AuthContext,

@@ -31,23 +31,27 @@ import {
   createPendingActionBatch,
   bulkApproveByConfidence,
 } from '../services/PendingActionService';
-
-const TEST_CONFIG = {
-  userId: process.env.TEST_USER_ID || 'user_rajesh_kumar',
-  orgId: process.env.TEST_ORG_ID || 'org_rajesh',
-};
+import { buildTestAuthContext } from './posting-harness-auth';
 
 describe('Session API — Phase 1', () => {
 
   let sessionId: string;
   let pendingActionId: string;
+  let testUserId: string;
+  let testOrgId: string;
+
+  beforeAll(async () => {
+    const auth = await buildTestAuthContext();
+    testUserId = auth.user!.id;
+    testOrgId = auth.user!.org_id!;
+  });
 
   // --- agent_session ---
 
   test('creates a session with correct defaults', async () => {
     const session = await createAgentSession({
-      org_id: TEST_CONFIG.orgId,
-      user_id: TEST_CONFIG.userId,
+      org_id: testOrgId,
+      user_id: testUserId,
       goal: 'Reconcile HDFC current account transactions',
       mode: 'supervised',
     });
@@ -65,7 +69,7 @@ describe('Session API — Phase 1', () => {
   });
 
   test('lists sessions for user', async () => {
-    const sessions = await listAgentSessions(TEST_CONFIG.userId, TEST_CONFIG.orgId);
+    const sessions = await listAgentSessions(testUserId, testOrgId);
     expect(sessions.length).toBeGreaterThanOrEqual(1);
     expect(sessions.some(s => s.id === sessionId)).toBe(true);
   });
@@ -101,7 +105,7 @@ describe('Session API — Phase 1', () => {
 
   test('creates a pending action', async () => {
     const action = await createPendingAction({
-      org_id: TEST_CONFIG.orgId,
+      org_id: testOrgId,
       session_id: sessionId,
       action_type: 'reconcile_posting',
       title: 'Match NEFT CR ACME to REC-DEMO-001',
@@ -145,7 +149,7 @@ describe('Session API — Phase 1', () => {
   test('approves a pending action', async () => {
     const resolved = await resolvePendingAction(pendingActionId, {
       status: 'approved',
-      resolved_by: TEST_CONFIG.userId,
+      resolved_by: testUserId,
     });
     expect(resolved.status).toBe('approved');
     expect(resolved.resolved_at).not.toBeNull();
@@ -153,7 +157,7 @@ describe('Session API — Phase 1', () => {
 
   test('rejects a pending action with reason', async () => {
     const action2 = await createPendingAction({
-      org_id: TEST_CONFIG.orgId,
+      org_id: testOrgId,
       session_id: sessionId,
       action_type: 'reconcile_posting',
       title: 'Match NEFT CR GLOBEX to REC-DEMO-002',
@@ -174,7 +178,7 @@ describe('Session API — Phase 1', () => {
     });
     const rejected = await resolvePendingAction(action2.id, {
       status: 'rejected',
-      resolved_by: TEST_CONFIG.userId,
+      resolved_by: testUserId,
       resolution_note: 'Wrong customer',
     });
     expect(rejected.status).toBe('rejected');
@@ -211,7 +215,7 @@ describe('Session API — Phase 1', () => {
         },
       ],
       {
-        org_id: TEST_CONFIG.orgId,
+        org_id: testOrgId,
         session_id: sessionId,
         action_type: 'reconcile_posting',
         batch_id: batchId,
@@ -229,7 +233,7 @@ describe('Session API — Phase 1', () => {
 
   test('bulk approves high confidence actions in a batch', async () => {
     const batchId = `${sessionId}-step-2`;
-    await bulkApproveByConfidence(batchId, 'high', TEST_CONFIG.userId);
+    await bulkApproveByConfidence(batchId, 'high', testUserId);
     const actions = await listPendingActions({ batch_id: batchId });
     const approved = actions.filter(a => a.status === 'approved');
     const pending = actions.filter(a => a.status === 'pending');

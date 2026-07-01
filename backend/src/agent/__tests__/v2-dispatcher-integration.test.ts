@@ -152,6 +152,7 @@ async function createTestSession(plan: PlanStep[], accumulatedContext: Record<st
     user_id: TEST_CONFIG.userId,
     goal: 'Reconcile unmatched postings for HDFC account',
     goal_model: 'posting',
+    template_id: 'atpl_reconcile',
     mode: 'supervised',
   });
   createdSessionIds.push(session.id);
@@ -442,6 +443,7 @@ describe('V2 Dispatcher Integration — Reconciliation Flow', () => {
       user_id: TEST_CONFIG.userId,
       goal: 'Reconcile postings',
       goal_model: 'posting',
+      template_id: 'atpl_reconcile',
     });
     createdSessionIds.push(session.id);
 

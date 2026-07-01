@@ -15,7 +15,6 @@ dotenv.config({ path: path.join(__dirname, '../../../.env.test') });
 dotenv.config();
 
 import { AgentService } from '../AgentService';
-import { PermissionService } from '../../services/permissions/PermissionService';
 import { AuthContext } from '../../auth/types';
 import prisma from '../../lib/prisma';
 import {
@@ -23,42 +22,25 @@ import {
   getAgentSession,
   listAgentMessages,
 } from '../services/SessionService';
-import {
-  listPendingActions,
-} from '../services/PendingActionService';
 import { shouldAutoContinue } from '../prompt/constants';
+import { buildTestAuthContext } from './posting-harness-auth';
 
 // Import session tool executors for direct testing
 import { PlanStep } from '../tools/sessionTools';
-
-const TEST_CONFIG = {
-  userId: process.env.TEST_USER_ID || 'user_rajesh_kumar',
-  orgId: process.env.TEST_ORG_ID || 'org_rajesh',
-};
-
-async function buildAuth(): Promise<AuthContext> {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: TEST_CONFIG.userId } });
-  const permissions = await PermissionService.getUserPermissions(TEST_CONFIG.userId);
-  return {
-    user: {
-      id: user.id,
-      email: user.email || '',
-      name: user.name,
-      org_id: user.org_id || TEST_CONFIG.orgId,
-    },
-    permissions,
-  };
-}
 
 describe('Session Agent — Phase 2', () => {
 
   let agentService: AgentService;
   let auth: AuthContext;
   let sessionId: string;
+  let testUserId: string;
+  let testOrgId: string;
 
   beforeAll(async () => {
     agentService = new AgentService();
-    auth = await buildAuth();
+    auth = await buildTestAuthContext();
+    testUserId = auth.user!.id;
+    testOrgId = auth.user!.org_id!;
   }, 30000);
 
   // --- Backward compatibility ---
@@ -88,8 +70,8 @@ describe('Session Agent — Phase 2', () => {
   test('agent calls createPlan on first session turn', async () => {
     // Create session
     const session = await createAgentSession({
-      org_id: TEST_CONFIG.orgId,
-      user_id: TEST_CONFIG.userId,
+      org_id: testOrgId,
+      user_id: testUserId,
       goal: 'Reconcile unmatched transactions for HDFC current account',
       mode: 'supervised',
     });

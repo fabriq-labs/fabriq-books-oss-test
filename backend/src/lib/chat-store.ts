@@ -40,6 +40,14 @@ export interface SaveChatParams {
 const DEFAULT_TITLE = 'New Financial Inquiry';
 const TITLE_MAX_LENGTH = 60;
 
+function userIdFilter(context: AuthContext) {
+  return { search: { filters: { user_id: context.user!.id } } };
+}
+
+function isOwnedByUser(row: Record<string, unknown>, context: AuthContext): boolean {
+  return String(row.user_id) === context.user!.id;
+}
+
 function extractMessageText(content: unknown): string {
   if (typeof content === 'string') return content.trim();
   if (Array.isArray(content)) {
@@ -97,7 +105,12 @@ export async function listChats(context: AuthContext): Promise<ChatThreadSummary
   const result = await modelService.search(
     MODEL_NAME,
     context,
-    { page: 1, pageSize: 200, sortOption: { created_at: 'asc' } },
+    {
+      page: 1,
+      pageSize: 200,
+      sortOption: { created_at: 'asc' },
+      ...userIdFilter(context),
+    },
     { viewName: VIEW_NAME }
   );
 
@@ -133,7 +146,12 @@ export async function loadChat(
     return null;
   }
 
-  return mapRow(result.data as Record<string, unknown>);
+  const row = result.data as Record<string, unknown>;
+  if (!isOwnedByUser(row, context)) {
+    return null;
+  }
+
+  return mapRow(row);
 }
 
 export interface CreateChatThreadParams {
@@ -159,6 +177,7 @@ export async function createChatThread({
     context,
     {
       id: chatId,
+      user_id: context.user!.id,
       title: DEFAULT_TITLE,
       messages: [],
       metadata: metadata ?? {},

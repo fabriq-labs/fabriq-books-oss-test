@@ -1,6 +1,7 @@
 import { run_report } from '../../lib/reports';
 import { AuthContext } from '../../auth/types';
 import type { PostingSearchToolContext, SearchFilterEntry } from '../search/searchFilterTypes';
+import { attachLegalEntityScopeToToolResult } from '../postingCreateHelpers';
 
 type PostingRow = Record<string, unknown>;
 
@@ -292,17 +293,24 @@ export async function enrichPostingSearchResult(
   filters: SearchFilterEntry[],
   toolContext?: PostingSearchToolContext
 ): Promise<Record<string, unknown>> {
+  const legalEntityId =
+    (filters.find((f) => f.field === 'legal_entity_id' && f.operator === 'eq')?.value as
+      | string
+      | undefined) ??
+    (toolContext?.modelContext?.legalEntityId as string | undefined);
+
+  const finalize = (result: Record<string, unknown>) =>
+    attachLegalEntityScopeToToolResult(auth, result, {
+      legalEntityIds: legalEntityId ? [String(legalEntityId)] : undefined,
+      search: filters,
+    });
+
   const records = Array.isArray(base.data) ? (base.data as PostingRow[]) : [];
   if (records.length === 0) {
-    return base;
+    return finalize(base);
   }
 
   const uiHint = resolvePostingDisplayMode(filters, toolContext);
-  const legalEntityId =
-    (toolContext?.modelContext?.legalEntityId as string | undefined) ??
-    (filters.find((f) => f.field === 'legal_entity_id' && f.operator === 'eq')?.value as
-      | string
-      | undefined);
 
   if (uiHint === 'account_ledger') {
     const focusAccountId = extractLedgerFocusAccountId(filters)!;
@@ -332,7 +340,7 @@ export async function enrichPostingSearchResult(
       focusAccountName
     );
 
-    return {
+    return finalize({
       ...base,
       uiHint: 'account_ledger',
       focusAccountId,
@@ -347,7 +355,7 @@ export async function enrichPostingSearchResult(
         { field: 'signed_amount', label: 'Amount' },
         { field: 'running_balance', label: 'Balance' },
       ],
-    };
+    });
   }
 
   const journalFocusAccountId = resolveJournalFocusAccountId(filters);
@@ -365,7 +373,7 @@ export async function enrichPostingSearchResult(
     const debitName = accountNameFromRow(sample, 'debit');
     const creditName = accountNameFromRow(sample, 'credit');
 
-    return {
+    return finalize({
       ...base,
       uiHint: 'posting_dual',
       currencyCode: journalRows[0]?.currency ?? 'INR',
@@ -395,10 +403,10 @@ export async function enrichPostingSearchResult(
         { field: 'amount', label: 'Amount' },
         { field: 'value_date', label: 'Date' },
       ],
-    };
+    });
   }
 
-  return {
+  return finalize({
     ...base,
     uiHint: 'posting_journal',
     currencyCode: journalRows[0]?.currency ?? 'INR',
@@ -411,5 +419,5 @@ export async function enrichPostingSearchResult(
       { field: 'amount', label: 'Amount' },
       { field: 'value_date', label: 'Date' },
     ],
-  };
+  });
 }

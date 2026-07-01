@@ -13,7 +13,7 @@ export const createDirectInvoiceData = (customerId: string, locationId: string, 
   invoice_net_total: 0, // Will be calculated by line items
   invoice_total: 0, // Will be calculated by line items
   balance_amount: 0, // Will be calculated by line items
-  payment_terms: 'Net 30',
+  payment_terms_id: 'pay_demo_net30',
   shipping_method: 'Standard', // String field in model
   shipping_terms: 'FOB',
   org_id: orgId,

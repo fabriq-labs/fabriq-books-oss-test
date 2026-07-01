@@ -25,7 +25,7 @@ import prisma from '../lib/prisma';
 import { ERPConnector } from '../lib/integrations/connectors/types';
 import { getHandler, getAllMethodNames } from './handlers/erp/registry';
 import { matchExtractedLineItemsToPO } from './invoiceMatching';
-import { preparePostingCreatePayload } from './postingCreateHelpers';
+import { preparePostingCreatePayload, attachLegalEntityScopeToToolResult } from './postingCreateHelpers';
 import {
   normalizeSearchParam,
   resolvePostingSearchPageSize,
@@ -292,7 +292,13 @@ export function searchRecordsTool(
         )) as typeof enrichedResult;
       }
 
-      const safeResult = JSON.parse(JSON.stringify(enrichedResult));
+      const safeResult = await attachLegalEntityScopeToToolResult(
+        auth,
+        JSON.parse(JSON.stringify(enrichedResult)),
+        {
+          search: normalized.search,
+        }
+      );
       return safeResult;
     }
   });

@@ -156,6 +156,7 @@ describe('ReconciliationActionBuilder', () => {
 
     // Context update
     expect(result.contextUpdate).toEqual({
+      unmatched_count: 3,
       queued_matches: 2,
       confidence_breakdown: { high: 1, medium: 1, low: 0 },
     });

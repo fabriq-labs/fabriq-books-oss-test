@@ -125,7 +125,7 @@ export const generate_invoice_from_so = async (
       requester_email: salesOrder.customer?.primary_email,
       deliver_to: salesOrder.location?.location,
       terms_and_conditions: salesOrder.notes,
-      payment_terms: salesOrder.payment_terms?.payment_terms,
+      payment_terms_id: salesOrder.payment_terms?.id ?? salesOrder.customer?.payment_term_id ?? null,
       shipping_method: salesOrder.shipping_method?.shipping_method,
       shipping_terms: salesOrder.shipping_terms?.shipping_terms,
       invoice_date: salesOrder.so_date,

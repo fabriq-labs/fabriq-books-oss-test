@@ -78,7 +78,7 @@ backend/
 │   └── lib/                  # Prisma, LLM, extractors, import extensions
 ├── prisma/schema/            # Multi-file Prisma models
 ├── prisma/metadata/views/    # View JSON definitions
-├── setup-db.js               # Full DB bootstrap
+├── setup-db.js               # Full DB bootstrap (see README-setup-db.md)
 └── scripts/                  # Tokens, types, utilities
 ```
 
@@ -124,6 +124,7 @@ Database: `npx prisma db push`, `npx prisma generate`, `npx prisma studio`
 | Add models, APIs, services | [docs/BACKEND.md](../docs/BACKEND.md) |
 | System architecture | [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) |
 | Deploy / env / demo data | [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md) |
+| Seed data only, remove org, CLI flags | [README-setup-db.md](README-setup-db.md) |
 | Auth providers | [docs/AUTHENTICATION.md](../docs/AUTHENTICATION.md) |
 | Business modules & rules | [docs/BUSINESS_DOMAIN.md](../docs/BUSINESS_DOMAIN.md) |
 | Full docs index | [docs/CLAUDE.md](../docs/CLAUDE.md) |
