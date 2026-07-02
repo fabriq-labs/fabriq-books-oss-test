@@ -49,17 +49,58 @@ const CHILD_DELETES: Array<{ parent: string; child: string; childFk: string }> =
   { parent: 'instance_email_ingest', child: 'instance_email_ingest_item', childFk: 'instance_email_ingest_id' },
 ];
 
+/** Prisma P2021 — table mapped by the model does not exist in this database. */
+function isMissingTableError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === 'P2021'
+  );
+}
+
+function logSkippedMissingTable(model: string, err: unknown): void {
+  const meta =
+    typeof err === 'object' && err !== null && 'meta' in err
+      ? (err as { meta?: { modelName?: string; table?: string } }).meta
+      : undefined;
+  const label = meta?.modelName ?? model;
+  const table = meta?.table;
+  console.warn(`  [skip] ${label}: table does not exist in database${table ? ` (${table})` : ''}`);
+  if (err instanceof Error) {
+    console.warn(`         ${err.message}`);
+  } else {
+    console.warn('         ', err);
+  }
+}
+
 async function getCount(model: string, where: object): Promise<number> {
   const delegate = (prisma as any)[model];
   if (!delegate?.count) return 0;
-  return delegate.count({ where });
+  try {
+    return await delegate.count({ where });
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      logSkippedMissingTable(model, err);
+      return 0;
+    }
+    throw err;
+  }
 }
 
 async function deleteMany(model: string, where: object): Promise<number> {
   const delegate = (prisma as any)[model];
   if (!delegate?.deleteMany) return 0;
-  const result = await delegate.deleteMany({ where });
-  return result.count ?? 0;
+  try {
+    const result = await delegate.deleteMany({ where });
+    return result.count ?? 0;
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      logSkippedMissingTable(model, err);
+      return 0;
+    }
+    throw err;
+  }
 }
 
 async function removeTenantData(orgId: string) {
@@ -82,12 +123,7 @@ async function removeTenantData(orgId: string) {
     console.log('Run with --confirm to perform deletion.');
     const counts: Array<[string, number]> = [];
     for (const model of ORG_TABLES) {
-      let n = 0;
-      try {
-        n = await getCount(model, w);
-      } catch {
-        // model might not have org_id or might be named differently
-      }
+      const n = await getCount(model, w);
       counts.push([model, n]);
     }
     for (const { parent, child, childFk } of CHILD_DELETES) {
@@ -95,10 +131,14 @@ async function removeTenantData(orgId: string) {
       try {
         const ids = await (prisma as any)[parent].findMany({ where: w, select: { id: true } }).then((r: { id: string }[]) => r.map((x) => x.id));
         if (ids.length > 0) {
-          n = await (prisma as any)[child].count({ where: { [childFk]: { in: ids } } });
+          n = await getCount(child, { [childFk]: { in: ids } });
         }
-      } catch {
-        // ignore
+      } catch (err) {
+        if (isMissingTableError(err)) {
+          logSkippedMissingTable(parent, err);
+        } else {
+          // model might not have org_id or might be named differently
+        }
       }
       counts.push([child, n]);
     }
@@ -119,12 +159,20 @@ async function removeTenantData(orgId: string) {
 
   // Delete child tables (no org_id) before their parents
   for (const { parent, child, childFk } of CHILD_DELETES) {
-    const ids = await (prisma as any)[parent].findMany({ where: w, select: { id: true } }).then((r: { id: string }[]) => r.map((x) => x.id));
-    if (ids.length > 0) {
-      const result = await (prisma as any)[child].deleteMany({ where: { [childFk]: { in: ids } } });
-      if (result.count > 0) {
-        console.log(`  ${child}: ${result.count}`);
-        total += result.count;
+    try {
+      const ids = await (prisma as any)[parent].findMany({ where: w, select: { id: true } }).then((r: { id: string }[]) => r.map((x) => x.id));
+      if (ids.length > 0) {
+        const n = await deleteMany(child, { [childFk]: { in: ids } });
+        if (n > 0) {
+          console.log(`  ${child}: ${n}`);
+          total += n;
+        }
+      }
+    } catch (err) {
+      if (isMissingTableError(err)) {
+        logSkippedMissingTable(parent, err);
+      } else {
+        throw err;
       }
     }
   }
