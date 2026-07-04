@@ -56,3 +56,5 @@ gitignore/
 
 # Local developer notes (not committed)
 docs/developer-docs/
+
+rnd/
