@@ -399,8 +399,8 @@ async function main() {
         console.log("   Skipping agent model tool config seed...");
       }
 
-      // Step 3.7: Seed chat_thread view permissions
-      console.log("💬 Step 3.7: Seeding chat thread view permissions...");
+      // Step 3.7: Seed chat_thread table + view permissions
+      console.log("💬 Step 3.7: Seeding chat thread table and view permissions...");
       const seedChatThreadViewSqlPath = path.join(
         __dirname,
         "prisma",
@@ -412,9 +412,9 @@ async function main() {
         try {
           runPrismaSqlFile(
             seedChatThreadViewSqlPath,
-            "Chat thread view permissions seeded successfully"
+            "Chat thread table and view permissions seeded successfully"
           );
-          console.log("✅ Chat thread view permissions seeded successfully");
+          console.log("✅ Chat thread table and view permissions seeded successfully");
         } catch (error) {
           console.error("⚠️  Error seeding chat thread view permissions:", error.message);
           console.log("   Continuing setup...");

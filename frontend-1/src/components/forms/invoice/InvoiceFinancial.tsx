@@ -6,6 +6,15 @@ import { SearchDropDown } from '@/components/search_dropdown/dropdown';
 const { Option } = Select;
 const { Title } = Typography;
 
+const formatPaymentTerms = (paymentTerms: unknown): string => {
+    if (!paymentTerms) return '';
+    if (typeof paymentTerms === 'string') return paymentTerms;
+    if (typeof paymentTerms === 'object' && paymentTerms !== null && 'payment_terms' in paymentTerms) {
+        return (paymentTerms as { payment_terms?: string }).payment_terms ?? '';
+    }
+    return '';
+};
+
 interface FinancialInformationProps {
     form: UseFormReturn<any>;
     readOnly?: boolean;
@@ -87,7 +96,7 @@ const InvoiceFinancialInformation: React.FC<FinancialInformationProps> = ({ form
                     </Form.Item>
                     <Form.Item label="Payment Terms" className='mb-0'>
                         <Input
-                            value={details?.payment_terms}
+                            value={formatPaymentTerms(details?.payment_terms)}
                             disabled
                         />
                     </Form.Item>

@@ -2,29 +2,37 @@
 
 **Audience**: Anyone working on the in-app chat panel (`frontend-1/src/components/chat/`)
 or debugging why a chat answer used the wrong tools/prompt.
+
 **Primary files**:
-- Frontend: `frontend-1/src/components/chat/ChatUI.tsx`, `ChatContext.tsx`, `chatUtils.ts`, `ToolResponseRenderer.tsx`
-- Backend: `backend/src/agent/routes.ts`, `backend/src/agent/AgentService.ts`
+- Frontend: `ChatUI.tsx`, `ChatShell.tsx`, `ChatContext.tsx`, `chatUtils.ts`, `postingChatContext.ts`, `ToolResponseRenderer.tsx`
+- Backend: `backend/src/agent/routes.ts`, `backend/src/agent/AgentService.ts`, `backend/src/lib/chat-store.ts`
+
+**Companion docs**:
+- [CHAT_THREADS.md](../CHAT_THREADS.md) — thread sidebar, DB schema, API
+- [frontend-1/src/components/chat/README.md](../../frontend-1/src/components/chat/README.md) — detailed how-it-works (suggestions, `promptTypes`, posting vs account)
 
 ---
 
 ## Overview
 
-Every page in the app — including the dashboard — has an AI chat panel. This
-is the **conversational chat**: a stateless, page-aware assistant that
-answers questions, queries data, and creates records using the same LLM and
-tool infrastructure as the workbench agent (see
-[02-ARCHITECTURE.md](./02-ARCHITECTURE.md)).
+Every page in the app — including the dashboard — has an AI chat panel. This is the
+**conversational chat**: a page-aware assistant that answers questions, queries data,
+and creates records using the same LLM and tool infrastructure as the workbench agent
+(see [02-ARCHITECTURE.md](./02-ARCHITECTURE.md)).
 
 It is **not** a workbench session. It has no plan, no pending actions, no
-auto-continuation (see [03-SESSION_LIFECYCLE.md](./03-SESSION_LIFECYCLE.md)
-for what a session adds). The conversation is ephemeral — messages live only
-in the browser's React state and are gone when you navigate away.
+auto-continuation (see [03-SESSION_LIFECYCLE.md](./03-SESSION_LIFECYCLE.md)).
 
-Both conversational chat and workbench sessions share the same HTTP endpoint,
+**History** is handled in two ways:
+- **`ChatShell` + `chatId`** (default in `AppLayout`, dashboards): messages persist to
+  the `chat_thread` table via `/api/chat/*` and survive refresh/navigation when you
+  reopen the same thread from the sidebar.
+- **Bare `ChatUI` without `chatId`** (legacy): in-memory only via `ChatContext.messagesAi`.
+
+Both paths stream through the same agent endpoint:
 [`POST /api/agent/chat/stream`](./09-API_REFERENCE.md#post-apiagentchatstream).
-The presence or absence of `sessionId` in the request body determines which
-code path runs inside `AgentService.handleStreamingRequest`.
+The presence or absence of `sessionId` in the request body determines whether
+`AgentService.handleStreamingRequest` runs the workbench session path.
 
 ---
 
@@ -33,25 +41,21 @@ code path runs inside `AgentService.handleStreamingRequest`.
 | | Conversational Chat | Workbench Session |
 |---|---|---|
 | **Entry point** | `POST /api/agent/chat/stream` (no `sessionId`) | `POST /api/agent/chat/stream` (with `sessionId`) |
-| **History storage** | React state — lost on navigate/close | DB `agent_message` table — permanent |
-| **History mechanism** | Frontend sends all messages in every request | Backend loads message history (see [08-DATA_MODELS.md](./08-DATA_MODELS.md)) |
+| **History storage** | `chat_thread` table (via `ChatShell`) or React state (`messagesAi`) | DB `agent_message` table — permanent |
+| **History mechanism** | Frontend sends all messages in every stream request; `ChatShell` also saves to DB | Backend loads message history (see [08-DATA_MODELS.md](./08-DATA_MODELS.md)) |
 | **Structured plan** | None | Yes — `createPlan` tool, see [05-TOOLS.md](./05-TOOLS.md#createplan) |
 | **Session tools** | Not available | `createPlan`, `completeStep`, `queueActions`, `requestClarification` |
 | **Auto-continuation** | No | Yes — `setImmediate` recursive calls, see [03-SESSION_LIFECYCLE.md](./03-SESSION_LIFECYCLE.md) |
 | **Pending actions** | No | Yes — `awaiting_approval` flow, executor registry (see [06-BUILDERS_AND_EXECUTORS.md](./06-BUILDERS_AND_EXECUTORS.md)) |
-| **Persistence** | `llm_trace` only (observability) | `agent_session` + `agent_message` + `llm_trace` |
-| **Question classification / `maxSteps`** | `classifyQuestion()` decides `maxSteps` (2 or 8) and `promptTypes`, see [04-PROMPT_SYSTEM.md — Question Routing](./04-PROMPT_SYSTEM.md#question-routing-conversational-chat) | Fixed `SESSION_MAX_STEPS` (default 20), see [10-LIBRARIES_AND_PROVIDERS.md](./10-LIBRARIES_AND_PROVIDERS.md#maxsteps) |
+| **Persistence** | `chat_thread` + `llm_trace` | `agent_session` + `agent_message` + `llm_trace` |
+| **`maxSteps`** | `AGENT_MAX_STEPS` env (default 5) | `SESSION_MAX_STEPS` (default 20) |
+| **`classifyQuestion()`** | Observability/logging only — does **not** switch tools or `promptTypes` | Not consulted |
+| **`promptTypes`** | From `PageContext` (page or `enrichFinanceChatContext` defaults) | From session template + context |
 | **`agent_template`** | Not used | Used when session has `template_id` |
 | **`prompt_template`** | Used (via `DynamicPromptManager`) | Used (via `DynamicPromptManager`) |
 | **Tool set** | Model tools + analytics tools, see [05-TOOLS.md](./05-TOOLS.md#tool-selection-toolmanagergetunifiedtools) | Model tools + analytics tools + session tools |
 | **Triggered by** | User types in the chat panel | User picks a template + goal in the workbench |
 | **UI location** | Chat panel on every page | Dedicated workbench session view |
-
-The rest of this doc covers the conversational-chat-specific pieces: the
-frontend `useChat` integration, `PageContext`, in-memory history, and UI
-placement. For prompt assembly, tool selection, model invocation, and
-logging, see the cross-linked reference docs above — those describe the
-unified session/non-session behavior and are not repeated here.
 
 ---
 
@@ -60,49 +64,36 @@ unified session/non-session behavior and are not repeated here.
 **File**: `frontend-1/src/components/chat/ChatUI.tsx`
 **Hook**: `useChat` from `@ai-sdk/react`
 
+### Building API context
+
+`ChatUI` does **not** send raw `pageContext` directly. It builds enriched `chatContext`:
+
 ```typescript
-const {
-  messages,          // Current conversation (managed by useChat)
-  setMessages,       // Used to restore history from context on mount
-  input,             // Controlled input field value
-  handleInputChange, // Input onChange handler
-  append,            // Add a message and trigger API call
-  stop,              // Cancel in-flight request
-  reload,            // Retry last message
-  isLoading,         // True while awaiting response
-  status,            // 'idle' | 'streaming' | 'submitted' | 'error'
-  setInput,
-} = useChat({
+const chatContext = useMemo(() => {
+  const base = pageContext ?? buildDefaultPostingChatContext(currentEntity, entities, currencyById);
+  return enrichFinanceChatContext(base, currentEntity, entities, currencyById);
+}, [pageContext, currentEntity, entities, currencyById, ...]);
+```
+
+On each request, `experimental_prepareRequestBody` also adds:
+- `userQuestion` — text of the latest user message
+- `searchAllEntities` — `true` when the user says "all entities" / "across all entities"
+
+```typescript
+useChat({
   api: `${VITE_API_BASE_URL}/api/agent/chat/stream`,
-
-  headers: {
-    'Accept': 'text/event-stream',
-    'Authorization': `Bearer ${token}`,   // Token from __session cookie via js-cookie
-  },
-
-  body: {
+  body: { stream: true, chatId, context: chatContext },
+  experimental_prepareRequestBody: ({ messages, ... }) => ({
+    messages: transformedMessages,
+    context: {
+      ...chatContextRef.current,
+      userQuestion,
+      searchAllEntities: userRequestedAllEntities(userQuestion),
+    },
     stream: true,
-    context: pageContext || undefined,     // PageContext from ChatContext
-  },
-
-  experimental_prepareRequestBody: ({ id, messages, requestBody }) => {
-    // Transforms message parts (text + file attachments) into standard format
-    // Explicitly includes context in the body
-    // Returns { id, messages: transformedMessages, context, stream: true }
-  },
-
-  onResponse: (response) => {
-    // Handles non-2xx HTTP responses (shows error to user)
-  },
-
-  onFinish: (message) => {
-    // Processes tool invocations in the completed message
-    // Passes results to ToolResponseRenderer
-  },
-
-  onError: (error) => {
-    // Logs streaming errors
-  },
+    chatId,
+  }),
+  // onResponse, onFinish (persist thread), onError
 });
 ```
 
@@ -110,146 +101,77 @@ const {
 
 ```typescript
 {
-  id: string,            // Auto-generated by useChat
   stream: true,
-  context: PageContext,  // Current page context, see below
+  chatId?: string,       // Present when wrapped in ChatShell
+  context: PageContext,  // Enriched — see PageContext section
   messages: Array<{
     role: 'user' | 'assistant',
     content: string | ContentPart[],
-    parts?: Array<{
-      type: 'text' | 'file',
-      text?: string,
-      data?: string,       // Base64-encoded file data
-      mimeType?: string,
-      mediaType?: string,
-    }>
+    parts?: Array<{ type: 'text' | 'file', ... }>
   }>
 }
 ```
 
 The `messages` array includes **all previous turns** plus the latest message.
-The backend doesn't store any history for conversational chat — the frontend
-is the source of truth for the conversation so far.
+The agent stream endpoint does not store chat history; the frontend (and optionally
+`chat_thread`) is the source of truth.
 
 ### File attachments
 
 Files are handled by `buildFileParts()` in `chatUtils.ts`:
 1. File is read as a data URL (base64)
-2. Sent as a message part: `{ type: 'file', data: 'data:image/png;base64,...', mimeType: 'image/png', mediaType: 'image/png' }`
-3. Backend's `messageProcessor.ts` decodes base64 back to `Uint8Array` before passing to the LLM
+2. Sent as a message part: `{ type: 'file', data: '...', mimeType, mediaType }`
+3. Backend's `messageProcessor.ts` decodes base64 before passing to the LLM
 
 ### Tool invocations
 
-When the backend calls a tool (e.g. `createRecord`, `analyticsQuery`,
-`searchRecords`, `runFinancialReport`), the result comes back in the
-message's `toolInvocations` array.
-`ToolResponseRenderer.tsx` (`frontend-1/src/components/chat/tool-responses/`)
-processes these and:
-- Renders structured tool results (tables, record cards) inline in the chat
-- When `createRecord` succeeds, updates `pageContext.recordId` with the new record's ID
+When the backend calls a tool (`createRecord`, `analyticsQuery`, `searchRecords`,
+`runFinancialReport`, …), results arrive in `message.toolInvocations`.
+`ToolResponseRenderer.tsx` processes these and:
+- Renders structured tool results (tables, ledgers, financial reports) inline
+- Shows legal-entity scope labels on scoped results (`ToolLegalEntityScopeLabel`)
+- Formats currency using the header entity's currency (`useCurrencies` / `entityCurrency.ts`)
+- On `createRecord` success, updates `pageContext.recordId` with the new record ID
 
-#### Tool Invocation Rendering
-
-`ToolResponseRenderer.tsx` dispatches on the result's `uiHint` (see
-[05-TOOLS.md — Tool Response Enrichment](./05-TOOLS.md#tool-response-enrichment))
-to one of several display components:
+#### Tool invocation rendering (`uiHint`)
 
 | `uiHint` | Component | Used for |
 |---|---|---|
 | `card` / `table` | generic record/list rendering | `createRecord`, `updateRecord`, plain `searchRecords` |
-| `account_ledger` | `AccountLedgerDisplay` | `searchRecords` on `posting` scoped to one focus account — chronological ledger with received/debited annotation |
-| `posting_journal` | `PostingJournalDisplay` | `searchRecords` on `posting` with no single focus account — journal-style listing |
-| `posting_dual` | `PostingDualDisplay` | `searchRecords` on `posting` fallback dual debit/credit columns |
+| `account_ledger` | `AccountLedgerDisplay` | `searchRecords` on `posting` scoped to one focus account |
+| `posting_journal` | `PostingJournalDisplay` | `searchRecords` on `posting` without single focus account |
+| `posting_dual` | `PostingDualDisplay` | `searchRecords` on `posting` dual debit/credit columns |
 | `financial_report` | `FinancialReportDisplay` | `runFinancialReport` (trial balance, monthly trial balance, income statement) |
 
-`MetricsDisplay` renders summary metric cards used by some analytics tool
-results. The `posting`-specific hints come from
-`enrichPostingSearchResult()` — see
+Posting-specific hints come from `enrichPostingSearchResult()` — see
 [05-TOOLS.md — `searchRecords` posting enrichment](./05-TOOLS.md#searchrecords-posting-enrichment--enrichpostingsearchresult).
-
-In **LLM trace detail pages** (`LLMTraceDetailPage.tsx`), the same
-`ToolResponseRenderer` is reused to render tool invocations from a completed
-trace, via `lib/traceToolResults.ts` (`parseTraceToolInvocations` /
-`parseTraceStepsToolInvocations` / `extractSqlQueriesFromStep`) — see
-[11-OBSERVABILITY.md](./11-OBSERVABILITY.md).
 
 ---
 
-## Conversation History: `ChatContext` (legacy) vs Thread Persistence
+## Conversation history
 
-Two history mechanisms now coexist:
+### Thread persistence (`chat_thread`) — primary path
 
-- **`ChatContext.messagesAi`** (React state, in-memory only) — the original
-  mechanism, still used for chats that have **no `chatId`**.
-- **`chat_thread` table** (Postgres, via `/api/chat/*`) — used whenever
-  `ChatUI` is rendered with a `chatId` (i.e. via `ChatShell`, see "Thread
-  Persistence" below). When `chatId` is set, messages are saved to
-  `chat_thread` and **not** synced through `ChatContext.messagesAi` — this
-  avoids one thread's messages overwriting another's in the shared context.
+**Full doc**: [CHAT_THREADS.md](../CHAT_THREADS.md)
 
-### `ChatContext.messagesAi` mechanism (no `chatId`)
+- `ChatShell` wraps `ChatThreadSidebar` + `ChatUI` with a client-generated `chatId` (`chat_<uuid>`).
+- On first message: `POST /api/chat/threads` creates the row; on `onFinish`: `PUT /api/chat/:chatId` saves full `messages[]` + metadata.
+- `GET /api/chat` lists threads for the current user (only those with messages).
+- Rows are scoped by **`org_id` + `user_id`** (standard DAL org filter since 2026-06-16).
+  Migration: `backend/prisma/migration/2026-06-16/add_chat_thread_org_id.sql`.
 
-```
-ChatContext.tsx
-  messagesAi: any[]        ← stored in useState
-  setMessagesAi(messages)  ← updated whenever useChat.messages changes
+When `chatId` is set, messages are **not** synced through `ChatContext.messagesAi` (avoids cross-thread overwrites).
 
-ChatUI.tsx (useChat hook)
-  messages ← useChat manages this locally
+### Legacy in-memory path (no `chatId`)
 
-  On mount (chat panel opens):
-    setMessages(messagesAi)    ← restore from context into useChat
-
-  On every response:
-    setMessagesAi(messages)    ← sync back to context
-```
-
-### What "lost" means in practice (no `chatId`)
+`ChatContext.messagesAi` still used for bare `ChatUI` without `ChatShell`:
 
 | Event | History outcome |
 |-------|----------------|
-| Close chat panel and reopen (same page) | Restored — context survives |
-| Navigate to a different page | **Lost** — context resets |
-| Refresh the browser | **Lost** |
-| Close the browser | **Lost** |
+| Close chat panel and reopen (same page) | Restored from `messagesAi` |
+| Navigate away / refresh | **Lost** |
 
-This remains the behaviour for any `ChatUI` instance that isn't wrapped in
-`ChatShell` (e.g. the legacy `ChatDrawer`, not currently wired into
-`App.tsx`). Long-lived task sequences still belong in a workbench session,
-where history is persisted to `agent_message` (see
-[08-DATA_MODELS.md](./08-DATA_MODELS.md)).
-
----
-
-## Thread Persistence (`chat_thread`)
-
-**Full doc**: [docs/CHAT_THREADS.md](../CHAT_THREADS.md) — architecture
-diagram, DB schema, API table, UI/layout details, manual test checklist.
-
-Summary for this doc's purposes:
-
-- `ChatShell` (`frontend-1/src/components/chat/ChatShell.tsx`) wraps
-  `ChatThreadSidebar` + `ChatUI` and assigns every chat a `chatId`
-  (`chat_<uuid>`, generated client-side). `ChatShell` is what's now mounted
-  in `AppLayout`/`PageLayout` (replacing the bare `ChatUI` from earlier
-  versions of this doc) and on dashboards (`fullPage` mode).
-- On first message, `ChatUI` calls `POST /api/chat/threads` to create the
-  `chat_thread` row, then streams via the existing `/api/agent/chat/stream`
-  endpoint (unchanged — see [Request Flow](#request-flow-frontend-to-backend)
-  below). On `onFinish`, `PUT /api/chat/:chatId` persists the full
-  `messages[]` (JSONB) plus `metadata` (`pageContext`, `entityId`,
-  `entityName`).
-- `GET /api/chat` lists the current user's threads (only those with
-  messages), used by `ChatThreadSidebar` and `useChatThreads`.
-- **No `org_id` filtering** — `chat_thread` rows are scoped by `user_id`, not
-  org. See [08-DATA_MODELS.md — `chat_thread`](./08-DATA_MODELS.md#chat_thread)
-  for the multi-tenancy rationale.
-- `resetChat()` / `closeChat()` (`ChatContext.tsx`) and `chatSessionId`
-  (incremented by `resetChat`) let other parts of the UI force a fresh
-  `ChatShell` instance (new `activeChatId`) — wired via
-  `frontend-1/src/utils/chatSessionBridge.ts` (`registerChatReset`), so code
-  outside `ChatContext` (e.g. a "start new chat" button elsewhere in the
-  layout) can trigger a reset without prop-drilling.
+Long-lived multi-step work belongs in a workbench session (`agent_message` table).
 
 ---
 
@@ -257,83 +179,141 @@ Summary for this doc's purposes:
 
 **File**: `frontend-1/src/contexts/ChatContext.tsx`
 
+`ChatContext` **stores** `pageContext` — it does not decide `posting` vs `account`.
+Each page calls `setPageContext()` in a `useEffect` on mount and clears on unmount.
+
 ```typescript
 export interface PageContext {
-  modelName: string;                   // Prisma model, e.g. 'posting', 'invoice', 'dashboard'
-  viewName: string;                    // View name, e.g. 'posting_view', 'invoice_view'
-  recordId?: string | null;            // ID of the record currently open (edit forms)
-  stateId?: string | null;             // Workflow state ID (transactional models)
-  viewId?: string | null;              // View ID for the current form view
-  modelDisplayName?: string | null;    // Human label, e.g. 'Posting' (used in input placeholder)
-  currentPath?: string;                // React Router pathname
-  promptTypes?: string[];              // Override prompt type selection, e.g. ['analytics']
-  modelContext?: Record<string, any>;  // Model-specific extras (see below)
+  modelName: string;                   // e.g. 'posting', 'account', 'invoice'
+  viewName: string;                    // e.g. 'posting_view'
+  recordId?: string | null;
+  stateId?: string | null;
+  viewId?: string | null;
+  modelDisplayName?: string | null;
+  currentPath?: string;
+  promptTypes?: string[];              // e.g. ['analytics', 'default']
+  focusModels?: string[];              // e.g. ['posting', 'account'] on finance chat
+  modelContext?: Record<string, any>;  // legalEntityId, selectedAccountId, accountName, …
+  searchAllEntities?: boolean;         // set per-request in ChatUI
+  userQuestion?: string;               // set per-request in ChatUI
 }
 ```
 
-`PageContext` is the bridge between "what page is the user on" and prompt/
-tool selection on the backend — see
-[04-PROMPT_SYSTEM.md — Layer 2](./04-PROMPT_SYSTEM.md#layer-2-base-prompt-from-dynamicpromptmanager-prompt_template)
-for how `recordId`, `viewName`, and `modelContext` placeholders are resolved
-into the prompt, and
-[05-TOOLS.md — Model → Default Tool Set](./05-TOOLS.md#model--default-tool-set)
-for how `modelName` determines which model-specific tools load.
+### Who sets `modelName`
+
+| Page | `modelName` | Set by |
+|------|-------------|--------|
+| Account list `/accounting/accounts` | `account` | `AccountList` → `Master type="account"` |
+| Transactions / posting list | `posting` | `Master type="posting"` |
+| Posting form | `posting` | `PostingForm.tsx` (hardcoded) |
+| Account form | `account` | `AccountForm.tsx` (hardcoded) |
+| Bank Transactions | `posting` | `BankTransactions.tsx` + `selectedAccountId` |
+| Dashboard | `posting` | `FabriqDashboard` → `buildDefaultPostingChatContext()` |
+| No page context | `posting` | `ChatUI` fallback via `buildDefaultPostingChatContext()` |
+
+**Dashboard does not infer model from typed text.** `modelName` is pre-set to `posting`;
+`focusModels: ['posting', 'account']` lets the LLM query either model in tool calls.
 
 ### `modelContext` examples
 
-| Page | `modelContext` content |
-|------|----------------------|
-| Posting list with account selected | `{ selectedAccountId: 'acc_...' }` |
-| Invoice form | `{ supplierId: 'sup_...' }` |
-| Dashboard | *(empty or omitted)* |
+| Page | `modelContext` |
+|------|----------------|
+| Dashboard / finance chat | `{ legalEntityId, legalEntityName, currencyCode, currencyId }` from header entity selector |
+| Bank Transactions | `{ selectedAccountId, selectedAccountName, legalEntityId, … }` |
+| Account form (edit) | `{ accountName, accountCode, legal_entity_id, currencyCode }` |
+| Posting list | `{ legalEntityId, legalEntityName }` |
 
-### How each page sets `PageContext`
+### `promptTypes` — default vs analytics
 
-Every page that wants the chat to be context-aware calls `setPageContext()`
-inside a `useEffect`:
+`promptTypes` controls which `prompt_template` rows `DynamicPromptManager` loads and merges.
+
+| `prompt_type` | Purpose |
+|---------------|---------|
+| `default` | CRUD, list filters, `createRecord` / `searchRecords` rules |
+| `analytics` | `analyticsQuery` SQL patterns, aggregates, trial balance via `runFinancialReport` |
+| `reconciliation` | Bank reconciliation (Bank Transactions page) |
+
+**Defaults in this project:**
+
+| Context | `promptTypes` |
+|---------|---------------|
+| Dashboard / finance chat | `['analytics', 'default']` via `buildDefaultPostingChatContext` or `enrichFinanceChatContext` |
+| Bank Transactions | `['reconciliation', 'analytics', 'default']` |
+| Posting/account pages (no explicit set) | `['analytics', 'default']` via enrichment |
+| Backend fallback (if empty) | `['analytics', 'default']` in `AgentService` |
+
+Posting templates: `backend/prisma/metadata/prompt-templates/view_d8b6c832-*` (`posting_view`).
+
+`PageContext.promptTypes` from the frontend **wins** over any `classifyQuestion()` suggestion.
+`classifyQuestion()` is used for `llm_trace.query_type` logging only.
+
+### Example: dashboard
 
 ```typescript
-// Example: PostingForm.tsx
-useEffect(() => {
-  setPageContext({
-    modelName: 'posting',
-    viewName: getViewName('posting'),     // e.g. 'posting_view'
-    recordId: id || null,                 // from useParams()
-    stateId: null,
-    viewId: viewId || null,               // from useParams()
-    modelDisplayName: 'Posting',
-    currentPath: location.pathname,
-  });
-
-  return () => setPageContext(null);      // Clear on unmount
-}, [id, viewId, location.pathname, setPageContext]);
+// FabriqDashboard.tsx
+setPageContext({
+  ...buildDefaultPostingChatContext(currentEntity, entities, currencyById),
+  currentPath: '/',
+});
+// → modelName: 'posting', promptTypes: ['analytics','default'],
+//   focusModels: ['posting','account']
 ```
 
+### Example: posting form
+
 ```typescript
-// Example: Dashboard (AIDashboard.tsx)
+// PostingForm.tsx
 setPageContext({
-  modelName: 'dashboard',
-  viewName: 'dashboard_view',
-  modelDisplayName: 'Dashboard',
-  currentPath: '/',
-  promptTypes: ['analytics', 'default'],
+  modelName: 'posting',
+  viewName: getViewName('posting'),
+  recordId: id || null,
+  viewId: viewId || null,
+  modelDisplayName: getModelDisplayName('posting'),
+  currentPath: location.pathname,
+  modelContext: buildPostingModelContext(currentEntity, entities),
 });
 ```
 
-### Pages that set `PageContext`
-
-- All form components (`PostingForm`, `InvoiceDetails`, `PromptTemplateForm`, etc.)
-- Dashboard (`AIDashboard.tsx`)
-- `ToolResponseRenderer.tsx` — updates `recordId` dynamically when a new record is created via tool
-
-Pages that don't call `setPageContext` leave it `null` — the chat falls back
-to a generic state with no model-specific tools or prompt tailoring.
+Pages that don't call `setPageContext` leave it `null` — `ChatUI` falls back to
+`buildDefaultPostingChatContext()` (finance assistant with posting as primary model).
 
 ---
 
-## Request Flow: Frontend to Backend
+## Context-aware UI features
+
+**File**: `frontend-1/src/components/chat/chatUtils.ts`
+
+### Input placeholder (`getInputPlaceholder`)
+
+| Context | Placeholder |
+|---------|-------------|
+| `modelName === 'account'` + `recordId` | "Ask about this account (balance, activity, updates)" |
+| `modelName === 'account'` (list) | "Ask about chart of accounts and balances" |
+| `modelName === 'posting'` | "Ask about transactions and postings" |
+| Other model | "Ask about this {modelDisplayName}" |
+| Fallback | "Ask about postings and accounts" |
+
+### Suggestion chips (`getContextSuggestions`)
+
+Shown only in the **empty state** (no messages). Clicking a chip calls `append()` — same as typing.
+
+| Context | Suggestions |
+|---------|-------------|
+| Dashboard / finance focus (`currentPath === '/'` or `focusModels` has posting + account) | Combined posting + account finance prompts |
+| `posting` + `selectedAccountId` | Reconciliation: "Which transactions are unreconciled?", … |
+| `modelName === 'posting'` | Posting list prompts |
+| `modelName === 'account'` + `recordId` | Account detail prompts |
+| `modelName === 'account'` (list) | Account list prompts |
+| Other models | Generic form prompts |
+
+Constants: `POSTING_CHAT_SUGGESTIONS`, `ACCOUNT_CHAT_SUGGESTIONS` in `chatUtils.ts`.
+
+---
+
+## Request flow: frontend to backend
 
 ### Headers
+
 ```
 POST /api/agent/chat/stream
 Content-Type: application/json
@@ -342,112 +322,81 @@ Authorization: Bearer <token>         ← JWT from __session cookie
 ```
 
 ### Request body
+
 ```json
 {
   "stream": true,
+  "chatId": "chat_<uuid>",
   "context": {
     "modelName": "posting",
     "viewName": "posting_view",
-    "recordId": "post_abc123",
-    "modelContext": { "selectedAccountId": "acc_xyz" }
+    "promptTypes": ["analytics", "default"],
+    "focusModels": ["posting", "account"],
+    "modelContext": {
+      "legalEntityId": "lega_…",
+      "legalEntityName": "Acme Corp",
+      "currencyCode": "INR"
+    },
+    "userQuestion": "How much did I spend last month?"
   },
   "messages": [
-    { "role": "user",      "content": "Show me unmatched transactions" },
-    { "role": "assistant", "content": "Here are the 12 unmatched postings..." },
-    { "role": "user",      "content": "Which ones are over ₹50,000?" }
+    { "role": "user", "content": "List postings from yesterday" },
+    { "role": "assistant", "content": "Here are the postings…" },
+    { "role": "user", "content": "How much did I spend last month?" }
   ]
 }
 ```
 
-For the full request/response contract (including how `sessionId` changes
-the shape), see
-[09-API_REFERENCE.md — `POST /api/agent/chat/stream`](./09-API_REFERENCE.md#post-apiagentchatstream).
+When `sessionId` is absent, `AgentService.handleStreamingRequest` skips session loading,
+`agent_message` writes, and auto-continuation.
 
-When `sessionId` is absent, `AgentService.handleStreamingRequest` skips all
-session-related logic: no session loading, no `agent_message` writes, no
-auto-continuation.
+Full contract: [09-API_REFERENCE.md](./09-API_REFERENCE.md#post-apiagentchatstream).
 
 ---
 
-## Backend Handling
+## Backend handling
 
-The backend treats a conversational-chat request the same as a session
-request, minus the session-specific steps. Rather than duplicate that here,
-this section is a map to where each piece is documented:
-
-| Concern | Where it's documented |
+| Concern | Document |
 |---|---|
-| Prompt assembly (`DynamicPromptManager`, placeholders, `{{#if}}` blocks) | [04-PROMPT_SYSTEM.md — Layer 2](./04-PROMPT_SYSTEM.md#layer-2-base-prompt-from-dynamicpromptmanager-prompt_template) |
-| `promptTypes` selection for chat (`classifyQuestion`, `maxSteps`) | [04-PROMPT_SYSTEM.md — Question Routing](./04-PROMPT_SYSTEM.md#question-routing-conversational-chat) |
-| Tool selection (`ToolManager.getUnifiedTools`, no session tools) | [05-TOOLS.md — Tool Selection](./05-TOOLS.md#tool-selection-toolmanagergetunifiedtools) |
-| `streamText` invocation, `maxSteps`, model provider | [10-LIBRARIES_AND_PROVIDERS.md](./10-LIBRARIES_AND_PROVIDERS.md) |
-| `llm_trace` / `llm_trace_step` logging | [11-OBSERVABILITY.md](./11-OBSERVABILITY.md) |
-
-One conversational-chat-specific note: `PageContext.promptTypes`, if set by
-the page (e.g. the dashboard sets `['analytics', 'default']`), takes
-precedence over `classifyQuestion()`'s suggestion — see
-[04-PROMPT_SYSTEM.md — Question Routing](./04-PROMPT_SYSTEM.md#question-routing-conversational-chat)
-for the exact precedence.
+| Prompt assembly (`DynamicPromptManager`, placeholders) | [04-PROMPT_SYSTEM.md — Layer 2](./04-PROMPT_SYSTEM.md#layer-2-base-prompt-from-dynamicpromptmanager-prompt_template) |
+| `promptTypes` and template files | [04-PROMPT_SYSTEM.md — Question Routing](./04-PROMPT_SYSTEM.md#question-routing-conversational-chat) |
+| Tool selection (`ToolManager.getUnifiedTools`) | [05-TOOLS.md — Tool Selection](./05-TOOLS.md#tool-selection-toolmanagergetunifiedtools) |
+| `streamText`, `maxSteps`, model provider | [10-LIBRARIES_AND_PROVIDERS.md](./10-LIBRARIES_AND_PROVIDERS.md) |
+| `llm_trace` logging | [11-OBSERVABILITY.md](./11-OBSERVABILITY.md) |
+| Chat thread CRUD | [CHAT_THREADS.md](../CHAT_THREADS.md) |
 
 ---
 
-## Context-Aware UI Features
+## Chat placement in the UI
 
-**File**: `frontend-1/src/components/chat/chatUtils.ts`
+All main placements render `ChatShell` (thread sidebar + `ChatUI`):
 
-### Input placeholder
+| Component | Where | Mode |
+|-----------|-------|------|
+| `AppLayout.tsx` | Right sidebar | `compact` + `sidebarMode` |
+| `PageLayout.tsx` | Right sidebar | `compact` + `sidebarMode` |
+| `FabriqDashboard`, `RequestDashboard`, `ProcurementDashboardApproval` | Full-page when `isChatOpen` | `fullPage` — nav collapses to icon rail |
+| `ChatDrawer.tsx` | Drawer overlay | Not wired in main `App.tsx` |
 
-```typescript
-// If page has a named model: "Ask about this Posting"
-// Otherwise: "Ask anything"
-placeholder = modelDisplayName
-  ? `Ask about this ${modelDisplayName}`
-  : 'Ask anything'
-```
+`toggleChat()` from `ChatContext` controls visibility.
+`resetChat()` increments `chatSessionId` and clears state — wired via `chatSessionBridge.ts`.
 
-### Suggested prompts
-
-Suggestions shown when chat opens (vary by page context):
-
-| Page context | Suggestions |
-|---|---|
-| Dashboard (`modelName: 'dashboard'`) | Procurement-focused: "Show pending purchase orders", "Outstanding invoices", etc. |
-| Posting with `selectedAccountId` | Reconciliation-focused: "Show unmatched transactions", "Reconcile this account" |
-| Other model pages | Generic form-related: "Create a new record", "Search for..." |
-| No context | Generic analytics prompts |
+On dashboards, opening chat switches to **full-page mode**
+(`isChatFullPage = isChatOpen && isDashboard` in `AppLayout.tsx`).
 
 ---
 
-## Chat Placement in the UI
+## Debugging checklist
 
-All placements below render `ChatShell` (thread sidebar + `ChatUI`), not a
-bare `ChatUI` — see [Thread Persistence](#thread-persistence-chat_thread).
-
-| Component | Where | Width / Mode |
-|-----------|-------|-------|
-| `AppLayout.tsx` | Main app layout — right sidebar | `ChatShell` with `compact sidebarMode`, width `min(38vw, 560px)` (was `20.666%`) |
-| `PageLayout.tsx` | Alternative layout — right sidebar | `ChatShell` with `compact sidebarMode`, `max(30vw, 420px)` |
-| Dashboards (`FabriqDashboard`, `RequestDashboard`, `ProcurementDashboardApproval`) | Full-page chat when `isChatOpen` | `ChatShell` with `fullPage` — nav auto-collapses to icon rail, edge-to-edge content, wide (`w-72`) thread sidebar with "New prompt" |
-| `ChatDrawer.tsx` | Slide-in drawer overlay (not currently wired into `App.tsx`) | Default `ChatShell` props, full right panel |
-
-The chat is hidden by default. `toggleChat()` from `ChatContext` controls
-visibility. `resetChat()`/`closeChat()` and `chatSessionId` (see
-[Thread Persistence](#thread-persistence-chat_thread)) let other UI trigger a
-fresh chat session.
-
-On dashboard pages, opening chat switches to **full-page mode**
-(`isChatFullPage = isChatOpen && isDashboard` in `AppLayout.tsx`): the nav
-auto-collapses to an icon rail (previous expanded/collapsed state is restored
-when chat closes), and the main content area becomes edge-to-edge
-(`overflow-hidden p-0`).
-
-The `isChatOpen` flag persists in `ChatContext` for the lifetime of the React
-app (resets on full page refresh).
+1. **Wrong suggestions?** — Check `pageContext` in React devtools; trace which page called `setPageContext`.
+2. **Wrong tools?** — Network tab → `context.modelName`, `context.viewName`, `context.promptTypes`.
+3. **Account question on dashboard?** — Expected: `modelName` stays `posting`; LLM should pass `modelName: 'account'` in tool args.
+4. **Thread not listed?** — Only threads with messages appear; check `chat_thread` filtered by `org_id` + `user_id`.
+5. **Prompt changes not applied?** — Edit `backend/prisma/metadata/prompt-templates/*.txt` → `npm run sync-prompt-templates`.
 
 ---
 
-## What's Next
+## What's next
 
-This is the final doc in the agent documentation set. See
-[README.md](./README.md) for the full index and reading order, and
+See [README.md](./README.md) for the full agent doc index and
 [14-SHORTFALLS_AND_ROADMAP.md](./14-SHORTFALLS_AND_ROADMAP.md) for known gaps.

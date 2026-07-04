@@ -28,6 +28,9 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useEntity } from "@/contexts/EntityContext";
+import { useCurrencies } from "@/hooks/useCurrencies";
+import { resolveEntityCurrencyCode } from "@/utils/entityCurrency";
+import { useUserData } from "@/hooks/useUserData";
 import { API_URL, getAuthToken } from "@/api/apiClient";
 import { viewAPI } from "@/api/metadataApi";
 import {
@@ -80,22 +83,6 @@ interface ImportedPostingRow {
 
 const BALANCE_SHEET_CLASSIFICATIONS = ["Assets", "Liabilities", "Equity"];
 const CREDIT_NORMAL = new Set(["Liabilities", "Equity"]);
-
-const BASE_CURRENCY_ID_TO_CODE: Record<string, string> = {
-  curr_inr: "INR",
-  curr_usd: "USD",
-};
-
-function resolveEntityCurrencyCode(
-  entity: { currency?: { code?: string }; basecurrency_id?: string } | null
-): string {
-  const code = entity?.currency?.code?.trim().toUpperCase();
-  if (code) return code;
-  const fromId = entity?.basecurrency_id
-    ? BASE_CURRENCY_ID_TO_CODE[entity.basecurrency_id.toLowerCase()]
-    : undefined;
-  return fromId ?? "INR";
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -184,10 +171,12 @@ async function apiUpload(path: string, formData: FormData) {
 export default function OpeningBalances() {
   const { toast } = useToast();
   const { currentEntity, currentEntityId } = useEntity();
+  const { currencyById } = useCurrencies();
+  const { getBaseCurrencyCode } = useUserData();
 
   const displayCurrencyCode = useMemo(
-    () => resolveEntityCurrencyCode(currentEntity),
-    [currentEntity]
+    () => resolveEntityCurrencyCode(currentEntity, currencyById) ?? getBaseCurrencyCode(),
+    [currentEntity, currencyById, getBaseCurrencyCode]
   );
 
   // ── State ─────────────────────────────────────────────────────────────────

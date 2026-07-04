@@ -6,6 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEntity } from '@/contexts/EntityContext';
 import { useChat } from '@/contexts/ChatContext';
+import { useCurrencies } from '@/hooks/useCurrencies';
 import { ChatShell } from '@/components/chat/ChatShell';
 import { buildDefaultPostingChatContext } from '@/utils/postingChatContext';
 import {
@@ -31,6 +32,7 @@ import { C } from './design-system';
 
 const FabriqDashboard: React.FC = () => {
   const { currentEntity, entities } = useEntity();
+  const { currencyById } = useCurrencies();
   const { isChatOpen, setPageContext } = useChat();
   const navigate = useNavigate();
 
@@ -38,11 +40,11 @@ const FabriqDashboard: React.FC = () => {
 
   useEffect(() => {
     setPageContext({
-      ...buildDefaultPostingChatContext(currentEntity, entities),
+      ...buildDefaultPostingChatContext(currentEntity, entities, currencyById),
       currentPath: '/',
     });
     return () => setPageContext(null);
-  }, [setPageContext, currentEntity, entities]);
+  }, [setPageContext, currentEntity, entities, currencyById]);
 
   // Period state for the company layout only (individual manages its own internally)
   const [selectedFY, setSelectedFY] = useState<FinancialYearOption>(() =>

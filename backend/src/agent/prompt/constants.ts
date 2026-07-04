@@ -24,6 +24,10 @@ export const TOOL_RESPONSE_HANDLING_GUIDELINE = `
 ❌ BAD: Listing each posting with description, amount, and date in your reply
 ✅ GOOD: "Here are the postings for this week:" or "Found 3 suppliers matching your criteria:"
 
+#### LEGAL ENTITY IN REPLIES (from tool step, not chat header)
+
+When a tool result includes **filters.legal_entity_names** (resolved from **legal_entity_ids** used in that tool call), name that entity in your reply — e.g. "expense account **for Mumbai Technology Hub Pvt Ltd**" or "trial balance **for Bangalore Office**". Use the exact names from the tool result; do not guess from the UI header or org name.
+
 #### CHAT RESPONSE FORMATTING — TEXT-ONLY ANSWERS (no tool table)
 
 When answering analytics, rankings, summaries, or explanations **without** a tool table (e.g. top vendors, spend breakdowns, balance explanations):

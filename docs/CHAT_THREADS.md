@@ -2,7 +2,7 @@
 
 This document describes the **ChatGPT-style chat thread** feature added to Fabriq Books: server-side conversation history, a thread sidebar, and full-page dashboard chat layout.
 
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-16
 
 ---
 
@@ -49,13 +49,17 @@ Agent responses still stream via the existing agent endpoint (`/api/agent/chat/s
 
 ## Database
 
-**Migration:** `backend/prisma/migration/add_chat_threads.sql`  
+**Migrations:**
+- `backend/prisma/migration/add_chat_threads.sql` — initial table (new installs)
+- `backend/prisma/migration/2026-06-16/add_chat_thread_org_id.sql` — add `org_id` + composite index (existing DBs)
+
 **Prisma model:** `chat_thread` in `backend/prisma/schema/data.prisma`
 
 | Column | Purpose |
 |--------|---------|
 | `id` | Client-generated thread ID (e.g. `chat_<uuid>`) |
-| `user_id` | Owner — all queries filter by authenticated user |
+| `org_id` | Tenant scope — set from authenticated user's org via DAL |
+| `user_id` | Owner — threads filtered by org + user |
 | `title` | Defaults to `New Financial Inquiry`; updated from first user message |
 | `messages` | Full `UIMessage[]` as JSONB |
 | `metadata` | Page context, entity ID/name at save time |

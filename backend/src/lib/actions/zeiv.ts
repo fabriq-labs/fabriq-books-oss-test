@@ -910,7 +910,9 @@ export const generate_invoice_from_po = async (
       supplier_remarks: purchaseOrder?.comment,
       shipping_terms: purchaseOrder?.supplier_details?.shipping_terms?.shipping_terms,
       shipping_method: purchaseOrder?.supplier_details?.shipping_method?.shipping_method,
-      payment_terms: purchaseOrder?.supplier_details?.payment_terms?.payment_terms,
+      payment_terms_id: purchaseOrder?.supplier_details?.payment_term_id
+        ?? purchaseOrder?.supplier_details?.payment_terms?.id
+        ?? null,
       requester_name: purchaseOrder?.requester,
       po_number: purchaseOrder?.po_number,
       invoice_type: 'With PO',

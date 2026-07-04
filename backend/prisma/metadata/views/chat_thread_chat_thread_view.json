@@ -13,9 +13,16 @@
     },
     "user_id": {
       "dataType": "string",
+      "required": true,
+      "permission": "update",
+      "displayName": "User",
+      "isColumnShow": false
+    },
+    "org_id": {
+      "dataType": "string",
       "required": false,
       "permission": "read",
-      "displayName": "User",
+      "displayName": "Org",
       "isColumnShow": false
     },
     "title": {

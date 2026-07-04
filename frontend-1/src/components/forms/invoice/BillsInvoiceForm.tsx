@@ -19,6 +19,16 @@ interface BillsInvoiceFormProps {
     onBack?: () => void;
 }
 
+function paymentTermsDisplay(value: unknown): string | undefined {
+    if (value == null) return undefined;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object' && value !== null && 'payment_terms' in value) {
+        const label = (value as { payment_terms?: string }).payment_terms;
+        return label || undefined;
+    }
+    return undefined;
+}
+
 function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
     return (
         <div className="flex flex-col gap-0.5 py-1">
@@ -27,6 +37,16 @@ function DetailRow({ label, value }: { label: string; value?: string | number | 
         </div>
     );
 }
+
+const formatPaymentTerms = (paymentTerms: unknown): string | undefined => {
+    if (!paymentTerms) return undefined;
+    if (typeof paymentTerms === 'string') return paymentTerms;
+    if (typeof paymentTerms === 'object' && paymentTerms !== null && 'payment_terms' in paymentTerms) {
+        const label = (paymentTerms as { payment_terms?: string }).payment_terms;
+        return label || undefined;
+    }
+    return undefined;
+};
 
 const BillsInvoiceForm: React.FC<BillsInvoiceFormProps> = ({
     onComplete,
@@ -115,7 +135,7 @@ const BillsInvoiceForm: React.FC<BillsInvoiceFormProps> = ({
                     : {}),
             };
             try {
-                const res = await viewAPI.update('invoice', requisitionId, 'invoice_view', updatedDetails);
+                const res: any = await viewAPI.update('invoice', requisitionId, 'invoice_view', updatedDetails);
                 console.log(res);
                 setDetails(res?.data ?? details);
             } catch (err: any) {
@@ -383,7 +403,7 @@ const BillsInvoiceForm: React.FC<BillsInvoiceFormProps> = ({
                                         )}
                                     </div>
                                 )}
-                                {(details?.shipping_terms || details?.payment_terms) && (
+                                {(details?.shipping_terms || formatPaymentTerms(details?.payment_terms)) && (
                                     <div className="pt-2 space-y-1">
                                         {details?.shipping_terms && (
                                             <>
@@ -391,10 +411,10 @@ const BillsInvoiceForm: React.FC<BillsInvoiceFormProps> = ({
                                                 <p className="text-sm font-medium text-foreground">{details.shipping_terms}</p>
                                             </>
                                         )}
-                                        {details?.payment_terms && (
+                                        {formatPaymentTerms(details?.payment_terms) && (
                                             <>
                                                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">Payment terms</p>
-                                                <p className="text-sm font-medium text-foreground">{details.payment_terms}</p>
+                                                <p className="text-sm font-medium text-foreground">{formatPaymentTerms(details?.payment_terms)}</p>
                                             </>
                                         )}
                                     </div>

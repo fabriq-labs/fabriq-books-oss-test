@@ -748,12 +748,14 @@ async function runSingleQuestion(question: string): Promise<void> {
     await prisma.$disconnect();
 }
 
-// Run: single question if --question/-q or first positional arg, otherwise full suite
-const customQuestion = getCustomQuestion();
-(customQuestion ? runSingleQuestion(customQuestion) : runAllTests(true)).catch(async (error) => {
+// Run only when executed directly (npm run test:posting-prompt), not when imported by Jest
+if (require.main === module) {
+  const customQuestion = getCustomQuestion();
+  (customQuestion ? runSingleQuestion(customQuestion) : runAllTests(true)).catch(async (error) => {
     console.error('Test harness error:', error);
     await prisma.$disconnect();
     process.exit(1);
-});
+  });
+}
 
 export { runAllTests, runSingleQuestion, getCustomQuestion, TEST_CASES, TEST_CONFIG };

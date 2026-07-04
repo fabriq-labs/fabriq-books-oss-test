@@ -154,7 +154,7 @@ export const createInvoiceData = (customerId: string, locationId: string, orgId:
     invoice_net_total: 1000.00, // Hardcoded test data
     invoice_total: 1000.00, // Hardcoded test data
     balance_amount: 1000.00, // Initial balance equals total
-    payment_terms: 'Net 30',
+    payment_terms_id: 'pay_demo_net30',
     shipping_method: 'Standard',
     shipping_terms: 'FOB',
     org_id: orgId,

@@ -1,13 +1,14 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Eye } from 'lucide-react';
+import { Pencil, Trash2, Eye, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActionButtonsProps {
   onView?: (id: string) => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onDuplicate?: (id: string) => void;
   id: string;
   className?: string;
 }
@@ -16,6 +17,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   onView,
   onEdit,
   onDelete,
+  onDuplicate,
   id,
   className
 }) => {
@@ -39,6 +41,16 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           className="h-8 w-8 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
         >
           <Pencil size={16} />
+        </Button>
+      )}
+      {onDuplicate && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onDuplicate(id)}
+          className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <Copy size={16} />
         </Button>
       )}
       {onDelete && (

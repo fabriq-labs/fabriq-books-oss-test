@@ -5,7 +5,7 @@
   "is_default": false,
   "version": 1,
   "priority": 0,
-  "context": null,
+  "context": "Posting aggregates, period filters, account ledger lists, and spending analysis via searchRecords and analyticsQuery",
   "created_by": null,
   "modified_by": null,
   "org_id": "52",

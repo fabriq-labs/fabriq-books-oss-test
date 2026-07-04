@@ -8,6 +8,7 @@ import { MetricsDisplay } from './MetricsDisplay';
 import { InvoiceMapPreview } from './InvoiceMapPreview';
 import { ReconciliationSuggestions } from './ReconciliationSuggestions';
 import { FinancialReportDisplay } from './FinancialReportDisplay';
+import { ToolLegalEntityScopeLabel } from './ToolLegalEntityScopeLabel';
 import { AccountLedgerDisplay } from './AccountLedgerDisplay';
 import { PostingJournalDisplay } from './PostingJournalDisplay';
 import { PostingDualDisplay, type PostingDualTable } from './PostingDualDisplay';
@@ -15,6 +16,7 @@ import { ToolInvocation as BaseToolInvocation, ToolResult as BaseToolResult } fr
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
 import { normalizeToolInvocation, resolvePostingSearchDisplayHint } from '../chatUtils';
+import { resolveToolLegalEntityLabel } from '@/utils/toolEntityLabel';
 import { Wrench } from 'lucide-react';
 
 interface ExtendedToolResult extends BaseToolResult {
@@ -24,6 +26,7 @@ interface ExtendedToolResult extends BaseToolResult {
     report_id?: string;
     filters?: Record<string, unknown>;
     currencyCode?: string;
+    legal_entity_names?: string[];
     success?: boolean;
     focusAccountName?: string;
     focusAccountId?: string;
@@ -41,13 +44,25 @@ interface ToolInvocation extends Omit<BaseToolInvocation, 'result'> {
 interface ToolResponseRendererProps {
     toolInvocations: ToolInvocation[];
     sidebarMode?: boolean;
+    /** Fallback when tool result omits currencyCode (e.g. legal entity reporting currency). */
+    defaultCurrencyCode?: string;
     /** When provided, used by ReconciliationSuggestions to send a follow-up message (e.g. confirm match) */
     onSendMessage?: (text: string) => void;
 }
 
-export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ toolInvocations, sidebarMode, onSendMessage }) => {
+export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({
+    toolInvocations,
+    sidebarMode,
+    defaultCurrencyCode,
+    onSendMessage,
+}) => {
     const navigate = useNavigate();
     const { setPageContext } = useChatContext();
+
+    const resolveCurrencyCode = (result?: ExtendedToolResult) =>
+        (typeof result?.currencyCode === 'string' && result.currencyCode.trim()
+            ? result.currencyCode.trim().toUpperCase()
+            : undefined) ?? defaultCurrencyCode;
 
     // Update context when createRecord is successful
     useEffect(() => {
@@ -190,13 +205,22 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                     <p className="text-sm text-slate-600">{description}</p>
                 ) : null;
 
+                const entityScopeLabel = resolveToolLegalEntityLabel(tool.result);
+
                 const wrapToolResult = (
                     content: React.ReactNode,
-                    options?: { showDescription?: boolean; hideToolBadge?: boolean }
+                    options?: {
+                        showDescription?: boolean;
+                        hideToolBadge?: boolean;
+                        hideEntityScope?: boolean;
+                    }
                 ) => (
                     <div key={index} className="space-y-2">
                         {!options?.hideToolBadge && toolNameBadge}
                         {options?.showDescription !== false && descriptionElement}
+                        {!options?.hideEntityScope && (
+                            <ToolLegalEntityScopeLabel label={entityScopeLabel} />
+                        )}
                         {content}
                     </div>
                 );
@@ -212,10 +236,10 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                             data={Array.isArray(data) ? data : []}
                             filters={tool.result.filters as Record<string, unknown> | undefined}
                             description={description ?? (tool.result.description as string | undefined)}
-                            currencyCode={tool.result.currencyCode as string | undefined}
+                            currencyCode={resolveCurrencyCode(tool.result)}
                             sidebarMode={sidebarMode}
                         />,
-                        { showDescription: false }
+                        { showDescription: false, hideEntityScope: true }
                     );
                 }
 
@@ -240,7 +264,7 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                         (tool.result.focusAccountName as string | undefined) ??
                                         undefined
                                     }
-                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    currencyCode={resolveCurrencyCode(tool.result)}
                                     sidebarMode={sidebarMode}
                                 />
                         );
@@ -252,7 +276,7 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                     title={tool.result.journalTitle as string | undefined}
                                     highlightSide={tool.result.journalFocusSide as 'debit' | 'credit' | undefined}
                                     highlightAccountName={tool.result.journalFocusAccountName as string | undefined}
-                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    currencyCode={resolveCurrencyCode(tool.result)}
                                     sidebarMode={sidebarMode}
                                 />
                         );
@@ -261,7 +285,7 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                         return wrapToolResult(
                                 <PostingDualDisplay
                                     tables={tool.result.tables as PostingDualTable[]}
-                                    currencyCode={tool.result.currencyCode as string | undefined}
+                                    currencyCode={resolveCurrencyCode(tool.result)}
                                     sidebarMode={sidebarMode}
                                 />
                         );
@@ -270,7 +294,7 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                         <PostingJournalDisplay
                             rows={data}
                             title={tool.result.journalTitle as string | undefined}
-                            currencyCode={tool.result.currencyCode as string | undefined}
+                            currencyCode={resolveCurrencyCode(tool.result)}
                             sidebarMode={sidebarMode}
                         />
                     );
@@ -372,10 +396,10 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({ tool
                                 data={Array.isArray(data) ? data : []}
                                 filters={tool.result.filters as Record<string, unknown> | undefined}
                                 description={description ?? tool.result.description as string | undefined}
-                                currencyCode={tool.result.currencyCode as string | undefined}
+                                currencyCode={resolveCurrencyCode(tool.result)}
                                 sidebarMode={sidebarMode}
                             />,
-                            { showDescription: false }
+                            { showDescription: false, hideEntityScope: true }
                         );
 
                     case 'invoice map':

@@ -483,10 +483,12 @@ async function runSingleQuestion(question: string): Promise<void> {
     }
 }
 
-const customQuestion = getCustomQuestion();
-(customQuestion ? runSingleQuestion(customQuestion) : runAllTests(true)).catch(async (error) => {
+if (require.main === module) {
+  const customQuestion = getCustomQuestion();
+  (customQuestion ? runSingleQuestion(customQuestion) : runAllTests(true)).catch(async (error) => {
     uninstallHardcodedPostingPromptPatch();
     console.error('Test harness error:', error);
     await prisma.$disconnect();
     process.exit(1);
-});
+  });
+}

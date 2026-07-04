@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "dev": "node -r dotenv/config ./node_modules/ts-node-dev/lib/bin.js --respawn --transpile-only src/index.ts",
     "test": "jest",
+    "test:suite": "jest --config jest.config.suite.js",
     "test:watch": "jest --watch",
     "test:posting-prompt": "ts-node --transpile-only src/agent/__tests__/posting-prompt.test.ts",
     "test:posting-sample-questions": "DOTENV_CONFIG_PATH=.env node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/agent/__tests__/posting-sample-questions.test.ts",

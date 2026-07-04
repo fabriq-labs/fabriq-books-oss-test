@@ -5,7 +5,7 @@
   "is_default": true,
   "version": 8,
   "priority": 0,
-  "context": null,
+  "context": "Posting / transactions — list, create, and update journals via searchRecords, createRecord, updateRecord",
   "created_by": null,
   "modified_by": null,
   "org_id": "52",

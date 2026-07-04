@@ -1,6 +1,12 @@
 import type { Entity } from '@/contexts/EntityContext';
 import { isEntityHeadquarters } from '@/contexts/EntityContext';
 import type { PageContext } from '@/contexts/ChatContext';
+import {
+  resolveEntityCurrencyCode,
+  type CurrencyCodeById,
+} from '@/utils/entityCurrency';
+
+export { resolveEntityCurrencyCode } from '@/utils/entityCurrency';
 
 /** Entity for posting chat/create — selected header entity, else HQ, else first. */
 export function resolvePostingLegalEntity(
@@ -26,6 +32,20 @@ export function resolveChatLegalEntity(
     legalEntityId: currentEntity?.id ?? null,
     legalEntityName: currentEntity?.legal_name ?? null,
   };
+}
+
+export function resolveEntityCurrencyId(
+  entity: Pick<Entity, 'currency' | 'basecurrency_id'> | null | undefined
+): string | null {
+  return entity?.currency?.id ?? entity?.basecurrency_id ?? null;
+}
+
+/** Entity used for default reporting currency in chat (selected entity, else HQ). */
+export function resolveChatReportingEntity(
+  currentEntity: Entity | null,
+  entities: Entity[]
+): Entity | null {
+  return currentEntity ?? entities.find((e) => isEntityHeadquarters(e)) ?? entities[0] ?? null;
 }
 
 /** posting_type applied when creating a posting through the UI form. */
@@ -59,13 +79,20 @@ export function buildPostingModelContext(
 /** Agent chat context — respects global entity selector only (no HQ default). */
 export function buildChatModelContext(
   currentEntity: Entity | null,
-  extra?: Record<string, unknown>
+  entities: Entity[],
+  extra?: Record<string, unknown>,
+  currencyById?: CurrencyCodeById
 ): Record<string, unknown> {
   const { legalEntityId, legalEntityName } = resolveChatLegalEntity(currentEntity);
+  const reportingEntity = resolveChatReportingEntity(currentEntity, entities);
+  const currencyCode = resolveEntityCurrencyCode(reportingEntity, currencyById);
+  const currencyId = resolveEntityCurrencyId(reportingEntity);
   return {
     ...extra,
     legalEntityId,
     legalEntityName,
+    ...(currencyCode ? { currencyCode } : {}),
+    ...(currencyId ? { currencyId } : {}),
   };
 }
 
@@ -75,7 +102,8 @@ export const FINANCE_FOCUS_MODELS = ['posting', 'account'] as const;
 /** Default agent context when ChatUI has no route pageContext (full-page chat). */
 export function buildDefaultPostingChatContext(
   currentEntity: Entity | null,
-  entities: Entity[]
+  entities: Entity[],
+  currencyById?: CurrencyCodeById
 ): PageContext {
   return {
     modelName: 'posting',
@@ -87,7 +115,7 @@ export function buildDefaultPostingChatContext(
     currentPath: '/chat',
     promptTypes: ['analytics', 'default'],
     focusModels: [...FINANCE_FOCUS_MODELS],
-    modelContext: buildChatModelContext(currentEntity),
+    modelContext: buildChatModelContext(currentEntity, entities, undefined, currencyById),
   };
 }
 
@@ -95,7 +123,8 @@ export function buildDefaultPostingChatContext(
 export function enrichFinanceChatContext(
   base: PageContext,
   currentEntity: Entity | null,
-  _entities: Entity[]
+  _entities: Entity[],
+  currencyById?: CurrencyCodeById
 ): PageContext {
   const modelName = base.modelName as string | undefined;
   if (modelName !== 'posting' && modelName !== 'account') {
@@ -113,7 +142,9 @@ export function enrichFinanceChatContext(
         : [...FINANCE_FOCUS_MODELS],
     modelContext: buildChatModelContext(
       currentEntity,
-      base.modelContext as Record<string, unknown> | undefined
+      _entities,
+      base.modelContext as Record<string, unknown> | undefined,
+      currencyById
     ),
   };
 }
