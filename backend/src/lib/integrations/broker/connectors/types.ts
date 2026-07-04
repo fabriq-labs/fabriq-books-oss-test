@@ -12,6 +12,10 @@ export interface BrokerOAuthConfig {
   refresh_token: string;
   api_server?: string;
   token_endpoint?: string;
+  /** Cached Questrade access token — encrypted in connection_config like refresh_token. */
+  access_token?: string;
+  /** ISO-8601 expiry for access_token; refresh only when now >= this minus buffer. */
+  access_token_expires_at?: string;
 }
 
 export interface BrokerConnectionConfig {
@@ -70,6 +74,66 @@ export interface BrokerQuoteDTO {
   currencyCode?: string;
 }
 
+export interface BrokerOptionStrikeDTO {
+  strikePrice: number;
+  callSymbolId: number;
+  putSymbolId: number;
+}
+
+export interface BrokerOptionRootDTO {
+  root: string;
+  multiplier: number;
+  strikes: BrokerOptionStrikeDTO[];
+}
+
+export interface BrokerOptionExpiryDTO {
+  expiryDate: string;
+  description?: string;
+  listingExchange?: string;
+  optionExerciseType?: string;
+  chainPerRoot: BrokerOptionRootDTO[];
+}
+
+export interface BrokerOptionChainDTO {
+  underlyingSymbolId: number;
+  underlyingSymbol?: string;
+  options: BrokerOptionExpiryDTO[];
+}
+
+export interface BrokerOptionQuoteFilter {
+  underlyingId: number;
+  expiryDate?: string;
+  optionType?: 'Call' | 'Put';
+  minstrikePrice?: number;
+  maxstrikePrice?: number;
+}
+
+export interface BrokerOptionQuoteRequest {
+  filters?: BrokerOptionQuoteFilter[];
+  optionIds?: number[];
+}
+
+export interface BrokerOptionQuoteDTO {
+  symbolId: number;
+  symbol?: string;
+  underlying?: string;
+  underlyingId?: number;
+  bidPrice?: number;
+  askPrice?: number;
+  lastTradePrice?: number;
+  lastTradePriceTrHrs?: number;
+  delta?: number;
+  gamma?: number;
+  theta?: number;
+  vega?: number;
+  rho?: number;
+  volatility?: number;
+  openInterest?: number;
+  volume?: number;
+  lastTradeSize?: number;
+  isHalted?: boolean;
+}
+
 export interface BrokerTradeDTO {
   tradeId: string;
   instrument?: BrokerInstrumentDTO;
@@ -95,4 +159,6 @@ export interface BrokerConnector {
   getSymbol?(symbolId: number): Promise<BrokerSymbolDTO | null>;
   searchSymbol?(symbol: string): Promise<BrokerSymbolDTO | null>;
   getQuotes?(symbolIds: number[]): Promise<BrokerQuoteDTO[]>;
+  getOptionChain?(underlyingSymbolId: number, underlyingSymbol?: string): Promise<BrokerOptionChainDTO>;
+  getOptionQuotes?(request: BrokerOptionQuoteRequest): Promise<BrokerOptionQuoteDTO[]>;
 }

@@ -1,7 +1,7 @@
 # Investments Module — Fabriq Financial Suite
 
-**When to read**: Understanding how investment portfolios, broker syncs, and holdings work  
-**Related docs**: [BOOKKEEPING_DOMAIN.md](./BOOKKEEPING_DOMAIN.md), [REPORTS.md](../REPORTS.md), [../QUESTRADE_PRODUCTION_DEPLOYMENT.md](../QUESTRADE_PRODUCTION_DEPLOYMENT.md)
+**When to read**: Understanding how investment portfolios, broker syncs, holdings, and option-chain analysis work  
+**Related docs**: [BOOKKEEPING_DOMAIN.md](./BOOKKEEPING_DOMAIN.md), [REPORTS.md](../REPORTS.md), [../QUESTRADE_PRODUCTION_DEPLOYMENT.md](../QUESTRADE_PRODUCTION_DEPLOYMENT.md), [../agent/MCP.md](../agent/MCP.md)
 
 ---
 
@@ -12,6 +12,7 @@ The Investments module tracks brokerage portfolios as first-class financial data
 - **Manual entry** — trades and holdings entered directly via the CRUD UI
 - **Broker sync** — automated forward sync from Questrade (and future brokers) via a pluggable connector interface
 - **Portfolio reporting** — real-time portfolio summary with FX conversion, equity/options/cash breakdown
+- **Option chain analysis (MCP)** — live Questrade option chains + quotes for covered-call screening via AI clients (Cursor, etc.)
 
 Data flows **one way only**: broker → Fabriq. There is no write-back to the broker.
 
@@ -109,6 +110,49 @@ One row per trade event (buy, sell, dividend, etc.).
 | `value_date` | `timestamp` | Settlement / trade date |
 | `source_system_id` | FK to `source_system` | Which broker sync inserted this row |
 | `posting_id` | FK UNIQUE | One-to-one link to an accounting `posting` (future: auto-reconciliation) |
+
+---
+
+### 5. `option_chain_cache` — Option Chain Skeleton Cache
+
+Caches Questrade option chain **structure** (expiries, strikes, call/put symbol IDs) to avoid repeated `GET /v1/symbols/:id/options` calls during the same calendar day. **Live option quotes are never cached.**
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | `varchar(50)` | `optcache_` prefix |
+| `org_id` | `varchar(50)` | Tenant |
+| `connection_id` | FK → `source_system` | Which Questrade connection |
+| `underlying_symbol` | `varchar(50)` | e.g. `VFV.TO` |
+| `underlying_symbol_id` | `integer` | Questrade `symbolId` |
+| `chain_json` | `jsonb` | Normalized skeleton (expiries → strikes → symbol IDs) |
+| `expiry_count` | `integer` | Denormalized stats |
+| `strike_count` | `integer` | Denormalized stats |
+| `refreshed_at` | `timestamptz` | Last fetch from Questrade |
+
+**Unique constraint**: `(connection_id, underlying_symbol_id)`
+
+**Refresh policy**: lazy, same calendar day in **`America/Toronto`**. On cache miss or stale date, Fabriq calls Questrade once and upserts. Any symbol can be cached on first MCP request — not limited to portfolio holdings.
+
+**DDL** (run manually if not using `prisma db push`):
+
+```sql
+CREATE TABLE option_chain_cache (
+  id                   VARCHAR(50) PRIMARY KEY DEFAULT ('optcache_' || gen_random_uuid()::text),
+  org_id               VARCHAR(50) NOT NULL,
+  connection_id        VARCHAR(50) NOT NULL,
+  underlying_symbol    VARCHAR(50) NOT NULL,
+  underlying_symbol_id INTEGER NOT NULL,
+  chain_json           JSONB NOT NULL,
+  expiry_count         INTEGER NOT NULL DEFAULT 0,
+  strike_count         INTEGER NOT NULL DEFAULT 0,
+  refreshed_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT option_chain_cache_connection_id_fkey
+    FOREIGN KEY (connection_id) REFERENCES source_system (id) ON DELETE CASCADE,
+  CONSTRAINT option_chain_cache_connection_id_underlying_symbol_id_key
+    UNIQUE (connection_id, underlying_symbol_id)
+);
+CREATE INDEX option_chain_cache_org_id_idx ON option_chain_cache (org_id);
+```
 
 ---
 
@@ -261,6 +305,50 @@ Response shape:
 
 ---
 
+## Option Chain Cache and MCP
+
+Fabriq exposes investment data to AI clients via the MCP server at `POST /api/mcp` (see [MCP.md](../agent/MCP.md)).
+
+### MCP tools (investments)
+
+| Tool | Data source | Purpose |
+|------|-------------|---------|
+| `get_portfolio_summary` | DB holdings (optional live sync) | Equity, options, cash, totals |
+| `get_option_chain` | Questrade live + same-day skeleton cache | Trimmed chain + live quotes/Greeks |
+
+### Covered-call screening flow
+
+1. **`get_portfolio_summary`** with `latest=true` — fresh holdings from Questrade sync
+2. From `data.equity` — identify round lots (typically ≥ 100 shares per contract)
+3. From `data.options` — detect existing option positions; check `instrument.underlying.symbol` for conflicts
+4. **`get_option_chain`** per eligible underlying — default Call band ATM → +20% OTM, 4 expiries, 15 strikes/expiry
+5. Rank by premium yield, delta, DTE, open interest (agent heuristics; not enforced in code)
+
+MCP prompt **`covered_call_candidates`** orchestrates steps 1–4 with configurable risk level.
+
+### Option chain defaults and limits
+
+Applied server-side before returning data to the MCP client:
+
+| Setting | Default | Max |
+|---------|---------|-----|
+| Strike band (calls) | Last price → +20% OTM | ±50% from last price |
+| Expiries returned | 4 | 8 |
+| Strikes per expiry | 15 | 25 |
+| Quoted contracts | — | 100 |
+
+Pagination: `expiry_offset`, `strike_offset` (Fabriq-side; Questrade has no chain pagination).
+
+### Live smoke test
+
+```bash
+cd backend && npx ts-node --transpile-only scripts/test-option-chain-live.ts VFV.TO
+```
+
+Uses the org's active Questrade connection from `backend/.env`. Requires `option_chain_cache` table and valid OAuth token.
+
+---
+
 ## Broker Integrations
 
 ### Architecture
@@ -282,16 +370,25 @@ upserts.ts (upsertAccount, upsertInstrument, upsertHolding, upsertTrade, syncCas
 backend/src/lib/integrations/broker/
 ├── connectors/
 │   ├── index.ts                   # Factory: createBrokerConnector(connectionId)
-│   ├── types.ts                   # BrokerConnector interface + DTOs
+│   ├── types.ts                   # BrokerConnector interface + DTOs (incl. option chain)
 │   └── questrade/
 │       ├── questrade_auth.ts      # OAuth2 token rotation + AES-256 persistence
 │       ├── questrade_connector.ts # HTTP calls to Questrade API
-│       └── questrade_mappers.ts   # Raw API responses → DTOs
+│       ├── questrade_mappers.ts   # Raw API responses → DTOs
+│       └── questrade_option_mappers.ts  # optionChain → BrokerOptionChainDTO
+├── option_chain/
+│   ├── option_chain_cache_service.ts  # Same-day DB cache read/write/invalidate
+│   └── option_chain_trim.ts           # Strike/expiry caps + truncation metadata
 ├── shared/
 │   └── broker-connection-loader.ts  # persistBrokerOAuth()
 └── sync/
     ├── broker_sync_service.ts     # runBrokerSync(), getPortfolio()
     └── upserts.ts                 # Idempotent upserts by natural key
+
+backend/src/mcp/tools/
+    getPortfolioSummary.ts         # MCP: get_portfolio_summary
+    getOptionChain.ts              # MCP: get_option_chain orchestration
+    brokerConnection.ts            # Shared connection resolver
 ```
 
 ### `BrokerConnector` interface
@@ -304,8 +401,15 @@ interface BrokerConnector {
   getBalances(accountExternalId: string): Promise<BrokerBalanceDTO[]>;
   getPositions(accountExternalId: string): Promise<BrokerPositionDTO[]>;
   getActivities(accountExternalId: string, startTime: Date, endTime: Date): Promise<BrokerTradeDTO[]>;
+  // Questrade market-data extensions (used by MCP get_option_chain):
+  searchSymbol?(symbol: string): Promise<BrokerSymbolDTO | null>;
+  getQuotes?(symbolIds: number[]): Promise<BrokerQuoteDTO[]>;
+  getOptionChain?(underlyingSymbolId: number, underlyingSymbol?: string): Promise<BrokerOptionChainDTO>;
+  getOptionQuotes?(request: BrokerOptionQuoteRequest): Promise<BrokerOptionQuoteDTO[]>;
 }
 ```
+
+Option chain methods are implemented on `QuestradeConnector` only. Other brokers would add their own implementations when supported.
 
 ### Sync sequence (per account)
 
@@ -384,16 +488,22 @@ trade_id = "qt_" + sha256(accountId | tradeDate | symbol | action | qty | netAmo
 
 Identical same-day fills at the same price could theoretically collide — acceptable risk.
 
-### Positions vs. Balances
+### Positions vs. Balances vs. Option Chain
 
 | API endpoint | What it returns | Used for |
 |---|---|---|
 | `GET v1/accounts/{id}/positions` | Open equity/ETF/option positions | Holdings (STOCK, ETF, OPTION, etc.) |
 | `GET v1/symbols/:id` | Option contract metadata + underlying symbol/id | Link option → underlying instrument |
-| `GET v1/markets/quotes?ids=…` | Level-1 quotes for symbol ids | Underlying spot price when not directly held |
+| `GET v1/symbols/:id/options` | Full option chain skeleton | MCP `get_option_chain` (cached same-day in `option_chain_cache`) |
+| `POST v1/markets/quotes/options` | Level-1 quotes + Greeks for option IDs | MCP `get_option_chain` live quotes (batched `optionIds`) |
+| `GET v1/markets/quotes?ids=…` | Level-1 quotes for symbol ids | Underlying spot price; equity quote refresh |
 | `GET v1/accounts/{id}/balances` | Cash per currency + market totals | CASH-type holdings |
 | `GET v1/accounts/{id}/activities` | Trade history | `trade` rows |
 | `GET v1/accounts` | Account list | `account` rows |
+
+**Option chain JSON**: Questrade returns `{ "optionChain": [ ... ] }` with `optionRoot` and `chainPerStrikePrice` per expiry. Official docs sometimes show `options`; Fabriq accepts both keys.
+
+**Symbols without options**: Some holdings (e.g. `XEQT.TO`) have no listed option chain — MCP returns `NO_OPTIONS`. Others (e.g. `VFV.TO`, `RY.TO`, `AAPL`) do.
 
 ### Currency inference
 
@@ -445,6 +555,15 @@ This covers the vast majority of retail accounts. Edge cases (e.g. `DLR.TO` whic
 | `POST` | `/api/report/portfolio_summary` | Holdings + cash + totals with FX conversion |
 | `POST` | `/api/report/investment_trades` | Trade history with date range filter |
 
+### MCP routes
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/mcp` | MCP JSON-RPC — tools include `get_portfolio_summary`, `get_option_chain` |
+| `GET` | `/api/mcp` | Returns `405` (stateless; POST only) |
+
+Auth: `X-API-Key` header (user API key). See [MCP.md](../agent/MCP.md).
+
 ### Connection test
 
 | Method | Path | Description |
@@ -464,3 +583,5 @@ This covers the vast majority of retail accounts. Edge cases (e.g. `DLR.TO` whic
 | **Option type detection** | Uses symbol regex (`\d{1,2}[A-Z][a-z]{2}\d{2}[CP]...`), not an API-provided type field |
 | **CAD/.V suffix inference** | Currency inferred from symbol — edge cases like dual-listed stocks may be wrong |
 | **Re-auth UX** | Portfolio page does not surface a visible warning when `last_sync_status.status === 'reauth_required'` |
+| **MCP trade execution** | Option chain tools are read-only analysis; no order placement |
+| **Option chain on all symbols** | Not every holding has Questrade-listed options — agent should handle `NO_OPTIONS` gracefully |

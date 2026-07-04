@@ -3,7 +3,7 @@ import { AuthContext } from '../../auth/types';
 import { runBrokerSync } from '../../lib/integrations/broker/sync/broker_sync_service';
 import { run_report } from '../../lib/reports';
 import type { PortfolioSummaryResult } from '../../lib/reports/investments';
-import prisma from '../../lib/prisma';
+import { resolveBrokerConnection } from './brokerConnection';
 
 const DEFAULT_REPORT_CURRENCY = 'CAD';
 
@@ -25,16 +25,6 @@ export const getPortfolioSummarySchema = {
 };
 
 export type GetPortfolioSummaryParams = z.infer<z.ZodObject<typeof getPortfolioSummarySchema>>;
-
-async function resolveBrokerConnection(orgId: string, connectionId?: string) {
-  return connectionId
-    ? prisma.source_system.findFirst({
-        where: { id: connectionId, org_id: orgId, is_active: true },
-      })
-    : prisma.source_system.findFirst({
-        where: { org_id: orgId, system_type: 'questrade', is_active: true },
-      });
-}
 
 export function getPortfolioSummaryHandler(auth: AuthContext) {
   return async (params: GetPortfolioSummaryParams) => {

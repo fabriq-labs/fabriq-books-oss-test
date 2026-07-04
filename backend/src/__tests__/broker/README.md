@@ -47,6 +47,28 @@ npm test -- --testPathPattern="broker/broker-sync-service"
 | `questrade-mappers.test.ts` | Field mapping, trade_id stability, type normalization |
 | `broker-sync-service.test.ts` | Full sync, idempotency, stale holding deactivation, partial failure |
 | `broker-api.test.ts` | HTTP routes: auth, request validation, response shape |
+| `option-chain-trim.test.ts` | Strike/expiry caps and truncation (pure logic) |
+| `option-chain-cache.test.ts` | Same-day cache lookup/upsert (prisma mocked) |
+| `questrade-option-mappers.test.ts` | Questrade JSON → DTO mapping |
+| `option-chain-live.test.ts` | **Live Questrade API** — real HTTP, opt-in via env |
+
+### Live option chain test
+
+Requires a valid Questrade refresh token in `source_system.connection_config` and the `option_chain_cache` table.
+
+```bash
+QUESTRADE_USE_LIVE=true \
+QUESTRADE_CONNECTION_ID=<source_system_id> \
+QUESTRADE_ORG_ID=<org_id> \
+QUESTRADE_OPTION_SYMBOL=VFV.TO \
+npm test -- --testPathPattern="option-chain-live"
+```
+
+This test calls the real Questrade endpoints:
+- `GET /v1/symbols` (symbol lookup)
+- `GET /v1/markets/quotes` (underlying price)
+- `GET /v1/symbols/:id/options` (chain skeleton, cached same-day in DB)
+- `POST /v1/markets/quotes/options` with `optionIds` (live quotes)
 
 ## Fixtures
 

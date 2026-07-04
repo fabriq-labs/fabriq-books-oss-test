@@ -152,3 +152,98 @@ export const QT_TOKEN_RESPONSE = {
   expires_in: 1800,
   token_type: 'Bearer',
 };
+
+export const QT_SYMBOL_VFV = {
+  symbols: [
+    {
+      symbol: 'VFV.TO',
+      symbolId: 1001,
+      description: 'Vanguard S&P 500 Index ETF',
+      securityType: 'ETF',
+      currency: 'CAD',
+      isQuotable: true,
+      isTradable: true,
+    },
+  ],
+};
+
+export const QT_QUOTE_VFV = {
+  quotes: [
+    {
+      symbol: 'VFV.TO',
+      symbolId: 1001,
+      lastTradePrice: 128.4,
+      currency: 'CAD',
+    },
+  ],
+};
+
+function makeExpiry(offsetMonths: number, strikes: number[]) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + offsetMonths);
+  d.setDate(17);
+  const expiryDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-17T00:00:00.000000-05:00`;
+  return {
+    expiryDate,
+    description: 'Vanguard S&P 500 Index ETF',
+    listingExchange: 'TSX',
+    optionExerciseType: 'American',
+    chainPerRoot: [
+      {
+        root: 'VFV',
+        optionRoot: 'VFV',
+        multiplier: 100,
+        chainPerStrikePrice: strikes.map((strikePrice, idx) => ({
+          strikePrice,
+          callSymbolId: 900000 + offsetMonths * 100 + idx,
+          putSymbolId: 910000 + offsetMonths * 100 + idx,
+        })),
+      },
+    ],
+  };
+}
+
+export const QT_OPTION_CHAIN_VFV = {
+  optionChain: [
+    makeExpiry(1, [125, 128, 130, 132, 135, 140, 145, 150]),
+    makeExpiry(2, [125, 128, 130, 132, 135, 140]),
+    makeExpiry(3, [125, 130, 135]),
+    makeExpiry(4, [125, 130, 135]),
+    makeExpiry(5, [125, 130, 135]),
+  ],
+};
+
+export const QT_OPTION_QUOTES_VFV = {
+  optionQuotes: [
+    {
+      symbolId: 900100,
+      symbol: 'VFV17Jul26C130',
+      underlying: 'VFV.TO',
+      underlyingId: 1001,
+      bidPrice: 2.1,
+      askPrice: 2.15,
+      lastTradePrice: 2.12,
+      delta: 0.42,
+      theta: -0.05,
+      vega: 0.08,
+      volatility: 18.2,
+      openInterest: 450,
+      volume: 12,
+    },
+    {
+      symbolId: 900101,
+      symbol: 'VFV17Jul26C132',
+      underlying: 'VFV.TO',
+      underlyingId: 1001,
+      bidPrice: 1.5,
+      askPrice: 1.55,
+      lastTradePrice: 1.52,
+      delta: 0.35,
+      theta: -0.04,
+      vega: 0.07,
+      volatility: 17.8,
+      openInterest: 320,
+      volume: 8,
+    },
+  ],
+};
