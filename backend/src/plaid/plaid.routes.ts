@@ -72,9 +72,7 @@ export function createPlaidRouter(): Router {
       if (!auth?.user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      const institutionId =
-        typeof req.body?.institution_id === 'string' ? req.body.institution_id : undefined;
-      const linkToken = await plaid.createLinkToken(auth.user.id, auth.user.org_id, institutionId);
+      const linkToken = await plaid.createLinkToken(auth.user.id, auth.user.org_id);
       return res.json({ link_token: linkToken });
     } catch (err: any) {
       logger.error('Plaid link-token error', { err });

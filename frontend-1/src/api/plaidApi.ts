@@ -76,10 +76,10 @@ export const plaidAPI = {
       }),
     }),
 
-  createLinkToken: (institutionId?: string) =>
+  createLinkToken: () =>
     fetchAPI<{ link_token: string }>('/api/plaid/link-token', {
       method: 'POST',
-      body: JSON.stringify(institutionId ? { institution_id: institutionId } : {}),
+      body: JSON.stringify({}),
     }),
 
   exchangeToken: (publicToken: string, metadata?: Record<string, unknown>, legalEntityId?: string) =>

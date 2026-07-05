@@ -187,21 +187,22 @@ export class PlaidService {
     throw new Error('Could not generate a unique account code for this bank account.');
   }
 
-  async createLinkToken(userId: string, orgId: string, institutionId?: string): Promise<string> {
+  async createLinkToken(userId: string, orgId: string): Promise<string> {
     this.assertConfigured();
     const client = getPlaidClient();
+    // Do not pass institution_id — search IDs often fail link/token/create in production
+    // (INVALID_INSTITUTION) even when returned by /institutions/search. User picks the bank in Link.
     const response = await client.linkTokenCreate({
       user: { client_user_id: userId },
       client_name: 'Fabriq',
       products: PLAID_PRODUCTS,
       country_codes: PLAID_COUNTRY_CODES,
       language: 'en',
-      ...(institutionId ? { institution_id: institutionId } : {}),
       ...(process.env.PLAID_LINK_CUSTOMIZATION_NAME?.trim()
         ? { link_customization_name: process.env.PLAID_LINK_CUSTOMIZATION_NAME.trim() }
         : {}),
     });
-    logger.info('Plaid link token created', { userId, orgId, institutionId });
+    logger.info('Plaid link token created', { userId, orgId });
     return response.data.link_token;
   }
 

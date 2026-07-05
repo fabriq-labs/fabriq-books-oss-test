@@ -1,5 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { usePlaidLink, PlaidLinkOnSuccessMetadata } from 'react-plaid-link';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  usePlaidLink,
+  PlaidLinkOnSuccessMetadata,
+  PlaidLinkOnExitMetadata,
+  PlaidLinkError,
+} from 'react-plaid-link';
 import {
   Dialog,
   DialogContent,
@@ -15,13 +20,50 @@ import { useToast } from '@/hooks/use-toast';
 import { useEntity } from '@/contexts/EntityContext';
 import { Building2, Landmark, Loader2, Search } from 'lucide-react';
 
+/** Opens Plaid Link outside any modal — Radix dialogs block the Link overlay. */
+function PlaidLinkLauncher({
+  linkToken,
+  onSuccess,
+  onExit,
+}: {
+  linkToken: string | null;
+  onSuccess: (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => void;
+  onExit: (error: PlaidLinkError | null, metadata: PlaidLinkOnExitMetadata) => void;
+}) {
+  const openedForToken = useRef<string | null>(null);
+
+  const { open, ready } = usePlaidLink({
+    token: linkToken,
+    onSuccess,
+    onExit,
+  });
+
+  useEffect(() => {
+    if (!linkToken) {
+      openedForToken.current = null;
+      return;
+    }
+    if (!ready || openedForToken.current === linkToken) return;
+    openedForToken.current = linkToken;
+    open();
+  }, [linkToken, ready, open]);
+
+  return null;
+}
+
 interface ConnectBankDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConnected: (item: PlaidItem) => void;
+  onLinkTokenReady: (linkToken: string) => void;
 }
 
-export function ConnectBankDialog({ open, onOpenChange, onConnected }: ConnectBankDialogProps) {
+export function ConnectBankDialog({
+  open,
+  onOpenChange,
+  onConnected,
+  onLinkTokenReady,
+}: ConnectBankDialogProps) {
   const { toast } = useToast();
   const { currentEntityId } = useEntity();
   const [skipLinkUi, setSkipLinkUi] = useState(true);
@@ -30,24 +72,20 @@ export function ConnectBankDialog({ open, onOpenChange, onConnected }: ConnectBa
   const [loadingInstitutions, setLoadingInstitutions] = useState(false);
   const [selected, setSelected] = useState<PlaidInstitution | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [pendingLinkOpen, setPendingLinkOpen] = useState(false);
 
-  const reset = useCallback(() => {
+  const resetSearch = useCallback(() => {
     setQuery('');
     setSelected(null);
-    setLinkToken(null);
-    setPendingLinkOpen(false);
     setConnecting(false);
   }, []);
 
   useEffect(() => {
     if (!open) {
-      reset();
+      resetSearch();
       return;
     }
     plaidAPI.getConfig().then((cfg) => setSkipLinkUi(cfg.skip_link_ui)).catch(() => setSkipLinkUi(false));
-  }, [open, reset]);
+  }, [open, resetSearch]);
 
   useEffect(() => {
     if (!open) return;
@@ -68,44 +106,6 @@ export function ConnectBankDialog({ open, onOpenChange, onConnected }: ConnectBa
     }, query ? 300 : 0);
     return () => window.clearTimeout(timer);
   }, [open, query, toast]);
-
-  const handlePlaidSuccess = useCallback(
-    async (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => {
-      setConnecting(true);
-      try {
-        const res = await plaidAPI.exchangeToken(
-          publicToken,
-          { institution: metadata.institution },
-          currentEntityId ?? undefined,
-        );
-        onOpenChange(false);
-        onConnected(res.data);
-      } catch (err: any) {
-        toast({
-          title: 'Connection failed',
-          description: err.message ?? 'Could not complete bank link',
-          variant: 'destructive',
-        });
-      } finally {
-        setConnecting(false);
-        setLinkToken(null);
-        setPendingLinkOpen(false);
-      }
-    },
-    [onConnected, onOpenChange, toast, currentEntityId],
-  );
-
-  const { open: openPlaidLink, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess: handlePlaidSuccess,
-  });
-
-  useEffect(() => {
-    if (pendingLinkOpen && linkToken && ready) {
-      openPlaidLink();
-      setPendingLinkOpen(false);
-    }
-  }, [pendingLinkOpen, linkToken, ready, openPlaidLink]);
 
   const handleConnect = async () => {
     if (!selected) return;
@@ -134,9 +134,9 @@ export function ConnectBankDialog({ open, onOpenChange, onConnected }: ConnectBa
 
     setConnecting(true);
     try {
-      const res = await plaidAPI.createLinkToken(selected.institution_id);
-      setLinkToken(res.link_token);
-      setPendingLinkOpen(true);
+      const res = await plaidAPI.createLinkToken();
+      onOpenChange(false);
+      onLinkTokenReady(res.link_token);
     } catch (err: any) {
       toast({
         title: 'Could not start bank login',
@@ -252,18 +252,84 @@ interface ConnectBankButtonProps {
 }
 
 export function ConnectBankButton({ onConnected, disabled }: ConnectBankButtonProps) {
+  const { toast } = useToast();
+  const { currentEntityId } = useEntity();
   const [open, setOpen] = useState(false);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [exchanging, setExchanging] = useState(false);
+
+  const handlePlaidExit = useCallback(
+    (error: PlaidLinkError | null, metadata: PlaidLinkOnExitMetadata) => {
+      setLinkToken(null);
+      if (error) {
+        toast({
+          title: 'Bank login cancelled',
+          description:
+            error.display_message ||
+            error.error_message ||
+            `${error.error_code}: could not complete bank login`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (metadata.status && metadata.status !== 'connected') {
+        toast({
+          title: 'Bank login incomplete',
+          description: `Plaid exited with status: ${metadata.status}`,
+        });
+      }
+    },
+    [toast],
+  );
+
+  const handlePlaidSuccess = useCallback(
+    async (publicToken: string, metadata: PlaidLinkOnSuccessMetadata) => {
+      setLinkToken(null);
+      setExchanging(true);
+      try {
+        const res = await plaidAPI.exchangeToken(
+          publicToken,
+          { institution: metadata.institution },
+          currentEntityId ?? undefined,
+        );
+        onConnected(res.data);
+      } catch (err: any) {
+        toast({
+          title: 'Connection failed',
+          description: err.message ?? 'Could not complete bank link',
+          variant: 'destructive',
+        });
+      } finally {
+        setExchanging(false);
+      }
+    },
+    [currentEntityId, onConnected, toast],
+  );
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} disabled={disabled} className="gap-2">
-        <Landmark className="h-4 w-4" />
+      <Button
+        onClick={() => setOpen(true)}
+        disabled={disabled || exchanging}
+        className="gap-2"
+      >
+        {exchanging ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Landmark className="h-4 w-4" />
+        )}
         Connect bank account
       </Button>
       <ConnectBankDialog
         open={open}
         onOpenChange={setOpen}
         onConnected={onConnected}
+        onLinkTokenReady={setLinkToken}
+      />
+      <PlaidLinkLauncher
+        linkToken={linkToken}
+        onSuccess={handlePlaidSuccess}
+        onExit={handlePlaidExit}
       />
     </>
   );
