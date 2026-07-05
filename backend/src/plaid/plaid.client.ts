@@ -39,4 +39,4 @@ export function getPlaidClient(): PlaidApi {
 }
 
 export const PLAID_PRODUCTS: Products[] = [Products.Transactions];
-export const PLAID_COUNTRY_CODES: CountryCode[] = [CountryCode.Us];
+export const PLAID_COUNTRY_CODES: CountryCode[] = [CountryCode.Us, CountryCode.Ca];
