@@ -170,8 +170,14 @@ export class SearchQueryBuilder {
 
     filters.forEach(filter => {
       const { field, operator, value } = filter;
+      const op = operator.toLowerCase();
 
-      if (value === undefined || value === null || value === '') {
+      // is_null / is_not_null are valid with a null payload (e.g. { account_id: { is_null: null } })
+      if (
+        (value === undefined || value === null || value === '') &&
+        op !== 'is_null' &&
+        op !== 'is_not_null'
+      ) {
         return;
       }
 
@@ -200,7 +206,7 @@ export class SearchQueryBuilder {
         where[field] = {};
       }
 
-      switch (operator.toLowerCase()) {
+      switch (op) {
         case 'eq':
           where[field] = value;
           break;
