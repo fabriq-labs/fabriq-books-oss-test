@@ -7,6 +7,13 @@
 # Node uses INTEGRATION_SYNC_URL (set by start scripts when sync is not disabled).
 # Build: COPY monorepo backend/ + frontend-1/ → build → final nginx image.
 # CI: GitHub Actions → GHCR. Optional build-args: SOURCE_* for /app/build-info.json.
+#
+# Runtime Node is pinned (see node-runtime stage). Do not use unpinned `apk add nodejs` —
+# Alpine package bumps (e.g. 24.14 → 24.17) broke google-auth-library / GCS on Railway.
+
+# Pinned Node.js for production runtime (nginx final stage). Bump only after validation.
+ARG NODE_RUNTIME_VERSION=24.14.1
+FROM node:${NODE_RUNTIME_VERSION}-alpine AS node-runtime
 
 # Stage 0: Application source from build context
 FROM scratch AS source
@@ -106,6 +113,7 @@ RUN BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
 # Stage 3: Final image (nginx + node + PostgreSQL; start script chosen by USE_EMBEDDED_PG)
 FROM nginx:alpine
 
+ARG NODE_RUNTIME_VERSION=24.14.1
 ARG BUILD_TIME
 ARG IMAGE_TAG=unknown
 ARG SOURCE_REF=unknown
@@ -116,10 +124,9 @@ LABEL fabriq.source.ref="${SOURCE_REF}"
 LABEL fabriq.backend.branch="${SOURCE_REF}"
 LABEL fabriq.frontend.branch="${SOURCE_REF}"
 LABEL fabriq.image.tag="${IMAGE_TAG}"
+LABEL fabriq.node.runtime="${NODE_RUNTIME_VERSION}"
 
 RUN apk add --no-cache \
-    nodejs \
-    npm \
     wget \
     gettext \
     python3 \
@@ -136,6 +143,11 @@ RUN apk add --no-cache \
     openssl \
     libpq \
     libstdc++
+
+# Pinned Node from official image (not Alpine apk — version must not float).
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+RUN ln -sf /usr/local/bin/node /usr/bin/node \
+ && node -v | grep -q "v${NODE_RUNTIME_VERSION}"
 
 WORKDIR /app
 
