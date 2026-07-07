@@ -1,4 +1,5 @@
 import type { FilterFieldEnhancement } from "@/types/customRowRenderer";
+import { isSelectFilterField } from "./filterFieldType";
 import { X } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { viewAPI } from "@/api/api";
@@ -224,7 +225,7 @@ export function FilterInputs({
 }: FilterInputsProps) {
     const { tableProps } = col;
     const [draftValue, setDraftValue] = useState('');
-    const isSelectField = tableProps?.columnType === 'select';
+    const isSelectField = isSelectFilterField(col);
     const filterSelectProps = useMemo(
         () => (isSelectField ? mergeSelectPropsForFilter(col) ?? tableProps?.selectProps : undefined),
         [isSelectField, col, tableProps?.selectProps],
