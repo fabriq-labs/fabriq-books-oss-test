@@ -93,6 +93,7 @@ import BankTransactions from "./pages/reports/BankTransactions";
 import PersonalIncomeReport from "./pages/reports/PersonalIncomeReport";
 import MonthlyTrialBalance from "./pages/reports/MonthlyTrialBalance";
 import InvestmentsPortfolio from "./pages/investments/InvestmentsPortfolio";
+import OptionsIncomeReport from "./pages/investments/OptionsIncomeReport";
 import Transactions from "./pages/Transactions";
 import { ReportControllerProvider } from "./contexts/ReportControllerContext";
 import { PaymentReceiptForm } from "./components/forms/Masters/PaymentReceiptForm";
@@ -458,6 +459,7 @@ const AppRoutes: React.FC = () => {
 
                 {/* Investments Routes */}
                 <Route path="investments/portfolio" element={<InvestmentsPortfolio />} />
+                <Route path="investments/options-income" element={<OptionsIncomeReport />} />
                 <Route path="investments/instruments" element={<Master type="instrument" view="instrument_view" displayName="Instruments" />} />
                 <Route path="instrument/:id/view/:viewId" element={<InstrumentForm />} />
                 <Route path="instrument/view/:viewId" element={<InstrumentForm />} />

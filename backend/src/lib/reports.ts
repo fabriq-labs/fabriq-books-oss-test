@@ -2,7 +2,7 @@ import { AuthContext } from "../auth/types";
 import logger from '../utils/logger';
 import { get_my_feed } from './reports/zeiv';
 import { getIncomeStatement, getTrialBalance, getMonthlyTrialBalance, getNetworthForAssets, getNetworthForLiabilities, getSavingRatio, getFinancialRatios, getAssetsTotal, getClassificationBreakdown, getIncomeByType, getIncomeTotal, getLiabilitiesBreakdown, getLiabilitiesTotal, getAssetsBreakdown, getCashFlowStatement } from './reports/perfin';
-import { getPortfolioSummary, getInvestmentTrades } from './reports/investments';
+import { getPortfolioSummary, getInvestmentTrades, getOptionsIncome } from './reports/investments';
 
 export const run_report = async (context: AuthContext, report_id: any, filters: any) => {
   logger.debug(`Running report ${report_id} with filters: ${JSON.stringify(filters)}`, context.user);
@@ -162,6 +162,19 @@ export const run_report = async (context: AuthContext, report_id: any, filters: 
       filters.to_date,
       filters.connection_id,
       entityIds
+    );
+  }
+  else if (report_id === "options_income") {
+    const entityId = filters.legal_entity_id;
+    const entityIds = filters.legal_entity_ids ?? (entityId ? [entityId] : undefined);
+    return await getOptionsIncome(
+      context.user.org_id,
+      filters.from_date,
+      filters.to_date,
+      filters.report_currency ?? filters.currency_id ?? filters.currency,
+      filters.connection_id,
+      entityIds,
+      filters.account_id
     );
   }
   else {

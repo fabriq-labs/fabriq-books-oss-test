@@ -10,3 +10,15 @@ export function parseUnderlyingSymbolFromOption(optionSymbol: string): string | 
   const match = optionSymbol.match(/^([A-Z]+)\d/);
   return match?.[1] ?? null;
 }
+
+/** Parse strike from Questrade option symbol, e.g. NVDA10Jul26P175.00 → 175 */
+export function parseStrikeFromOption(optionSymbol: string): number | null {
+  const match = optionSymbol.match(/[CP](\d+(?:\.\d+)?)$/);
+  return match ? Number(match[1]) : null;
+}
+
+/** Parse option type from Questrade option symbol. */
+export function parseOptionTypeFromOption(optionSymbol: string): 'C' | 'P' | null {
+  const match = optionSymbol.match(/([CP])\d+(?:\.\d+)?$/);
+  return match?.[1] === 'C' || match?.[1] === 'P' ? match[1] : null;
+}

@@ -1,5 +1,10 @@
 import prisma from '../prisma';
-import { isOptionSymbol } from '../integrations/broker/option_symbol';
+import {
+  isOptionSymbol,
+  parseUnderlyingSymbolFromOption,
+  parseStrikeFromOption,
+  parseOptionTypeFromOption,
+} from '../integrations/broker/option_symbol';
 
 export interface PortfolioInstrumentSnapshot {
   id: string;
@@ -66,6 +71,83 @@ export interface InvestmentTradeRow {
   net_amount: number | null;
   brokerage: number | null;
   value_date: string;
+}
+
+export interface OptionsIncomeTradeLeg {
+  trade_id: string;
+  type: 'BUY' | 'SELL';
+  quantity: number;
+  price: number;
+  /** Absolute premium cash amount in report currency. */
+  amount: number;
+  value_date: string;
+}
+
+export interface OptionsIncomeTransactionRow {
+  account_id: string;
+  account_name: string;
+  instrument_id: string;
+  symbol: string;
+  instrument_name: string;
+  underlying_symbol: string | null;
+  quantity: number;
+  /** Signed open position qty as of period end (negative = short, positive = long). */
+  position_qty: number;
+  position_status: 'open' | 'closed';
+  acquisition_cost: number;
+  sale_cost: number;
+  profit_loss: number;
+  open_leg: OptionsIncomeTradeLeg | null;
+  close_leg: OptionsIncomeTradeLeg | null;
+  trade_date: string;
+  /** Open rows only — underlying last price in report currency. */
+  underlying_current_price?: number | null;
+  /** Open rows only — option contract premium (per share) in report currency. */
+  option_current_price?: number | null;
+  strike_price?: number | null;
+  option_type?: 'C' | 'P' | null;
+  unrealized_pnl?: number | null;
+}
+
+export interface OptionsIncomePositionRow {
+  account_id: string;
+  account_name: string;
+  instrument_id: string;
+  symbol: string;
+  instrument_name: string;
+  underlying_symbol: string | null;
+  position_status: 'open' | 'closed';
+  position_qty: number;
+  /** Net premium cash flow in the report period (SELL positive, BUY negative). */
+  income_received: number;
+  /** Net premium cash flow from inception through period end. */
+  cumulative_income: number;
+  premium_collected: number;
+  premium_paid: number;
+  opened_date: string | null;
+  closed_date: string | null;
+  last_trade_date: string | null;
+}
+
+export interface OptionsIncomeSection {
+  transactions: OptionsIncomeTransactionRow[];
+  total_acquisition_cost: number;
+  total_sale_cost: number;
+  total_profit_loss: number;
+  /** @deprecated Use transactions — kept for backward compatibility */
+  positions: OptionsIncomePositionRow[];
+  total_income: number;
+  total_premium_collected: number;
+  total_premium_paid: number;
+}
+
+export interface OptionsIncomeResult {
+  report_currency: string;
+  from_date: string;
+  to_date: string;
+  closed: OptionsIncomeSection;
+  open: OptionsIncomeSection;
+  total_income: number;
 }
 
 /** Resolve latest SPOT rate to convert fromCurrencyId → toCurrencyId. Falls back to inverse. */
@@ -369,4 +451,505 @@ export async function getInvestmentTrades(
     brokerage: t.brokerage != null ? Number(t.brokerage) : null,
     value_date: t.value_date.toISOString().split('T')[0],
   }));
+}
+
+function isOptionInstrument(type: string, symbol: string): boolean {
+  return type === 'OPTION' || isOptionSymbol(symbol);
+}
+
+function tradeCashFlow(type: string, quantity: number, price: number, netAmount: number | null): number {
+  if (netAmount != null) return netAmount;
+  const gross = quantity * price * 100;
+  return type === 'SELL' ? gross : -gross;
+}
+
+function signedQuantity(type: string, quantity: number): number {
+  return type === 'BUY' ? quantity : -quantity;
+}
+
+function emptyOptionsIncomeSection(): OptionsIncomeSection {
+  return {
+    transactions: [],
+    total_acquisition_cost: 0,
+    total_sale_cost: 0,
+    total_profit_loss: 0,
+    positions: [],
+    total_income: 0,
+    total_premium_collected: 0,
+    total_premium_paid: 0,
+  };
+}
+
+type ConvertedTrade = {
+  trade_id: string;
+  type: 'BUY' | 'SELL';
+  quantity: number;
+  price: number;
+  amount: number;
+  value_date: string;
+  inPeriod: boolean;
+};
+
+function legFromTrade(trade: ConvertedTrade): OptionsIncomeTradeLeg {
+  return {
+    trade_id: trade.trade_id,
+    type: trade.type,
+    quantity: trade.quantity,
+    price: trade.price,
+    amount: trade.amount,
+    value_date: trade.value_date,
+  };
+}
+
+function costsFromLegs(legs: ConvertedTrade[]): {
+  acquisition_cost: number;
+  sale_cost: number;
+  profit_loss: number;
+} {
+  let acquisition_cost = 0;
+  let sale_cost = 0;
+  for (const leg of legs) {
+    if (leg.type === 'BUY') acquisition_cost += leg.amount;
+    else sale_cost += leg.amount;
+  }
+  return { acquisition_cost, sale_cost, profit_loss: sale_cost - acquisition_cost };
+}
+
+function splitRoundTrips(trades: ConvertedTrade[]): ConvertedTrade[][] {
+  const rounds: ConvertedTrade[][] = [];
+  let current: ConvertedTrade[] = [];
+  let positionQty = 0;
+
+  for (const trade of trades) {
+    current.push(trade);
+    positionQty += signedQuantity(trade.type, trade.quantity);
+    if (Math.abs(positionQty) < 0.0001) {
+      rounds.push(current);
+      current = [];
+      positionQty = 0;
+    }
+  }
+
+  return rounds;
+}
+
+function openCloseLegs(round: ConvertedTrade[]): {
+  open_leg: OptionsIncomeTradeLeg;
+  close_leg: OptionsIncomeTradeLeg;
+  quantity: number;
+} {
+  const open = round[0];
+  const close = round[round.length - 1];
+  return {
+    open_leg: legFromTrade(open),
+    close_leg: legFromTrade(close),
+    quantity: open.quantity,
+  };
+}
+
+/** Build account_id → currency_id map from holdings (broker accounts). */
+async function getAccountCurrencyMap(orgId: string): Promise<Map<string, string>> {
+  const rows = await prisma.holding.findMany({
+    where: { org_id: orgId, currency_id: { not: null } },
+    select: { account_id: true, currency_id: true },
+    distinct: ['account_id', 'currency_id'],
+  });
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    if (row.currency_id && !map.has(row.account_id)) {
+      map.set(row.account_id, row.currency_id);
+    }
+  }
+  return map;
+}
+
+export async function getOptionsIncome(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  reportCurrency?: string,
+  connectionId?: string,
+  legalEntityIds?: string[],
+  accountId?: string
+): Promise<OptionsIncomeResult> {
+  const reportCurrencyRow = await prisma.currency.findFirst({
+    where: {
+      OR: [
+        { id: reportCurrency ?? '' },
+        { code: (reportCurrency ?? 'CAD').toUpperCase() },
+      ],
+    },
+    select: { id: true, code: true },
+  });
+  const reportCurrencyId = reportCurrencyRow?.id ?? null;
+  const reportCurrencyCode = reportCurrencyRow?.code ?? (reportCurrency ?? 'CAD').toUpperCase();
+
+  const accountIds = await getAccountIdsForLegalEntities(orgId, legalEntityIds);
+  if (accountIds !== null && accountIds.length === 0) {
+    return {
+      report_currency: reportCurrencyCode,
+      from_date: startDate,
+      to_date: endDate,
+      closed: emptyOptionsIncomeSection(),
+      open: emptyOptionsIncomeSection(),
+      total_income: 0,
+    };
+  }
+
+  const effectiveAccountIds =
+    accountId != null
+      ? accountIds !== null
+        ? accountIds.filter((id) => id === accountId)
+        : [accountId]
+      : accountIds;
+
+  if (effectiveAccountIds !== null && effectiveAccountIds.length === 0) {
+    return {
+      report_currency: reportCurrencyCode,
+      from_date: startDate,
+      to_date: endDate,
+      closed: emptyOptionsIncomeSection(),
+      open: emptyOptionsIncomeSection(),
+      total_income: 0,
+    };
+  }
+
+  const trades = await prisma.trade.findMany({
+    where: {
+      org_id: orgId,
+      type: { in: ['BUY', 'SELL'] },
+      value_date: { lte: new Date(endDate + 'T23:59:59Z') },
+      ...(connectionId
+        ? { source_system_id: connectionId }
+        : { source_system_id: { not: 'srcsys_fabriq' } }),
+      ...(effectiveAccountIds !== null ? { account_id: { in: effectiveAccountIds } } : {}),
+      instrument: { isNot: null },
+    },
+    include: {
+      account: { select: { name: true } },
+      instrument: {
+        select: {
+          id: true,
+          symbol: true,
+          name: true,
+          type: true,
+          current_price: true,
+          price_currency_id: true,
+          underlying: {
+            select: {
+              symbol: true,
+              current_price: true,
+              price_currency_id: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { value_date: 'asc' },
+  });
+
+  const optionTrades = trades.filter(
+    (t) =>
+      t.instrument &&
+      t.account_id &&
+      isOptionInstrument(t.instrument.type, t.instrument.symbol)
+  );
+
+  const accountCurrencyMap = await getAccountCurrencyMap(orgId);
+  const holdingRows = await prisma.holding.findMany({
+    where: {
+      org_id: orgId,
+      is_active: true,
+      ...(effectiveAccountIds !== null ? { account_id: { in: effectiveAccountIds } } : {}),
+    },
+    select: {
+      account_id: true,
+      instrument_id: true,
+      unrealized_pnl: true,
+      current_price: true,
+      currency_id: true,
+    },
+  });
+  const holdingMap = new Map(
+    holdingRows.map((h) => [`${h.account_id}:${h.instrument_id}`, h])
+  );
+
+  const rateCache = new Map<string, number>();
+  const getRate = async (fromId: string | null | undefined): Promise<number> => {
+    if (!fromId || !reportCurrencyId || fromId === reportCurrencyId) return 1;
+    if (rateCache.has(fromId)) return rateCache.get(fromId)!;
+    const rate = await getConversionRate(orgId, fromId, reportCurrencyId);
+    rateCache.set(fromId, rate);
+    return rate;
+  };
+
+  type PositionBucket = {
+    account_id: string;
+    account_name: string;
+    instrument_id: string;
+    symbol: string;
+    instrument_name: string;
+    underlying_symbol: string | null;
+    underlying_current_price: number | null;
+    option_current_price: number | null;
+    strike_price: number | null;
+    option_type: 'C' | 'P' | null;
+    position_qty: number;
+    period_income: number;
+    cumulative_income: number;
+    premium_collected: number;
+    premium_paid: number;
+    opened_date: string | null;
+    closed_date: string | null;
+    last_trade_date: string | null;
+    has_period_activity: boolean;
+    trades: ConvertedTrade[];
+  };
+
+  const positions = new Map<string, PositionBucket>();
+  const periodStart = new Date(startDate);
+  const periodEnd = new Date(endDate + 'T23:59:59Z');
+
+  for (const trade of optionTrades) {
+    const account_id = trade.account_id!;
+    const instrument = trade.instrument!;
+    const key = `${account_id}:${instrument.id}`;
+    const tradeDate = trade.value_date.toISOString().split('T')[0];
+    const inPeriod = trade.value_date >= periodStart && trade.value_date <= periodEnd;
+    const qty = Number(trade.quantity);
+    const price = Number(trade.price);
+    const netAmount = trade.net_amount != null ? Number(trade.net_amount) : null;
+    const cashFlow = tradeCashFlow(trade.type, qty, price, netAmount);
+    const currencyId = accountCurrencyMap.get(account_id);
+    const rate = await getRate(currencyId);
+    const convertedCashFlow = cashFlow * rate;
+    const qtyDelta = signedQuantity(trade.type, qty);
+    const convertedAmount = Math.abs(convertedCashFlow);
+    const convertedTrade: ConvertedTrade = {
+      trade_id: trade.id,
+      type: trade.type as 'BUY' | 'SELL',
+      quantity: qty,
+      price: price * rate,
+      amount: convertedAmount,
+      value_date: tradeDate,
+      inPeriod,
+    };
+
+    let bucket = positions.get(key);
+    const underlying = instrument.underlying as {
+      symbol?: string;
+      current_price?: { toString(): string } | null;
+      price_currency_id?: string | null;
+    } | null;
+    const underlyingRate = await getRate(underlying?.price_currency_id ?? currencyId);
+    const underlyingPrice =
+      underlying?.current_price != null ? Number(underlying.current_price) * underlyingRate : null;
+    const optionRate = await getRate(
+      (instrument as { price_currency_id?: string | null }).price_currency_id ?? currencyId
+    );
+    const optionPrice =
+      instrument.current_price != null ? Number(instrument.current_price) * optionRate : null;
+
+    if (!bucket) {
+      bucket = {
+        account_id,
+        account_name: trade.account?.name ?? account_id,
+        instrument_id: instrument.id,
+        symbol: instrument.symbol,
+        instrument_name: instrument.name,
+        underlying_symbol:
+          underlying?.symbol ?? parseUnderlyingSymbolFromOption(instrument.symbol),
+        underlying_current_price: underlyingPrice,
+        option_current_price: optionPrice,
+        strike_price: parseStrikeFromOption(instrument.symbol),
+        option_type: parseOptionTypeFromOption(instrument.symbol),
+        position_qty: 0,
+        period_income: 0,
+        cumulative_income: 0,
+        premium_collected: 0,
+        premium_paid: 0,
+        opened_date: tradeDate,
+        closed_date: null,
+        last_trade_date: tradeDate,
+        has_period_activity: false,
+        trades: [],
+      };
+      positions.set(key, bucket);
+    } else {
+      if (underlyingPrice != null) bucket.underlying_current_price = underlyingPrice;
+      if (optionPrice != null) bucket.option_current_price = optionPrice;
+    }
+
+    bucket.trades.push(convertedTrade);
+
+    bucket.position_qty += qtyDelta;
+    bucket.cumulative_income += convertedCashFlow;
+    bucket.last_trade_date = tradeDate;
+    if (!bucket.opened_date) bucket.opened_date = tradeDate;
+    if (Math.abs(bucket.position_qty) < 0.0001) {
+      bucket.closed_date = tradeDate;
+    }
+
+    if (inPeriod) {
+      bucket.has_period_activity = true;
+      bucket.period_income += convertedCashFlow;
+      if (convertedCashFlow >= 0) {
+        bucket.premium_collected += convertedCashFlow;
+      } else {
+        bucket.premium_paid += Math.abs(convertedCashFlow);
+      }
+    }
+  }
+
+  const closedTransactions: OptionsIncomeTransactionRow[] = [];
+  const openTransactions: OptionsIncomeTransactionRow[] = [];
+  const closedPositions: OptionsIncomePositionRow[] = [];
+  const openPositions: OptionsIncomePositionRow[] = [];
+
+  for (const bucket of positions.values()) {
+    const isClosed = Math.abs(bucket.position_qty) < 0.0001;
+    const include =
+      bucket.has_period_activity ||
+      (isClosed && bucket.closed_date != null && bucket.closed_date >= startDate) ||
+      (!isClosed && bucket.cumulative_income !== 0);
+
+    if (!include) continue;
+
+    const positionRow: OptionsIncomePositionRow = {
+      account_id: bucket.account_id,
+      account_name: bucket.account_name,
+      instrument_id: bucket.instrument_id,
+      symbol: bucket.symbol,
+      instrument_name: bucket.instrument_name,
+      underlying_symbol: bucket.underlying_symbol,
+      position_status: isClosed ? 'closed' : 'open',
+      position_qty: bucket.position_qty,
+      income_received: bucket.period_income,
+      cumulative_income: bucket.cumulative_income,
+      premium_collected: bucket.premium_collected,
+      premium_paid: bucket.premium_paid,
+      opened_date: bucket.opened_date,
+      closed_date: bucket.closed_date,
+      last_trade_date: bucket.last_trade_date,
+    };
+
+    if (isClosed) closedPositions.push(positionRow);
+    else openPositions.push(positionRow);
+
+    const rounds = splitRoundTrips(bucket.trades);
+    const closedTradeIds = new Set(
+      rounds.flatMap((round) => round.map((t) => t.trade_id))
+    );
+
+    for (const round of rounds) {
+      const inScope = round.some((t) => t.inPeriod);
+      if (!inScope) continue;
+
+      const { open_leg, close_leg, quantity } = openCloseLegs(round);
+      const costs = costsFromLegs(round);
+      closedTransactions.push({
+        account_id: bucket.account_id,
+        account_name: bucket.account_name,
+        instrument_id: bucket.instrument_id,
+        symbol: bucket.symbol,
+        instrument_name: bucket.instrument_name,
+        underlying_symbol: bucket.underlying_symbol,
+        quantity,
+        position_qty: 0,
+        position_status: 'closed',
+        acquisition_cost: costs.acquisition_cost,
+        sale_cost: costs.sale_cost,
+        profit_loss: costs.profit_loss,
+        open_leg,
+        close_leg,
+        trade_date: close_leg.value_date,
+      });
+    }
+
+    if (!isClosed) {
+      for (const trade of bucket.trades) {
+        if (!trade.inPeriod || closedTradeIds.has(trade.trade_id)) continue;
+        const costs = costsFromLegs([trade]);
+        const holding = holdingMap.get(`${bucket.account_id}:${bucket.instrument_id}`);
+        const bucketCurrencyId = accountCurrencyMap.get(bucket.account_id);
+        const holdingRate = await getRate(holding?.currency_id ?? bucketCurrencyId);
+        const unrealizedPnl =
+          holding?.unrealized_pnl != null ? Number(holding.unrealized_pnl) * holdingRate : null;
+        const optionCurrentPrice =
+          holding?.current_price != null
+            ? Number(holding.current_price) * holdingRate
+            : bucket.option_current_price;
+        openTransactions.push({
+          account_id: bucket.account_id,
+          account_name: bucket.account_name,
+          instrument_id: bucket.instrument_id,
+          symbol: bucket.symbol,
+          instrument_name: bucket.instrument_name,
+          underlying_symbol: bucket.underlying_symbol,
+          quantity: trade.quantity,
+          position_qty: bucket.position_qty,
+          position_status: 'open',
+          acquisition_cost: costs.acquisition_cost,
+          sale_cost: costs.sale_cost,
+          profit_loss: costs.profit_loss,
+          open_leg: legFromTrade(trade),
+          close_leg: null,
+          trade_date: trade.value_date,
+          underlying_current_price: bucket.underlying_current_price,
+          option_current_price: optionCurrentPrice,
+          strike_price: bucket.strike_price,
+          option_type: bucket.option_type,
+          unrealized_pnl: unrealizedPnl,
+        });
+      }
+    }
+  }
+
+  const sortTransactions = (a: OptionsIncomeTransactionRow, b: OptionsIncomeTransactionRow) =>
+    b.trade_date.localeCompare(a.trade_date) || a.symbol.localeCompare(b.symbol);
+
+  closedTransactions.sort(sortTransactions);
+  openTransactions.sort(sortTransactions);
+
+  const sortRows = (a: OptionsIncomePositionRow, b: OptionsIncomePositionRow) =>
+    Math.abs(b.income_received) - Math.abs(a.income_received) ||
+    a.symbol.localeCompare(b.symbol);
+
+  closedPositions.sort(sortRows);
+  openPositions.sort(sortRows);
+
+  const sumTransactions = (rows: OptionsIncomeTransactionRow[]): OptionsIncomeSection => ({
+    transactions: rows,
+    total_acquisition_cost: rows.reduce((sum, r) => sum + r.acquisition_cost, 0),
+    total_sale_cost: rows.reduce((sum, r) => sum + r.sale_cost, 0),
+    total_profit_loss: rows.reduce((sum, r) => sum + r.profit_loss, 0),
+    positions: [],
+    total_income: rows.reduce((sum, r) => sum + r.profit_loss, 0),
+    total_premium_collected: rows.reduce((sum, r) => sum + r.sale_cost, 0),
+    total_premium_paid: rows.reduce((sum, r) => sum + r.acquisition_cost, 0),
+  });
+
+  const closed = {
+    ...sumTransactions(closedTransactions),
+    positions: closedPositions,
+    total_income: closedPositions.reduce((sum, r) => sum + r.income_received, 0),
+    total_premium_collected: closedPositions.reduce((sum, r) => sum + r.premium_collected, 0),
+    total_premium_paid: closedPositions.reduce((sum, r) => sum + r.premium_paid, 0),
+  };
+  const open = {
+    ...sumTransactions(openTransactions),
+    positions: openPositions,
+    total_income: openPositions.reduce((sum, r) => sum + r.income_received, 0),
+    total_premium_collected: openPositions.reduce((sum, r) => sum + r.premium_collected, 0),
+    total_premium_paid: openPositions.reduce((sum, r) => sum + r.premium_paid, 0),
+  };
+
+  return {
+    report_currency: reportCurrencyCode,
+    from_date: startDate,
+    to_date: endDate,
+    closed,
+    open,
+    total_income: closed.total_income + open.total_income,
+  };
 }
