@@ -101,6 +101,39 @@ function fmtQty(n: number) {
   return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
 }
 
+const OPTION_CONTRACT_SIZE = 100;
+
+function computeLegMarketValue(row: OptionsIncomeTransactionRow): number | null {
+  const leg = row.open_leg;
+  const mark = row.option_current_price;
+  if (!leg || mark == null) return null;
+  return mark * leg.quantity * OPTION_CONTRACT_SIZE;
+}
+
+/** Unrealized P/L for this leg: current value vs premium paid/received. */
+function computeLegUnrealizedPnl(row: OptionsIncomeTransactionRow): number | null {
+  const leg = row.open_leg;
+  const marketValue = computeLegMarketValue(row);
+  if (!leg || marketValue == null) return null;
+  return leg.type === "BUY" ? marketValue - leg.amount : leg.amount - marketValue;
+}
+
+function sumOpenValuation(rows: OptionsIncomeTransactionRow[]): {
+  marketValue: number;
+  unrealizedPnl: number;
+} {
+  return rows.reduce(
+    (acc, row) => {
+      const mv = computeLegMarketValue(row);
+      const pnl = computeLegUnrealizedPnl(row);
+      if (mv != null) acc.marketValue += mv;
+      if (pnl != null) acc.unrealizedPnl += pnl;
+      return acc;
+    },
+    { marketValue: 0, unrealizedPnl: 0 }
+  );
+}
+
 function getUnderlyingPriceStatus(row: OptionsIncomeTransactionRow): PriceStatus {
   const isShort = row.position_qty < 0;
 
@@ -131,6 +164,143 @@ const priceStatusClass: Record<PriceStatus, string> = {
   neutral: "text-slate-700",
 };
 
+function OpenTransactionCell({ leg, currency }: { leg: OptionsIncomeTradeLeg | null; currency: string }) {
+  if (!leg) return <span className="text-slate-400">—</span>;
+  return (
+    <span className="text-sm font-medium text-slate-800 tabular-nums">
+      {leg.type} @ {formatCurrency(leg.price, currency)}
+    </span>
+  );
+}
+
+function ProceedsCell({ row, currency }: { row: OptionsIncomeTransactionRow; currency: string }) {
+  const leg = row.open_leg;
+  if (!leg) return <span className="text-slate-400">—</span>;
+  const isInflow = leg.type === "SELL";
+  const amount = leg.amount;
+  return (
+    <span
+      className={cn(
+        "tabular-nums font-semibold text-sm",
+        isInflow ? "text-emerald-700" : "text-red-600"
+      )}
+    >
+      {isInflow ? "+" : "−"}
+      {formatCurrency(amount, currency)}
+    </span>
+  );
+}
+
+function OptionCell({ row }: { row: OptionsIncomeTransactionRow }) {
+  return (
+    <div className="font-medium text-slate-900 text-sm leading-tight min-w-[9rem]">
+      {row.symbol}
+      {row.underlying_symbol && (
+        <sub className="ml-1 text-[10px] font-normal text-slate-400 not-italic align-baseline">
+          {row.underlying_symbol}
+        </sub>
+      )}
+    </div>
+  );
+}
+
+function SimpleUnderlyingPrice({ row, currency }: { row: OptionsIncomeTransactionRow; currency: string }) {
+  const status = getUnderlyingPriceStatus(row);
+  const px = row.underlying_current_price;
+  if (px == null) return <span className="text-slate-400">—</span>;
+  return (
+    <span className={cn("tabular-nums font-semibold text-sm", priceStatusClass[status])}>
+      {formatCurrency(px, currency)}
+    </span>
+  );
+}
+
+function OptionMarkCell({ row, currency }: { row: OptionsIncomeTransactionRow; currency: string }) {
+  const mark = row.option_current_price;
+  if (mark == null) return <span className="text-slate-400">—</span>;
+  return <span className="tabular-nums text-sm text-slate-800">{formatCurrency(mark, currency)}</span>;
+}
+
+function MarketValueCell({ row, currency }: { row: OptionsIncomeTransactionRow; currency: string }) {
+  const value = computeLegMarketValue(row);
+  if (value == null) return <span className="text-slate-400">—</span>;
+  return <span className="tabular-nums text-sm font-medium text-slate-800">{formatCurrency(value, currency)}</span>;
+}
+
+function UnrealizedPnlCell({ row, currency }: { row: OptionsIncomeTransactionRow; currency: string }) {
+  const pnl = computeLegUnrealizedPnl(row);
+  if (pnl == null) return <span className="text-slate-400">—</span>;
+  return <PnlCell value={pnl} currency={currency} />;
+}
+
+function sumOpenProceeds(rows: OptionsIncomeTransactionRow[]): { inflow: number; outflow: number; net: number } {
+  return rows.reduce(
+    (acc, row) => {
+      const leg = row.open_leg;
+      if (!leg) return acc;
+      if (leg.type === "SELL") {
+        acc.inflow += leg.amount;
+        acc.net += leg.amount;
+      } else {
+        acc.outflow += leg.amount;
+        acc.net -= leg.amount;
+      }
+      return acc;
+    },
+    { inflow: 0, outflow: 0, net: 0 }
+  );
+}
+
+function OpenTableTotalsFooter({
+  rows,
+  currency,
+}: {
+  rows: OptionsIncomeTransactionRow[];
+  currency: string;
+}) {
+  const { inflow, outflow, net } = sumOpenProceeds(rows);
+  const { marketValue, unrealizedPnl } = sumOpenValuation(rows);
+  return (
+    <TableFooter>
+      <TableRow className="bg-slate-50 font-semibold border-t-2 border-slate-200 hover:bg-slate-50">
+        <TableCell colSpan={4} className="text-slate-700">
+          Total ({rows.length} {rows.length === 1 ? "row" : "rows"})
+        </TableCell>
+        <TableCell className="text-right tabular-nums text-slate-800">
+          {formatCurrency(marketValue, currency)}
+        </TableCell>
+        <TableCell colSpan={2} />
+        <TableCell className="text-right">
+          <div className="text-xs font-normal text-slate-500 space-y-0.5">
+            <div className="text-emerald-700 tabular-nums">+{formatCurrency(inflow, currency)} in</div>
+            <div className="text-red-600 tabular-nums">−{formatCurrency(outflow, currency)} out</div>
+          </div>
+        </TableCell>
+        <TableCell className="text-right">
+          <PnlCell value={unrealizedPnl} currency={currency} />
+        </TableCell>
+      </TableRow>
+      <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+        <TableCell colSpan={7} className="text-right text-xs text-slate-500 py-2">
+          Net proceeds
+        </TableCell>
+        <TableCell className="text-right py-2">
+          <span
+            className={cn(
+              "tabular-nums font-bold",
+              net >= 0 ? "text-emerald-700" : "text-red-600"
+            )}
+          >
+            {net >= 0 ? "+" : "−"}
+            {formatCurrency(Math.abs(net), currency)}
+          </span>
+        </TableCell>
+        <TableCell />
+      </TableRow>
+    </TableFooter>
+  );
+}
+
 function LegCell({ leg, currency }: { leg: OptionsIncomeTradeLeg | null; currency: string }) {
   if (!leg) return <span className="text-slate-400">—</span>;
   return (
@@ -154,32 +324,6 @@ function PnlCell({ value, currency }: { value: number; currency: string }) {
     >
       {formatCurrency(value, currency)}
     </span>
-  );
-}
-
-function UnderlyingPriceCell({ row, currency }: { row: OptionsIncomeTransactionRow; currency: string }) {
-  const status = getUnderlyingPriceStatus(row);
-  const px = row.underlying_current_price;
-
-  if (px == null) return <span className="text-slate-400">—</span>;
-
-  return (
-    <div className="text-sm leading-snug">
-      <div className={cn("font-semibold tabular-nums", priceStatusClass[status])}>
-        {formatCurrency(px, currency)}
-      </div>
-      {row.strike_price != null && (
-        <div className="text-xs text-slate-500 tabular-nums">
-          Strike {formatCurrency(row.strike_price, currency)}
-          {row.option_type ? ` ${row.option_type}` : ""}
-        </div>
-      )}
-      {row.position_qty > 0 && row.unrealized_pnl != null && (
-        <div className={cn("text-xs tabular-nums", priceStatusClass[status])}>
-          Unrealized {formatCurrency(row.unrealized_pnl, currency)}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -227,50 +371,52 @@ function OpenTransactionsTable({
   return (
     <Table>
       <TableHeader>
-        <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>Symbol</TableHead>
-          <TableHead className="text-right">Option Price</TableHead>
-          <TableHead>Underlying</TableHead>
-          <TableHead className="text-right">Underlying Price</TableHead>
-          <TableHead>Account</TableHead>
-          <TableHead className="text-right">Qty</TableHead>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="w-[6.5rem]">Date</TableHead>
+          <TableHead>Option</TableHead>
+          <TableHead className="text-right w-[6.5rem]">Underlying</TableHead>
+          <TableHead className="text-right w-[5.5rem]">Mark</TableHead>
+          <TableHead className="text-right w-[6.5rem]">Value</TableHead>
           <TableHead>Transaction</TableHead>
-          <TableHead className="text-right">Acquisition Cost</TableHead>
-          <TableHead className="text-right">Sale Proceeds</TableHead>
-          <TableHead className="text-right">P/L</TableHead>
+          <TableHead className="text-right w-[4.5rem]">Quantity</TableHead>
+          <TableHead className="text-right w-[7rem]">Proceeds</TableHead>
+          <TableHead className="text-right w-[7rem]">Unreal P/L</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
           <TableRow key={`${row.account_id}:${row.symbol}:${row.trade_date}:${row.open_leg?.trade_id ?? ""}`}>
-            <TableCell className="text-slate-600 text-sm whitespace-nowrap">{row.trade_date}</TableCell>
-            <TableCell className="font-medium">{row.symbol}</TableCell>
-            <TableCell className="text-right tabular-nums text-sm text-slate-700">
-              {row.option_current_price != null
-                ? formatCurrency(row.option_current_price, currency)
-                : "—"}
+            <TableCell className="text-slate-600 text-sm whitespace-nowrap align-top py-3">
+              {row.trade_date}
             </TableCell>
-            <TableCell>{row.underlying_symbol ?? "—"}</TableCell>
-            <TableCell className="text-right">
-              <UnderlyingPriceCell row={row} currency={currency} />
+            <TableCell className="align-top py-3">
+              <OptionCell row={row} />
             </TableCell>
-            <TableCell className="text-slate-600">{row.account_name}</TableCell>
-            <TableCell className="text-right tabular-nums">{fmtQty(row.quantity)}</TableCell>
-            <TableCell><LegCell leg={row.open_leg} currency={currency} /></TableCell>
-            <TableCell className="text-right tabular-nums text-red-600">
-              {row.acquisition_cost > 0 ? formatCurrency(row.acquisition_cost, currency) : "—"}
+            <TableCell className="text-right align-top py-3">
+              <SimpleUnderlyingPrice row={row} currency={currency} />
             </TableCell>
-            <TableCell className="text-right tabular-nums text-emerald-700">
-              {row.sale_cost > 0 ? formatCurrency(row.sale_cost, currency) : "—"}
+            <TableCell className="text-right align-top py-3">
+              <OptionMarkCell row={row} currency={currency} />
             </TableCell>
-            <TableCell className="text-right">
-              <PnlCell value={row.profit_loss} currency={currency} />
+            <TableCell className="text-right align-top py-3">
+              <MarketValueCell row={row} currency={currency} />
+            </TableCell>
+            <TableCell className="align-top py-3">
+              <OpenTransactionCell leg={row.open_leg} currency={currency} />
+            </TableCell>
+            <TableCell className="text-right tabular-nums align-top py-3 font-medium text-slate-800">
+              {fmtQty(row.position_qty)}
+            </TableCell>
+            <TableCell className="text-right align-top py-3">
+              <ProceedsCell row={row} currency={currency} />
+            </TableCell>
+            <TableCell className="text-right align-top py-3">
+              <UnrealizedPnlCell row={row} currency={currency} />
             </TableCell>
           </TableRow>
         ))}
       </TableBody>
-      <TableTotalsFooter rows={rows} currency={currency} labelColSpan={8} />
+      <OpenTableTotalsFooter rows={rows} currency={currency} />
     </Table>
   );
 }
@@ -336,6 +482,7 @@ function SectionSummary({
   currency,
   icon: Icon,
   accent,
+  proceeds,
 }: {
   label: string;
   totals: TableTotals;
@@ -343,7 +490,9 @@ function SectionSummary({
   currency: string;
   icon: React.ComponentType<{ className?: string }>;
   accent: string;
+  proceeds?: { inflow: number; outflow: number };
 }) {
+  const headline = proceeds ? proceeds.inflow - proceeds.outflow : totals.profit_loss;
   return (
     <div className={cn("rounded-lg border p-4", accent)}>
       <div className="flex items-center gap-2 mb-2">
@@ -354,14 +503,31 @@ function SectionSummary({
       <p
         className={cn(
           "text-2xl font-bold tabular-nums",
-          totals.profit_loss > 0 ? "text-emerald-700" : totals.profit_loss < 0 ? "text-red-600" : "text-slate-900"
+          headline > 0 ? "text-emerald-700" : headline < 0 ? "text-red-600" : "text-slate-900"
         )}
       >
-        {formatCurrency(totals.profit_loss, currency)}
+        {proceeds ? (
+          <>
+            {headline >= 0 ? "+" : "−"}
+            {formatCurrency(Math.abs(headline), currency)}
+          </>
+        ) : (
+          formatCurrency(totals.profit_loss, currency)
+        )}
       </p>
       <p className="text-xs text-slate-500 mt-1">
-        Acquired {formatCurrency(totals.acquisition_cost, currency)} · Sold{" "}
-        {formatCurrency(totals.sale_cost, currency)}
+        {proceeds ? (
+          <>
+            <span className="text-emerald-700">+{formatCurrency(proceeds.inflow, currency)} in</span>
+            {" · "}
+            <span className="text-red-600">−{formatCurrency(proceeds.outflow, currency)} out</span>
+          </>
+        ) : (
+          <>
+            Acquired {formatCurrency(totals.acquisition_cost, currency)} · Sold{" "}
+            {formatCurrency(totals.sale_cost, currency)}
+          </>
+        )}
       </p>
     </div>
   );
@@ -482,15 +648,16 @@ export default function OptionsIncomeReport() {
 
   const closedTotals = useMemo(() => sumRows(closedRows), [closedRows]);
   const openTotals = useMemo(() => sumRows(openRows), [openRows]);
-  const totalPnl = closedTotals.profit_loss + openTotals.profit_loss;
+  const openProceeds = useMemo(() => sumOpenProceeds(openRows), [openRows]);
+  const totalPnl = closedTotals.profit_loss + openProceeds.net;
 
   return (
-    <div className="p-4 space-y-4 max-w-[1600px]">
+    <div className="p-4 space-y-4 max-w-[1800px]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-slate-900">Options Income Report</h1>
           <p className="text-sm text-slate-500">
-            Period transactions with acquisition cost, sale proceeds, and P/L. Closed round-trips on one row.
+            Open positions show period cash flows; closed round-trips show realized P/L.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -558,6 +725,7 @@ export default function OptionsIncomeReport() {
             <SectionSummary
               label="Open Positions"
               totals={openTotals}
+              proceeds={{ inflow: openProceeds.inflow, outflow: openProceeds.outflow }}
               rowCount={openRows.length}
               currency={currency}
               icon={Unlock}
