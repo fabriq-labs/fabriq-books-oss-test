@@ -31,14 +31,6 @@ const sampleReports = [
     path: '/reports/personal-income'
   },
   {
-    id: 'options-income',
-    name: 'Options Income Report',
-    category: 'Personal Finance',
-    createdBy: 'System Generated',
-    lastVisited: '-',
-    path: '/investments/options-income'
-  },
-  {
     id: 'cash-flow',
     name: 'Cash Flow Statement',
     category: 'Business Overview',

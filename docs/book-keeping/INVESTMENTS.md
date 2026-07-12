@@ -314,6 +314,7 @@ Fabriq exposes investment data to AI clients via the MCP server at `POST /api/mc
 | Tool | Data source | Purpose |
 |------|-------------|---------|
 | `get_portfolio_summary` | DB holdings (optional live sync) | Equity, options, cash, totals |
+| `get_options_income` | Trade ledger (+ holdings marks) | Open/closed options premium & period income |
 | `get_option_chain` | Questrade live + same-day skeleton cache | Trimmed chain + live quotes/Greeks |
 
 ### Covered-call screening flow
@@ -387,6 +388,7 @@ backend/src/lib/integrations/broker/
 
 backend/src/mcp/tools/
     getPortfolioSummary.ts         # MCP: get_portfolio_summary
+    getOptionsIncome.ts            # MCP: get_options_income
     getOptionChain.ts              # MCP: get_option_chain orchestration
     brokerConnection.ts            # Shared connection resolver
 ```
@@ -559,7 +561,7 @@ This covers the vast majority of retail accounts. Edge cases (e.g. `DLR.TO` whic
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/mcp` | MCP JSON-RPC — tools include `get_portfolio_summary`, `get_option_chain` |
+| `POST` | `/api/mcp` | MCP JSON-RPC — tools include `get_portfolio_summary`, `get_options_income`, `get_option_chain` |
 | `GET` | `/api/mcp` | Returns `405` (stateless; POST only) |
 
 Auth: `X-API-Key` header (user API key). See [MCP.md](../agent/MCP.md).

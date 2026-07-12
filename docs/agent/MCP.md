@@ -59,6 +59,7 @@ backend/src/mcp/
     listAccounts.ts         list_accounts tool — DB query, pure function
     getTrialBalance.ts      get_trial_balance tool — canonical trial balance report
     getPortfolioSummary.ts  get_portfolio_summary tool — investment holdings report
+    getOptionsIncome.ts     get_options_income tool — open/closed options premium report
     getOptionChain.ts       get_option_chain orchestration (cache, trim, quotes)
     getOptionChainTool.ts   MCP schema + handler wiring for get_option_chain
     brokerConnection.ts     Shared Questrade connection resolver
@@ -355,6 +356,82 @@ cd backend && npx ts-node --transpile-only scripts/test-option-chain-live.ts VFV
 
 Requires the `option_chain_cache` table (see INVESTMENTS.md).
 
+### `get_options_income`
+
+Options income from trade history — same `run_report(auth, 'options_income', …)` path as the in-app Options Income page. Defaults to **open positions only** for agent analysis of period premium cash flows and marks.
+
+Prefer this for premium / open-options income analysis. Use `get_portfolio_summary.data.options` for a point-in-time holdings snapshot (qty / avg cost / MTM only). Use `get_option_chain` for screening *new* contracts.
+
+| Parameter | Type | Behaviour |
+|-----------|------|-----------|
+| `from_date` | `string` (optional) | Period start (`YYYY-MM-DD`). With `to_date` omitted pair, uses current financial year. |
+| `to_date` | `string` (optional) | Period end (`YYYY-MM-DD`). |
+| `report_currency` | `string` (optional) | ISO code or currency id. Defaults to **USD**. |
+| `section` | `"open"` \| `"closed"` \| `"all"` | Defaults to **`open`**. |
+| `account_id` | `string` (optional) | Scope to one investment/broker account. |
+| `connection_id` | `string` (optional) | Scope to one broker `source_system`. |
+| `legal_entity_id` | `string` (optional) | Entity filter when `account_id` is not supplied. |
+
+**Returns** (as JSON string in `content[0].text`):
+```json
+{
+  "tool": "get_options_income",
+  "success": true,
+  "periodSource": "current_financial_year",
+  "filters": {
+    "from_date": "2026-01-01",
+    "to_date": "2026-12-31",
+    "report_currency": "USD",
+    "section": "open",
+    "account_id": null,
+    "connection_id": null,
+    "legal_entity_id": null
+  },
+  "summary": {
+    "report_currency": "USD",
+    "open_transaction_count": 4,
+    "open_position_count": 3,
+    "open_proceeds": { "inflow": 1200, "outflow": 100, "net": 1100 },
+    "open_market_value": 850,
+    "open_unrealized_pnl": 350,
+    "open_priced_row_count": 4,
+    "closed_transaction_count": 12,
+    "closed_profit_loss": 2400
+  },
+  "notes": ["…"],
+  "data": {
+    "report_currency": "USD",
+    "from_date": "2026-01-01",
+    "to_date": "2026-12-31",
+    "open": {
+      "transactions": [
+        {
+          "symbol": "AMZN31Jul26C290.00",
+          "position_qty": -2,
+          "open_leg": { "type": "SELL", "quantity": 2, "price": 0.95, "amount": 190, "value_date": "2026-06-01" },
+          "option_current_price": 0.85,
+          "underlying_current_price": 245.34,
+          "strike_price": 290,
+          "option_type": "C",
+          "market_value": 170,
+          "mark_to_market_unrealized_pnl": 20
+        }
+      ],
+      "positions": [],
+      "total_profit_loss": 0
+    }
+  }
+}
+```
+
+**Notes for agents:**
+
+- Open may have **multiple transaction rows per instrument** (one per unmatched period leg). Group by `instrument_id` / `symbol` when counting positions.
+- `summary.open_unrealized_pnl` and per-row `mark_to_market_unrealized_pnl` use option mark × qty × 100 vs premium (same as the UI). Holding `unrealized_pnl` on rows may differ slightly.
+- `summary` always includes open/closed counts even when `section=open` (closed detail omitted from `data`).
+
+**Scope**: Trades and holdings filtered to the authenticated user's `org_id`.
+
 ---
 
 ## Covered-call workflow (recommended agent flow)
@@ -516,6 +593,24 @@ curl -s -X POST http://localhost:4000/api/mcp \
   -H "Accept: application/json, text/event-stream" \
   -H "X-API-Key: <key>" \
   -d '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_option_chain","arguments":{"symbol":"VFV.TO","include_quotes":false}}}'
+```
+
+**Call `get_options_income` (open positions, current FY, USD):**
+```bash
+curl -s -X POST http://localhost:4000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "X-API-Key: <key>" \
+  -d '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"get_options_income","arguments":{}}}'
+```
+
+**Call `get_options_income` (closed + open):**
+```bash
+curl -s -X POST http://localhost:4000/api/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "X-API-Key: <key>" \
+  -d '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"get_options_income","arguments":{"section":"all","report_currency":"USD"}}}'
 ```
 
 The response is an SSE-framed event even for simple queries:

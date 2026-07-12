@@ -577,7 +577,7 @@ export default function OptionsIncomeReport() {
   const [selectedFY, setSelectedFY] = useState<FinancialYearOption>(() =>
     getCurrentFYOption("JAN_DEC")
   );
-  const [reportCurrency, setReportCurrency] = useState("CAD");
+  const [reportCurrency, setReportCurrency] = useState("USD");
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [openPositionFilter, setOpenPositionFilter] = useState<OpenPositionFilter>("all");
   const [data, setData] = useState<OptionsIncomeData | null>(null);
@@ -649,6 +649,10 @@ export default function OptionsIncomeReport() {
   const closedTotals = useMemo(() => sumRows(closedRows), [closedRows]);
   const openTotals = useMemo(() => sumRows(openRows), [openRows]);
   const openProceeds = useMemo(() => sumOpenProceeds(openRows), [openRows]);
+  const openUnrealizedPnl = useMemo(
+    () => sumOpenValuation(openRows).unrealizedPnl,
+    [openRows]
+  );
   const totalPnl = closedTotals.profit_loss + openProceeds.net;
 
   return (
@@ -702,7 +706,7 @@ export default function OptionsIncomeReport() {
         </div>
       ) : data ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="shadow-sm border-slate-200">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2 text-slate-600 text-sm mb-1">
@@ -719,6 +723,29 @@ export default function OptionsIncomeReport() {
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
                   {data.from_date} → {data.to_date}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm border-slate-200">
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 text-slate-600 text-sm mb-1">
+                  <TrendingUp className="h-4 w-4" />
+                  Unrealized P/L
+                </div>
+                <p
+                  className={cn(
+                    "text-2xl font-bold tabular-nums",
+                    openUnrealizedPnl > 0
+                      ? "text-emerald-700"
+                      : openUnrealizedPnl < 0
+                        ? "text-red-600"
+                        : "text-slate-900"
+                  )}
+                >
+                  {formatCurrency(openUnrealizedPnl, currency)}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Mark-to-market on open positions
                 </p>
               </CardContent>
             </Card>

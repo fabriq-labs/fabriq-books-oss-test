@@ -46,7 +46,6 @@ const reportsNavItem: MasterNavItem = {
     { label: 'Balance Sheet', path: '/reports/balance-sheet' },
     { label: 'Monthly Trial Balance', path: '/reports/monthly-trial-balance' },
     { label: 'Income Statement', path: '/reports/income-statement' },
-    { label: 'Options Income', path: '/investments/options-income' },
     { label: 'Cash Flow', path: '/reports/cash-flow' },
     { label: 'Posting List', path: '/reports/posting-list' },
   ],
