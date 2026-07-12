@@ -1,4 +1,4 @@
-import React, { useMemo, useState, forwardRef, useImperativeHandle, useEffect } from 'react';
+import React, { useMemo, useState, forwardRef, useImperativeHandle, useEffect, useCallback, useRef } from 'react';
 import {
     Table,
     TableBody,
@@ -33,6 +33,8 @@ interface DynamicTableProps {
     data: any;
     isLoading: boolean;
     renderActions: any;
+    /** Parent-owned selection; when passed, checkboxes follow this array directly. */
+    selectedRows?: any[];
     onSelectionChange?: (selectedRows: any[]) => void;
     enableMultiSelect?: boolean;
     enableCollapsible?: boolean;
@@ -53,6 +55,7 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
     data,
     isLoading,
     renderActions,
+    selectedRows: controlledSelectedRows,
     onSelectionChange,
     enableMultiSelect = false,
     enableCollapsible = false,
@@ -71,24 +74,37 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
     const sortDirection = isSortControlled
         ? (controlledSortDirection ?? 'asc')
         : internalSortDirection;
-    const [selectedRows, setSelectedRows] = useState<any[]>([]);
+    const [uncontrolledSelectedRows, setUncontrolledSelectedRows] = useState<any[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const isSelectionControlled = controlledSelectedRows !== undefined;
+    const selectedRows = isSelectionControlled ? controlledSelectedRows : uncontrolledSelectedRows;
+    const onSelectionChangeRef = useRef(onSelectionChange);
+    onSelectionChangeRef.current = onSelectionChange;
+    const dataRef = useRef(data);
 
-    useEffect(() => {
-        setSelectedRows([]);
-    }, [data]);
+    const updateSelection = useCallback((next: any[] | ((prev: any[]) => any[])) => {
+        const prev = isSelectionControlled
+            ? (controlledSelectedRows ?? [])
+            : uncontrolledSelectedRows;
+        const resolved = typeof next === 'function' ? next(prev) : next;
+        if (!isSelectionControlled) {
+            setUncontrolledSelectedRows(resolved);
+        }
+        onSelectionChangeRef.current?.(resolved);
+    }, [isSelectionControlled, controlledSelectedRows, uncontrolledSelectedRows]);
 
+    // Clear selection only when the list data object actually changes (pagination, refresh, etc.)
     useEffect(() => {
-        return () => {
-            setSelectedRows([]);
-        };
-    }, []);
+        if (dataRef.current === data) return;
+        dataRef.current = data;
+        updateSelection([]);
+    }, [data, updateSelection]);
 
     useImperativeHandle(ref, () => ({
         clearSelection: () => {
-            setSelectedRows([]);
+            updateSelection([]);
         }
-    }));
+    }), [updateSelection]);
 
     // Generate table columns from metadata using the new modular system
     const columns = useMemo(() => {
@@ -181,27 +197,16 @@ const DynamicTable = forwardRef<any, DynamicTableProps>(({
     };
 
     const handleSelectAll = (checked: boolean) => {
-        if (checked) {
-            setSelectedRows(sortedData || []);
-        } else {
-            setSelectedRows([]);
-        }
+        updateSelection(checked ? (sortedData || []) : []);
     };
 
     const handleSelectRow = (row: any, checked: boolean) => {
         if (checked) {
-            setSelectedRows([...selectedRows, row]);
+            updateSelection((prev) => [...prev, row]);
         } else {
-            setSelectedRows(selectedRows.filter(r => r.id !== row.id));
+            updateSelection((prev) => prev.filter((r) => r.id !== row.id));
         }
     };
-
-    // Notify parent component when selection changes
-    React.useEffect(() => {
-        if (onSelectionChange) {
-            onSelectionChange(selectedRows);
-        }
-    }, [selectedRows, onSelectionChange]);
 
     // Filter visible columns
     const visibleColumns = useMemo(() => {

@@ -141,8 +141,12 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
     }
   };
 
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open) onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="sm:max-w-[700px] rounded-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-[#403E43]">

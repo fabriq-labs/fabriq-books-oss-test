@@ -587,30 +587,23 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
     setShowImport(true);
   };
 
-  const handleSelectionChange = (rows: any[]) => {
+  const handleSelectionChange = useCallback((rows: any[]) => {
     setSelectedRows(rows);
-  };
+  }, []);
 
-  const handleBulkEditClose = () => {
+  const handleBulkEditClose = useCallback(() => {
     setIsBulkEditOpen(false);
-    setSelectedRows([]);
-    if (tableRef.current) {
-      tableRef.current.clearSelection();
-    }
-  };
+  }, []);
 
-  const handleBulkEditSave = async () => {
+  const handleBulkEditSave = useCallback(async () => {
     try {
-      handleBulkEditClose();
+      setIsBulkEditOpen(false);
       setSelectedRows([]);
-      if (tableRef.current) {
-        tableRef.current.clearSelection();
-      }
       fetchModelData();
     } catch (error) {
       console.error("Error updating data:", error);
     }
-  };
+  }, [fetchModelData]);
 
   const handleBulkDelete = async (ids: string[]) => {
     Modal.confirm({
@@ -1162,6 +1155,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
           isLoading={isLoading}
           renderActions={renderActions}
           enableMultiSelect={true}
+          selectedRows={selectedRows}
           onSelectionChange={handleSelectionChange}
           cellHighlights={cellHighlights}
           renderRowExtra={renderRowExtra}
