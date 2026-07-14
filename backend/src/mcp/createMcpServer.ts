@@ -8,6 +8,7 @@ import {
   createGetOptionChainHandler,
   getOptionChainSchema,
 } from './tools/getOptionChainTool';
+import { getOptionsIncomeHandler, getOptionsIncomeSchema } from './tools/getOptionsIncome';
 
 /**
  * Creates a new McpServer with all tools registered for the given auth context.
@@ -64,7 +65,7 @@ export function createMcpServer(auth: AuthContext): McpServer {
     'get_portfolio_summary',
     {
       description:
-        'Investment portfolio: equity holdings, options, cash balances, and per-account totals in report_currency (default CAD). By default returns cached data from the last broker sync. Set latest=true to sync from Questrade first. For covered-call analysis, use equity symbols from data.equity with get_option_chain; check data.options for existing short option positions.',
+        'Investment portfolio: equity holdings, options, cash balances, and per-account totals in report_currency (default CAD). By default returns cached data from the last broker sync. Set latest=true to sync from Questrade first. For covered-call analysis, use equity symbols from data.equity with get_option_chain; check data.options for existing short option positions. For period premium / open-options income analysis, use get_options_income instead.',
       inputSchema: getPortfolioSummarySchema,
     },
     async (params: { latest?: boolean; report_currency?: string; connection_id?: string }) => {
@@ -95,6 +96,28 @@ export function createMcpServer(auth: AuthContext): McpServer {
       connection_id?: string;
     }) => {
       const result = await createGetOptionChainHandler(auth)(params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
+    }
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (server as any).registerTool(
+    'get_options_income',
+    {
+      description:
+        'Options income report from trade history: period premium cash flows and marks on open option positions (default), or closed round-trip realized P/L. Defaults to section=open and report_currency=USD. Prefer this for premium/income analysis of open shorts/longs; use get_portfolio_summary.data.options for a point-in-time holdings snapshot only. Open may have multiple transaction rows per instrument — group by instrument_id when counting positions.',
+      inputSchema: getOptionsIncomeSchema,
+    },
+    async (params: {
+      from_date?: string;
+      to_date?: string;
+      report_currency?: string;
+      section?: 'open' | 'closed' | 'all';
+      account_id?: string;
+      connection_id?: string;
+      legal_entity_id?: string;
+    }) => {
+      const result = await getOptionsIncomeHandler(auth)(params);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
     }
   );
