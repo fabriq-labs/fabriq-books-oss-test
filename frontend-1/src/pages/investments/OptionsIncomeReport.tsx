@@ -6,7 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { reportAPI } from "@/api/postingApi";
 import { formatCurrency } from "@/lib/formatters";
-import { Loader2, RefreshCw, TrendingUp, Lock, Unlock } from "lucide-react";
+import { Loader2, RefreshCw, TrendingUp, Lock, Unlock, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { fetchAPI } from "@/api/api";
 import { toast } from "@/hooks/use-toast";
 import { useEntity } from "@/contexts/EntityContext";
 import {
@@ -582,6 +589,7 @@ export default function OptionsIncomeReport() {
   const [openPositionFilter, setOpenPositionFilter] = useState<OpenPositionFilter>("all");
   const [data, setData] = useState<OptionsIncomeData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const fetchSeq = useRef(0);
 
   const accountAdditionalFilters = useMemo(
@@ -627,6 +635,19 @@ export default function OptionsIncomeReport() {
       if (seq === fetchSeq.current) setLoading(false);
     }
   }, [selectedFY, reportCurrency, currentEntityId, selectedAccount?.id]);
+
+  const syncAndRefresh = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await fetchAPI("/api/broker-sync/run", { method: "POST" });
+      toast({ title: "Sync complete", description: "Option income data updated from Questrade." });
+      void fetchReport();
+    } catch {
+      toast({ title: "Sync failed", description: "Could not reach Questrade.", variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetchReport]);
 
   useEffect(() => {
     if (!entityLoading) void fetchReport();
@@ -681,10 +702,36 @@ export default function OptionsIncomeReport() {
               </option>
             ))}
           </select>
-          <Button variant="outline" size="sm" onClick={() => void fetchReport()} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            <span className="ml-2">Refresh</span>
-          </Button>
+          <div className="flex">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-r-none border-r-0"
+              onClick={() => void fetchReport()}
+              disabled={loading || syncing}
+            >
+              {loading || syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <span className="ml-2">Refresh</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-l-none px-2"
+                  disabled={loading || syncing}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => void syncAndRefresh()}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sync &amp; Refresh
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
