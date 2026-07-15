@@ -87,6 +87,8 @@ export interface OptionsIncomeTransactionRow {
   account_id: string;
   account_name: string;
   instrument_id: string;
+  /** Questrade integer symbolId — present on open rows when available. */
+  external_symbol_id?: number | null;
   symbol: string;
   instrument_name: string;
   underlying_symbol: string | null;
@@ -635,6 +637,7 @@ export async function getOptionsIncome(
           type: true,
           current_price: true,
           price_currency_id: true,
+          external_symbol_id: true,
           underlying: {
             select: {
               symbol: true,
@@ -687,6 +690,7 @@ export async function getOptionsIncome(
     account_id: string;
     account_name: string;
     instrument_id: string;
+    external_symbol_id: number | null;
     symbol: string;
     instrument_name: string;
     underlying_symbol: string | null;
@@ -755,6 +759,7 @@ export async function getOptionsIncome(
         account_id,
         account_name: trade.account?.name ?? account_id,
         instrument_id: instrument.id,
+        external_symbol_id: (instrument as { external_symbol_id?: number | null }).external_symbol_id ?? null,
         symbol: instrument.symbol,
         instrument_name: instrument.name,
         underlying_symbol:
@@ -883,6 +888,7 @@ export async function getOptionsIncome(
           account_id: bucket.account_id,
           account_name: bucket.account_name,
           instrument_id: bucket.instrument_id,
+          external_symbol_id: bucket.external_symbol_id,
           symbol: bucket.symbol,
           instrument_name: bucket.instrument_name,
           underlying_symbol: bucket.underlying_symbol,

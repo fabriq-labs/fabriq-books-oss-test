@@ -15,6 +15,7 @@ import { errorHandler } from './rest/middleware/errorHandler';
 import agentModule from './agent';
 import { createChatRouter } from './routes/chat';
 import { createBrokerSyncRouter } from './routes/broker-sync';
+import { createInvestmentsRouter } from './routes/investments';
 import { GracefulShutdown } from './utils/gracefulShutdown';
 import { ensureDatabaseViews } from './utils/setup/ensureDatabaseViews';
 import { initializeImportExtensions } from './lib/import-extensions';
@@ -79,6 +80,7 @@ async function startServer(): Promise<void> {
 
     // Broker forward sync (Questrade)
     app.use('/api/broker-sync', createBrokerSyncRouter());
+    app.use('/api/investments', createInvestmentsRouter());
 
     // MCP endpoint
     app.use('/api/mcp', mcpRouter);

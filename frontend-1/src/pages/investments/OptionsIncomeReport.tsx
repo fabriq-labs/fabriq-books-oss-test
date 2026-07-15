@@ -24,6 +24,7 @@ import {
 } from "@/components/Reports/FinancialYearSelector";
 import { ReportAccountFilter } from "@/components/Reports/ReportAccountFilter";
 import { cn } from "@/lib/utils";
+import { OptionPositionDetailModal, type OpenOptionRow } from "@/components/investments/OptionPositionDetailModal";
 
 interface OptionsIncomeTradeLeg {
   trade_id: string;
@@ -37,6 +38,8 @@ interface OptionsIncomeTradeLeg {
 interface OptionsIncomeTransactionRow {
   account_id: string;
   account_name: string;
+  instrument_id: string;
+  external_symbol_id?: number | null;
   symbol: string;
   instrument_name: string;
   underlying_symbol: string | null;
@@ -367,9 +370,11 @@ function TableTotalsFooter({
 function OpenTransactionsTable({
   rows,
   currency,
+  onRowClick,
 }: {
   rows: OptionsIncomeTransactionRow[];
   currency: string;
+  onRowClick?: (row: OptionsIncomeTransactionRow) => void;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-slate-500 py-6 text-center">No transactions in this section.</p>;
@@ -392,7 +397,11 @@ function OpenTransactionsTable({
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
-          <TableRow key={`${row.account_id}:${row.symbol}:${row.trade_date}:${row.open_leg?.trade_id ?? ""}`}>
+          <TableRow
+            key={`${row.account_id}:${row.symbol}:${row.trade_date}:${row.open_leg?.trade_id ?? ""}`}
+            className={cn(onRowClick && "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors")}
+            onClick={() => onRowClick?.(row)}
+          >
             <TableCell className="text-slate-600 text-sm whitespace-nowrap align-top py-3">
               {row.trade_date}
             </TableCell>
@@ -590,6 +599,7 @@ export default function OptionsIncomeReport() {
   const [data, setData] = useState<OptionsIncomeData | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<OpenOptionRow | null>(null);
   const fetchSeq = useRef(0);
 
   const accountAdditionalFilters = useMemo(
@@ -824,7 +834,11 @@ export default function OptionsIncomeReport() {
               <OpenPositionFilter value={openPositionFilter} onChange={setOpenPositionFilter} />
             </CardHeader>
             <CardContent className="p-0">
-              <OpenTransactionsTable rows={openRows} currency={currency} />
+              <OpenTransactionsTable
+                rows={openRows}
+                currency={currency}
+                onRowClick={(row) => setSelectedPosition(row as OpenOptionRow)}
+              />
             </CardContent>
           </Card>
 
@@ -842,5 +856,13 @@ export default function OptionsIncomeReport() {
         </>
       ) : null}
     </div>
+
+    {selectedPosition && (
+      <OptionPositionDetailModal
+        row={selectedPosition}
+        currency={currency}
+        onClose={() => setSelectedPosition(null)}
+      />
+    )}
   );
 }
