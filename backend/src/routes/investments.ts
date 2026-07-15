@@ -79,7 +79,7 @@ export function createInvestmentsRouter(): Router {
 
     try {
       const instrument = await prisma.instrument.findFirst({
-        where: { id: instrument_id, org_id: orgId },
+        where: { id: instrument_id },
         select: { external_symbol_id: true, symbol: true },
       });
 
