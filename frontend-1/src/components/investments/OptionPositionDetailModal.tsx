@@ -63,24 +63,41 @@ interface Props {
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
+const MONTHS: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+/** Parse expiry date from an option symbol. Supports OCC-style
+ *  `AAPL240119C00150000` (YYMMDD) and Questrade-style
+ *  `SPCX17Jul26P135.00` (DDMonYY). */
+function parseExpiryDate(symbol: string): Date | null {
+  const occ = symbol.match(/(\d{6})[CP]/);
+  if (occ) {
+    const s = occ[1];
+    return new Date(2000 + parseInt(s.slice(0, 2), 10), parseInt(s.slice(2, 4), 10) - 1, parseInt(s.slice(4, 6), 10));
+  }
+  const qt = symbol.match(/(\d{1,2})([A-Za-z]{3})(\d{2})[CP]/);
+  if (qt) {
+    const month = MONTHS[qt[2].toLowerCase()];
+    if (month === undefined) return null;
+    return new Date(2000 + parseInt(qt[3], 10), month, parseInt(qt[1], 10));
+  }
+  return null;
+}
+
 function parseExpiry(symbol: string): string | null {
-  const m = symbol.match(/(\d{6})[CP]/);
-  if (!m) return null;
-  const s = m[1];
-  const year = 2000 + parseInt(s.slice(0, 2), 10);
-  const month = parseInt(s.slice(2, 4), 10) - 1;
-  const day = parseInt(s.slice(4, 6), 10);
-  return new Date(year, month, day).toLocaleDateString("en-CA", {
+  const d = parseExpiryDate(symbol);
+  if (!d) return null;
+  return d.toLocaleDateString("en-CA", {
     month: "short", day: "numeric", year: "numeric",
   });
 }
 
 function daysToExpiry(symbol: string): number | null {
-  const m = symbol.match(/(\d{6})[CP]/);
-  if (!m) return null;
-  const s = m[1];
-  const expiry = new Date(2000 + parseInt(s.slice(0, 2), 10), parseInt(s.slice(2, 4), 10) - 1, parseInt(s.slice(4, 6), 10));
-  return Math.max(0, Math.ceil((expiry.getTime() - Date.now()) / 86400000));
+  const d = parseExpiryDate(symbol);
+  if (!d) return null;
+  return Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86400000));
 }
 
 function fmtNum(v: number | null | undefined, decimals = 4): string {
