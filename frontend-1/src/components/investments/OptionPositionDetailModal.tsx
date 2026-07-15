@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
+import Cookies from "js-cookie";
 import { X, RefreshCw, Loader2, ArrowUp, TrendingUp, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchAPI } from "@/api/api";
@@ -239,8 +240,15 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
   useEffect(() => { void fetchQuote(); }, [fetchQuote]);
 
   /* Streaming analysis chat */
+  const authToken = Cookies.get("__session");
   const { messages, append, isLoading, input, setInput } = useChat({
     api: `${import.meta.env.VITE_API_BASE_URL || ""}/api/investments/option-analysis`,
+    headers: authToken
+      ? { Accept: "text/event-stream", Authorization: `Bearer ${authToken}` }
+      : { Accept: "text/event-stream" },
+    onError: (err) => {
+      console.error("Option analysis stream error:", err);
+    },
     experimental_prepareRequestBody: ({ messages: msgs }) => ({
       messages: msgs,
       positionContext: row,
