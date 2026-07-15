@@ -83,8 +83,8 @@ export function createInvestmentsRouter(): Router {
         select: { external_symbol_id: true, symbol: true },
       });
 
-      if (!instrument?.external_symbol_id) {
-        return res.status(404).json({ error: 'Instrument not found or has no Questrade symbol ID' });
+      if (!instrument) {
+        return res.status(404).json({ error: 'Instrument not found' });
       }
 
       const connection = await prisma.source_system.findFirst({
@@ -102,7 +102,25 @@ export function createInvestmentsRouter(): Router {
         return res.status(501).json({ error: 'Broker connector does not support option quotes' });
       }
 
-      const quotes = await connector.getOptionQuotes({ optionIds: [instrument.external_symbol_id] });
+      // Resolve symbolId: prefer cached external_symbol_id, fall back to symbol search
+      let symbolId = instrument.external_symbol_id;
+      if (!symbolId) {
+        if (!connector.searchSymbol) {
+          return res.status(404).json({ error: 'Instrument has no Questrade symbol ID and broker does not support symbol search' });
+        }
+        const found = await connector.searchSymbol(instrument.symbol);
+        if (!found?.symbolId) {
+          return res.status(404).json({ error: `Could not resolve Questrade symbol ID for ${instrument.symbol}` });
+        }
+        symbolId = found.symbolId;
+        // Persist so future calls skip the search
+        await prisma.instrument.update({
+          where: { id: instrument_id },
+          data: { external_symbol_id: symbolId },
+        });
+      }
+
+      const quotes = await connector.getOptionQuotes({ optionIds: [symbolId] });
       const quote = quotes[0] ?? null;
 
       return res.json({ quote });
