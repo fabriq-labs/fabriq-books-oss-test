@@ -13,7 +13,6 @@ import { AuthContext } from './auth/types';
 import { setupRestRoutes } from './rest/routes';
 import { errorHandler } from './rest/middleware/errorHandler';
 import agentModule from './agent';
-import { createChatRouter } from './routes/chat';
 import { createBrokerSyncRouter } from './routes/broker-sync';
 import { createInvestmentsRouter } from './routes/investments';
 import { GracefulShutdown } from './utils/gracefulShutdown';
@@ -74,9 +73,6 @@ async function startServer(): Promise<void> {
 
     // Setup Agent routes
     app.use('/api/agent', agentModule.createAgentRouter());
-
-    // Persisted financial chat (Vercel AI SDK useChat + chat_threads)
-    app.use('/api/chat', createChatRouter());
 
     // Broker forward sync (Questrade)
     app.use('/api/broker-sync', createBrokerSyncRouter());
