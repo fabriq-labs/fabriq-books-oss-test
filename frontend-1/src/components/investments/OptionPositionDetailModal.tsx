@@ -105,6 +105,44 @@ function fmtNum(v: number | null | undefined, decimals = 4): string {
   return v.toFixed(decimals);
 }
 
+/**
+ * Flatten the position row + already-fetched quote into the flat key/value shape
+ * consumed by the `options_analysis` prompt_template's {{context.modelContext.KEY}}
+ * placeholders. Only defined values are included — the prompt template conditionally
+ * omits any section whose key is absent, so a failed/partial quote degrades gracefully.
+ */
+function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<string, string | number> {
+  const ctx: Record<string, string | number> = {
+    symbol: row.symbol,
+    underlyingSymbol: row.underlying_symbol ?? row.symbol,
+    optionType: row.option_type === "P" ? "Put" : row.option_type === "C" ? "Call" : "Option",
+    positionQty: row.position_qty,
+    accountName: row.account_name,
+  };
+  if (row.strike_price != null) ctx.strike = row.strike_price;
+  if (row.open_leg?.value_date) ctx.entryDate = row.open_leg.value_date;
+  if (row.open_leg?.price != null) ctx.entryPrice = row.open_leg.price;
+  if (row.sale_cost != null) ctx.premiumCollected = row.sale_cost;
+  if (row.underlying_current_price != null) ctx.underlyingCurrentPrice = row.underlying_current_price;
+  if (row.option_current_price != null) ctx.optionMarkPrice = row.option_current_price;
+  if (row.unrealized_pnl != null) ctx.unrealizedPnl = row.unrealized_pnl;
+
+  if (quote) {
+    if (quote.delta != null) ctx.delta = quote.delta;
+    if (quote.gamma != null) ctx.gamma = quote.gamma;
+    if (quote.theta != null) ctx.theta = quote.theta;
+    if (quote.vega != null) ctx.vega = quote.vega;
+    if (quote.rho != null) ctx.rho = quote.rho;
+    if (quote.volatility != null) ctx.impliedVolatility = Number(quote.volatility).toFixed(1);
+    if (quote.openInterest != null) ctx.openInterest = quote.openInterest;
+    if (quote.bidPrice != null) ctx.bidPrice = quote.bidPrice;
+    if (quote.askPrice != null) ctx.askPrice = quote.askPrice;
+    if (quote.volume != null) ctx.volume = quote.volume;
+  }
+
+  return ctx;
+}
+
 function fmtPct(v: number | null | undefined): string {
   if (v == null) return "—";
   return `${v.toFixed(1)}%`;
@@ -256,10 +294,20 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
 
   useEffect(() => { void fetchQuote(); }, [fetchQuote]);
 
-  /* Streaming analysis chat */
+  /*
+   * Streaming analysis chat — routed through the shared in-app agent endpoint
+   * (/api/agent/chat/stream) instead of a bespoke route. No sessionId/chatId is
+   * sent, so this is the "conversational chat, non-persistent" path: history
+   * lives only in this component's React state (useChat's `messages`) and is
+   * gone once the modal closes. The position + live Greeks are fetched exactly
+   * once above (fetchQuote) and re-sent as `modelContext` on every turn — the
+   * LLM never fetches quotes itself (see modelName: 'instrument' tool config,
+   * which has an empty tool list on purpose).
+   */
   const authToken = Cookies.get("__session");
+  const modelContext = buildModelContext(row, quote);
   const { messages, append, isLoading, input, setInput } = useChat({
-    api: `${import.meta.env.VITE_API_BASE_URL || ""}/api/investments/option-analysis`,
+    api: `${import.meta.env.VITE_API_BASE_URL || ""}/api/agent/chat/stream`,
     headers: authToken
       ? { Accept: "text/event-stream", Authorization: `Bearer ${authToken}` }
       : { Accept: "text/event-stream" },
@@ -268,8 +316,13 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
     },
     experimental_prepareRequestBody: ({ messages: msgs }) => ({
       messages: msgs,
-      positionContext: row,
-      liveQuote: quote,
+      context: {
+        modelName: "instrument",
+        viewName: "instrument_view",
+        recordId: row.instrument_id,
+        promptTypes: ["options_analysis"],
+        modelContext,
+      },
     }),
   });
 

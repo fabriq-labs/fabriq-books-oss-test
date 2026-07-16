@@ -91,6 +91,18 @@ INSERT INTO agent_model_tool_config (
   NOW()
 ),
 (
+  'amtc_instrument',
+  'instrument',
+  'Instrument / Option Position Analysis',
+  'Prompts: instrument_view (view_0498aa82) — options_analysis. No tools: position + live Greeks are pushed in via modelContext by the frontend (fetched once, deterministically) before the chat turn, so the LLM never needs — and should never trigger — its own quote fetch or DB lookup for this conversation.',
+  ARRAY[]::text[],
+  false,
+  true,
+  40,
+  NOW(),
+  NOW()
+),
+(
   'amtc_fallback',
   '_fallback',
   'Other Models',
