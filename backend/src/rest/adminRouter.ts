@@ -14,10 +14,15 @@ import {
   getIndianDemoReconStatus,
   resetIndianDemoReconciliation,
 } from '../utils/setup/resetIndianDemoReconciliation';
+import {
+  listLegalEntities,
+  removeLegalEntityData,
+} from '../utils/setup/removeLegalEntityData';
 
 const adminRouter = Router();
 
 let indianDemoReconResetInProgress = false;
+let legalEntityDropInProgress = false;
 
 /** Check if the given user id has the Super Admin role (any of their roles). */
 export async function isSuperAdmin(userId: string): Promise<boolean> {
@@ -635,6 +640,126 @@ adminRouter.post(
       });
       return res.status(500).json({
         error: err?.message || 'Failed to reset indian-demo reconciliation data',
+      });
+    }
+  }
+);
+
+adminRouter.get(
+  '/demo-data/legal-entities',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+
+      const orgId =
+        typeof req.query.orgId === 'string' && req.query.orgId.trim()
+          ? req.query.orgId.trim()
+          : undefined;
+      const entities = await listLegalEntities(orgId);
+      return res.status(200).json({ success: true, entities });
+    } catch (err: any) {
+      logger.error('demo-data legal-entities list error', {
+        error: err?.message,
+        stack: err?.stack,
+      });
+      return res.status(500).json({
+        error: err?.message || 'Failed to list legal entities',
+      });
+    }
+  }
+);
+
+adminRouter.post(
+  '/demo-data/legal-entities/:entityId/preview',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+
+      const entityId = String(req.params.entityId || '').trim();
+      const result = await removeLegalEntityData(entityId, { confirm: false });
+      return res.status(200).json({ success: true, result });
+    } catch (err: any) {
+      logger.error('demo-data legal-entity preview error', {
+        error: err?.message,
+        stack: err?.stack,
+      });
+      const status = String(err?.message || '').includes('not found') ? 404 : 500;
+      return res.status(status).json({
+        error: err?.message || 'Failed to preview legal entity drop',
+      });
+    }
+  }
+);
+
+adminRouter.post(
+  '/demo-data/legal-entities/:entityId/drop',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+
+      if (legalEntityDropInProgress || indianDemoReconResetInProgress) {
+        return res.status(409).json({
+          error: 'Another demo-data mutation is already in progress',
+        });
+      }
+
+      const entityId = String(req.params.entityId || '').trim();
+      const confirmToken = String((req.body as { confirm?: string })?.confirm || '');
+      if (confirmToken !== entityId) {
+        return res.status(400).json({
+          error: 'Body.confirm must exactly match the legal entity id to drop',
+        });
+      }
+
+      legalEntityDropInProgress = true;
+      try {
+        const result = await removeLegalEntityData(entityId, { confirm: true });
+        logger.info('legal entity drop completed', {
+          userId: context.user.id,
+          entityId: result.entityId,
+          total: result.total,
+        });
+        return res.status(200).json({
+          success: true,
+          message: `Dropped legal entity ${result.entityName} (${result.entityId}).`,
+          result,
+        });
+      } finally {
+        legalEntityDropInProgress = false;
+      }
+    } catch (err: any) {
+      legalEntityDropInProgress = false;
+      logger.error('demo-data legal-entity drop error', {
+        error: err?.message,
+        stack: err?.stack,
+      });
+      const status = String(err?.message || '').includes('not found') ? 404 : 500;
+      return res.status(status).json({
+        error: err?.message || 'Failed to drop legal entity',
       });
     }
   }

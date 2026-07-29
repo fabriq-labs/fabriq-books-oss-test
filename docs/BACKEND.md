@@ -287,6 +287,9 @@ npx prisma generate
 | `POST /api/admin/setup-chart-of-accounts` | Super Admin: runs `setupChartOfAccounts()` for a specific legal entity. Body: `entityId` (string), `coaTemplate` (`indian` \| `us-ca` \| `perfin` \| `nri-india` \| `nri-canada`). Returns `{ success, entityId, orgId, template, currency, counts: { created, existing, total } }`. Idempotent — existing accounts are preserved (upsert by deterministic ID). |
 | `GET /api/admin/demo-data/indian-demo/status` | Super Admin: read-only counts for `org_indian_demo` reconciliation seed lines (`post_demo_*`). |
 | `POST /api/admin/demo-data/indian-demo/reset-reconciliation` | Super Admin: reset indian-demo recon / categorization bank lines and confirm-created payment receipts only (`post_demo_*`). Reloads from `prisma/setup-IN/posting.csv`. Does not wipe FY journals or other orgs. |
+| `GET /api/admin/demo-data/legal-entities?orgId=` | Super Admin: list legal entities (optional `orgId` filter) with invoice/posting/account counts. |
+| `POST /api/admin/demo-data/legal-entities/:entityId/preview` | Super Admin: dry-run counts for dropping one legal entity and related transactions. |
+| `POST /api/admin/demo-data/legal-entities/:entityId/drop` | Super Admin: drop one legal entity. Body `{ confirm: "<entityId>" }` must match. Deletes invoices/bills/postings/COA/org-structure for that entity; keeps tenant org and shared masters. |
 
 ## Search Query Filters
 

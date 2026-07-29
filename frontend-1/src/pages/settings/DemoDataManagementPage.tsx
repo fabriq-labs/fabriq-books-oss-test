@@ -7,13 +7,25 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   adminAPI,
   type IndianDemoReconStatus,
+  type LegalEntitySummary,
+  type RemoveLegalEntityResult,
   type ResetIndianDemoReconciliationResult,
 } from "@/api/superAdminApi";
-import { AlertTriangle, RefreshCw, RotateCcw } from "lucide-react";
+import { AlertTriangle, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+
+const INDIAN_DEMO_ORG_ID = "org_indian_demo";
 
 function StatusRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -30,6 +42,14 @@ export default function DemoDataManagementPage() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [lastResult, setLastResult] = useState<ResetIndianDemoReconciliationResult | null>(null);
+
+  const [entities, setEntities] = useState<LegalEntitySummary[]>([]);
+  const [entitiesLoading, setEntitiesLoading] = useState(true);
+  const [selectedEntityId, setSelectedEntityId] = useState("");
+  const [preview, setPreview] = useState<RemoveLegalEntityResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [dropping, setDropping] = useState(false);
+  const [lastDrop, setLastDrop] = useState<RemoveLegalEntityResult | null>(null);
 
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -48,9 +68,30 @@ export default function DemoDataManagementPage() {
     }
   }, [toast]);
 
+  const loadEntities = useCallback(async () => {
+    setEntitiesLoading(true);
+    try {
+      const res = await adminAPI.listLegalEntities(INDIAN_DEMO_ORG_ID);
+      setEntities(res.entities);
+      setSelectedEntityId((prev) =>
+        prev && res.entities.some((e) => e.id === prev) ? prev : ""
+      );
+    } catch (err) {
+      setEntities([]);
+      toast({
+        title: "Could not load legal entities",
+        description: err instanceof Error ? err.message : "Request failed",
+        variant: "destructive",
+      });
+    } finally {
+      setEntitiesLoading(false);
+    }
+  }, [toast]);
+
   useEffect(() => {
     void loadStatus();
-  }, [loadStatus]);
+    void loadEntities();
+  }, [loadStatus, loadEntities]);
 
   const handleResetReconciliation = async () => {
     const confirmed = window.confirm(
@@ -82,16 +123,88 @@ export default function DemoDataManagementPage() {
     }
   };
 
+  const handlePreviewDrop = async () => {
+    if (!selectedEntityId) return;
+    setPreviewLoading(true);
+    setPreview(null);
+    try {
+      const res = await adminAPI.previewDropLegalEntity(selectedEntityId);
+      setPreview(res.result);
+    } catch (err) {
+      toast({
+        title: "Preview failed",
+        description: err instanceof Error ? err.message : "Request failed",
+        variant: "destructive",
+      });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleDropLegalEntity = async () => {
+    if (!selectedEntityId) return;
+    const selected = entities.find((e) => e.id === selectedEntityId);
+    const label = selected
+      ? `${selected.organizationName} (${selected.id})`
+      : selectedEntityId;
+
+    const confirmed = window.confirm(
+      `Drop legal entity ${label}?\n\n` +
+        "This permanently deletes invoices, bills, postings, COA accounts, org-structure " +
+        "(departments, locations, …), linked sales docs, payment receipts, and the entity row.\n\n" +
+        "Tenant org and shared masters (customers, suppliers, items, users) are kept.\n\n" +
+        "Type OK in the next prompt to continue."
+    );
+    if (!confirmed) return;
+
+    const typed = window.prompt(`Type the entity id to confirm:\n${selectedEntityId}`);
+    if (typed !== selectedEntityId) {
+      toast({
+        title: "Drop cancelled",
+        description: "Entity id did not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDropping(true);
+    setLastDrop(null);
+    try {
+      const res = await adminAPI.dropLegalEntity(selectedEntityId);
+      setLastDrop(res.result);
+      setPreview(null);
+      setSelectedEntityId("");
+      toast({
+        title: "Legal entity dropped",
+        description: res.message,
+      });
+      await Promise.all([loadEntities(), loadStatus()]);
+    } catch (err) {
+      toast({
+        title: "Drop failed",
+        description: err instanceof Error ? err.message : "Request failed",
+        variant: "destructive",
+      });
+    } finally {
+      setDropping(false);
+    }
+  };
+
   const canReset =
     Boolean(status?.orgExists) && Boolean(status?.checkingAccountExists) && !resetting;
+  const selectedEntity = entities.find((e) => e.id === selectedEntityId);
+  const previewNonZero = preview
+    ? Object.entries(preview.counts).filter(([, n]) => n > 0)
+    : [];
 
   return (
     <div className="container mx-auto max-w-3xl space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Demo Data Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Super Admin tools for restoring demo use-case data. Currently scoped to{" "}
-          <code className="text-xs">org_indian_demo</code> only.
+          Super Admin tools for demo use-case data. Recon reset is scoped to{" "}
+          <code className="text-xs">org_indian_demo</code>; legal-entity drop works per entity under
+          that tenant.
         </p>
       </div>
 
@@ -188,11 +301,130 @@ export default function DemoDataManagementPage() {
       </Card>
 
       <Card>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle>Drop legal entity</CardTitle>
+            <CardDescription>
+              Deletes one legal entity under <code className="text-xs">{INDIAN_DEMO_ORG_ID}</code>{" "}
+              and all related invoices, bills, postings, accounts, and org-structure. Shared tenant
+              masters are kept.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void loadEntities()}
+            disabled={entitiesLoading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${entitiesLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+            <p className="text-muted-foreground">
+              Destructive and irreversible. Prefer dropping a branch entity (e.g. Mumbai / Bangalore
+              / US) rather than HQ unless you intend to remove the main demo company.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="legal-entity">Legal entity</Label>
+            <Select
+              value={selectedEntityId || undefined}
+              onValueChange={(v) => {
+                setSelectedEntityId(v);
+                setPreview(null);
+              }}
+              disabled={entitiesLoading || entities.length === 0}
+            >
+              <SelectTrigger id="legal-entity">
+                <SelectValue
+                  placeholder={
+                    entitiesLoading
+                      ? "Loading…"
+                      : entities.length === 0
+                        ? "No legal entities found"
+                        : "Select a legal entity"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {entities.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.organizationName}
+                    {e.isHeadquarters ? " (HQ)" : ""} — {e.id} · inv {e.invoiceCount} · post{" "}
+                    {e.postingCount} · accts {e.accountCount}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedEntity && (
+            <div className="divide-y rounded-md border px-3">
+              <StatusRow label="Entity" value={selectedEntity.organizationName} />
+              <StatusRow label="Id" value={selectedEntity.id} />
+              <StatusRow label="Country" value={selectedEntity.country || "—"} />
+              <StatusRow label="Invoices" value={selectedEntity.invoiceCount} />
+              <StatusRow label="Postings" value={selectedEntity.postingCount} />
+              <StatusRow label="Accounts" value={selectedEntity.accountCount} />
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handlePreviewDrop()}
+              disabled={!selectedEntityId || previewLoading || dropping}
+            >
+              {previewLoading ? "Previewing…" : "Preview delete counts"}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleDropLegalEntity()}
+              disabled={!selectedEntityId || dropping}
+            >
+              <Trash2 className={`mr-2 h-4 w-4 ${dropping ? "animate-pulse" : ""}`} />
+              {dropping ? "Dropping…" : "Drop legal entity"}
+            </Button>
+          </div>
+
+          {preview && (
+            <div className="space-y-2 rounded-md border p-3 text-sm">
+              <p className="font-medium">
+                Dry run — {preview.total} row(s) would be affected for {preview.entityName}
+              </p>
+              <div className="max-h-48 overflow-y-auto divide-y">
+                {previewNonZero.length === 0 ? (
+                  <p className="text-muted-foreground py-1">No related rows found.</p>
+                ) : (
+                  previewNonZero.map(([name, n]) => (
+                    <StatusRow key={name} label={name} value={n} />
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {lastDrop && (
+            <p className="text-sm text-muted-foreground">
+              Last drop: {lastDrop.entityName} ({lastDrop.entityId}) — removed {lastDrop.total}{" "}
+              row(s).
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
           <CardTitle>Also available elsewhere</CardTitle>
           <CardDescription>
-            Broader tenant ops stay on Tenant Administration; CLI covers org wipe and full posting
-            reset.
+            Broader tenant ops stay on Tenant Administration; CLI covers org wipe and entity wipe.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
@@ -203,9 +435,10 @@ export default function DemoDataManagementPage() {
           </p>
           <p>
             <span className="font-medium text-foreground">CLI</span> —{" "}
-            <code className="text-xs">remove-tenant-data</code> (drop org),{" "}
-            <code className="text-xs">--reset-postings-full</code> (all indian-demo journals),{" "}
-            <code className="text-xs">--reset-transactions</code> (global AI + agent wipe).
+            <code className="text-xs">npm run remove-tenant-data -- --legal-entity=&lt;id&gt; --confirm</code>{" "}
+            (entity wipe), or{" "}
+            <code className="text-xs">npm run remove-tenant-data -- &lt;org_id&gt; --confirm</code>{" "}
+            (full tenant wipe).
           </p>
         </CardContent>
       </Card>
