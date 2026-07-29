@@ -167,14 +167,6 @@ async function importOpeningBalancesFromSeedCsv(demoOrgId: string): Promise<numb
 /** Bank-import style lines for reconciliation / categorization UI (one-sided; HQ only). */
 const RECONCILIATION_POSTING_CSV = 'posting.csv';
 
-const DEMO_POSTING_IDS = [
-  'post_demo_01', 'post_demo_02', 'post_demo_03', 'post_demo_04', 'post_demo_05',
-  'post_demo_06', 'post_demo_07', 'post_demo_08', 'post_demo_09', 'post_demo_10',
-  'post_demo_11', 'post_demo_12', 'post_demo_13', 'post_demo_14', 'post_demo_15',
-  'post_demo_16', 'post_demo_17', 'post_demo_18', 'post_demo_19', 'post_demo_20',
-  'post_demo_21', 'post_demo_22', 'post_demo_23', 'post_demo_24',
-];
-
 async function upsertPostingsFromCsvFile(csvFileName: string, demoOrgId: string): Promise<number> {
   const filePath = path.join(__dirname, csvFileName);
   if (!fs.existsSync(filePath)) {
@@ -1846,64 +1838,21 @@ async function setupIndianDemoData() {
   }
 }
 
-/** Payment receipt IDs seeded by setup (keep these; only delete receipts created by confirming). */
-const SEED_RECEIPT_IDS = [
-  'payr_demo_001',
-  'payr_demo_002',
-  'payr_demo_003',
-  'payr_demo_004',
-  'payr_demo_005',
-  'payr_demo_006',
-  'payr_demo_007',
-];
-
 /**
  * Drop only post_demo_* reconciliation lines (and receipts created by confirming),
  * then reload from posting.csv. FY journal postings (post_fy25_*, etc.) are untouched.
+ * Delegates to shared util used by Super Admin Demo Data Management API.
  */
 async function resetDemoPostingsAndReceipts() {
-  const demoOrgId = 'org_indian_demo';
-  const demoLegalEntityId = 'org_indian_demo';
-
-  console.log(`🔄 Resetting reconciliation demo postings (${RECONCILIATION_POSTING_CSV})...`);
-
-  const existingPostings = await prisma.posting.findMany({
-    where: { id: { in: DEMO_POSTING_IDS }, org_id: demoOrgId },
-    select: { id: true, payment_receipt_id: true },
-  });
-
-  const receiptIdsToDelete = existingPostings
-    .map((p) => p.payment_receipt_id)
-    .filter((id): id is string => id != null && !SEED_RECEIPT_IDS.includes(id));
-
-  if (receiptIdsToDelete.length > 0) {
-    await prisma.payment_receipt.deleteMany({ where: { id: { in: receiptIdsToDelete } } });
-    console.log(`  ✓ Deleted ${receiptIdsToDelete.length} payment receipt(s) created by confirming`);
-  }
-
-  const deleted = await prisma.posting.deleteMany({
-    where: { id: { in: DEMO_POSTING_IDS }, org_id: demoOrgId },
-  });
-  console.log(`  ✓ Deleted ${deleted.count} reconciliation demo postings`);
-
-  const bankAccount = await prisma.account.findFirst({
-    where: { org_id: demoOrgId, legal_entity_id: demoLegalEntityId, code: '1102' },
-  });
-  if (!bankAccount) {
-    throw new Error('Chart of accounts missing Checking (1102). Run full Indian demo setup first.');
-  }
-
-  const baseDate = new Date();
-  baseDate.setMonth(baseDate.getMonth() - 2);
-
-  const count = await upsertReconciliationBankPostingsFromCsv(
-    bankAccount,
-    demoOrgId,
-    demoLegalEntityId,
-    baseDate
+  // Relative require keeps ts-node CLI working without a prior `tsc` build of src/.
+  const {
+    resetIndianDemoReconciliation,
+  } = require('../../src/utils/setup/resetIndianDemoReconciliation');
+  const result = await resetIndianDemoReconciliation();
+  console.log(
+    `✅ Reconciliation demo postings reset complete ` +
+      `(deleted ${result.deletedPostings}, receipts ${result.deletedConfirmReceipts}, reloaded ${result.reloadedPostings}).`
   );
-  console.log(`  ✓ Reloaded ${count} reconciliation demo postings`);
-  console.log('✅ Reconciliation demo postings reset complete.');
   await prisma.$disconnect();
 }
 

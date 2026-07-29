@@ -103,6 +103,36 @@ export interface SeedModelDataResponse {
   counts: { created: number; updated: number; total: number };
 }
 
+export interface IndianDemoReconStatus {
+  orgExists: boolean;
+  orgId: string;
+  orgName: string | null;
+  checkingAccountExists: boolean;
+  reconPostingCount: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  aiCategorizedCount: number;
+  confirmCreatedReceiptCount: number;
+}
+
+export interface IndianDemoReconStatusResponse {
+  success: boolean;
+  status: IndianDemoReconStatus;
+}
+
+export interface ResetIndianDemoReconciliationResult {
+  orgId: string;
+  deletedPostings: number;
+  deletedConfirmReceipts: number;
+  reloadedPostings: number;
+}
+
+export interface ResetIndianDemoReconciliationResponse {
+  success: boolean;
+  message: string;
+  result: ResetIndianDemoReconciliationResult;
+}
+
 // ── Admin API ─────────────────────────────────────────────────────────────────
 
 export const adminAPI = {
@@ -134,4 +164,13 @@ export const adminAPI = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  getIndianDemoReconStatus: () =>
+    adminFetch<IndianDemoReconStatusResponse>('/api/admin/demo-data/indian-demo/status'),
+
+  resetIndianDemoReconciliation: () =>
+    adminFetch<ResetIndianDemoReconciliationResponse>(
+      '/api/admin/demo-data/indian-demo/reset-reconciliation',
+      { method: 'POST' }
+    ),
 };

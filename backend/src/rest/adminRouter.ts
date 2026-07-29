@@ -10,8 +10,14 @@ import logger from '../utils/logger';
 import { main as syncMetadataFromJson } from '../utils/setup/metadata/syncMetadataFromJson';
 import { setupChartOfAccounts } from '../utils/setup/setupChartOfAccounts';
 import { seedPaymentTermsFromCsv } from '../utils/setup/seedPaymentTermsFromCsv';
+import {
+  getIndianDemoReconStatus,
+  resetIndianDemoReconciliation,
+} from '../utils/setup/resetIndianDemoReconciliation';
 
 const adminRouter = Router();
+
+let indianDemoReconResetInProgress = false;
 
 /** Check if the given user id has the Super Admin role (any of their roles). */
 export async function isSuperAdmin(userId: string): Promise<boolean> {
@@ -551,6 +557,85 @@ adminRouter.post(
     } catch (err: any) {
       logger.error('setup-chart-of-accounts error', { error: err?.message, stack: err?.stack });
       return res.status(500).json({ error: err?.message || 'Failed to setup chart of accounts' });
+    }
+  }
+);
+
+// ── Demo data management (indian-demo scoped) ─────────────────────────────────
+
+adminRouter.get(
+  '/demo-data/indian-demo/status',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+
+      const status = await getIndianDemoReconStatus();
+      return res.status(200).json({ success: true, status });
+    } catch (err: any) {
+      logger.error('demo-data indian-demo status error', {
+        error: err?.message,
+        stack: err?.stack,
+      });
+      return res.status(500).json({
+        error: err?.message || 'Failed to load indian-demo status',
+      });
+    }
+  }
+);
+
+adminRouter.post(
+  '/demo-data/indian-demo/reset-reconciliation',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+
+      if (indianDemoReconResetInProgress) {
+        return res.status(409).json({
+          error: 'Indian demo reconciliation reset is already in progress',
+        });
+      }
+
+      indianDemoReconResetInProgress = true;
+      try {
+        const result = await resetIndianDemoReconciliation();
+        logger.info('indian-demo reconciliation reset completed', {
+          userId: context.user.id,
+          ...result,
+        });
+        return res.status(200).json({
+          success: true,
+          message:
+            'Indian demo reconciliation / categorization / confirm-receipts reset complete.',
+          result,
+        });
+      } finally {
+        indianDemoReconResetInProgress = false;
+      }
+    } catch (err: any) {
+      indianDemoReconResetInProgress = false;
+      logger.error('demo-data indian-demo reset-reconciliation error', {
+        error: err?.message,
+        stack: err?.stack,
+      });
+      return res.status(500).json({
+        error: err?.message || 'Failed to reset indian-demo reconciliation data',
+      });
     }
   }
 );

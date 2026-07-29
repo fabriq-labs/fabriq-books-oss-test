@@ -50,6 +50,7 @@ import BankConnectionsPage from "./pages/banking/BankConnections";
 import TenantOnboardingPage from "./pages/settings/TenantOnboardingPage";
 import DeveloperOptionsPage from "./pages/settings/DeveloperOptionsPage";
 import TenantAdministrationPage from "./pages/settings/TenantAdministrationPage";
+import DemoDataManagementPage from "./pages/settings/DemoDataManagementPage";
 import OpeningBalances from "./pages/accounting/OpeningBalances";
 import { SuperAdminGuard } from "./components/layout/SuperAdminGuard";
 import { PromptTemplateForm } from "./components/forms/Masters/PromptTemplateForm";
@@ -459,6 +460,11 @@ const AppRoutes: React.FC = () => {
                 <Route path="settings/tenant-admin" element={
                   <SuperAdminGuard>
                     <TenantAdministrationPage />
+                  </SuperAdminGuard>
+                } />
+                <Route path="settings/demo-data" element={
+                  <SuperAdminGuard>
+                    <DemoDataManagementPage />
                   </SuperAdminGuard>
                 } />
                 <Route path="settings/tenant-onboarding" element={<Navigate to="/settings/tenant-admin" replace />} />
