@@ -165,7 +165,7 @@ export async function getIndianDemoReconStatus(): Promise<IndianDemoReconStatus>
       checkingAccountExists: false,
       reconPostingCount: 0,
       matchedCount: 0,
-      uncategorizedCount: 0,
+      unmatchedCount: 0,
       aiCategorizedCount: 0,
       confirmCreatedReceiptCount: 0,
     };
