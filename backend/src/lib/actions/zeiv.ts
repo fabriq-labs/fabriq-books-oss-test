@@ -7,6 +7,7 @@ import { WorkflowContext } from "../../workflow-engine/types/workflow.types";
 import { WorkflowEngine } from "../../workflow-engine/core/WorkflowEngine";
 import { sendEmail } from './email';
 import { generateWorkflowEmailTemplate, getActionSuffix } from './emailTemplates';
+import { billTypeAndPoMode } from '../bills/poMode';
 
 
 export const calculate_invoice_total = async (context: AuthContext, model: string, instance_id: string, change_set: string[], select_set: any, tx: any) => {
@@ -22,7 +23,7 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
       change_set,
     });
 
-    let invoice: any = await tx.invoice.findUnique({
+    const invoice: any = await tx.invoice.findUnique({
       where: {
         id: instance_id,
       },
@@ -36,6 +37,7 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
         adjustable_label: true,
         wf_instance_id: true,
         payment_terms_id: true,
+        org_id: true,
         payment_terms: {
           select: {
             id: true,
@@ -52,7 +54,9 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
             discount_rate: true,
             discount_amount: true,
             tax_rate: true,
+            tax_group_id: true,
             line_tax_amount: true,
+            org_id: true,
             purchase_order_line_item: {
               select: {
                 id: true,
@@ -111,87 +115,167 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
       return parseFloat(value.toFixed(2));
     };
 
-    const invoice_calculations = invoice.invoice_line_item.reduce(
-      (acc: any, item: any) => {
-        const quantity = Number(item.invoice_qty || 0);
-        const rate = Number(item.rate || 0);
-        const discount_rate = Number(item.discount_rate || 0);
-        const tax_rate = Number(item.tax_rate || 0);
+    // Preload tax group components for lines that use structured tax
+    const taxGroupIds = Array.from(
+      new Set(
+        (invoice.invoice_line_item || [])
+          .map((item: any) => item.tax_group_id)
+          .filter((id: string | null | undefined) => !!id)
+      )
+    ) as string[];
 
-        // Step 1: Base line total (quantity × rate)
-        const base_line_total = roundToTwoDecimals(quantity * rate);
+    const taxGroupComponentMap = new Map<
+      string,
+      Array<{ tax_master_id: string; rate: number; component_type: string | null; sequence: number }>
+    >();
 
-        // Step 2: Discount amount from discount_rate (% of base)
-        let discount_amount = 0;
-        if (discount_rate > 0) {
-          discount_amount = roundToTwoDecimals(base_line_total * (discount_rate / 100));
-        }
-
-        // Step 3: Line total after discount
-        const line_total_after_discount = roundToTwoDecimals(base_line_total - discount_amount);
-
-        // Step 4: Tax amount from tax_rate (% of amount after discount)
-        const line_tax_amount = roundToTwoDecimals(line_total_after_discount * (tax_rate / 100));
-
-        // Step 5: Final line total (after discount + tax)
-        const line_total = roundToTwoDecimals(line_total_after_discount + line_tax_amount);
-
-        acc.modified_items.push({
-          where: { id: item.id },
-          data: {
-            line_total,
-            line_tax_amount,
-            discount_amount,
+    if (taxGroupIds.length > 0 && tx.tax_group_component) {
+      const components = await tx.tax_group_component.findMany({
+        where: { tax_group_id: { in: taxGroupIds } },
+        select: {
+          tax_group_id: true,
+          tax_master_id: true,
+          sequence: true,
+          tax_master: {
+            select: {
+              id: true,
+              tax_rate: true,
+              component_type: true,
+            },
           },
+        },
+        orderBy: { sequence: 'asc' },
+      });
+
+      for (const component of components) {
+        const list = taxGroupComponentMap.get(component.tax_group_id) || [];
+        list.push({
+          tax_master_id: component.tax_master_id,
+          rate: Number(component.tax_master?.tax_rate || 0),
+          component_type: component.tax_master?.component_type ?? null,
+          sequence: component.sequence ?? 1,
         });
-
-        // Skip if item is empty or purchase_order_line_item is missing
-        if (item && item.purchase_order_line_item && item.purchase_order_line_item.invoice_line_item) {
-          if (workflowInstance?.current_state !== "Draft") {
-            // Filter out Draft invoices - only include approved/non-Draft invoices
-            // Use workflow instance current_state instead of invoice status
-            const nonDraftInvoiceLineItems = item.purchase_order_line_item.invoice_line_item.filter(
-              (inv_item: any) => {
-                const wfInstanceId = inv_item.invoice?.wf_instance_id;
-                const workflowState = wfInstanceId ? workflowStateMap.get(wfInstanceId) : null;
-                return workflowState !== "Draft";
-              }
-            );
-
-            const po_item_qty_total =
-              nonDraftInvoiceLineItems.reduce(
-                (inv_item_acc: any, inv_item: any) => {
-                  const quantity = Number(inv_item.invoice_qty || 0);
-                  inv_item_acc = inv_item_acc + quantity;
-                  return inv_item_acc;
-                },
-                0
-              );
-
-            acc.modified_po_items.push({
-              where: { id: item.purchase_order_item_id },
-              data: {
-                invoice_qty: po_item_qty_total,
-              },
-            });
-          }
-        }
-        return {
-          invoice_net_total: roundToTwoDecimals(acc.invoice_net_total + line_total_after_discount),
-          tax_total: roundToTwoDecimals(acc.tax_total + line_tax_amount),
-          invoice_total: roundToTwoDecimals(acc.invoice_total + line_total),
-          modified_items: acc.modified_items,
-          modified_po_items: acc.modified_po_items,
-        };
-      },
-      {
-        invoice_net_total: 0,
-        tax_total: 0,
-        invoice_total: 0,
-        modified_items: [],
-        modified_po_items: [],
+        taxGroupComponentMap.set(component.tax_group_id, list);
       }
-    );
+    }
+
+    const invoice_calculations = {
+      invoice_net_total: 0,
+      tax_total: 0,
+      invoice_total: 0,
+      modified_items: [] as Array<{ where: { id: string }; data: any }>,
+      modified_po_items: [] as Array<{ where: { id: string }; data: any }>,
+      line_tax_writes: [] as Array<{
+        invoice_line_item_id: string;
+        tax_group_id: string | null;
+        org_id: string | null | undefined;
+        components: Array<{ tax_master_id: string; rate: number; amount: number; component_type: string | null }>;
+      }>,
+    };
+
+    for (const item of invoice.invoice_line_item || []) {
+      const quantity = Number(item.invoice_qty || 0);
+      const rate = Number(item.rate || 0);
+      const discount_rate = Number(item.discount_rate || 0);
+
+      const base_line_total = roundToTwoDecimals(quantity * rate);
+      let discount_amount = 0;
+      if (discount_rate > 0) {
+        discount_amount = roundToTwoDecimals(base_line_total * (discount_rate / 100));
+      }
+      const taxable_amount = roundToTwoDecimals(base_line_total - discount_amount);
+
+      let line_tax_amount = 0;
+      let rolled_up_tax_rate = Number(item.tax_rate || 0);
+      const lineTaxComponents: Array<{
+        tax_master_id: string;
+        rate: number;
+        amount: number;
+        component_type: string | null;
+      }> = [];
+
+      if (item.tax_group_id && taxGroupComponentMap.has(item.tax_group_id)) {
+        const groupComponents = taxGroupComponentMap.get(item.tax_group_id) || [];
+        rolled_up_tax_rate = 0;
+        for (const component of groupComponents) {
+          const amount = roundToTwoDecimals(taxable_amount * (component.rate / 100));
+          line_tax_amount = roundToTwoDecimals(line_tax_amount + amount);
+          rolled_up_tax_rate = roundToTwoDecimals(rolled_up_tax_rate + component.rate);
+          lineTaxComponents.push({
+            tax_master_id: component.tax_master_id,
+            rate: component.rate,
+            amount,
+            component_type: component.component_type,
+          });
+        }
+        invoice_calculations.line_tax_writes.push({
+          invoice_line_item_id: item.id,
+          tax_group_id: item.tax_group_id,
+          org_id: item.org_id ?? invoice.org_id,
+          components: lineTaxComponents,
+        });
+      } else {
+        line_tax_amount = roundToTwoDecimals(taxable_amount * (rolled_up_tax_rate / 100));
+        // Clear structured tax rows when falling back to single %
+        invoice_calculations.line_tax_writes.push({
+          invoice_line_item_id: item.id,
+          tax_group_id: null,
+          org_id: item.org_id ?? invoice.org_id,
+          components: [],
+        });
+      }
+
+      const line_total = roundToTwoDecimals(taxable_amount + line_tax_amount);
+
+      invoice_calculations.modified_items.push({
+        where: { id: item.id },
+        data: {
+          line_total,
+          line_tax_amount,
+          discount_amount,
+          taxable_amount,
+          tax_rate: rolled_up_tax_rate,
+        },
+      });
+
+      if (item && item.purchase_order_line_item && item.purchase_order_line_item.invoice_line_item) {
+        if (workflowInstance?.current_state !== "Draft") {
+          const nonDraftInvoiceLineItems = item.purchase_order_line_item.invoice_line_item.filter(
+            (inv_item: any) => {
+              const wfInstanceId = inv_item.invoice?.wf_instance_id;
+              const workflowState = wfInstanceId ? workflowStateMap.get(wfInstanceId) : null;
+              return workflowState !== "Draft";
+            }
+          );
+
+          const po_item_qty_total = nonDraftInvoiceLineItems.reduce(
+            (inv_item_acc: any, inv_item: any) => {
+              const quantity = Number(inv_item.invoice_qty || 0);
+              inv_item_acc = inv_item_acc + quantity;
+              return inv_item_acc;
+            },
+            0
+          );
+
+          invoice_calculations.modified_po_items.push({
+            where: { id: item.purchase_order_item_id },
+            data: {
+              invoice_qty: po_item_qty_total,
+            },
+          });
+        }
+      }
+
+      invoice_calculations.invoice_net_total = roundToTwoDecimals(
+        invoice_calculations.invoice_net_total + taxable_amount
+      );
+      invoice_calculations.tax_total = roundToTwoDecimals(
+        invoice_calculations.tax_total + line_tax_amount
+      );
+      invoice_calculations.invoice_total = roundToTwoDecimals(
+        invoice_calculations.invoice_total + line_total
+      );
+    }
 
     const poItemUpdates = await Promise.all(
       invoice_calculations.modified_po_items.map((item: any) =>
@@ -202,6 +286,27 @@ export const calculate_invoice_total = async (context: AuthContext, model: strin
       )
     );
 
+    // Persist structured tax component rows (CA-1)
+    if (tx.invoice_line_tax) {
+      for (const write of invoice_calculations.line_tax_writes) {
+        await tx.invoice_line_tax.deleteMany({
+          where: { invoice_line_item_id: write.invoice_line_item_id },
+        });
+        if (write.components.length > 0) {
+          await tx.invoice_line_tax.createMany({
+            data: write.components.map((component) => ({
+              invoice_line_item_id: write.invoice_line_item_id,
+              tax_master_id: component.tax_master_id,
+              tax_group_id: write.tax_group_id,
+              rate: component.rate,
+              amount: component.amount,
+              component_type: component.component_type,
+              org_id: write.org_id,
+            })),
+          });
+        }
+      }
+    }
 
     const updatedInvoice = await tx.invoice.update({
       where: {
@@ -915,7 +1020,7 @@ export const generate_invoice_from_po = async (
         ?? null,
       requester_name: purchaseOrder?.requester,
       po_number: purchaseOrder?.po_number,
-      invoice_type: 'With PO',
+      ...billTypeAndPoMode('With PO'),
       purchase_order_id: purchaseOrder?.id,
       created_at: purchaseOrder?.created_at,
       created_by: purchaseOrder?.created_by,

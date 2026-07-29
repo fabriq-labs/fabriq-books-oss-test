@@ -5,6 +5,8 @@ import { FileText, Plus, Upload } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { log } from 'console';
 import { viewAPI, workflowAPI } from '@/api/api';
+import { buildNewBillCreatePayload } from '@/lib/bills/createBillDefaults';
+import { useEntity } from '@/contexts/EntityContext';
 
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -20,6 +22,7 @@ import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
 export const Invoice: React.FC = () => {
   const location = useLocation();
   const { setPageContext } = useChatContext();
+  const { currentEntityId } = useEntity();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('toDos');
   const [details, setDetails] = useState([]);
@@ -103,14 +106,13 @@ export const Invoice: React.FC = () => {
   };
 
   const handleCreate = () => {
-    workflowAPI.create("invoice", '9', {
-      status: '9',
-    })
+    void buildNewBillCreatePayload({}, { preferredLegalEntityId: currentEntityId })
+      .then((payload) => workflowAPI.create('invoice', '9', payload))
       .then((res: any) => {
-        navigate(`/purchases/bills/${res?.data?.id}/state/9`)
-      }).catch((err) => {
-        const { response } = err;
-        console.log("Error :", err.message);
+        navigate(`/purchases/bills/${res?.data?.id}/state/9`);
+      })
+      .catch((err) => {
+        console.log('Error :', err.message);
       });
   };
 

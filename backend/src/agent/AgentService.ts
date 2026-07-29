@@ -20,12 +20,18 @@ import {
 import { buildSessionContextBlock, shouldAutoContinue } from './prompt/constants';
 import { sessionEventBus } from './services/SessionEventBus';
 import { sessionTimeoutService } from './services/SessionTimeoutService';
-import { getAgentStreamErrorMessage } from './utils/streamErrorMessage';
+import {
+  consumeStreamAndThrowOnError,
+  getAgentStreamErrorMessage,
+} from './utils/streamErrorMessage';
 import prisma from '../lib/prisma';
 
 // Default max steps for the agent loop
 // Can be overridden via AGENT_MAX_STEPS environment variable
 const DEFAULT_MAX_STEPS = 5;
+
+/** Hard cap for streamText consume (extract / non-SSE). Override via AGENT_STREAM_TIMEOUT_MS. */
+const DEFAULT_STREAM_TIMEOUT_MS = 120_000;
 
 // When a session targets a specific goal_model, only include these related models
 // in the system prompt to reduce noise and improve LLM accuracy
@@ -912,18 +918,32 @@ export class AgentService {
    * Handle request via streamText and consume to completion.
    * Uses the streaming API path (avoids "Invalid JSON response" from generateText).
    * Returns the same structure as handleRequest for compatibility.
+   *
+   * NOTE: AI SDK `consumeStream()` swallows provider errors. We rethrow via
+   * `consumeStreamAndThrowOnError`, write an error llm_trace, and enforce a timeout
+   * so callers (e.g. POST /extract) never hang on auth/network failures.
    */
   async handleRequestViaStreaming(message: string | any, auth: AuthContext, previousMessages: any[] = [], context?: any): Promise<any> {
-    try {
-      const maxSteps = context?.maxAgentSteps || parseInt(process.env.AGENT_MAX_STEPS || '', 10) || DEFAULT_MAX_STEPS;
-      const questionText = this.extractQuestionText(message);
-      const classification = classifyQuestion(questionText);
-      const basePromptTypes = context?.modelName === 'posting' ? ['reconciliation', 'analytics', 'default'] : ['analytics', 'default'];
-      const enhancedContext = {
-        ...context,
-        promptTypes: context?.promptTypes?.length ? context.promptTypes : basePromptTypes,
-      };
+    const maxSteps = context?.maxAgentSteps || parseInt(process.env.AGENT_MAX_STEPS || '', 10) || DEFAULT_MAX_STEPS;
+    const questionText = this.extractQuestionText(message);
+    const classification = classifyQuestion(questionText);
+    const basePromptTypes = context?.modelName === 'posting' ? ['reconciliation', 'analytics', 'default'] : ['analytics', 'default'];
+    const enhancedContext = {
+      ...context,
+      promptTypes: context?.promptTypes?.length ? context.promptTypes : basePromptTypes,
+    };
+    const llmModelId = getModelId('agent');
+    const startTime = Date.now();
+    const timeoutMs =
+      Number(context?.streamTimeoutMs) ||
+      parseInt(process.env.AGENT_STREAM_TIMEOUT_MS || '', 10) ||
+      DEFAULT_STREAM_TIMEOUT_MS;
+    const abortController = new AbortController();
+    const timeoutHandle = setTimeout(() => {
+      abortController.abort();
+    }, timeoutMs);
 
+    try {
       const { processedMessages, systemPrompt, promptMetadata, modelName } = await this.prepareRequestSetup(
         message,
         auth,
@@ -933,16 +953,31 @@ export class AgentService {
 
       const toolManager = ToolManager.getInstance();
       const tools = await toolManager.getUnifiedTools(modelName, auth, enhancedContext);
-      logger.info('maxSteps', { maxSteps });
-      const llmModelId = getModelId('agent');
-      const startTime = Date.now();
+      logger.info('maxSteps', { maxSteps, streamTimeoutMs: timeoutMs });
+
+      let streamError: unknown;
       const result = streamText({
         model: getModel('agent'),
         system: systemPrompt,
         messages: processedMessages as any,
         tools,
         maxSteps,
+        abortSignal: abortController.signal,
+        maxRetries: typeof context?.maxRetries === 'number' ? context.maxRetries : 1,
+        onError: ({ error }) => {
+          streamError = error;
+          logger.error('streamText error during handleRequestViaStreaming', {
+            error: getAgentStreamErrorMessage(error),
+            userId: auth.user?.id,
+            orgId: auth.user?.org_id,
+            modelName: context?.modelName,
+            viewName: context?.viewName,
+            llmModel: llmModelId,
+          });
+        },
         onFinish: ({ text, usage, steps }) => {
+          // Success-only: failures are traced in the catch path below.
+          if (streamError) return;
           const durationMs = Date.now() - startTime;
           llmTraceLogger.logTrace({
             orgId: auth.user?.org_id || 'default',
@@ -961,7 +996,24 @@ export class AgentService {
         },
       });
 
-      await result.consumeStream();
+      await consumeStreamAndThrowOnError(result, (error) => {
+        streamError = error;
+        logger.error('consumeStream error during handleRequestViaStreaming', {
+          error: getAgentStreamErrorMessage(error),
+          userId: auth.user?.id,
+          orgId: auth.user?.org_id,
+          modelName: context?.modelName,
+          viewName: context?.viewName,
+          llmModel: llmModelId,
+        });
+      });
+
+      if (streamError != null) {
+        throw streamError instanceof Error
+          ? streamError
+          : new Error(getAgentStreamErrorMessage(streamError));
+      }
+
       const text = await result.text;
       const steps = await result.steps;
       const toolResults = await result.toolResults;
@@ -977,25 +1029,38 @@ export class AgentService {
         },
       };
     } catch (error: any) {
-      logger.error('Error handling agent request (via streaming)', error.message);
+      const durationMs = Date.now() - startTime;
+      const errorMessage = getAgentStreamErrorMessage(error);
+      logger.error('Error handling agent request (via streaming)', {
+        error: errorMessage,
+        durationMs,
+        userId: auth.user?.id,
+        orgId: auth.user?.org_id,
+        modelName: context?.modelName,
+        viewName: context?.viewName,
+        llmModel: llmModelId,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       try {
-        const questionText = this.extractQuestionText(message);
-        llmTraceLogger.logTrace({
+        await llmTraceLogger.logTrace({
           orgId: auth.user?.org_id || 'default',
           userId: auth.user?.id,
           sessionId: context?.sessionId,
           modelName: context?.modelName,
           viewName: context?.viewName,
           recordId: context?.recordId,
+          queryType: classification.type,
           question: questionText,
-          llmModel: getModelId('agent'),
+          llmModel: llmModelId,
           result: { text: '', steps: [], usage: { promptTokens: 0, completionTokens: 0 } },
-          durationMs: 0,
+          durationMs,
           status: 'error',
-          errorMessage: error.message,
-        }).catch(() => { });
-      } catch { /* ignore */ }
+          errorMessage,
+        });
+      } catch { /* ignore trace failures */ }
       throw error;
+    } finally {
+      clearTimeout(timeoutHandle);
     }
   }
 

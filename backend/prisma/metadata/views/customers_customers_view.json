@@ -189,6 +189,49 @@
       },
       "displayName": "Currency",
       "isColumnShow": true
+    },
+    "tax_treatment": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "200",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Tax Treatment",
+      "isColumnShow": true
+    },
+    "default_tax_region_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "tax_region",
+          "limit": "20",
+          "instanceKey": "id",
+          "instanceType": "tax_region",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "default_tax_region_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "default_tax_region.name"
+      },
+      "displayName": "Default Tax Region",
+      "isColumnShow": true
+    },
+    "default_tax_region": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "read",
+        "name": "read",
+        "country_code": "read"
+      }
     }
   },
   "org_id": "52",

@@ -18,14 +18,13 @@ export interface Dependency {
 export const execute_Action = async (context: AuthContext, action: string, model: string, instance_id: string, change_set: string[], select_set: any, tx: any, created?: any) => {
     logger.debug('Executing action', action, model, instance_id, change_set, !select_set ? 'no select' : 'select');
     if (action === 'UPDATE' && functionMap[model] && change_set.some(field => functionMap[model].fields.includes(field))) {
-        const methods = functionMap[model].fields
-            .filter(field => change_set.includes(field))
-            .map(() => functionMap[model].method(context, model, instance_id, change_set, select_set, tx));
-        return Promise.all(methods);
+        // Call once (no parallel races), return [result] — original DAL contract is action_result[0]
+        const result = await functionMap[model].method(context, model, instance_id, change_set, select_set, tx);
+        return [result];
     }
     else if ((action === 'DELETE' || action === 'ADD') && functionMap[model]) {
-        const methods = [functionMap[model].method(context, model, instance_id, change_set, select_set, tx, created)];
-        return Promise.all(methods);
+        const result = await functionMap[model].method(context, model, instance_id, change_set, select_set, tx, created);
+        return [result];
     }
 }
 
@@ -59,12 +58,15 @@ export const functionMap: Record<string, Dependency> = {
         fields: ["quantity", "rate"],
         method: calculate_pr_total
     },
+    // Invoice totals: fire on field save (ADD/UPDATE/DELETE of lines, or header deps).
+    // Submit may re-run via workflow side_effect; totals must not depend on Submit alone.
+    // Header: only adjustable_value affects the formula today (+ purchase_order_id for PO qty side effects).
     "invoice": {
         fields: ["purchase_order_id", "adjustable_value"],
         method: calculate_invoice_total
     },
     "invoice.invoice_line_item": {
-        fields: ["invoice_qty", "rate", "tax_rate", "discount_rate"],
+        fields: ["invoice_qty", "rate", "tax_rate", "discount_rate", "tax_group_id"],
         method: calculate_invoice_total
     },
     "purchase_order.purchase_order_item": {

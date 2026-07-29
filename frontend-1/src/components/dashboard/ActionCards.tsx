@@ -8,6 +8,8 @@ import {
 import { Card } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import { workflowAPI } from '@/api/api';
+import { buildNewBillCreatePayload } from '@/lib/bills/createBillDefaults';
+import { useEntity } from '@/contexts/EntityContext';
 import { useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
 const ActionCard = ({
@@ -30,6 +32,7 @@ const ActionCard = ({
 export const ActionCards = () => {
   const [isError, setError] = useState<any>({});
   const navigate = useNavigate();
+  const { currentEntityId } = useEntity();
   const handleCreate = () => {
     workflowAPI.create("purchase_requisition", "2", {
       status: "2",
@@ -55,9 +58,8 @@ export const ActionCards = () => {
   };
 
   const handleCreateInvoice = () => {
-    workflowAPI.create("invoice", "9", {
-      status: "9",
-    })
+    void buildNewBillCreatePayload({}, { preferredLegalEntityId: currentEntityId })
+      .then((payload) => workflowAPI.create('invoice', '9', payload))
       .then((res: any) => {
         handleInvoiceDetails(res?.data?.id);
       })
@@ -71,7 +73,7 @@ export const ActionCards = () => {
             subTitle: response?.data?.error,
           });
         }
-        console.log("Error :", err.message);
+        console.log('Error :', err.message);
       });
   };
   const handleInvoiceDetails = (id: any) => {

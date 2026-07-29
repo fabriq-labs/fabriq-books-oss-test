@@ -13,6 +13,13 @@ const INSTANCE_EMAIL_INGEST_ITEM_VIEW = 'instance_email_ingest_item_view';
 const INSTANCE_EMAIL_INGEST_VIEW = 'instance_email_ingest_view';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { billTypeAndPoMode } from '@/lib/bills/poMode';
+import {
+    BILL_UPLOAD_ACCEPT_ATTR,
+    BILL_UPLOAD_HELPER_TEXT,
+    resolveBillUploadMime,
+} from '@/lib/bills/billUploadMime';
+import { useEntity } from '@/contexts/EntityContext';
 
 /** Tool result may include created_invoice_id when backend auto-created an invoice from PO match */
 interface ExtractToolResult extends ParsedData {
@@ -49,6 +56,12 @@ interface ParsedData {
             invoice_status?: string;
             invoice_type?: string;
             supplier_name?: string;
+            supplier_tax_id?: string;
+            supplier_gstin?: string;
+            place_of_supply?: string;
+            supplier_region?: string;
+            reverse_charge?: boolean | string;
+            tax_responsibility?: string;
             attach?: string;
             supplier_remarks?: string;
             shipping_terms?: string;
@@ -92,6 +105,15 @@ interface ParsedData {
             tax_rate?: number;
             tax_rate_intra?: number;
             line_tax_amount?: number;
+            classification_code?: string;
+            classification_scheme?: string;
+            hsn_sac?: string;
+            tax_components?: Array<{
+                name?: string;
+                component_type?: string;
+                rate?: number;
+                amount?: number;
+            }>;
             po_number?: string;
             need_by_date?: string;
         }>;
@@ -101,6 +123,29 @@ interface ParsedData {
             documentType?: string;
             pageCount?: number;
             extractedAt?: string;
+        };
+        resolved?: {
+            supplier_id?: string | null;
+            supplier_name?: string | null;
+            currency_id?: string | null;
+            currency_code?: string | null;
+            exchange_rate?: number | null;
+            legal_entity_id?: string | null;
+            tax_region_id?: string | null;
+            seller_tax_region_id?: string | null;
+            tax_responsibility?: string | null;
+            supplier_tax_id?: string | null;
+            place_of_supply?: string | null;
+            payment_terms_id?: string | null;
+            lines?: Array<{
+                tax_group_id?: string | null;
+                tax_group_code?: string | null;
+                tax_rate?: number | null;
+                line_tax_amount?: number | null;
+                classification_code?: string | null;
+                classification_scheme?: string | null;
+                match?: string;
+            }>;
         };
     };
     metaData: {
@@ -171,6 +216,7 @@ export const InvoiceUpload: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { toast } = useToast();
+    const { currentEntityId } = useEntity();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [originalFile, setOriginalFile] = useState<File | null>(null); // Store original file for attachment
@@ -181,6 +227,39 @@ export const InvoiceUpload: React.FC = () => {
     const [createWithPO, setCreateWithPO] = useState(false);
     const [showPdfPreview, setShowPdfPreview] = useState(false);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+    // Shared component: purchases accept receipt photos; sales stays PDF-only.
+    const isPurchaseUpload = location.pathname.includes('/purchases/bills');
+    const fileAcceptAttr = isPurchaseUpload ? BILL_UPLOAD_ACCEPT_ATTR : '.pdf,application/pdf';
+    const uploadTitle = isPurchaseUpload ? 'Upload bill or receipt' : 'Upload Invoice PDF';
+    const uploadHelper = isPurchaseUpload
+        ? BILL_UPLOAD_HELPER_TEXT
+        : 'PDF files only, up to 10MB';
+    const uploadPrompt = isPurchaseUpload
+        ? 'Extract invoice data from this bill or receipt'
+        : 'Extract invoice data from this PDF file';
+
+    const acceptSelectedFile = (file: File) => {
+        if (isPurchaseUpload) {
+            const resolved = resolveBillUploadMime({
+                originalName: file.name,
+                mimetype: file.type,
+            });
+            if (!resolved.ok) {
+                setError(resolved.error);
+                return false;
+            }
+        } else if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+            setError('Please select a valid PDF file');
+            return false;
+        }
+        setSelectedFile(file);
+        setOriginalFile(file);
+        setError(null);
+        setParsedData(null);
+        handleUpload(file);
+        return true;
+    };
 
     // Handle data passed from chat navigation
     useEffect(() => {
@@ -212,15 +291,10 @@ export const InvoiceUpload: React.FC = () => {
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file && file.type === 'application/pdf') {
-            setSelectedFile(file);
-            setOriginalFile(file); // Store original file for attachment
-            setError(null);
-            setParsedData(null);
-            // Automatically start parsing
-            handleUpload(file);
+        if (file) {
+            acceptSelectedFile(file);
         } else {
-            setError('Please select a valid PDF file');
+            setError(isPurchaseUpload ? BILL_UPLOAD_HELPER_TEXT : 'Please select a valid PDF file');
         }
     };
 
@@ -235,17 +309,21 @@ export const InvoiceUpload: React.FC = () => {
         try {
             const extractResponse = await agentAPI.extract(
                 fileToUpload,
-                'Extract invoice data from this PDF file',
+                uploadPrompt,
                 {
                     modelName: 'invoice',
                     viewName: 'invoice_view',
                     promptTypes: ['invoice_extractor'],
+                    // Prefer global entity switcher over HQ for resolve/auto-create.
+                    preferredLegalEntityId: currentEntityId || undefined,
                 }
             ) as ExtractResponse;
 
             // Check if toolResults is empty or missing
             if (!extractResponse?.toolResults || extractResponse.toolResults.length === 0 || !extractResponse.toolResults[0]) {
-                setError('Failed to extract data from PDF. Please try again.');
+                setError(
+                    'Could not extract invoice data from this file (no extract result). Check that the LLM is configured and try again.',
+                );
                 setIsUploading(false);
                 return;
             }
@@ -254,7 +332,13 @@ export const InvoiceUpload: React.FC = () => {
 
             // Check if response is empty or invalid
             if (!response || !response.data) {
-                setError('Failed to extract data from PDF. Please try again.');
+                const toolError =
+                    (response as { error?: string; message?: string } | undefined)?.error ||
+                    (response as { error?: string; message?: string } | undefined)?.message;
+                setError(
+                    toolError ||
+                        'Could not extract invoice data from this file. Please try another file or try again.',
+                );
                 setIsUploading(false);
                 return;
             }
@@ -274,6 +358,14 @@ export const InvoiceUpload: React.FC = () => {
                         await attachmentAPI.create('invoice', invoiceId, attachmentFormData);
                     } catch (attachmentError) {
                         console.error('Error uploading attachment:', attachmentError);
+                        toast({
+                            title: 'Bill created, but file was not attached',
+                            description:
+                                attachmentError instanceof Error
+                                    ? attachmentError.message
+                                    : 'You can upload the file from the bill Attachments section.',
+                            variant: 'destructive',
+                        });
                     }
                 }
                 navigate(`/purchases/bills/${invoiceId}/state/Draft`);
@@ -300,15 +392,20 @@ export const InvoiceUpload: React.FC = () => {
                 fileInputRef.current.value = '';
             }
         } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'Failed to parse PDF. Please try again.';
+            const errorMessage =
+                err instanceof Error && err.message
+                    ? err.message
+                    : 'Failed to extract data from file. Please try again.';
+            console.error('Bill extract failed:', err);
             setError(errorMessage);
+            setParsedData(null);
         } finally {
             setIsUploading(false);
         }
     };
 
     const handleBack = () => {
-        navigate('/purchases/bills');
+        navigate(isPurchaseUpload ? '/purchases/bills' : '/sales/invoices');
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -318,15 +415,10 @@ export const InvoiceUpload: React.FC = () => {
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         const file = e.dataTransfer.files[0];
-        if (file && file.type === 'application/pdf') {
-            setSelectedFile(file);
-            setOriginalFile(file); // Store original file for attachment
-            setError(null);
-            setParsedData(null);
-            // Automatically start parsing
-            handleUpload(file);
+        if (file) {
+            acceptSelectedFile(file);
         } else {
-            setError('Please select a valid PDF file');
+            setError(isPurchaseUpload ? BILL_UPLOAD_HELPER_TEXT : 'Please select a valid PDF file');
         }
     };
 
@@ -352,6 +444,27 @@ export const InvoiceUpload: React.FC = () => {
             setShowPdfPreview(true);
         }
     };
+
+    const previewMime = originalFile
+        ? resolveBillUploadMime({
+              originalName: originalFile.name,
+              mimetype: originalFile.type,
+          })
+        : null;
+    const previewKind =
+        previewMime && previewMime.ok
+            ? previewMime.mime === 'application/pdf'
+                ? 'pdf'
+                : previewMime.mime === 'image/heic' || previewMime.mime === 'image/heif'
+                  ? 'heic'
+                  : previewMime.mime.startsWith('image/')
+                    ? 'image'
+                    : 'other'
+            : 'other';
+    const previewButtonLabel =
+        previewKind === 'pdf' ? 'Preview PDF' : previewKind === 'image' || previewKind === 'heic' ? 'Preview file' : 'Preview file';
+    const previewDialogTitle =
+        previewKind === 'pdf' ? 'PDF Preview' : 'Receipt Preview';
 
     const handleClosePdfPreview = () => {
         setShowPdfPreview(false);
@@ -380,10 +493,11 @@ export const InvoiceUpload: React.FC = () => {
         try {
             const invoice = parsedData.data.invoice;
             const lineItems = parsedData.data.line_items || [];
+            const resolved = parsedData.data.resolved;
 
-            // Prepare invoice payload - exclude PO and supplier related fields from PO data
+            // Persist tax / party / currency from extract resolve; default Without PO.
             const invoicePayload: Record<string, unknown> = {
-                invoice_type: 'With PO',
+                ...billTypeAndPoMode(withPO ? 'With PO' : 'Without PO'),
                 invoice_number: invoice?.invoice_number,
                 invoice_date: formatDateToISO(invoice?.invoice_date),
                 invoice_total: invoice?.invoice_total || invoice?.invoice_net_total || 0,
@@ -391,17 +505,44 @@ export const InvoiceUpload: React.FC = () => {
                 additional_tax: invoice?.additional_tax || 0,
                 shipping_cost: invoice?.shipping_cost || 0,
                 terms_and_conditions: invoice?.terms_and_conditions,
+                // payment_terms is a Prisma relation on invoice — never send extracted free text
+                // (e.g. "Due on receipt"). Use payment_terms_id when resolve provides one.
+                shipping_terms: invoice?.shipping_terms,
+                shipping_method: invoice?.shipping_method,
+                remit_to: invoice?.remit_to,
+                ap_comment: invoice?.ap_comment,
+                supplier_name: resolved?.supplier_name || invoice?.supplier_name,
                 status: '9',
             };
 
-            // Only add invoice_type, po_number, and purchase_order_id if creating with PO
+            if (resolved?.supplier_id) invoicePayload.supplier_id = resolved.supplier_id;
+            // Prefer entity selector over extract's HQ default.
+            if (currentEntityId) {
+                invoicePayload.legal_entity_id = currentEntityId;
+            } else if (resolved?.legal_entity_id) {
+                invoicePayload.legal_entity_id = resolved.legal_entity_id;
+            }
+            if (resolved?.currency_id) invoicePayload.currency_id = resolved.currency_id;
+            if (resolved?.exchange_rate != null) invoicePayload.exchange_rate = resolved.exchange_rate;
+            if (resolved?.tax_region_id) invoicePayload.tax_region_id = resolved.tax_region_id;
+            if (resolved?.seller_tax_region_id) {
+                invoicePayload.seller_tax_region_id = resolved.seller_tax_region_id;
+            }
+            if (resolved?.tax_responsibility) {
+                invoicePayload.tax_responsibility = resolved.tax_responsibility;
+            }
+            if (resolved?.payment_terms_id) {
+                invoicePayload.payment_terms_id = resolved.payment_terms_id;
+            }
+
             if (withPO) {
                 invoicePayload.po_number = invoice?.po_number;
                 invoicePayload.purchase_order_id = invoice?.purchase_order_id;
             }
 
-            // Create invoice using the workflow API with status '9'
-            const createResponse = await workflowAPI.create("invoice", '9', invoicePayload) as { data?: { id?: string } };
+            const createResponse = await workflowAPI.create('invoice', '9', invoicePayload) as {
+                data?: { id?: string };
+            };
 
             if (!createResponse?.data?.id) {
                 throw new Error('Failed to create invoice');
@@ -409,9 +550,10 @@ export const InvoiceUpload: React.FC = () => {
 
             const invoiceId = createResponse.data.id;
 
-            // Add invoice line items
             if (lineItems.length > 0) {
-                for (const lineItem of lineItems) {
+                for (let i = 0; i < lineItems.length; i++) {
+                    const lineItem = lineItems[i];
+                    const lr = resolved?.lines?.[i];
                     await viewAPI.addChild(
                         'invoice',
                         invoiceId,
@@ -422,13 +564,40 @@ export const InvoiceUpload: React.FC = () => {
                             item_description: lineItem?.item_description,
                             item_type: lineItem?.item_type,
                             rate: lineItem?.rate || 0,
-                            tax_rate: lineItem?.tax_rate || 0,
+                            tax_rate: lr?.tax_rate ?? lineItem?.tax_rate ?? 0,
+                            line_tax_amount:
+                                lr?.line_tax_amount ?? lineItem?.line_tax_amount ?? undefined,
+                            line_total: lineItem?.line_total ?? lineItem?.invoiced_amount ?? undefined,
+                            tax_group_id: lr?.tax_group_id || undefined,
+                            classification_code:
+                                lr?.classification_code ||
+                                lineItem?.classification_code ||
+                                lineItem?.hsn_sac ||
+                                undefined,
+                            classification_scheme:
+                                lr?.classification_scheme ||
+                                lineItem?.classification_scheme ||
+                                undefined,
                             ordered_quantity: lineItem?.ordered_quantity || 0,
                             ordered_amount: lineItem?.ordered_amount || 0,
-                            invoice_qty: lineItem?.quantity || lineItem?.invoice_qty || lineItem?.ordered_quantity || 0,
+                            invoice_qty:
+                                lineItem?.quantity ||
+                                lineItem?.invoice_qty ||
+                                lineItem?.ordered_quantity ||
+                                0,
                             need_by_date: lineItem?.need_by_date,
-                        }
+                        },
                     );
+                }
+
+                // Final totals pass — each addChild already fires calculate_invoice_total via
+                // functionMap ADD; nudge header dep so totals are consistent before navigate.
+                try {
+                    await viewAPI.update('invoice', invoiceId, 'invoice_view', {
+                        adjustable_value: 0,
+                    });
+                } catch (calcErr) {
+                    console.warn('Could not refresh invoice totals after line create:', calcErr);
                 }
             }
 
@@ -444,7 +613,14 @@ export const InvoiceUpload: React.FC = () => {
                     attachmentUploaded = true;
                 } catch (attachmentError) {
                     console.error('Error uploading attachment:', attachmentError);
-                    // Don't fail the whole process if attachment upload fails
+                    toast({
+                        title: 'Invoice created, but file was not attached',
+                        description:
+                            attachmentError instanceof Error
+                                ? attachmentError.message
+                                : 'You can upload the file from the bill Attachments section.',
+                        variant: 'destructive',
+                    });
                 }
             }
 
@@ -498,13 +674,12 @@ export const InvoiceUpload: React.FC = () => {
                 {/* Header */}
                 <div className="flex items-center justify-between gap-4">
                     <Button
-                        variant="ghost"
-                        size="sm"
+                        variant="outline"
                         onClick={handleBack}
                         className="flex items-center gap-2"
                     >
                         <ArrowLeft size={16} />
-                        Back to Invoices
+                        {isPurchaseUpload ? 'Back to Bills' : 'Back to Invoices'}
                     </Button>
                     {parsedData && !isUploading && (
                         <div className="flex items-center gap-2">
@@ -513,9 +688,10 @@ export const InvoiceUpload: React.FC = () => {
                                 onClick={handlePreviewPdf}
                                 size="sm"
                                 className="flex items-center gap-2"
+                                disabled={!originalFile}
                             >
                                 <Eye size={16} />
-                                Preview PDF
+                                {previewButtonLabel}
                             </Button>
                             <Button
                                 variant="outline"
@@ -535,10 +711,12 @@ export const InvoiceUpload: React.FC = () => {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <FileText className="text-primary" size={24} />
-                            Upload Invoice PDF
+                            {uploadTitle}
                         </CardTitle>
                         <CardDescription>
-                            Upload a PDF invoice to automatically extract data
+                            {isPurchaseUpload
+                                ? 'Upload a supplier PDF or a photo of the receipt to extract data'
+                                : 'Upload a PDF invoice to automatically extract data'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -553,20 +731,22 @@ export const InvoiceUpload: React.FC = () => {
                                 <input
                                     ref={fileInputRef}
                                     type="file"
-                                    accept=".pdf"
+                                    accept={fileAcceptAttr}
                                     onChange={handleFileSelect}
                                     className="hidden"
                                 />
                                 <Upload size={64} className="mx-auto text-gray-400 mb-6" />
                                 <p className="text-xl font-semibold text-gray-700 mb-3">
-                                    Upload Invoice PDF
+                                    {uploadTitle}
                                 </p>
                                 <p className="text-base text-gray-500 mb-4">
-                                    Click to browse or drag and drop your PDF file here
+                                    {isPurchaseUpload
+                                        ? 'Click to browse or drag and drop a PDF or receipt photo'
+                                        : 'Click to browse or drag and drop your PDF file here'}
                                 </p>
                                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm text-gray-600">
                                     <FileText size={16} />
-                                    PDF files only, up to 10MB
+                                    {uploadHelper}
                                 </div>
                             </div>
                         )}
@@ -575,9 +755,31 @@ export const InvoiceUpload: React.FC = () => {
                         {isUploading && (
                             <div className="text-center py-8">
                                 <Loader2 size={48} className="animate-spin mx-auto text-primary mb-4" />
-                                <p className="text-lg font-medium text-gray-700">Processing your PDF...</p>
+                                <p className="text-lg font-medium text-gray-700">
+                                    {isPurchaseUpload ? 'Processing your bill...' : 'Processing your PDF...'}
+                                </p>
                                 <p className="text-sm text-gray-500">This may take a few moments</p>
                             </div>
+                        )}
+
+                        {/* Error Display — shown above results so failed extracts are obvious */}
+                        {error && !isUploading && (
+                            <Alert variant="destructive">
+                                <AlertCircle size={20} />
+                                <AlertDescription className="flex items-center justify-between gap-4">
+                                    <span>{error}</span>
+                                    {originalFile && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleUpload(originalFile)}
+                                            className="shrink-0"
+                                        >
+                                            Retry
+                                        </Button>
+                                    )}
+                                </AlertDescription>
+                            </Alert>
                         )}
 
                         {/* Parsed Invoice Data Display */}
@@ -595,7 +797,9 @@ export const InvoiceUpload: React.FC = () => {
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Invoice Details</CardTitle>
-                                        <CardDescription>Extracted invoice information from PDF</CardDescription>
+                                        <CardDescription>
+                                            Extracted invoice information from uploaded file
+                                        </CardDescription>
                                     </CardHeader>
                                     <CardContent className="space-y-4">
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -615,6 +819,44 @@ export const InvoiceUpload: React.FC = () => {
                                                 <div>
                                                     <p className="text-sm font-medium text-gray-500">Supplier</p>
                                                     <p className="text-base font-semibold text-gray-900">{parsedData.data.invoice.supplier_name}</p>
+                                                </div>
+                                            )}
+                                            {(parsedData.data.resolved?.supplier_tax_id ||
+                                                parsedData.data.invoice.supplier_tax_id ||
+                                                parsedData.data.invoice.supplier_gstin) && (
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-500">Supplier tax ID</p>
+                                                    <p className="text-base font-semibold text-gray-900">
+                                                        {parsedData.data.resolved?.supplier_tax_id ||
+                                                            parsedData.data.invoice.supplier_tax_id ||
+                                                            parsedData.data.invoice.supplier_gstin}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {(parsedData.data.resolved?.place_of_supply ||
+                                                parsedData.data.invoice.place_of_supply) && (
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-500">Place of supply</p>
+                                                    <p className="text-base font-semibold text-gray-900">
+                                                        {parsedData.data.resolved?.place_of_supply ||
+                                                            parsedData.data.invoice.place_of_supply}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {(parsedData.data.resolved?.currency_code ||
+                                                parsedData.data.context?.currency) && (
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-500">Currency</p>
+                                                    <p className="text-base font-semibold text-gray-900">
+                                                        {parsedData.data.resolved?.currency_code ||
+                                                            parsedData.data.context?.currency}
+                                                        {parsedData.data.resolved?.exchange_rate != null &&
+                                                            parsedData.data.resolved.exchange_rate !== 1 && (
+                                                            <span className="text-sm font-normal text-gray-500 ml-2">
+                                                                (FX {parsedData.data.resolved.exchange_rate})
+                                                            </span>
+                                                        )}
+                                                    </p>
                                                 </div>
                                             )}
                                             {parsedData.data.invoice.po_number && (
@@ -695,7 +937,7 @@ export const InvoiceUpload: React.FC = () => {
                                     <Card>
                                         <CardHeader>
                                             <CardTitle>Line Items ({parsedData.data.line_items.length})</CardTitle>
-                                            <CardDescription>Invoice line items extracted from PDF</CardDescription>
+                                            <CardDescription>Invoice line items extracted from uploaded file</CardDescription>
                                         </CardHeader>
                                         <CardContent>
                                             <div className="overflow-x-auto">
@@ -704,29 +946,53 @@ export const InvoiceUpload: React.FC = () => {
                                                         <tr className="border-b bg-gray-50">
                                                             <th className="text-left p-3 text-sm font-semibold text-gray-700">Item Name</th>
                                                             <th className="text-left p-3 text-sm font-semibold text-gray-700">Description</th>
+                                                            <th className="text-left p-3 text-sm font-semibold text-gray-700">HSN</th>
                                                             <th className="text-right p-3 text-sm font-semibold text-gray-700">Quantity</th>
                                                             <th className="text-right p-3 text-sm font-semibold text-gray-700">Rate</th>
-                                                            <th className="text-right p-3 text-sm font-semibold text-gray-700">Tax</th>
+                                                            <th className="text-right p-3 text-sm font-semibold text-gray-700">Tax %</th>
+                                                            <th className="text-right p-3 text-sm font-semibold text-gray-700">Tax amt</th>
                                                             <th className="text-right p-3 text-sm font-semibold text-gray-700">Total</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {parsedData.data.line_items.map((item, index) => (
+                                                        {parsedData.data.line_items.map((item, index) => {
+                                                            const lr = parsedData.data.resolved?.lines?.[index];
+                                                            const currencyLabel =
+                                                                parsedData.data.resolved?.currency_code ||
+                                                                parsedData.data.context?.currency ||
+                                                                '';
+                                                            const hsn =
+                                                                lr?.classification_code ||
+                                                                item.classification_code ||
+                                                                item.hsn_sac ||
+                                                                '-';
+                                                            const taxRate = lr?.tax_rate ?? item.tax_rate;
+                                                            const taxGroup = lr?.tax_group_code;
+                                                            return (
                                                             <tr key={index} className="border-b hover:bg-gray-50">
                                                                 <td className="p-3 text-sm text-gray-900">{item.item_name || '-'}</td>
                                                                 <td className="p-3 text-sm text-gray-600">{item.item_description || '-'}</td>
+                                                                <td className="p-3 text-sm text-gray-900">{hsn}</td>
                                                                 <td className="p-3 text-sm text-gray-900 text-right">{item.quantity || item.invoice_qty || item.ordered_quantity || 0}</td>
                                                                 <td className="p-3 text-sm text-gray-900 text-right">
-                                                                    {parsedData.data.context?.currency || '$'}{(item.rate || 0).toLocaleString()}
+                                                                    {currencyLabel}{(item.rate || 0).toLocaleString()}
                                                                 </td>
                                                                 <td className="p-3 text-sm text-gray-900 text-right">
-                                                                    {parsedData.data.context?.currency || '$'}{(item.line_tax_amount || 0).toLocaleString()}
+                                                                    {taxGroup
+                                                                        ? taxGroup
+                                                                        : taxRate != null
+                                                                          ? `${taxRate}%`
+                                                                          : '-'}
+                                                                </td>
+                                                                <td className="p-3 text-sm text-gray-900 text-right">
+                                                                    {currencyLabel}{(lr?.line_tax_amount ?? item.line_tax_amount ?? 0).toLocaleString()}
                                                                 </td>
                                                                 <td className="p-3 text-sm font-semibold text-gray-900 text-right">
-                                                                    {parsedData.data.context?.currency || '$'}{(item.line_total || item.invoiced_amount || 0).toLocaleString()}
+                                                                    {currencyLabel}{(item.line_total || item.invoiced_amount || 0).toLocaleString()}
                                                                 </td>
                                                             </tr>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -768,37 +1034,17 @@ export const InvoiceUpload: React.FC = () => {
                                 </div>
                             </div>
                         )}
-
-                        {/* Error Display */}
-                        {error && (
-                            <Alert variant="destructive">
-                                <AlertCircle size={20} />
-                                <AlertDescription className="flex items-center justify-between">
-                                    <span>{error}</span>
-                                    {originalFile && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleUpload(originalFile)}
-                                            className="ml-4"
-                                        >
-                                            Retry
-                                        </Button>
-                                    )}
-                                </AlertDescription>
-                            </Alert>
-                        )}
                     </CardContent>
                 </Card>
             </div>
 
-            {/* PDF Preview Dialog */}
+            {/* File Preview Dialog */}
             <Dialog open={showPdfPreview} onOpenChange={handleClosePdfPreview}>
                 <DialogContent className="max-w-5xl w-full h-[90vh] p-0">
                     <DialogHeader className="px-6 pt-6 pb-4 border-b">
                         <DialogTitle className="flex items-center gap-2">
                             <FileText className="text-primary" size={20} />
-                            PDF Preview
+                            {previewDialogTitle}
                             {originalFile && (
                                 <span className="text-sm font-normal text-gray-500">
                                     - {originalFile.name}
@@ -807,11 +1053,35 @@ export const InvoiceUpload: React.FC = () => {
                         </DialogTitle>
                     </DialogHeader>
                     <div className="flex-1 overflow-hidden px-6 pb-6">
-                        {pdfUrl ? (
+                        {pdfUrl && previewKind === 'pdf' ? (
                             <iframe
                                 src={pdfUrl}
                                 className="w-full h-full border rounded-lg"
                                 title="PDF Preview"
+                                style={{ minHeight: 'calc(90vh - 120px)' }}
+                            />
+                        ) : pdfUrl && previewKind === 'image' ? (
+                            <div className="flex items-center justify-center h-full overflow-auto" style={{ minHeight: 'calc(90vh - 120px)' }}>
+                                <img
+                                    src={pdfUrl}
+                                    alt={originalFile?.name || 'Receipt preview'}
+                                    className="max-w-full max-h-full object-contain"
+                                />
+                            </div>
+                        ) : previewKind === 'heic' ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center gap-2 text-gray-600" style={{ minHeight: 'calc(90vh - 120px)' }}>
+                                <FileText size={40} className="text-gray-400" />
+                                <p className="font-medium">HEIC/HEIF preview is not available in this browser.</p>
+                                <p className="text-sm">The file was still uploaded for extraction.</p>
+                                {originalFile && (
+                                    <p className="text-sm text-gray-500">{originalFile.name}</p>
+                                )}
+                            </div>
+                        ) : pdfUrl ? (
+                            <iframe
+                                src={pdfUrl}
+                                className="w-full h-full border rounded-lg"
+                                title="File Preview"
                                 style={{ minHeight: 'calc(90vh - 120px)' }}
                             />
                         ) : (

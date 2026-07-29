@@ -23,9 +23,12 @@ const InvoiceOrderSummary: React.FC<OrderSummaryProps> = ({ form, details, setDe
                     <Form.Item label="Invoice Total" className="mb-2">
                         <Input
                             type="text"
-                            value={formatCurrency(details?.invoice_total || 0)}
+                            value={formatCurrency(
+                                details?.invoice_total || 0,
+                                details?.currency?.code || details?.currency?.item?.code || 'INR',
+                            )}
                             disabled
-                            suffix="INR"
+                            suffix={details?.currency?.code || details?.currency?.item?.code || 'INR'}
                         />
                     </Form.Item>
 

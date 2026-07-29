@@ -646,7 +646,8 @@ describe('Purchase Requisition Workflow Tests', () => {
 
       expect(invoice).toBeDefined();
       expect(invoice?.purchase_order_id).toBe(poId);
-      expect(invoice?.invoice_type).toBe('With PO');
+      expect(invoice?.invoice_type).toBe('PURCHASE');
+      expect(invoice?.po_mode).toBe('With PO');
       console.log('✓ Invoice Created:', invoice?.invoice_number);
 
       // Verify invoice line items were created

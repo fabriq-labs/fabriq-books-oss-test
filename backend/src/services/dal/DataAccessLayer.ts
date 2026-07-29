@@ -27,6 +27,7 @@ export class DataAccessLayer {
     'agent_model_tool_config', // Global agent tool assignment per model (no org_id)
     'currency', // Global platform data — seeded once, shared across all tenants
     'instrument', // Global security master — shared across orgs; isolation via holding
+    'tax_region', // System (and shared) place-of-supply regions; org_id may be 'system'
     // 'chat_thread', // Scoped by user_id, not org_id
   ];
 

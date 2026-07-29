@@ -72,6 +72,12 @@ interface SearchDropDownProps {
      */
     additionalFilters?: Record<string, any>;
     /**
+     * Optional sticky footer action in the dropdown (e.g. "Add new supplier").
+     * Rendered below search results; does not become a selectable option value.
+     */
+    createOptionLabel?: string;
+    onCreateNew?: () => void;
+    /**
      * Optional client-side filter applied to fetched items before displaying.
      * Use when the API cannot filter (e.g. array fields); filter after fetch.
      */
@@ -106,7 +112,9 @@ export const SearchDropDown = ({
     additionalFilters,
     filterOptions,
     placeholder,
-    initialCallback
+    initialCallback,
+    createOptionLabel,
+    onCreateNew,
 }: SearchDropDownProps) => {
     const [isLoader, setLoader] = useState(false);
     const [isLookupLoader, setLookupLoader] = useState(false);
@@ -282,6 +290,15 @@ export const SearchDropDown = ({
                 if (filterOptions && Array.isArray(filteredData)) {
                     filteredData = filterOptions(filteredData);
                 }
+                // Keep the currently selected row visible even if it is outside the page/search hit.
+                if (
+                    instanceValue &&
+                    instanceValue[instanceKey] &&
+                    Array.isArray(filteredData) &&
+                    !filteredData.some((item: any) => item?.[instanceKey] === instanceValue[instanceKey])
+                ) {
+                    filteredData = [instanceValue, ...filteredData];
+                }
                 setItems(filteredData);
                 setLoader(false);
                 return filteredData;
@@ -303,14 +320,21 @@ export const SearchDropDown = ({
     };
 
     const onSearch = (value: string) => {
-        if (value.length > 3) {
-            fetchDropDownData(value);
-        }
+        // Fetch as the user types so options aren't limited to the current selection.
+        fetchDropDownData(value || "");
     };
 
     const handleDropdownClick = (e: React.MouseEvent) => {
         // Stop propagation to prevent dialog from closing
         e.stopPropagation();
+    };
+
+    const handleDropdownVisibleChange = (open: boolean) => {
+        // When a value is already set, items is only [selected]. Reload the list on
+        // open so the user can pick another option without clearing first.
+        if (open) {
+            fetchDropDownData(searchTerm || "");
+        }
     };
 
     return (
@@ -323,9 +347,11 @@ export const SearchDropDown = ({
                 value={selectedValue}
                 disabled={disabled || isLookupLoader}
                 optionFilterProp="label"
+                filterOption={false}
                 onChange={onChange}
                 onSearch={onSearch}
                 onClear={onClearSelect}
+                onDropdownVisibleChange={handleDropdownVisibleChange}
                 style={{ width: "100%" }}
                 notFoundContent={isLoader ? <Spin size="small" /> : undefined}
                 onBlur={onBlur}
@@ -334,6 +360,33 @@ export const SearchDropDown = ({
                 onClick={handleDropdownClick}
                 className="purple-select"
                 {...rest}
+                dropdownRender={
+                    onCreateNew && createOptionLabel
+                        ? (menu) => (
+                            <>
+                                {menu}
+                                <div className="border-t border-border px-2 py-1.5">
+                                    <button
+                                        type="button"
+                                        className="w-full rounded-md px-2 py-1.5 text-left text-sm font-medium text-primary hover:bg-accent"
+                                        onMouseDown={(e) => {
+                                            // Prevent Select from stealing the click / closing without action
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                        }}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            onCreateNew();
+                                        }}
+                                    >
+                                        {createOptionLabel}
+                                    </button>
+                                </div>
+                            </>
+                        )
+                        : rest?.dropdownRender
+                }
                 options={items?.map((item: any) => {
                     return {
                         label: item[instanceLabel] + (rest?.instanceSubLabel ? ` (${item[rest?.instanceSubLabel]})` : ''),

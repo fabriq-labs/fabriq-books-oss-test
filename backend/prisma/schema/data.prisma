@@ -296,6 +296,7 @@ model currency {
   modified_at       DateTime          @updatedAt
   org_id            String
   payment_receipt   payment_receipt[]
+  invoices          invoice[]
   entities          entity[]
   suppliers         supplier[]
   customers         customers[]

@@ -235,11 +235,12 @@ To sync local files to the DB: `cd backend && npx ts-node prisma/sync-metadata.t
 `DynamicPromptManager` always filters `prompt_template` rows by
 `app_name = process.env.APP_NAME`. If `APP_NAME` is unset, all templates load
 regardless of app name. This allows separate prompt sets per deployment (e.g.
-`fabriq`, `perfin`) sharing the same database.
+`fabriq_books`, `zeiv`) sharing the same database.
 
 **Failure mode**: If `APP_NAME` in `.env` doesn't match the `app_name` column
 in any `prompt_template` rows, `DynamicPromptManager` throws "No prompt
-templates found" and the session fails immediately. See
+templates found" and the session fails immediately. Seeded Books prompts use
+`app_name=fabriq_books` — set `APP_NAME=fabriq_books`. See
 [debugging/SESSION_FAILURE_PATTERNS.md — Pattern 5](./debugging/SESSION_FAILURE_PATTERNS.md#5-prompt-template-not-found).
 
 ---

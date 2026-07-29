@@ -5,6 +5,10 @@ import prisma from '../../lib/prisma';
 import logger from '../../utils/logger';
 import { TOOL_RESPONSE_HANDLING_GUIDELINE } from './constants';
 import { applyDatePlaceholders, computeDatePlaceholders } from './datePlaceholders';
+import {
+    formatMissingPromptTemplatesError,
+    parsePromptTemplateFileSuffix,
+} from './promptTemplateFileMatch';
 
 export interface PromptTemplate {
     id: string;
@@ -89,8 +93,7 @@ export class DynamicPromptManager {
             const templates = await this.getPromptTemplates();
 
             if (templates.length === 0) {
-                const viewName = this.viewName || `${this.modelName}_view`;
-                throw new Error(`No prompt templates found for model: ${this.modelName}, view: ${viewName}`);
+                throw new Error(this.missingPromptTemplatesMessage());
             }
 
             // Merge templates based on priority and type
@@ -122,6 +125,15 @@ export class DynamicPromptManager {
         }
     }
 
+    private missingPromptTemplatesMessage(): string {
+        return formatMissingPromptTemplatesError({
+            modelName: this.modelName,
+            viewName: this.viewName || `${this.modelName}_view`,
+            promptTypes: this.promptTypes,
+            appName: process.env.APP_NAME || null,
+        });
+    }
+
     /**
      * Generate a dynamic prompt with metadata for observability
      * Returns both the prompt and metadata about which templates were used
@@ -135,8 +147,7 @@ export class DynamicPromptManager {
             const templates = await this.getPromptTemplates();
           
             if (templates.length === 0) {
-                const viewName = this.viewName || `${this.modelName}_view`;
-                throw new Error(`No prompt templates found for model: ${this.modelName}, view: ${viewName}`);
+                throw new Error(this.missingPromptTemplatesMessage());
             }
 
             // Build metadata from templates for observability
@@ -242,45 +253,22 @@ export class DynamicPromptManager {
         // Support both formats:
         // - Old: view_{view_id}_{prompt_type}.json
         // - New: view_{view_id}_{prompt_type}_{app_name}.json
-        const templateFiles = fs.readdirSync(templatesDir)
-            .filter(file => {
-                if (!file.endsWith('.json')) return false;
-                // File format: view_{view_id}_{prompt_type}[_{app_name}].json
-                // Normalize filename too — some files use hyphens, others underscores
-                const normalizedFile = file.replace(/-/g, '_');
-                const filePrefix = `view_${normalizedViewId}_`;
-                if (!normalizedFile.startsWith(filePrefix)) return false;
+        // prompt_type may contain underscores (invoice_extractor); match longest requested type.
+        // App filter uses JSON app_name (exact match to APP_NAME), not the filename token.
+        const filePrefix = `view_${normalizedViewId}_`;
+        const envAppName = process.env.APP_NAME || null;
 
-                // Extract prompt_type (and optionally app_name)
-                // Remove prefix and .json extension
-                const suffix = normalizedFile.replace(filePrefix, '').replace('.json', '');
-                // Split by underscore - first part is prompt_type, rest is app_name (if exists)
-                const parts = suffix.split('_');
-                const promptType = parts[0];
+        const templateFiles = fs.readdirSync(templatesDir).filter((file) => {
+            if (!file.endsWith('.json')) return false;
+            const normalizedFile = file.replace(/-/g, '_');
+            if (!normalizedFile.startsWith(filePrefix)) return false;
 
-                // Check if prompt_type matches
-                if (!requestedTypes.includes(promptType)) return false;
-
-                // Handle app_name filtering
-                const hasAppName = parts.length > 1;
-                const appNameFromFile = hasAppName ? parts.slice(1).join('_') : null;
-
-                // If APP_NAME is set, prefer files with matching app_name, but also allow files without app_name
-                if (process.env.APP_NAME) {
-                    // If file has app_name, it must match APP_NAME
-                    if (hasAppName) {
-                        return appNameFromFile === process.env.APP_NAME;
-                    }
-                    // If file doesn't have app_name, allow it (fallback)
-                    return true;
-                }
-
-                // If APP_NAME is not set, match files with or without app_name
-                return true;
-            });
+            const suffix = normalizedFile.replace(filePrefix, '').replace(/\.json$/, '');
+            return parsePromptTemplateFileSuffix(suffix, requestedTypes) !== null;
+        });
 
         if (templateFiles.length === 0) {
-            throw new Error(`No prompt templates found for model: ${this.modelName}, view: ${viewName}, types: ${requestedTypes.join(', ')}`);
+            throw new Error(this.missingPromptTemplatesMessage());
         }
 
         // Read all matching template files
@@ -303,8 +291,8 @@ export class DynamicPromptManager {
                     logger.warn(`Prompt text file not found: ${txtFilePath}, using empty text`);
                 }
 
-                // Filter by app_name if specified
-                if (process.env.APP_NAME && templateData.app_name && templateData.app_name !== process.env.APP_NAME) {
+                // Filter by app_name if specified (exact match; JSON is source of truth)
+                if (envAppName && templateData.app_name && templateData.app_name !== envAppName) {
                     continue;
                 }
 

@@ -22,6 +22,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Modal } from 'antd';
 import { RequiredFormLabel } from '@/utils/formUtils';
 import { useDataGraphAndSchema } from '@/hooks/useDataGraphAndSchema';
+import { resolveTaxPack, type TaxPackCatalog } from '@/lib/tax/taxPack';
+import { fetchEntityTaxPack } from '@/lib/tax/taxLookups';
+import { getUserDetails } from '@/utils/auth';
 
 interface ItemMasterFormProps {
     initialValues?: any;
@@ -52,6 +55,7 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
     const [availableSuppliers, setAvailableSuppliers] = useState<any[]>([]);
     const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
     const [supplierSearchTerm, setSupplierSearchTerm] = useState<string>('');
+    const [taxPack, setTaxPack] = useState<TaxPackCatalog>(resolveTaxPack('GENERIC'));
 
     type ItemMasterValues = z.infer<typeof dynamicSchema>;
 
@@ -59,6 +63,38 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
         resolver: zodResolver(dynamicSchema),
         defaultValues: initialValues || {},
     });
+
+    // Item master is tenant-scoped; use HQ (or first) LE pack for labels.
+    useEffect(() => {
+        const orgId = initialValues?.org_id || getUserDetails()?.org_id;
+        if (!orgId) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res: any = await viewAPI.search(
+                    'entity',
+                    'entity_view',
+                    1,
+                    50,
+                    undefined,
+                    { org_id: { eq: orgId } },
+                );
+                const rows = res?.data || [];
+                const hq =
+                    rows.find((e: any) => e.is_it_headquartres === 'Yes') ||
+                    rows.find((e: any) => e.id === orgId) ||
+                    rows[0];
+                const pack = await fetchEntityTaxPack(hq?.id);
+                if (!cancelled) setTaxPack(resolveTaxPack(pack));
+            } catch {
+                if (!cancelled) setTaxPack(resolveTaxPack('GENERIC'));
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [initialValues?.org_id]);
+
     useEffect(() => {
         if (id) {
             fetchingDetails(id);
@@ -84,7 +120,18 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                 setSupplierItems(res.data.supplier_items || []);
 
                 // Foreign key fields that should use null instead of empty string
-                const foreignKeyFields = ['item_category_id', 'supplier_id', 'uom_id', 'sales_account_id', 'purchase_account_id', 'tax_master_id', 'tax_rate_intra_id', 'currency_id'];
+                const foreignKeyFields = [
+                    'item_category_id',
+                    'supplier_id',
+                    'uom_id',
+                    'sales_account_id',
+                    'purchase_account_id',
+                    'tax_master_id',
+                    'tax_rate_intra_id',
+                    'tax_group_id',
+                    'tax_group_interstate_id',
+                    'currency_id',
+                ];
 
                 // Build form values dynamically from response data
                 const formValues: Record<string, any> = {};
@@ -104,6 +151,14 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                             formValues[key] = '';
                         }
                     });
+                }
+
+                // Prefer classification fields; fall back from legacy hsn_code for display
+                if (!formValues.classification_code && formValues.hsn_code) {
+                    formValues.classification_code = formValues.hsn_code;
+                }
+                if (!formValues.classification_scheme && formValues.hsn_code) {
+                    formValues.classification_scheme = 'HSN';
                 }
 
                 form.reset(formValues as any);
@@ -140,13 +195,30 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
             }
 
             // Foreign key fields in item_master (must match zeiv.prisma `item_master`, e.g. currency_id not currency_master_id)
-            const foreignKeyFields = ['item_category_id', 'supplier_id', 'uom_id', 'sales_account_id', 'purchase_account_id', 'tax_master_id', 'tax_rate_intra_id', 'currency_id'];
+            const foreignKeyFields = [
+                'item_category_id',
+                'supplier_id',
+                'uom_id',
+                'sales_account_id',
+                'purchase_account_id',
+                'tax_master_id',
+                'tax_rate_intra_id',
+                'tax_group_id',
+                'tax_group_interstate_id',
+                'currency_id',
+            ];
 
             foreignKeyFields.forEach((field) => {
                 if (submissionData[field] === '' || submissionData[field] === undefined) {
                     submissionData[field] = null;
                 }
             });
+
+            // Keep legacy hsn_code in sync when using HSN/SAC classification
+            const scheme = String(submissionData.classification_scheme || '').toUpperCase();
+            if (scheme === 'HSN' || scheme === 'SAC') {
+                submissionData.hsn_code = submissionData.classification_code || null;
+            }
 
             if (!id) {
                 // For creates: remove null foreign key fields (don't send them - backend will use defaults)
@@ -426,12 +498,57 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
 
                                                 <FormField
                                                     control={form.control}
-                                                    name="hsn_code"
+                                                    name="classification_scheme"
                                                     render={({ field }) => (
                                                         <FormItem>
-                                                            <RequiredFormLabel fieldName="hsn_code" dataGraph={dataGraph}>HSN Code</RequiredFormLabel>
+                                                            <FormLabel>Classification scheme</FormLabel>
+                                                            {taxPack.classificationSchemes.length > 0 ? (
+                                                                <Select
+                                                                    onValueChange={field.onChange}
+                                                                    value={field.value || undefined}
+                                                                >
+                                                                    <FormControl>
+                                                                        <SelectTrigger>
+                                                                            <SelectValue placeholder="Select scheme" />
+                                                                        </SelectTrigger>
+                                                                    </FormControl>
+                                                                    <SelectContent>
+                                                                        {taxPack.classificationSchemes.map((scheme) => (
+                                                                            <SelectItem key={scheme} value={scheme}>
+                                                                                {scheme}
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            ) : (
+                                                                <FormControl>
+                                                                    <Input placeholder="e.g. UNSPSC / CUSTOM" {...field} value={field.value || ''} />
+                                                                </FormControl>
+                                                            )}
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <FormField
+                                                    control={form.control}
+                                                    name="classification_code"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>{taxPack.classificationLabel}</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="Enter HSN code" {...field} />
+                                                                <Input
+                                                                    placeholder={`Enter ${taxPack.classificationLabel.toLowerCase()}`}
+                                                                    {...field}
+                                                                    value={field.value || ''}
+                                                                    onChange={(e) => {
+                                                                        field.onChange(e);
+                                                                        const scheme = String(form.getValues('classification_scheme') || '').toUpperCase();
+                                                                        if (scheme === 'HSN' || scheme === 'SAC') {
+                                                                            form.setValue('hsn_code', e.target.value || null);
+                                                                        }
+                                                                    }}
+                                                                />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -606,20 +723,64 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                 />
                                                 <FormField
                                                     control={form.control}
-                                                    name="tax_master_id"
-                                                    render={({ field }) => (
+                                                    name="tax_group_id"
+                                                    render={() => (
                                                         <FormItem>
-                                                            <RequiredFormLabel fieldName="tax_master_id" dataGraph={dataGraph}>Tax Rate</RequiredFormLabel>
+                                                            <FormLabel>{taxPack.defaultTaxGroupLabel}</FormLabel>
+                                                            <SearchDropDown
+                                                                instanceType="tax_group"
+                                                                instanceSourceKey="tax_group_id"
+                                                                instanceKey="id"
+                                                                instanceLabel="name"
+                                                                instanceValue={initialValues?.tax_group}
+                                                                onSelectItem={handleSelectChange}
+                                                                onClear={() => handleSelectClear('tax_group_id')}
+                                                                limit="20"
+                                                                searchParams="name"
+                                                                type="item_master"
+                                                            />
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="tax_group_interstate_id"
+                                                    render={() => (
+                                                        <FormItem>
+                                                            <FormLabel>{taxPack.interstateTaxGroupLabel}</FormLabel>
+                                                            <SearchDropDown
+                                                                instanceType="tax_group"
+                                                                instanceSourceKey="tax_group_interstate_id"
+                                                                instanceKey="id"
+                                                                instanceLabel="name"
+                                                                instanceValue={initialValues?.tax_group_interstate}
+                                                                onSelectItem={handleSelectChange}
+                                                                onClear={() => handleSelectClear('tax_group_interstate_id')}
+                                                                limit="20"
+                                                                searchParams="name"
+                                                                type="item_master"
+                                                            />
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="tax_master_id"
+                                                    render={() => (
+                                                        <FormItem>
+                                                            <FormLabel>Legacy tax rate (optional)</FormLabel>
                                                             <SearchDropDown
                                                                 instanceType="tax_master"
                                                                 instanceSourceKey="tax_master_id"
                                                                 instanceKey="id"
-                                                                instanceLabel="tax_rate"
+                                                                instanceLabel="tax_name"
                                                                 instanceValue={initialValues?.tax_master}
                                                                 onSelectItem={handleSelectChange}
                                                                 onClear={() => handleSelectClear('tax_master_id')}
                                                                 limit="10"
-                                                                searchParams="tax_rate"
+                                                                searchParams="tax_name"
                                                                 type="item_master"
                                                             />
                                                             <FormMessage />
@@ -812,12 +973,57 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
 
                                         <FormField
                                             control={form.control}
-                                            name="hsn_code"
+                                            name="classification_scheme"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <RequiredFormLabel fieldName="hsn_code" dataGraph={dataGraph}>HSN Code</RequiredFormLabel>
+                                                    <FormLabel>Classification scheme</FormLabel>
+                                                    {taxPack.classificationSchemes.length > 0 ? (
+                                                        <Select
+                                                            onValueChange={field.onChange}
+                                                            value={field.value || undefined}
+                                                        >
+                                                            <FormControl>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select scheme" />
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                {taxPack.classificationSchemes.map((scheme) => (
+                                                                    <SelectItem key={scheme} value={scheme}>
+                                                                        {scheme}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    ) : (
+                                                        <FormControl>
+                                                            <Input placeholder="e.g. UNSPSC / CUSTOM" {...field} value={field.value || ''} />
+                                                        </FormControl>
+                                                    )}
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={form.control}
+                                            name="classification_code"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>{taxPack.classificationLabel}</FormLabel>
                                                     <FormControl>
-                                                        <Input placeholder="Enter HSN code" {...field} />
+                                                        <Input
+                                                            placeholder={`Enter ${taxPack.classificationLabel.toLowerCase()}`}
+                                                            {...field}
+                                                            value={field.value || ''}
+                                                            onChange={(e) => {
+                                                                field.onChange(e);
+                                                                const scheme = String(form.getValues('classification_scheme') || '').toUpperCase();
+                                                                if (scheme === 'HSN' || scheme === 'SAC') {
+                                                                    form.setValue('hsn_code', e.target.value || null);
+                                                                }
+                                                            }}
+                                                        />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -961,6 +1167,73 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                         onClear={() => handleSelectClear('supplier_id')}
                                                         limit="10"
                                                         searchParams="supplier_name"
+                                                        type="item_master"
+                                                    />
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={form.control}
+                                            name="tax_group_id"
+                                            render={() => (
+                                                <FormItem>
+                                                    <FormLabel>{taxPack.defaultTaxGroupLabel}</FormLabel>
+                                                    <SearchDropDown
+                                                        instanceType="tax_group"
+                                                        instanceSourceKey="tax_group_id"
+                                                        instanceKey="id"
+                                                        instanceLabel="name"
+                                                        instanceValue={initialValues?.tax_group}
+                                                        onSelectItem={handleSelectChange}
+                                                        onClear={() => handleSelectClear('tax_group_id')}
+                                                        limit="20"
+                                                        searchParams="name"
+                                                        type="item_master"
+                                                    />
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="tax_group_interstate_id"
+                                            render={() => (
+                                                <FormItem>
+                                                    <FormLabel>{taxPack.interstateTaxGroupLabel}</FormLabel>
+                                                    <SearchDropDown
+                                                        instanceType="tax_group"
+                                                        instanceSourceKey="tax_group_interstate_id"
+                                                        instanceKey="id"
+                                                        instanceLabel="name"
+                                                        instanceValue={initialValues?.tax_group_interstate}
+                                                        onSelectItem={handleSelectChange}
+                                                        onClear={() => handleSelectClear('tax_group_interstate_id')}
+                                                        limit="20"
+                                                        searchParams="name"
+                                                        type="item_master"
+                                                    />
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="tax_master_id"
+                                            render={() => (
+                                                <FormItem>
+                                                    <FormLabel>Legacy tax rate (optional)</FormLabel>
+                                                    <SearchDropDown
+                                                        instanceType="tax_master"
+                                                        instanceSourceKey="tax_master_id"
+                                                        instanceKey="id"
+                                                        instanceLabel="tax_name"
+                                                        instanceValue={initialValues?.tax_master}
+                                                        onSelectItem={handleSelectChange}
+                                                        onClear={() => handleSelectClear('tax_master_id')}
+                                                        limit="10"
+                                                        searchParams="tax_name"
                                                         type="item_master"
                                                     />
                                                     <FormMessage />

@@ -8,6 +8,12 @@
       "dataType": "string",
       "permission": "read"
     },
+    "org_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Organization",
+      "isColumnShow": false
+    },
     "name": {
       "dataType": "string",
       "permission": "update"
@@ -64,6 +70,16 @@
         "payment_term_id": "update",
         "customer_address": "update",
         "preferred_currency_id": "update",
+        "default_tax_region_id": "read",
+        "tax_treatment": "read",
+        "default_tax_region": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "code": "read",
+            "name": "read"
+          }
+        },
         "currency": {
           "type": "table",
           "select": {
@@ -115,6 +131,57 @@
       "displayName": "Customers",
       "isColumnShow": false
     },
+    "supplier_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "invoice",
+          "limit": "10",
+          "instanceKey": "id",
+          "instanceType": "supplier",
+          "searchParams": "supplier_name",
+          "instanceLabel": "supplier_name",
+          "instanceSourceKey": "supplier_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "supplier.supplier_name"
+      },
+      "displayName": "Supplier",
+      "isColumnShow": true
+    },
+    "supplier": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "supplier_name": "read",
+        "legal_name": "read",
+        "primary_email": "read",
+        "primary_phone": "read",
+        "preferred_currency_id": "read",
+        "tax_treatment": "read",
+        "default_tax_region_id": "read",
+        "default_tax_region": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "code": "read",
+            "name": "read"
+          }
+        },
+        "currency": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "code": "read"
+          }
+        }
+      }
+    },
     "location_id": {
       "datatype": "string",
       "permission": "update",
@@ -144,7 +211,7 @@
       "dataType": "string",
       "required": true,
       "permission": "update",
-      "displayName": "Invoice Type",
+      "displayName": "Invoice Class",
       "isColumnShow": false
     },
     "invoice_total": {
@@ -326,7 +393,7 @@
       "dataType": "string",
       "required": true,
       "permission": "update",
-    "displayName": "Requester Name",
+      "displayName": "Requester Name",
       "isColumnShow": false
     },
     "shipping_terms": {
@@ -347,12 +414,33 @@
         "id": "read",
         "name": "read",
         "legal_name": "read",
+        "organization_name": "read",
         "address": "read",
         "city": "read",
         "state": "read",
         "country": "read",
         "zip_code": "read",
-        "website": "read"
+        "website": "read",
+        "default_tax_region_id": "read",
+        "tax_treatment": "read",
+        "basecurrency_id": "read",
+        "currency": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "code": "read",
+            "name": "read",
+            "symbol": "read"
+          }
+        },
+        "default_tax_region": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "code": "read",
+            "name": "read"
+          }
+        }
       },
       "listProps": {
         "type": "text",
@@ -473,6 +561,106 @@
       "dataType": "float",
       "permission": "update"
     },
+    "tax_region_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "tax_region",
+          "limit": "20",
+          "instanceKey": "id",
+          "instanceType": "tax_region",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "tax_region_id"
+        }
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "tax_region.name"
+      },
+      "displayName": "Place of Supply",
+      "isColumnShow": true
+    },
+    "tax_region": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "read",
+        "name": "read",
+        "country_code": "read"
+      }
+    },
+    "seller_tax_region_id": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Seller Tax Region",
+      "isColumnShow": false
+    },
+    "seller_tax_region": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "read",
+        "name": "read",
+        "country_code": "read"
+      }
+    },
+    "tax_responsibility": {
+      "datatype": "string",
+      "permission": "update",
+      "displayName": "Tax Responsibility",
+      "isColumnShow": false
+    },
+    "currency_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "width": "160",
+        "columnType": "select",
+        "selectProps": {
+          "type": "invoice",
+          "limit": "20",
+          "instanceKey": "id",
+          "instanceType": "currency",
+          "searchParams": "code",
+          "instanceLabel": "code",
+          "instanceSourceKey": "currency_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "currency.code"
+      },
+      "displayName": "Currency",
+      "isColumnShow": true
+    },
+    "currency": {
+      "type": "table",
+      "select": {
+        "id": "read",
+        "code": "read",
+        "name": "read",
+        "symbol": "read"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Currency",
+      "isColumnShow": false
+    },
+    "exchange_rate": {
+      "datatype": "float",
+      "permission": "update",
+      "tableProps": {
+        "width": "120",
+        "columnType": "text",
+        "defaultValue": "1"
+      },
+      "displayName": "Exchange Rate",
+      "isColumnShow": true
+    },
     "invoice_line_item": {
       "type": "table",
       "select": {
@@ -480,6 +668,37 @@
         "rate": "read",
         "tax_rate": "read",
         "tax_type": "read",
+        "tax_group_id": "update",
+        "classification_code": "update",
+        "classification_scheme": "update",
+        "taxable_amount": "read",
+        "tax_group": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "name": "read",
+            "code": "read"
+          }
+        },
+        "invoice_line_tax": {
+          "type": "table",
+          "select": {
+            "id": "read",
+            "rate": "read",
+            "amount": "read",
+            "component_type": "read",
+            "tax_master_id": "read",
+            "tax_master": {
+              "type": "table",
+              "select": {
+                "id": "read",
+                "tax_name": "read",
+                "tax_rate": "read",
+                "component_type": "read"
+              }
+            }
+          }
+        },
         "item_name": "read",
         "created_at": "read",
         "line_total": "read",
@@ -501,7 +720,28 @@
             "item_name": "update",
             "item_type": "update",
             "unit_price": "update",
-            "item_description": "update"
+            "item_description": "update",
+            "hsn_code": "read",
+            "classification_code": "read",
+            "classification_scheme": "read",
+            "tax_group_id": "read",
+            "tax_group_interstate_id": "read",
+            "tax_group": {
+              "type": "table",
+              "select": {
+                "id": "read",
+                "name": "read",
+                "code": "read"
+              }
+            },
+            "tax_group_interstate": {
+              "type": "table",
+              "select": {
+                "id": "read",
+                "name": "read",
+                "code": "read"
+              }
+            }
           }
         },
         "item_number": "read",
@@ -606,6 +846,12 @@
     "shipping_handling_misc_total": {
       "dataType": "float",
       "permission": "update"
+    },
+    "po_mode": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "PO Mode",
+      "isColumnShow": false
     }
   },
   "org_id": "52",

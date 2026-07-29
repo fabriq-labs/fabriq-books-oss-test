@@ -20,8 +20,23 @@ import { PaymentReceiptModal } from "./forms/Masters/PaymentReceiptModal";
 import { PaymentReceiptTable } from "./forms/Masters/PaymentReceiptTable";
 import { SalesInvoiceItemTable } from "./forms/Masters/SalesInvoiceItemTable";
 import { Attachment } from "./attachment/Attachment";
+import { QuickCustomerCreateDialog } from "./forms/shared/QuickPartyCreateDialog";
 import { formatCurrency } from "@/lib/formatters";
 import { currencyUtils } from "@/utils/currencyUtils";
+import {
+  isExportTaxTreatment,
+  resolveTaxPack,
+  suggestTaxGroupId,
+} from "@/lib/tax/taxPack";
+import {
+  fetchEntityTaxPack,
+  fetchPrimaryPartyTaxRegistration,
+  fetchZeroRatedTaxGroup,
+  PartyTaxRegistration,
+  ZeroRatedTaxGroup,
+} from "@/lib/tax/taxLookups";
+import { fetchLatestExchangeRate } from "@/lib/currency/exchangeRateLookups";
+
 interface InvoiceItem {
   id: number | string;
   product: string;
@@ -35,6 +50,16 @@ interface InvoiceItem {
   item_name: string;
   item_description: string;
   item_number?: string;
+  tax_group_id?: string | null;
+  tax_group_name?: string | null;
+  classification_code?: string | null;
+  classification_scheme?: string | null;
+  tax_components?: Array<{
+    rate: number;
+    amount: number;
+    component_type?: string | null;
+    tax_name?: string | null;
+  }>;
 }
 
 const formatLocationAddress = (location?: {
@@ -48,6 +73,17 @@ const formatLocationAddress = (location?: {
   return `${location.address || ""}\n${location.city || ""}, ${location.state || ""} ${location.zip_code || ""}\n${location.country || ""}`.trim();
 };
 
+/** UI-only due date: invoice date + payment term days. */
+const computeDueDate = (
+  invoiceDate?: string | null,
+  noOfDays?: number | string | null,
+): string | null => {
+  if (!invoiceDate || noOfDays == null || noOfDays === "") return null;
+  const days = Number(noOfDays);
+  if (!Number.isFinite(days)) return null;
+  return dayjs(invoiceDate).add(days, "day").format("DD-MM-YYYY");
+};
+
 interface InvoiceFormData {
   legal_entity_id: string;
   legalEntityData: any;
@@ -57,6 +93,8 @@ interface InvoiceFormData {
   locationData: any;
   bill_to?: string;
   payment_terms_id?: string;
+  paymentTermsData?: any;
+  paymentTermsDays?: number | null;
   invoice_number: string;
   invoice_date: any;
   items: InvoiceItem[];
@@ -69,6 +107,21 @@ interface InvoiceFormData {
   invoice_total: number;
   notes?: string;
   terms_and_conditions?: string;
+  tax_region_id?: string | null;
+  taxRegionData?: any;
+  seller_tax_region_id?: string | null;
+  tax_responsibility?: string | null;
+  sellerRegistration?: PartyTaxRegistration | null;
+  buyerRegistration?: PartyTaxRegistration | null;
+  taxCountryPack?: string;
+  /** Pack zero-rated / export group (e.g. GST0) for suggestion */
+  zeroRatedTaxGroup?: ZeroRatedTaxGroup | null;
+  currency_id?: string | null;
+  currencyData?: any;
+  /** Snapshot rate: invoice currency → LE base currency */
+  exchange_rate?: number | string | null;
+  /** LE functional currency id (rate denominator) */
+  baseCurrencyId?: string | null;
 }
 
 export const InvoiceForm: React.FC = () => {
@@ -88,6 +141,8 @@ export const InvoiceForm: React.FC = () => {
     locationData: null,
     bill_to: "",
     payment_terms_id: "",
+    paymentTermsData: null,
+    paymentTermsDays: null,
     invoice_number: id,
     invoice_date: id ? null : new Date().toISOString(),
     invoice_total: null,
@@ -100,6 +155,18 @@ export const InvoiceForm: React.FC = () => {
     adjustable_value: 0,
     notes: "",
     terms_and_conditions: "",
+    tax_region_id: null,
+    taxRegionData: null,
+    seller_tax_region_id: null,
+    tax_responsibility: null,
+    sellerRegistration: null,
+    buyerRegistration: null,
+    taxCountryPack: "GENERIC",
+    zeroRatedTaxGroup: null,
+    currency_id: null,
+    currencyData: null,
+    exchange_rate: 1,
+    baseCurrencyId: null,
   });
 
   const [nextItemId, setNextItemId] = useState(1);
@@ -107,10 +174,13 @@ export const InvoiceForm: React.FC = () => {
   const didPersistHQLegalEntityRef = useRef(false);
   const [invoiceCurrencyCode, setInvoiceCurrencyCode] = useState<string>("INR");
   const didUserChangeLegalEntityRef = useRef(false);
+  /** When true, auto rate lookup will not overwrite the exchange rate field. */
+  const didUserEditExchangeRateRef = useRef(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewFileName, setPdfPreviewFileName] = useState<string>("");
+  const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
   const lastUpdateRef = useRef<{ field: string; timestamp: number } | null>(
     null,
   );
@@ -180,8 +250,8 @@ export const InvoiceForm: React.FC = () => {
     }
   }, [id]);
 
-  const fetchDetails = (invoiceId: any) => {
-    viewAPI.getById("invoice", invoiceId, "invoice_view").then((res: any) => {
+  const fetchDetails = async (invoiceId: any) => {
+    const res: any = await viewAPI.getById("invoice", invoiceId, "invoice_view");
       setInitialValues(res.data);
       // Map invoice line items to form items format, sorted by item_number when present
       const lineItems = res.data?.invoice_line_item || [];
@@ -221,6 +291,60 @@ export const InvoiceForm: React.FC = () => {
       }
       const billTo =
         res.data.bill_to || formatLocationAddress(res.data.location) || "";
+
+      const sellerRegionId =
+        res.data.seller_tax_region_id ||
+        res.data.legal_entity?.default_tax_region_id ||
+        null;
+      const placeOfSupplyId =
+        res.data.tax_region_id ||
+        res.data.customers?.default_tax_region_id ||
+        null;
+      const taxRegion =
+        res.data.tax_region ||
+        res.data.customers?.default_tax_region ||
+        (placeOfSupplyId ? { id: placeOfSupplyId } : null);
+
+      const [sellerRegistration, buyerRegistration, taxCountryPack, paymentTermsDays] =
+        await Promise.all([
+          res.data.legal_entity_id
+            ? fetchPrimaryPartyTaxRegistration("entity", res.data.legal_entity_id)
+            : Promise.resolve(null),
+          res.data.customer_id
+            ? fetchPrimaryPartyTaxRegistration("customer", res.data.customer_id)
+            : Promise.resolve(null),
+          fetchEntityTaxPack(res.data.legal_entity_id),
+          (async () => {
+            const nestedDays = res.data.payment_terms?.no_of_days;
+            if (nestedDays != null) return Number(nestedDays);
+            if (!res.data.payment_terms_id) return null;
+            try {
+              const pt: any = await viewAPI.getById(
+                "payment_terms",
+                res.data.payment_terms_id,
+                "payment_terms_view",
+              );
+              return pt?.data?.no_of_days != null
+                ? Number(pt.data.no_of_days)
+                : null;
+            } catch {
+              return null;
+            }
+          })(),
+        ]);
+      const zeroRatedTaxGroup = await fetchZeroRatedTaxGroup(taxCountryPack);
+      const customerTreatment =
+        customerData?.item?.tax_treatment ||
+        res.data.customers?.tax_treatment ||
+        null;
+      const effectivePlaceOfSupplyId = isExportTaxTreatment(customerTreatment)
+        ? res.data.tax_region_id || null
+        : placeOfSupplyId;
+      const effectiveTaxRegion = isExportTaxTreatment(customerTreatment)
+        ? res.data.tax_region ||
+          (effectivePlaceOfSupplyId ? { id: effectivePlaceOfSupplyId } : null)
+        : taxRegion;
+
       setFormData((prev) => ({
         ...prev,
         legal_entity_id: res.data.legal_entity_id,
@@ -230,6 +354,11 @@ export const InvoiceForm: React.FC = () => {
         customerData: customerData || prev.customerData,
         locationData: locationData || prev.locationData,
         bill_to: billTo || prev.bill_to,
+        payment_terms_id: res.data.payment_terms_id || prev.payment_terms_id,
+        paymentTermsData: res.data.payment_terms
+          ? { item: res.data.payment_terms, id: res.data.payment_terms_id }
+          : prev.paymentTermsData,
+        paymentTermsDays,
         invoice_number: res.data.invoice_number || prev.invoice_number,
         invoice_date: res.data.invoice_date || prev.invoice_date,
         grandTotal: res.data.invoice_total,
@@ -242,7 +371,36 @@ export const InvoiceForm: React.FC = () => {
         items: items,
         notes: res.data.notes ?? prev.notes ?? "",
         terms_and_conditions: res.data.terms_and_conditions ?? prev.terms_and_conditions ?? "",
+        tax_region_id: effectivePlaceOfSupplyId,
+        taxRegionData: effectiveTaxRegion
+          ? {
+              item: effectiveTaxRegion,
+              id: effectivePlaceOfSupplyId,
+              name: effectiveTaxRegion.name,
+            }
+          : null,
+        seller_tax_region_id: sellerRegionId,
+        tax_responsibility: res.data.tax_responsibility || null,
+        sellerRegistration,
+        buyerRegistration,
+        taxCountryPack,
+        zeroRatedTaxGroup,
+        currency_id: res.data.currency_id || null,
+        currencyData: res.data.currency
+          ? { item: res.data.currency, id: res.data.currency_id }
+          : null,
+        exchange_rate:
+          res.data.exchange_rate != null ? Number(res.data.exchange_rate) : 1,
+        baseCurrencyId:
+          res.data.legal_entity?.basecurrency_id ||
+          res.data.legal_entity?.currency?.id ||
+          null,
       }));
+
+      if (res.data.currency?.code) {
+        setInvoiceCurrencyCode(res.data.currency.code);
+      }
+      didUserEditExchangeRateRef.current = false;
 
       // Update nextItemId to avoid conflicts
       const maxId = Math.max(
@@ -252,7 +410,6 @@ export const InvoiceForm: React.FC = () => {
         0,
       );
       setNextItemId(maxId + 1);
-    });
   };
 
   const handleInputChange = (field: keyof InvoiceFormData, value: string) => {
@@ -314,6 +471,95 @@ export const InvoiceForm: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [id],
   );
+
+  const resolveBaseCurrencyId = (le?: any): string | null =>
+    le?.basecurrency_id ||
+    le?.currency?.id ||
+    le?.item?.basecurrency_id ||
+    le?.item?.currency?.id ||
+    null;
+
+  /**
+   * Look up latest exchange rate (invoice currency → LE base) and apply it
+   * unless the user has manually edited the rate (and forceRefresh is false).
+   */
+  const applyLatestExchangeRate = async (args: {
+    currencyId?: string | null;
+    baseCurrencyId?: string | null;
+    invoiceDate?: any;
+    forceRefresh?: boolean;
+    persist?: boolean;
+  }) => {
+    const currencyId = args.currencyId ?? null;
+    const baseCurrencyId = args.baseCurrencyId ?? null;
+    if (!currencyId) return;
+
+    if (!args.forceRefresh && didUserEditExchangeRateRef.current) {
+      return;
+    }
+
+    const latest = await fetchLatestExchangeRate(
+      currencyId,
+      baseCurrencyId || currencyId,
+      args.invoiceDate,
+    );
+    const rate = latest?.rate != null && Number.isFinite(latest.rate) ? latest.rate : 1;
+    didUserEditExchangeRateRef.current = false;
+    setFormData((prev) => ({ ...prev, exchange_rate: rate }));
+    if (args.persist && id) {
+      handleFieldUpdate("exchange_rate", rate);
+    }
+  };
+
+  const handleCurrencySelectChange = async (
+    sourceKey: any,
+    key: string,
+    value: any,
+  ) => {
+    const currencyId = value?.[key] || value?.item?.id || null;
+    const code = value?.item?.code;
+    if (typeof code === "string" && code) {
+      setInvoiceCurrencyCode(code);
+    }
+
+    const baseCurrencyId =
+      formData.baseCurrencyId ||
+      resolveBaseCurrencyId(formData.legalEntityData) ||
+      resolveBaseCurrencyId(formData.legalEntityData?.item);
+
+    setFormData((prev) => ({
+      ...prev,
+      currency_id: currencyId,
+      currencyData: value,
+      baseCurrencyId: baseCurrencyId || prev.baseCurrencyId,
+    }));
+
+    if (id) {
+      handleFieldUpdate("currency_id", currencyId);
+    }
+
+    await applyLatestExchangeRate({
+      currencyId,
+      baseCurrencyId,
+      invoiceDate: formData.invoice_date,
+      forceRefresh: true,
+      persist: !!id,
+    });
+  };
+
+  const handleCurrencyClear = () => {
+    setFormData((prev) => ({
+      ...prev,
+      currency_id: null,
+      currencyData: null,
+      exchange_rate: 1,
+    }));
+    didUserEditExchangeRateRef.current = false;
+    if (id) {
+      handleFieldUpdate("currency_id", null);
+      handleFieldUpdate("exchange_rate", 1);
+    }
+  };
 
   const handleItemChange = (
     itemId: number | string,
@@ -379,10 +625,69 @@ export const InvoiceForm: React.FC = () => {
           item.item_description || item.item_master?.item_description || "",
         item_number:
           item.item_number || item.item_master?.item_code || item.item_code,
+        tax_group_id: item.tax_group_id || null,
+        tax_group_name: item.tax_group?.name || null,
+        classification_code:
+          item.classification_code ||
+          item.item_master?.classification_code ||
+          item.item_master?.hsn_code ||
+          null,
+        classification_scheme:
+          item.classification_scheme ||
+          item.item_master?.classification_scheme ||
+          null,
+        tax_components: (item.invoice_line_tax || []).map((t: any) => ({
+          rate: Number(t.rate) || 0,
+          amount: Number(t.amount) || 0,
+          component_type: t.component_type || t.tax_master?.component_type,
+          tax_name: t.tax_master?.tax_name,
+        })),
       }));
       return mapped;
     },
     [],
+  );
+
+  const applyInvoicePayload = useCallback(
+    (invoiceData: any) => {
+      if (!invoiceData?.invoice_line_item) return false;
+      const mappedItems = mapLineItemsToForm(invoiceData.invoice_line_item);
+      setInitialValues(invoiceData);
+      setFormData((prev) => {
+        const subTotal = mappedItems.reduce((sum, item) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.price) || 0;
+          return sum + qty * price;
+        }, 0);
+        const totalDiscount = mappedItems.reduce((sum, item) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.price) || 0;
+          const discountRate = Number(item.discount_rate) || 0;
+          return sum + (qty * price * discountRate) / 100;
+        }, 0);
+        const totalTax = mappedItems.reduce((sum, item) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.price) || 0;
+          const discountRate = Number(item.discount_rate) || 0;
+          const tax = Number(item.tax) || 0;
+          const lineAfterDiscount =
+            qty * price - (qty * price * discountRate) / 100;
+          return sum + (lineAfterDiscount * tax) / 100;
+        }, 0);
+        const grandTotal =
+          invoiceData?.invoice_total ?? subTotal - totalDiscount + totalTax;
+        return {
+          ...prev,
+          items: mappedItems,
+          subTotal,
+          totalDiscount,
+          totalTax,
+          grandTotal,
+        };
+      });
+      return true;
+    },
+    [mapLineItemsToForm],
   );
 
   // Update line item via API (for editing existing invoice)
@@ -400,6 +705,9 @@ export const InvoiceForm: React.FC = () => {
           product: "item_master_id",
           period: "period",
           total: "total",
+          tax_group_id: "tax_group_id",
+          classification_code: "classification_code",
+          classification_scheme: "classification_scheme",
         };
         const apiField = fieldMapping[field] || field;
 
@@ -412,40 +720,9 @@ export const InvoiceForm: React.FC = () => {
           { [apiField]: value },
         )) as any;
 
-        // Use API response to update the row and totals (like purchase requisition)
-        if (res?.data?.invoice_line_item) {
-          const mappedItems = mapLineItemsToForm(res.data.invoice_line_item);
-          setInitialValues(res.data);
-          setFormData((prev) => {
-            const subTotal = mappedItems.reduce((sum, item) => {
-              const qty = Number(item.quantity) || 0;
-              const price = Number(item.price) || 0;
-              return sum + qty * price;
-            }, 0);
-            const totalDiscount = mappedItems.reduce((sum, item) => {
-              const qty = Number(item.quantity) || 0;
-              const price = Number(item.price) || 0;
-              const discountRate = Number(item.discount_rate) || 0;
-              return sum + (qty * price * discountRate) / 100;
-            }, 0);
-            const totalTax = mappedItems.reduce((sum, item) => {
-              const qty = Number(item.quantity) || 0;
-              const price = Number(item.price) || 0;
-              const discountRate = Number(item.discount_rate) || 0;
-              const tax = Number(item.tax) || 0;
-              const lineAfterDiscount = qty * price - (qty * price * discountRate) / 100;
-              return sum + (lineAfterDiscount * tax) / 100;
-            }, 0);
-            const grandTotal = res.data?.invoice_total ?? subTotal - totalDiscount + totalTax;
-            return {
-              ...prev,
-              items: mappedItems,
-              subTotal,
-              totalDiscount,
-              totalTax,
-              grandTotal,
-            };
-          });
+        // Prefer response data graph; fall back to full fetch if payload missing
+        if (!applyInvoicePayload(res?.data) && id) {
+          await fetchDetails(id);
         }
       } catch (error) {
         console.error("Error updating line item:", error);
@@ -456,7 +733,7 @@ export const InvoiceForm: React.FC = () => {
         });
       }
     },
-    [id, toast, mapLineItemsToForm],
+    [id, toast, applyInvoicePayload],
   );
 
   // Update line item when product is selected so that
@@ -475,39 +752,8 @@ export const InvoiceForm: React.FC = () => {
           payload,
         )) as any;
 
-        if (res?.data?.invoice_line_item) {
-          const mappedItems = mapLineItemsToForm(res.data.invoice_line_item);
-          setInitialValues(res.data);
-          setFormData((prev) => {
-            const subTotal = mappedItems.reduce((sum, item) => {
-              const qty = Number(item.quantity) || 0;
-              const price = Number(item.price) || 0;
-              return sum + qty * price;
-            }, 0);
-            const totalDiscount = mappedItems.reduce((sum, item) => {
-              const qty = Number(item.quantity) || 0;
-              const price = Number(item.price) || 0;
-              const discountRate = Number(item.discount_rate) || 0;
-              return sum + (qty * price * discountRate) / 100;
-            }, 0);
-            const totalTax = mappedItems.reduce((sum, item) => {
-              const qty = Number(item.quantity) || 0;
-              const price = Number(item.price) || 0;
-              const discountRate = Number(item.discount_rate) || 0;
-              const tax = Number(item.tax) || 0;
-              const lineAfterDiscount = qty * price - (qty * price * discountRate) / 100;
-              return sum + (lineAfterDiscount * tax) / 100;
-            }, 0);
-            const grandTotal = res.data?.invoice_total ?? subTotal - totalDiscount + totalTax;
-            return {
-              ...prev,
-              items: mappedItems,
-              subTotal,
-              totalDiscount,
-              totalTax,
-              grandTotal,
-            };
-          });
+        if (!applyInvoicePayload(res?.data) && id) {
+          await fetchDetails(id);
         }
       } catch (error) {
         console.error("Error updating line item from product:", error);
@@ -518,7 +764,7 @@ export const InvoiceForm: React.FC = () => {
         });
       }
     },
-    [id, toast, mapLineItemsToForm],
+    [id, toast, applyInvoicePayload],
   );
 
   // Handle blur to save changes when editing
@@ -585,10 +831,9 @@ export const InvoiceForm: React.FC = () => {
           "invoice_line_item",
           { item_number: nextItemNumber },
         )) as any;
-        if (response?.data) {
-          // Re-fetch full invoice so all line items (not just the new one)
-          // are loaded and shown in SalesInvoiceItemTable
-          fetchDetails(id);
+        // Use returned data graph when present; otherwise refresh (UI fallback)
+        if (!applyInvoicePayload(response?.data)) {
+          await fetchDetails(id);
         }
       } catch (error) {
         console.error("Error adding line item:", error);
@@ -625,68 +870,363 @@ export const InvoiceForm: React.FC = () => {
     }
   };
 
-  const handleLegalEntitySelectChange = (
+  const handleLegalEntitySelectChange = async (
     sourceKey: any,
     key: string,
     value: any,
     fields: any,
   ) => {
-    const lookupData = constructObject(value.item, fields);
+    constructObject(value.item, fields);
 
-    // Update form state
     form.setValue(sourceKey, value[key]);
     form.trigger(sourceKey);
-
-    // User-manual change: prevent HQ auto-persist from overriding this.
     didUserChangeLegalEntityRef.current = true;
 
-    // Update local form data
+    const sellerRegionId =
+      value?.item?.default_tax_region_id ||
+      value?.item?.default_tax_region?.id ||
+      null;
+    const sellerRegistration = value?.[key]
+      ? await fetchPrimaryPartyTaxRegistration("entity", value[key])
+      : null;
+    const legalEntityId = value?.[key] || value?.item?.id || null;
+    const taxCountryPack = await fetchEntityTaxPack(legalEntityId);
+    const zeroRatedTaxGroup = await fetchZeroRatedTaxGroup(taxCountryPack);
+    const taxTreatment =
+      formData.customerData?.item?.tax_treatment ||
+      formData.customerData?.tax_treatment ||
+      null;
+    const baseCurrencyId = resolveBaseCurrencyId(value);
+
     setFormData((prev) => ({
       ...prev,
       [sourceKey]: value[key],
       legalEntityData: value,
+      seller_tax_region_id: sellerRegionId,
+      sellerRegistration,
+      taxCountryPack,
+      zeroRatedTaxGroup,
+      baseCurrencyId,
+      // Default invoice currency to LE base when none chosen yet
+      ...(prev.currency_id
+        ? {}
+        : {
+            currency_id: baseCurrencyId,
+            currencyData: value?.item?.currency
+              ? { item: value.item.currency, id: baseCurrencyId }
+              : prev.currencyData,
+          }),
     }));
     setLegalEntity(value);
 
-    // Update base currency immediately when user changes legal entity.
-    const candidate =
-      value?.item?.currency?.code ||
-      value?.item?.currency?.code ||
-      value?.item?.currency?.code ||
-      value?.item?.code ||
-      value?.item?.code;
-    if (typeof candidate === "string" && candidate) {
-      setInvoiceCurrencyCode(candidate);
+    if (!formData.currency_id) {
+      const candidate = value?.item?.currency?.code || value?.item?.code;
+      if (typeof candidate === "string" && candidate) {
+        setInvoiceCurrencyCode(candidate);
+      }
     }
 
     if (id) {
       handleFieldUpdate("legal_entity_id", value[key]);
+      if (sellerRegionId) {
+        handleFieldUpdate("seller_tax_region_id", sellerRegionId);
+      }
+      if (!formData.currency_id && baseCurrencyId) {
+        handleFieldUpdate("currency_id", baseCurrencyId);
+      }
     }
+
+    await applyLatestExchangeRate({
+      currencyId: formData.currency_id || baseCurrencyId,
+      baseCurrencyId,
+      invoiceDate: formData.invoice_date,
+      forceRefresh: true,
+      persist: !!id,
+    });
+
+    await resyncLineTaxGroups({
+      sellerRegionId,
+      placeOfSupplyId: formData.tax_region_id,
+      items: formData.items,
+      taxTreatment,
+      zeroRatedTaxGroup,
+    });
   };
 
-  const handleCustomerSelectChange = (
+  /**
+   * Re-apply tax group suggestion on existing lines when seller region,
+   * place of supply, or customer tax treatment changes.
+   */
+  const resyncLineTaxGroups = async (args: {
+    sellerRegionId?: string | null;
+    placeOfSupplyId?: string | null;
+    items: InvoiceItem[];
+    taxTreatment?: string | null;
+    zeroRatedTaxGroup?: ZeroRatedTaxGroup | null;
+  }) => {
+    const sellerRegionId = args.sellerRegionId ?? null;
+    const placeOfSupplyId = args.placeOfSupplyId ?? null;
+    const taxTreatment = args.taxTreatment ?? null;
+    const zeroRatedTaxGroup =
+      args.zeroRatedTaxGroup ?? formData.zeroRatedTaxGroup ?? null;
+    const lines = (args.items || []).filter((item) => item.product);
+    if (lines.length === 0) return;
+
+    const suggestions: Array<{
+      id: number | string;
+      tax_group_id: string | null;
+      tax_group_name: string | null;
+    }> = [];
+
+    await Promise.all(
+      lines.map(async (item) => {
+        try {
+          const res: any = await viewAPI.getById(
+            "item_master",
+            String(item.product),
+            "item_master_view",
+          );
+          const product = res?.data;
+          if (!product) return;
+
+          const suggestedTaxGroupId = suggestTaxGroupId({
+            sellerRegionId,
+            placeOfSupplyId,
+            defaultTaxGroupId: product.tax_group_id || product.tax_group?.id,
+            interstateTaxGroupId:
+              product.tax_group_interstate_id ||
+              product.tax_group_interstate?.id,
+            taxTreatment,
+            zeroRatedTaxGroupId: zeroRatedTaxGroup?.id,
+          });
+
+          // Export with no GST0: clear domestic group rather than keep CGST/SGST.
+          if (isExportTaxTreatment(taxTreatment)) {
+            if (suggestedTaxGroupId === item.tax_group_id) return;
+          } else if (
+            !suggestedTaxGroupId ||
+            suggestedTaxGroupId === item.tax_group_id
+          ) {
+            return;
+          }
+
+          const taxGroupName = !suggestedTaxGroupId
+            ? null
+            : suggestedTaxGroupId === zeroRatedTaxGroup?.id
+              ? zeroRatedTaxGroup?.name || suggestedTaxGroupId
+              : suggestedTaxGroupId ===
+                  (product.tax_group_interstate_id ||
+                    product.tax_group_interstate?.id)
+                ? product.tax_group_interstate?.name || suggestedTaxGroupId
+                : product.tax_group?.name || suggestedTaxGroupId;
+
+          suggestions.push({
+            id: item.id,
+            tax_group_id: suggestedTaxGroupId,
+            tax_group_name: taxGroupName,
+          });
+        } catch (err) {
+          console.error("Failed to suggest tax group for line", item.id, err);
+        }
+      }),
+    );
+
+    if (suggestions.length === 0) return;
+
+    const byId = new Map(suggestions.map((s) => [String(s.id), s]));
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        const next = byId.get(String(item.id));
+        return next
+          ? {
+              ...item,
+              tax_group_id: next.tax_group_id,
+              tax_group_name: next.tax_group_name,
+            }
+          : item;
+      }),
+    }));
+
+    if (!id) return;
+
+    for (const suggestion of suggestions) {
+      if (typeof suggestion.id !== "string") continue;
+      try {
+        const res = (await viewAPI.updateChild(
+          "invoice",
+          id,
+          "invoice_view",
+          "invoice_line_item",
+          suggestion.id,
+          { tax_group_id: suggestion.tax_group_id },
+        )) as any;
+        if (res?.data?.invoice_line_item) {
+          applyInvoicePayload(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to persist tax group for line", suggestion.id, err);
+      }
+    }
+
+    // After multi-line updates, one refresh guarantees final components/totals
+    await fetchDetails(id);
+  };
+
+  const handleCustomerSelectChange = async (
     sourceKey: any,
     key: string,
     value: any,
     fields: any,
   ) => {
-    const lookupData = constructObject(value.item, fields);
+    constructObject(value.item, fields);
 
-    // Update form state
     form.setValue(sourceKey, value[key]);
     form.trigger(sourceKey);
 
-    // Update local form data
+    const taxTreatment = value?.item?.tax_treatment || null;
+    const isExport = isExportTaxTreatment(taxTreatment);
+    // Export/overseas: do not stamp an IN place of supply from customer defaults.
+    const placeOfSupplyId = isExport
+      ? null
+      : value?.item?.default_tax_region_id ||
+        value?.item?.default_tax_region?.id ||
+        null;
+    const taxRegion = isExport
+      ? null
+      : value?.item?.default_tax_region ||
+        (placeOfSupplyId
+          ? { id: placeOfSupplyId, name: value?.item?.state }
+          : null);
+    const buyerRegistration = value?.[key]
+      ? await fetchPrimaryPartyTaxRegistration("customer", value[key])
+      : null;
+
+    const sellerRegionId = formData.seller_tax_region_id;
+    const currentItems = formData.items;
+    let zeroRatedTaxGroup = formData.zeroRatedTaxGroup || null;
+    if (isExport && !zeroRatedTaxGroup) {
+      zeroRatedTaxGroup = await fetchZeroRatedTaxGroup(formData.taxCountryPack);
+    }
+
+    const preferredCurrencyId =
+      value?.item?.preferred_currency_id || value?.item?.currency?.id || null;
+    const preferredCurrency = value?.item?.currency || null;
+    const baseCurrencyId =
+      formData.baseCurrencyId ||
+      resolveBaseCurrencyId(formData.legalEntityData);
+    // Prefer customer currency when invoice currency not set yet
+    const nextCurrencyId = formData.currency_id || preferredCurrencyId || baseCurrencyId;
+    const nextCurrencyData = formData.currency_id
+      ? formData.currencyData
+      : preferredCurrency
+        ? { item: preferredCurrency, id: preferredCurrencyId }
+        : formData.currencyData;
+
     setFormData((prev) => ({
       ...prev,
       [sourceKey]: value[key],
       customerData: value,
+      tax_region_id: placeOfSupplyId,
+      taxRegionData: taxRegion
+        ? { item: taxRegion, id: placeOfSupplyId, name: taxRegion.name }
+        : null,
+      buyerRegistration,
+      tax_responsibility:
+        value?.item?.tax_responsibility || prev.tax_responsibility || "taxable",
+      zeroRatedTaxGroup: zeroRatedTaxGroup ?? prev.zeroRatedTaxGroup,
+      currency_id: nextCurrencyId,
+      currencyData: nextCurrencyData,
+      baseCurrencyId: baseCurrencyId || prev.baseCurrencyId,
     }));
     setCustomer(value);
+
+    if (!formData.currency_id && preferredCurrency?.code) {
+      setInvoiceCurrencyCode(preferredCurrency.code);
+    }
+
     if (id) {
       handleFieldUpdate("customer_id", value[key]);
+      // Persist cleared POS for export, or customer default for domestic.
+      handleFieldUpdate("tax_region_id", placeOfSupplyId);
+      if (!formData.currency_id && nextCurrencyId) {
+        handleFieldUpdate("currency_id", nextCurrencyId);
+      }
+    }
+
+    if (!formData.currency_id && nextCurrencyId) {
+      await applyLatestExchangeRate({
+        currencyId: nextCurrencyId,
+        baseCurrencyId,
+        invoiceDate: formData.invoice_date,
+        forceRefresh: true,
+        persist: !!id,
+      });
+    }
+
+    await resyncLineTaxGroups({
+      sellerRegionId,
+      placeOfSupplyId,
+      items: currentItems,
+      taxTreatment,
+      zeroRatedTaxGroup,
+    });
+  };
+
+  const handlePlaceOfSupplyChange = async (
+    sourceKey: any,
+    key: string,
+    value: any,
+  ) => {
+    form.setValue(sourceKey, value[key]);
+    form.trigger(sourceKey);
+    const placeOfSupplyId = value[key] || null;
+    const currentItems = formData.items;
+    const sellerRegionId = formData.seller_tax_region_id;
+    const taxTreatment =
+      formData.customerData?.item?.tax_treatment ||
+      formData.customerData?.tax_treatment ||
+      null;
+
+    setFormData((prev) => ({
+      ...prev,
+      tax_region_id: placeOfSupplyId,
+      taxRegionData: value,
+    }));
+    if (id) {
+      handleFieldUpdate("tax_region_id", placeOfSupplyId);
+    }
+
+    await resyncLineTaxGroups({
+      sellerRegionId,
+      placeOfSupplyId,
+      items: currentItems,
+      taxTreatment,
+    });
+  };
+
+  const handleTaxGroupSelect = (
+    itemId: number | string,
+    taxGroupId: string | null,
+    taxGroup?: any,
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              tax_group_id: taxGroupId,
+              tax_group_name: taxGroup?.name || taxGroupId || null,
+            }
+          : item,
+      ),
+    }));
+    if (id && typeof itemId === "string") {
+      updateLineItemApi(itemId, "tax_group_id", taxGroupId);
     }
   };
+
   const handleLoctionSelectChange = (
     sourceKey: any,
     key: string,
@@ -729,61 +1269,94 @@ export const InvoiceForm: React.FC = () => {
       return resolvedTax != null ? Number(resolvedTax) : null;
     };
 
-    const lookupData = constructObject(value.item, fields);
+    if (fields) {
+      constructObject(value.item, fields);
+    }
     // Extract item ID from sourceKey (format: "product_0" or "product_abcd")
     const itemIdStr = sourceKey.replace("product_", "").replace("_id", "");
     setProducts(value);
+
+    const product = value?.item;
+    const taxTreatment =
+      formData.customerData?.item?.tax_treatment ||
+      formData.customerData?.tax_treatment ||
+      null;
+    const suggestedTaxGroupId = suggestTaxGroupId({
+      sellerRegionId: formData.seller_tax_region_id,
+      placeOfSupplyId: formData.tax_region_id,
+      defaultTaxGroupId: product?.tax_group_id || product?.tax_group?.id,
+      interstateTaxGroupId:
+        product?.tax_group_interstate_id || product?.tax_group_interstate?.id,
+      taxTreatment,
+      zeroRatedTaxGroupId: formData.zeroRatedTaxGroup?.id,
+    });
+    const taxGroupName =
+      suggestedTaxGroupId &&
+      suggestedTaxGroupId === formData.zeroRatedTaxGroup?.id
+        ? formData.zeroRatedTaxGroup?.name
+        : suggestedTaxGroupId &&
+            suggestedTaxGroupId ===
+              (product?.tax_group_interstate_id ||
+                product?.tax_group_interstate?.id)
+          ? product?.tax_group_interstate?.name
+          : product?.tax_group?.name;
+
     // Update the specific item in the form data
     setFormData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
-        if (String(item.id) === itemIdStr) {
-          const updatedItem = { ...item };
-          updatedItem.product = value[key];
+        if (String(item.id) !== itemIdStr) return item;
 
-          // Save item name and description from the selected product
-          if (value.item) {
-            updatedItem.item_name =
-              value.item.item_name ||
-              value.item.name ||
-              value.item.product_name ||
-              value.item.title ||
-              "";
-            updatedItem.item_description =
-              value.item.item_description ||
-              value.item.description ||
-              value.item.product_description ||
-              value.item.desc ||
-              "";
+        const updatedItem = { ...item };
+        updatedItem.product = value[key];
+
+        if (product) {
+          updatedItem.item_name =
+            product.item_name ||
+            product.name ||
+            product.product_name ||
+            product.title ||
+            "";
+          updatedItem.item_description =
+            product.item_description ||
+            product.description ||
+            product.product_description ||
+            product.desc ||
+            "";
+          updatedItem.classification_code =
+            product.classification_code || product.hsn_code || null;
+          updatedItem.classification_scheme =
+            product.classification_scheme ||
+            (product.hsn_code || product.classification_code ? "HSN" : null);
+          updatedItem.tax_group_id = suggestedTaxGroupId;
+          updatedItem.tax_group_name = taxGroupName || suggestedTaxGroupId;
+
+          if (product.unit_price != null) {
+            updatedItem.price = parseFloat(product.unit_price);
           }
 
-          // Auto-populate price and tax if available in the selected product
-          if (value.item && value.item.unit_price) {
-            updatedItem.price = parseFloat(value.item.unit_price);
-          }
-          if (value.item) {
-            const resolvedTax = resolveProductTaxRate(value.item);
+          if (!suggestedTaxGroupId) {
+            const resolvedTax = resolveProductTaxRate(product);
             if (resolvedTax != null) {
               updatedItem.tax = resolvedTax;
             }
           }
-
-          // Recalculate item total
-          const quantity = Number(updatedItem.quantity) || 0;
-          const price = Number(updatedItem.price) || 0;
-          const tax = Number(updatedItem.tax) || 0;
-          const discountRate = Number(updatedItem.discount_rate) || 0;
-          const subtotal = quantity * price;
-          const discountAmount = (subtotal * discountRate) / 100;
-          const taxableAmount = subtotal - discountAmount;
-          const taxAmount = (taxableAmount * tax) / 100;
-          updatedItem.total = taxableAmount + taxAmount;
-
-          return updatedItem;
         }
-        return item;
+
+        const quantity = Number(updatedItem.quantity) || 0;
+        const price = Number(updatedItem.price) || 0;
+        const tax = Number(updatedItem.tax) || 0;
+        const discountRate = Number(updatedItem.discount_rate) || 0;
+        const subtotal = quantity * price;
+        const discountAmount = (subtotal * discountRate) / 100;
+        const taxableAmount = subtotal - discountAmount;
+        const taxAmount = (taxableAmount * tax) / 100;
+        updatedItem.total = taxableAmount + taxAmount;
+
+        return updatedItem;
       }),
     }));
+
     // Update via API when editing existing invoice
     const matchedItem = formData.items.find(
       (item) => String(item.id) === itemIdStr,
@@ -793,20 +1366,28 @@ export const InvoiceForm: React.FC = () => {
         item_master_id: value[key],
       };
 
-      if (value.item) {
-        payload.item_name = value.item.item_name ?? null;
-        payload.item_number = value.item.item_code ?? null;
-        payload.item_description = value.item.item_description ?? null;
-        payload.item_type = value.item.item_type ?? null;
+      if (product) {
+        payload.item_name = product.item_name ?? null;
+        payload.item_number = product.item_code ?? null;
+        payload.item_description = product.item_description ?? null;
+        payload.item_type = product.item_type ?? null;
+        payload.classification_code =
+          product.classification_code || product.hsn_code || null;
+        payload.classification_scheme =
+          product.classification_scheme ||
+          (product.hsn_code || product.classification_code ? "HSN" : null);
 
-        if (value.item.unit_price != null) {
-          payload.rate = Number(value.item.unit_price);
+        if (product.unit_price != null) {
+          payload.rate = Number(product.unit_price);
         }
 
-        // Prefer intra-state tax if present, otherwise tax_master.tax_rate, fallback to direct tax_rate
-        const resolvedTax = resolveProductTaxRate(value.item);
-        if (resolvedTax != null) {
-          payload.tax_rate = resolvedTax;
+        if (suggestedTaxGroupId) {
+          payload.tax_group_id = suggestedTaxGroupId;
+        } else {
+          const resolvedTax = resolveProductTaxRate(product);
+          if (resolvedTax != null) {
+            payload.tax_rate = resolvedTax;
+          }
         }
       }
 
@@ -880,6 +1461,11 @@ export const InvoiceForm: React.FC = () => {
           updatedItem.tax = "";
           updatedItem.discount_rate = "";
           updatedItem.total = 0;
+          updatedItem.tax_group_id = null;
+          updatedItem.tax_group_name = null;
+          updatedItem.classification_code = null;
+          updatedItem.classification_scheme = null;
+          updatedItem.tax_components = [];
           return updatedItem;
         }
         return item;
@@ -898,6 +1484,9 @@ export const InvoiceForm: React.FC = () => {
         rate: 0,
         tax_rate: 0,
         discount_rate: 0,
+        tax_group_id: null,
+        classification_code: null,
+        classification_scheme: null,
       });
     }
   };
@@ -957,6 +1546,10 @@ export const InvoiceForm: React.FC = () => {
       const invoiceData = {
         invoice_number: formData.invoice_number,
         invoice_date: formData.invoice_date,
+        due_date: computeDueDate(
+          formData.invoice_date,
+          formData.paymentTermsDays,
+        ),
         items: formData.items.map((item) => ({
           product: item.product || "",
           period: item.period || "",
@@ -968,6 +1561,10 @@ export const InvoiceForm: React.FC = () => {
           item_description: item.item_description || "",
           discount_rate: Number(item.discount_rate) || 0,
           discount_amount: Number(item.discount_amount) || 0,
+          classification_code: item.classification_code || null,
+          classification_scheme: item.classification_scheme || null,
+          tax_group_name: item.tax_group_name || null,
+          tax_components: item.tax_components || [],
         })),
         subTotal: Number(formData.subTotal) || 0,
         totalDiscount: Number(formData.totalDiscount) || 0,
@@ -990,6 +1587,14 @@ export const InvoiceForm: React.FC = () => {
           formatLocationAddress(
             formData.locationData?.item || initialValues?.location,
           ),
+        sellerRegistration: formData.sellerRegistration,
+        buyerRegistration: formData.buyerRegistration,
+        taxRegionName:
+          formData.taxRegionData?.item?.name ||
+          formData.taxRegionData?.name ||
+          null,
+        registrationLabel: resolveTaxPack(formData.taxCountryPack).registrationLabel,
+        regionLabel: resolveTaxPack(formData.taxCountryPack).regionLabel,
       };
       const blob = await pdf(
         <InvoicePDFDocument
@@ -1156,19 +1761,59 @@ export const InvoiceForm: React.FC = () => {
     form.setValue("legal_entity_id", selected?.id as never);
     form.trigger("legal_entity_id");
 
+    const sellerRegionId =
+      selected.default_tax_region_id ||
+      selected.default_tax_region?.id ||
+      null;
+    const baseCurrencyId = resolveBaseCurrencyId(selected);
+
     setFormData((prev) => ({
       ...prev,
       legal_entity_id: selected.id,
       legalEntityData: selectedValueObj,
+      seller_tax_region_id: sellerRegionId || prev.seller_tax_region_id,
+      baseCurrencyId: baseCurrencyId || prev.baseCurrencyId,
+      ...(prev.currency_id
+        ? {}
+        : {
+            currency_id: baseCurrencyId,
+            currencyData: selected.currency
+              ? { item: selected.currency, id: baseCurrencyId }
+              : prev.currencyData,
+            exchange_rate: 1,
+          }),
     }));
     setLegalEntity(selectedValueObj);
+
+    // Load GSTIN + country pack + zero-rated group in background (dropdown init is sync)
+    void (async () => {
+      const [sellerRegistration, taxCountryPack] = await Promise.all([
+        fetchPrimaryPartyTaxRegistration("entity", selected.id),
+        fetchEntityTaxPack(selected.id),
+      ]);
+      const zeroRatedTaxGroup = await fetchZeroRatedTaxGroup(taxCountryPack);
+      setFormData((prev) => ({
+        ...prev,
+        sellerRegistration,
+        taxCountryPack: taxCountryPack || prev.taxCountryPack,
+        zeroRatedTaxGroup: zeroRatedTaxGroup ?? prev.zeroRatedTaxGroup,
+        seller_tax_region_id:
+          sellerRegionId || prev.seller_tax_region_id,
+      }));
+      if (!didUserEditExchangeRateRef.current) {
+        await applyLatestExchangeRate({
+          currencyId: baseCurrencyId,
+          baseCurrencyId,
+          invoiceDate: formData.invoice_date,
+          forceRefresh: true,
+          persist: !!id,
+        });
+      }
+    })();
 
     // Try to set currency immediately (if dropdown payload includes it)
     const candidate =
       selected?.currency?.code ||
-      selected?.currency?.code ||
-      selected?.currency?.code ||
-      selected?.code ||
       selected?.code;
     if (typeof candidate === "string" && candidate) {
       setInvoiceCurrencyCode(candidate);
@@ -1239,21 +1884,22 @@ export const InvoiceForm: React.FC = () => {
     navigate("/sales/invoices");
   };
 
-  // Currency for totals/PDF should come from the selected legal entity.
-  // If not present in the dropdown payload, we resolve it via `organization_view` using `legal_entity_id`.
+  // Display currency: invoice currency first, else LE base.
   useEffect(() => {
     let cancelled = false;
 
+    const fromInvoice =
+      formData.currencyData?.item?.code ||
+      formData.currencyData?.code ||
+      initialValues?.currency?.code;
+    if (typeof fromInvoice === "string" && fromInvoice) {
+      setInvoiceCurrencyCode(fromInvoice);
+      return;
+    }
+
     const candidate =
       formData.legalEntityData?.item?.currency?.code ||
-      formData.legalEntityData?.item?.currency?.code ||
-      formData.legalEntityData?.item?.currency?.code ||
-      formData.legalEntityData?.item?.code ||
-      formData.legalEntityData?.item?.code ||
       legalEntity?.item?.currency?.code ||
-      legalEntity?.item?.currency?.code ||
-      legalEntity?.item?.currency?.code ||
-      legalEntity?.item?.code ||
       legalEntity?.item?.code;
 
     if (typeof candidate === "string" && candidate) {
@@ -1265,7 +1911,6 @@ export const InvoiceForm: React.FC = () => {
       formData.legal_entity_id || initialValues?.legal_entity_id;
 
     if (!selectedLegalEntityId) {
-      // Never pass `undefined` into `currencyUtils.getCurrencyInfo()`
       setInvoiceCurrencyCode("INR");
       return;
     }
@@ -1277,21 +1922,13 @@ export const InvoiceForm: React.FC = () => {
           selectedLegalEntityId,
           "entity_view",
         );
-        const org = res?.data;
-
-        const code =
-          org?.currency?.code ||
-          org?.currency?.code ||
-          org?.currency?.code ||
-          org?.code ||
-          org?.code;
-
+        const code = res?.data?.currency?.code;
         if (!cancelled) {
           setInvoiceCurrencyCode(
             typeof code === "string" && code ? code : "INR",
           );
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) setInvoiceCurrencyCode("INR");
       }
     };
@@ -1302,15 +1939,20 @@ export const InvoiceForm: React.FC = () => {
       cancelled = true;
     };
   }, [
+    formData.currency_id,
+    formData.currencyData,
     formData.legal_entity_id,
     formData.legalEntityData,
     legalEntity,
     initialValues?.legal_entity_id,
+    initialValues?.currency?.code,
   ]);
 
   const invoiceCurrencySymbol = currencyUtils.getCurrencyInfo(
     invoiceCurrencyCode,
   ).symbol;
+  const taxPack = resolveTaxPack(formData.taxCountryPack);
+  const showStructuredTax = taxPack.id !== "GENERIC";
 
   const getFormTitle = () =>
     id ? "Edit Invoice" : "New Invoice";
@@ -1405,9 +2047,27 @@ export const InvoiceForm: React.FC = () => {
                               }
                               onSelectItem={handleCustomerSelectChange}
                               onClear={handleLegalEntitySelectClear}
+                              createOptionLabel="+ Add new customer"
+                              onCreateNew={() => setCustomerCreateOpen(true)}
                               limit="10"
                               searchParams="customer_name"
                               type="customers"
+                            />
+                            <QuickCustomerCreateDialog
+                              open={customerCreateOpen}
+                              onOpenChange={setCustomerCreateOpen}
+                              onCreated={async (customerRow) => {
+                                await handleCustomerSelectChange(
+                                  "customer_id",
+                                  "id",
+                                  {
+                                    id: customerRow.id,
+                                    customer_name: customerRow.customer_name,
+                                    item: customerRow,
+                                  },
+                                  [],
+                                );
+                              }}
                             />
                           </div>
                           <div className="space-y-2">
@@ -1450,19 +2110,38 @@ export const InvoiceForm: React.FC = () => {
                               instanceSourceKey="payment_terms_id"
                               instanceKey="id"
                               instanceLabel="payment_terms"
-                              instanceValue={initialValues?.payment_terms || ''}
+                              instanceValue={
+                                formData.paymentTermsData?.item ||
+                                initialValues?.payment_terms ||
+                                ""
+                              }
                               onSelectItem={(sourceKey, key, value) => {
                                 form.setValue(sourceKey, value[key]);
-                                handleInputChange('payment_terms_id', value[key]);
+                                const days =
+                                  value?.item?.no_of_days != null
+                                    ? Number(value.item.no_of_days)
+                                    : null;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  payment_terms_id: value[key],
+                                  paymentTermsData: value,
+                                  paymentTermsDays: days,
+                                }));
                                 if (id) {
-                                  handleFieldUpdate('payment_terms_id', value[key]);
+                                  handleFieldUpdate("payment_terms_id", value[key]);
                                 }
                               }}
                               onClear={(sourceKey) => {
-                                form.setValue(sourceKey, '');
-                                handleInputChange('payment_terms_id', '');
+                                form.setValue(sourceKey, "");
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  payment_terms_id: "",
+                                  paymentTermsData: null,
+                                  paymentTermsDays: null,
+                                }));
                                 if (id) {
-                                  handleFieldUpdate('payment_terms_id', '');
+                                  // Empty string fails Prisma FK update; null clears cleanly
+                                  handleFieldUpdate("payment_terms_id", null);
                                 }
                               }}
                               limit="10"
@@ -1493,6 +2172,68 @@ export const InvoiceForm: React.FC = () => {
                               searchParams="location"
                             />
                           </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              Currency
+                            </Label>
+                            <SearchDropDown
+                              instanceType="currency"
+                              instanceSourceKey="currency_id"
+                              instanceKey="id"
+                              instanceLabel="code"
+                              instanceValue={
+                                formData.currencyData?.item ||
+                                initialValues?.currency
+                              }
+                              onSelectItem={handleCurrencySelectChange}
+                              onClear={handleCurrencyClear}
+                              limit="20"
+                              searchParams="code"
+                              type="invoice"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="exchange_rate"
+                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Exchange Rate
+                            </Label>
+                            <Input
+                              id="exchange_rate"
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="1"
+                              value={
+                                formData.exchange_rate == null
+                                  ? ""
+                                  : String(formData.exchange_rate)
+                              }
+                              onChange={(e) => {
+                                didUserEditExchangeRateRef.current = true;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  exchange_rate: e.target.value,
+                                }));
+                              }}
+                              onBlur={() => {
+                                const n = Number(formData.exchange_rate);
+                                const rate =
+                                  Number.isFinite(n) && n > 0 ? n : 1;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  exchange_rate: rate,
+                                }));
+                                if (id) {
+                                  handleFieldUpdate("exchange_rate", rate);
+                                }
+                              }}
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                              Latest rate to LE base currency; editable.
+                            </p>
+                          </div>
                           <div className="space-y-2 md:col-span-2">
                             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               Customer Address
@@ -1513,6 +2254,91 @@ export const InvoiceForm: React.FC = () => {
                               rows={3}
                             />
                           </div>
+                          {showStructuredTax ? (
+                            <>
+                              <div className="space-y-2">
+                                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  {taxPack.regionLabel}
+                                </Label>
+                                <SearchDropDown
+                                  instanceType="tax_region"
+                                  instanceSourceKey="tax_region_id"
+                                  instanceKey="id"
+                                  instanceLabel="name"
+                                  instanceValue={
+                                    formData.tax_region_id
+                                      ? formData.taxRegionData?.item ||
+                                        initialValues?.tax_region || {
+                                          id: formData.tax_region_id,
+                                          name:
+                                            formData.taxRegionData?.name ||
+                                            formData.tax_region_id,
+                                        }
+                                      : undefined
+                                  }
+                                  onSelectItem={handlePlaceOfSupplyChange}
+                                  onClear={() => {
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      tax_region_id: null,
+                                      taxRegionData: null,
+                                    }));
+                                    if (id) {
+                                      handleFieldUpdate("tax_region_id", null);
+                                    }
+                                    void resyncLineTaxGroups({
+                                      sellerRegionId: formData.seller_tax_region_id,
+                                      placeOfSupplyId: null,
+                                      items: formData.items,
+                                    });
+                                  }}
+                                  limit="20"
+                                  searchParams="name"
+                                  type="tax_region"
+                                  additionalFilters={
+                                    taxPack.id === "IN"
+                                      ? { country_code: { eq: "IN" } }
+                                      : taxPack.id === "CA"
+                                        ? { country_code: { eq: "CA" } }
+                                        : undefined
+                                  }
+                                />
+                                <p className="text-[11px] text-muted-foreground">
+                                  Defaults from the customer&apos;s tax region;
+                                  override anytime (independent of bill-to
+                                  address).
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Seller {taxPack.registrationLabel}
+                                </Label>
+                                <Input
+                                  readOnly
+                                  value={
+                                    formData.sellerRegistration
+                                      ?.registration_number || ""
+                                  }
+                                  placeholder={`No ${taxPack.registrationLabel} on file`}
+                                  className="h-10 border-border/70 bg-muted/30"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Buyer {taxPack.registrationLabel}
+                                </Label>
+                                <Input
+                                  readOnly
+                                  value={
+                                    formData.buyerRegistration
+                                      ?.registration_number || ""
+                                  }
+                                  placeholder={`No ${taxPack.registrationLabel} on file`}
+                                  className="h-10 border-border/70 bg-muted/30"
+                                />
+                              </div>
+                            </>
+                          ) : null}
                          
                         </div>
                       </div>
@@ -1569,6 +2395,22 @@ export const InvoiceForm: React.FC = () => {
                               placeholder="Invoice Date"
                             />
                           </div>
+                          <div className="space-y-2">
+                            <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Due Date
+                            </Label>
+                            <Input
+                              readOnly
+                              value={
+                                computeDueDate(
+                                  formData.invoice_date,
+                                  formData.paymentTermsDays,
+                                ) || ""
+                              }
+                              placeholder="Select date & payment terms"
+                              className="h-10 border-border/70 bg-muted/30"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1586,6 +2428,9 @@ export const InvoiceForm: React.FC = () => {
                     adjustableLabel={formData.adjustable_label ?? "Adjustable"}
                     adjustableValue={formData.adjustable_value ?? 0}
                     isAddingItem={isAddingItem}
+                    taxGroupLabel={taxPack.taxGroupLabel}
+                    classificationLabel={taxPack.classificationLabel}
+                    showStructuredTax={showStructuredTax}
                     onAddItem={addItem}
                     onItemChange={handleItemChange}
                     onItemBlur={handleItemBlur}
@@ -1615,6 +2460,7 @@ export const InvoiceForm: React.FC = () => {
                     }}
                     onProductSelectChange={handleProductSelectChange}
                     onProductSelectClear={handleProductSelectClear}
+                    onTaxGroupSelect={handleTaxGroupSelect}
                   />
 
                   {/* Zoho-style Notes, Terms and Attachments */}

@@ -146,7 +146,16 @@ export const agentAPI = {
     formData.append('file', file);
     if (prompt) formData.append('prompt', prompt);
     if (context) formData.append('context', JSON.stringify(context));
-    return uploadAPI('/api/agent/extract', { method: 'POST', body: formData });
+    // Client-side safety net: backend also enforces AGENT_STREAM_TIMEOUT_MS.
+    // Keep FE slightly above backend default (120s) so server can return a clean error first.
+    const controller = new AbortController();
+    const timeoutMs = 150_000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return uploadAPI('/api/agent/extract', {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
   },
 
   /** Reassign attachments from one instance to another (generic). */

@@ -1,0 +1,82 @@
+{
+  "id": "view_party_tax_reg_001",
+  "name": "party_tax_registration_view",
+  "model_name": "party_tax_registration",
+  "description": "Party tax registrations (GSTIN, BN, etc.)",
+  "data_graph": {
+    "id": { "datatype": "string", "permission": "read" },
+    "party_type": {
+      "required": true,
+      "permission": "update",
+      "tableProps": { "width": "140", "columnType": "text", "defaultValue": "customer" },
+      "displayName": "Party Type",
+      "isColumnShow": true
+    },
+    "party_id": {
+      "required": true,
+      "permission": "update",
+      "tableProps": { "width": "200", "columnType": "text", "defaultValue": "" },
+      "displayName": "Party Id",
+      "isColumnShow": true
+    },
+    "scheme": {
+      "required": true,
+      "permission": "update",
+      "tableProps": { "width": "140", "columnType": "text", "defaultValue": "" },
+      "displayName": "Scheme",
+      "searchProps": { "isSearch": true, "operation": "startswith" },
+      "isColumnShow": true
+    },
+    "registration_number": {
+      "required": true,
+      "permission": "update",
+      "tableProps": { "width": "220", "columnType": "text", "defaultValue": "" },
+      "displayName": "Registration Number",
+      "searchProps": { "isSearch": true, "operation": "startswith" },
+      "isColumnShow": true
+    },
+    "tax_region_id": {
+      "datatype": "string",
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "tax_region",
+          "limit": "20",
+          "instanceKey": "id",
+          "instanceType": "tax_region",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "tax_region_id"
+        }
+      },
+      "listProps": { "type": "text", "recordPath": "tax_region.name" },
+      "displayName": "Tax Region",
+      "isColumnShow": true
+    },
+    "is_primary": {
+      "datatype": "boolean",
+      "permission": "update",
+      "tableProps": { "width": "100", "columnType": "boolean", "defaultValue": "true" },
+      "displayName": "Primary",
+      "isColumnShow": true
+    },
+    "effective_from": {
+      "datatype": "date",
+      "permission": "update",
+      "tableProps": { "width": "160", "columnType": "date" },
+      "displayName": "Effective From",
+      "isColumnShow": false
+    },
+    "effective_to": {
+      "datatype": "date",
+      "permission": "update",
+      "tableProps": { "width": "160", "columnType": "date" },
+      "displayName": "Effective To",
+      "isColumnShow": false
+    }
+  },
+  "org_id": "system",
+  "created_by": null,
+  "modified_by": null
+}

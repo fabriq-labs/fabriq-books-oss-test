@@ -116,6 +116,28 @@
       "displayName": "Tax Master",
       "isColumnShow": false
     },
+    "tax_group": {
+      "select": {
+        "id": "read",
+        "name": "read",
+        "code": "read"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Tax Group",
+      "isColumnShow": false
+    },
+    "tax_group_interstate": {
+      "select": {
+        "id": "read",
+        "name": "read",
+        "code": "read"
+      },
+      "dataType": "table",
+      "required": false,
+      "displayName": "Interstate Tax Group",
+      "isColumnShow": false
+    },
     "unit_price": {
       "datatype": "float",
       "required": false,
@@ -208,6 +230,87 @@
         "recordPath": "tax_master.tax_rate"
       },
       "displayName": "Tax Master",
+      "isColumnShow": false
+    },
+    "tax_group_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "tax_group",
+          "limit": "20",
+          "instanceKey": "id",
+          "instanceType": "tax_group",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "tax_group_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "tax_group.name"
+      },
+      "displayName": "Tax Group",
+      "isColumnShow": true
+    },
+    "tax_group_interstate_id": {
+      "datatype": "string",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "tax_group",
+          "limit": "20",
+          "instanceKey": "id",
+          "instanceType": "tax_group",
+          "searchParams": "name",
+          "instanceLabel": "name",
+          "instanceSourceKey": "tax_group_interstate_id"
+        },
+        "defaultValue": ""
+      },
+      "listProps": {
+        "type": "text",
+        "recordPath": "tax_group_interstate.name"
+      },
+      "displayName": "Interstate Tax Group",
+      "isColumnShow": true
+    },
+    "classification_code": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "160",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Classification Code",
+      "isColumnShow": true
+    },
+    "classification_scheme": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "120",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Classification Scheme",
+      "isColumnShow": true
+    },
+    "item_tax_category": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "120",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Tax Category",
       "isColumnShow": false
     },
     "item_shortname": {

@@ -36,6 +36,7 @@ const itemMasterSchema = z.object({
 
     status: z.string().min(1, { message: 'Status is required' }),
     geo: z.string().min(1, { message: 'Geo is required' }),
+    component_type: z.string().optional(),
 });
 
 type ItemMasterValues = z.infer<typeof itemMasterSchema>;
@@ -66,6 +67,7 @@ export const TaxMasterForm: React.FC<ItemMasterFormProps> = (
             tax_rate: '',
             status: '',
             geo: '',
+            component_type: '',
             effective_from: undefined,
             expires_on: undefined,
         },
@@ -87,6 +89,7 @@ export const TaxMasterForm: React.FC<ItemMasterFormProps> = (
                     geo: res.data.geo || '',
                     tax_rate: res.data.tax_rate?.toString() || '',
                     status: res.data.status || '',
+                    component_type: res.data.component_type || '',
                     effective_from: res.data.effective_from ? new Date(res.data.effective_from) : undefined,
                     expires_on: res.data.expires_on ? new Date(res.data.expires_on) : undefined,
                 });
@@ -254,6 +257,36 @@ export const TaxMasterForm: React.FC<ItemMasterFormProps> = (
                                                 <FormControl>
                                                     <Input placeholder="Enter Geo" {...field} />
                                                 </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="component_type"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Component Type</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value || undefined}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Optional (cgst, sgst, igst, gst, hst…)" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="cgst">cgst</SelectItem>
+                                                        <SelectItem value="sgst">sgst</SelectItem>
+                                                        <SelectItem value="igst">igst</SelectItem>
+                                                        <SelectItem value="gst">gst</SelectItem>
+                                                        <SelectItem value="hst">hst</SelectItem>
+                                                        <SelectItem value="pst">pst</SelectItem>
+                                                        <SelectItem value="qst">qst</SelectItem>
+                                                        <SelectItem value="vat">vat</SelectItem>
+                                                        <SelectItem value="sales_tax">sales_tax</SelectItem>
+                                                        <SelectItem value="cess">cess</SelectItem>
+                                                        <SelectItem value="other">other</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                                 <FormMessage />
                                             </FormItem>
                                         )}

@@ -241,9 +241,9 @@ ORDER BY created_at DESC LIMIT 1;
 
 **Fix**
 
-1. Ensure `APP_NAME` in your `.env` matches the `app_name` column in `prompt_template` rows.
-2. If templates are missing, run `seed-agent-templates.sql` against the target database.
-3. If using `USE_LOCAL_PROMPT=true`, verify the local `.txt` prompt files exist in `backend/prisma/metadata/prompt-templates/`.
+1. Ensure `APP_NAME` in your `.env` matches the `app_name` column in `prompt_template` rows (seeded Books prompts use `fabriq_books`).
+2. If templates are missing, run `seed-agent-templates.sql` / sync metadata against the target database (bill upload needs `prompt_type=invoice_extractor` on `invoice_view`).
+3. If using `USE_LOCAL_PROMPT=true`, verify the local `.txt` prompt files exist in `backend/prisma/metadata/prompt-templates/`. Filename prompt types may contain underscores (`invoice_extractor`); app filtering uses JSON `app_name`, which must equal `APP_NAME`.
 
 **Files to change**
 - `backend/.env` — verify `APP_NAME` value

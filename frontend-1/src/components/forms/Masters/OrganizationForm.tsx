@@ -15,13 +15,31 @@ import { viewAPI } from '@/api/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from '@/contexts/AuthContext';
 import { HQAccountMappingTab } from './HQAccountMappingTab';
+import { TaxRegistrationsTab } from './TaxRegistrationsTab';
+
+const ENTITY_TAX_SETTINGS_VIEW = 'entity_tax_settings_view';
 
 const FINANCIAL_YEAR_OPTIONS = [
   { value: 'APR_MAR', label: 'April – March (India / UK)' },
   { value: 'JAN_DEC', label: 'January – December (Calendar Year)' },
   { value: 'JUL_JUN', label: 'July – June (Australia)' },
   { value: 'OCT_SEP', label: 'October – September' },
+] as const;
+
+const TAX_TREATMENT_OPTIONS = [
+  { value: 'registered', label: 'Registered' },
+  { value: 'export', label: 'Export / overseas' },
+  { value: 'sez', label: 'SEZ' },
+  { value: 'composition', label: 'Composition' },
+  { value: 'unregistered', label: 'Unregistered' },
+] as const;
+
+const TAX_COUNTRY_PACK_OPTIONS = [
+  { value: 'IN', label: 'India (GST)' },
+  { value: 'CA', label: 'Canada (GST/HST/PST)' },
+  { value: 'GENERIC', label: 'Generic' },
 ] as const;
 
 const organizationSchema = z.object({
@@ -39,6 +57,9 @@ const organizationSchema = z.object({
   basecurrency_id: z.string().optional(),
   is_individual: z.string().optional(),
   financial_year_type: z.enum(['APR_MAR', 'JAN_DEC', 'JUL_JUN', 'OCT_SEP']).optional(),
+  tax_country_pack: z.enum(['IN', 'CA', 'GENERIC']),
+  tax_treatment: z.string().optional(),
+  default_tax_region_id: z.string().optional().nullable(),
 });
 
 type OrganizationFormValues = z.infer<typeof organizationSchema>;
@@ -50,12 +71,27 @@ interface ItemMasterFormProps {
   isSubmitting?: boolean;
 }
 
+async function findEntityTaxSettings(legalEntityId: string): Promise<any | null> {
+  const res: any = await viewAPI.search(
+    'entity_tax_settings',
+    ENTITY_TAX_SETTINGS_VIEW,
+    1,
+    1,
+    undefined,
+    { legal_entity_id: { eq: legalEntityId } },
+  );
+  const rows = res?.data || [];
+  return rows[0] || null;
+}
+
 export const OrganizationForm: React.FC<ItemMasterFormProps> = () => {
   const { id, viewId } = useParams<{ id: string; viewId: string }>();
   const [initialValues, setInitialValues] = useState<any>();
+  const [entityTaxSettingsId, setEntityTaxSettingsId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<OrganizationFormValues>({
@@ -74,61 +110,153 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = () => {
       is_it_a_groupcompany: '',
       is_individual: '',
       financial_year_type: undefined,
+      tax_country_pack: 'GENERIC',
+      tax_treatment: '',
+      default_tax_region_id: null,
     },
   });
 
+  const taxCountryPack = form.watch('tax_country_pack');
+  const taxRegionFilters =
+    taxCountryPack === 'IN' || taxCountryPack === 'CA'
+      ? { country_code: { eq: taxCountryPack } }
+      : undefined;
+
   useEffect(() => {
-    if (id) fetchingDetails(id);
+    if (id) void fetchingDetails(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const fetchingDetails = (id: string) => {
+  const fetchingDetails = async (entityId: string) => {
     setIsLoading(true);
-    viewAPI.getById("entity", id, viewId)
-      .then((res: any) => {
-        setInitialValues(res.data);
-        form.reset({
-          organization_name: res.data.organization_name || '',
-          legal_name: res.data.legal_name || '',
-          address: res.data.address || '',
-          city: res.data.city || '',
-          state: res.data.state || '',
-          country: res.data.country || '',
-          zip_code: res.data.zip_code || '',
-          website: res.data.website || '',
-          basecurrency_id: res.data.basecurrency_id || '',
-          is_it_headquartres: res.data.is_it_headquartres || '',
-          is_it_a_groupcompany: res.data.is_it_a_groupcompany || '',
-          is_individual: res.data.is_individual != null ? String(res.data.is_individual) : '',
-          financial_year_type: res.data.financial_year_type || undefined,
-        });
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setIsLoading(false);
-        console.log(err);
+    try {
+      const res: any = await viewAPI.getById('entity', entityId, viewId);
+      let pack: 'IN' | 'CA' | 'GENERIC' = 'GENERIC';
+      try {
+        const settings = await findEntityTaxSettings(entityId);
+        if (settings?.id) {
+          setEntityTaxSettingsId(settings.id);
+          const raw = String(settings.tax_country_pack || 'GENERIC').toUpperCase();
+          if (raw === 'IN' || raw === 'CA' || raw === 'GENERIC') pack = raw;
+        } else {
+          setEntityTaxSettingsId(null);
+        }
+      } catch {
+        setEntityTaxSettingsId(null);
+      }
+
+      setInitialValues(res.data);
+      form.reset({
+        organization_name: res.data.organization_name || '',
+        legal_name: res.data.legal_name || '',
+        address: res.data.address || '',
+        city: res.data.city || '',
+        state: res.data.state || '',
+        country: res.data.country || '',
+        zip_code: res.data.zip_code || '',
+        website: res.data.website || '',
+        basecurrency_id: res.data.basecurrency_id || '',
+        is_it_headquartres: res.data.is_it_headquartres || '',
+        is_it_a_groupcompany: res.data.is_it_a_groupcompany || '',
+        is_individual: res.data.is_individual != null ? String(res.data.is_individual) : '',
+        financial_year_type: res.data.financial_year_type || undefined,
+        tax_country_pack: pack,
+        tax_treatment: res.data.tax_treatment || '',
+        default_tax_region_id: res.data.default_tax_region_id || null,
       });
+    } catch (err) {
+      console.log(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const upsertEntityTaxSettings = async (
+    legalEntityId: string,
+    orgId: string,
+    pack: 'IN' | 'CA' | 'GENERIC',
+  ) => {
+    const payload = {
+      legal_entity_id: legalEntityId,
+      org_id: orgId,
+      tax_country_pack: pack,
+      enable_tax_responsibility: pack === 'IN',
+    };
+
+    let settingsId = entityTaxSettingsId;
+    if (!settingsId) {
+      const existing = await findEntityTaxSettings(legalEntityId);
+      settingsId = existing?.id || null;
+    }
+
+    if (settingsId) {
+      await viewAPI.update(
+        'entity_tax_settings',
+        settingsId,
+        ENTITY_TAX_SETTINGS_VIEW,
+        payload,
+      );
+      setEntityTaxSettingsId(settingsId);
+    } else {
+      const created: any = await viewAPI.create(
+        'entity_tax_settings',
+        ENTITY_TAX_SETTINGS_VIEW,
+        payload,
+      );
+      setEntityTaxSettingsId(created?.data?.id || created?.id || null);
+    }
   };
 
   const handleSubmit = async (data: OrganizationFormValues) => {
     try {
       setIsSubmitting(true);
+      const { tax_country_pack, ...entityFields } = data;
       const submissionData = {
-        ...data,
+        ...entityFields,
         basecurrency_id: data.basecurrency_id || undefined,
-        is_individual: data.is_individual === 'true' ? true : data.is_individual === 'false' ? false : undefined,
+        is_individual:
+          data.is_individual === 'true'
+            ? true
+            : data.is_individual === 'false'
+              ? false
+              : undefined,
         financial_year_type: data.financial_year_type || undefined,
+        tax_treatment: data.tax_treatment || null,
+        default_tax_region_id: data.default_tax_region_id || null,
       };
 
-      if (!id) {
-        await viewAPI.create("entity", viewId, submissionData);
-        toast({ title: "Success", description: "Entity created successfully" });
+      let legalEntityId = id;
+      let orgId = initialValues?.org_id || user?.org_id || '';
+
+      if (!legalEntityId) {
+        const created: any = await viewAPI.create('entity', viewId, submissionData);
+        legalEntityId = created?.data?.id || created?.id;
+        orgId = created?.data?.org_id || orgId;
+        if (!legalEntityId) {
+          throw new Error('Entity created but id was not returned');
+        }
       } else {
-        await viewAPI.update("entity", id, viewId, submissionData);
-        toast({ title: "Success", description: "Entity updated successfully" });
+        await viewAPI.update('entity', legalEntityId, viewId, submissionData);
+        orgId = initialValues?.org_id || orgId;
       }
+
+      if (!orgId) {
+        throw new Error('Missing tenant org_id for tax settings');
+      }
+
+      await upsertEntityTaxSettings(legalEntityId, orgId, tax_country_pack);
+
+      toast({
+        title: 'Success',
+        description: id ? 'Entity updated successfully' : 'Entity created successfully',
+      });
       navigate('/masters/entity');
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "Something went wrong" });
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Something went wrong',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -140,13 +268,14 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = () => {
   };
 
   const handleSelectClear = (sourceKey: any) => {
-    form.setValue(sourceKey, '');
+    form.setValue(sourceKey, sourceKey === 'default_tax_region_id' ? null : '');
   };
 
   const handleCancel = () => navigate('/masters/entity');
 
   const isSubEntity = initialValues?.is_it_headquartres !== 'Yes';
-  const showTabs = id && isSubEntity;
+  /** Tabs whenever editing an existing LE (tax regs for HQ + branches; HQ mapping for branches). */
+  const showTabs = !!id;
 
   const loadingSkeleton = (
     <div className="space-y-6">
@@ -275,6 +404,70 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = () => {
               </Select>
               <FormMessage /></FormItem>
           )} />
+
+          <FormField control={form.control} name="tax_country_pack" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tax country pack <span className="text-red-500">*</span></FormLabel>
+              <Select
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  // Region catalog is pack-scoped; clear stale selection on pack change.
+                  form.setValue('default_tax_region_id', null);
+                  setInitialValues((prev: any) =>
+                    prev ? { ...prev, default_tax_region: null, default_tax_region_id: null } : prev,
+                  );
+                }}
+                value={field.value}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select tax country pack" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {TAX_COUNTRY_PACK_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Controls GSTIN/region labels and which tax regions appear for this legal entity.
+              </p>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <FormField control={form.control} name="tax_treatment" render={({ field }) => (
+            <FormItem><FormLabel>Tax treatment</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select tax treatment" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {TAX_TREATMENT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage /></FormItem>
+          )} />
+
+          <FormField control={form.control} name="default_tax_region_id" render={() => (
+            <FormItem><FormLabel>Default tax region</FormLabel>
+              <SearchDropDown
+                key={`default-tax-region-${taxCountryPack}`}
+                instanceType="tax_region"
+                instanceSourceKey="default_tax_region_id"
+                instanceKey="id"
+                instanceLabel="name"
+                instanceValue={initialValues?.default_tax_region}
+                onSelectItem={handleSelectChange}
+                onClear={() => handleSelectClear('default_tax_region_id')}
+                limit="20"
+                searchParams="name"
+                type="entity"
+                additionalFilters={taxRegionFilters}
+              />
+              <FormMessage /></FormItem>
+          )} />
         </div>
 
         <div className="flex justify-end space-x-2">
@@ -304,7 +497,10 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = () => {
         <Tabs defaultValue="details" className="w-full">
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="hq-mapping">HQ Account Mapping</TabsTrigger>
+            <TabsTrigger value="tax-registrations">Tax Registrations</TabsTrigger>
+            {isSubEntity && (
+              <TabsTrigger value="hq-mapping">HQ Account Mapping</TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="details">
             <Card>
@@ -312,13 +508,33 @@ export const OrganizationForm: React.FC<ItemMasterFormProps> = () => {
               <CardContent>{formContent}</CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="hq-mapping">
+          <TabsContent value="tax-registrations">
             {id ? (
-              <HQAccountMappingTab organizationId={id} orgId={initialValues?.org_id || ''} />
+              <TaxRegistrationsTab
+                partyType="entity"
+                partyId={id}
+                orgId={initialValues?.org_id || ''}
+                packLegalEntityId={id}
+              />
             ) : (
-              <Card><CardContent><div className="text-center py-8 text-muted-foreground">Organization ID is required</div></CardContent></Card>
+              <Card>
+                <CardContent>
+                  <div className="text-center py-8 text-muted-foreground">
+                    Save the legal entity first, then add tax registrations.
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
+          {isSubEntity && (
+            <TabsContent value="hq-mapping">
+              {id ? (
+                <HQAccountMappingTab organizationId={id} orgId={initialValues?.org_id || ''} />
+              ) : (
+                <Card><CardContent><div className="text-center py-8 text-muted-foreground">Organization ID is required</div></CardContent></Card>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       ) : (
         <Card>

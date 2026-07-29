@@ -19,6 +19,7 @@ export const extractInvoicePDFData = (data: any): any => {
   return {
     invoice_number: data.invoice_number,
     invoice_date: data.invoice_date,
+    due_date: data.due_date,
     items: Array.isArray(data.items)
       ? data.items.map((item: any) => ({
         product: item.product,
@@ -31,6 +32,10 @@ export const extractInvoicePDFData = (data: any): any => {
         item_description: item.item_description,
         discount_rate: item.discount_rate,
         discount_amount: item.discount_amount,
+        classification_code: item.classification_code,
+        classification_scheme: item.classification_scheme,
+        tax_group_name: item.tax_group_name,
+        tax_components: item.tax_components || [],
       }))
       : [],
     subTotal: data.subTotal,
@@ -45,6 +50,11 @@ export const extractInvoicePDFData = (data: any): any => {
     adjustable_value: data.adjustable_value,
     adjustable_label: data.adjustable_label,
     bill_to: data.bill_to,
+    sellerRegistration: data.sellerRegistration,
+    buyerRegistration: data.buyerRegistration,
+    taxRegionName: data.taxRegionName,
+    registrationLabel: data.registrationLabel || "Tax registration",
+    regionLabel: data.regionLabel || "Place of Supply",
   };
 };
 
@@ -295,6 +305,22 @@ const InvoicePDF = ({
     );
   const showAdjustment = adjustableValue !== 0;
 
+  const registrationLabel = invoice?.registrationLabel || "Tax registration";
+  const sellerRegNo = invoice?.sellerRegistration?.registration_number;
+  const buyerRegNo = invoice?.buyerRegistration?.registration_number;
+  const taxRegionName = invoice?.taxRegionName;
+
+  const componentSummary = items.reduce(
+    (acc: Record<string, number>, item: any) => {
+      for (const c of item?.tax_components || []) {
+        const key = (c.component_type || c.tax_name || "Tax").toUpperCase();
+        acc[key] = (acc[key] || 0) + Number(c.amount || 0);
+      }
+      return acc;
+    },
+    {},
+  );
+
   const customerAddress =
     invoice?.bill_to ||
     customer?.item?.customer_address ||
@@ -303,7 +329,27 @@ const InvoicePDF = ({
 
   // Use actual tax percentage from form data
   const getTaxPercentage = (item: any) => {
+    if (item?.tax_components?.length) {
+      return item.tax_components.reduce(
+        (sum: number, c: any) => sum + (Number(c.rate) || 0),
+        0,
+      );
+    }
     return Number(item?.tax || 0);
+  };
+
+  const getTaxAmount = (item: any) => {
+    if (item?.tax_components?.length) {
+      return item.tax_components.reduce(
+        (sum: number, c: any) => sum + (Number(c.amount) || 0),
+        0,
+      );
+    }
+    const taxPercent = getTaxPercentage(item);
+    return (
+      (Number(item?.price || 0) * Number(item?.quantity || 0) * taxPercent) /
+      100
+    );
   };
 
   return (
@@ -331,6 +377,11 @@ const InvoicePDF = ({
             {legalEntity?.item?.website ? (
               <Text style={styles.companyAddress}>{legalEntity.item.website}</Text>
             ) : null}
+            {sellerRegNo ? (
+              <Text style={styles.gstin}>
+                {registrationLabel}: {sellerRegNo}
+              </Text>
+            ) : null}
           </View>
           <View style={styles.invoiceInfo}>
             <Text style={styles.invoiceTitle}>INVOICE</Text>
@@ -343,6 +394,16 @@ const InvoicePDF = ({
                 ? moment(invoice.invoice_date).format("DD-MM-YYYY")
                 : ""}
             </Text>
+            {invoice?.due_date ? (
+              <Text style={styles.invoice_date}>
+                Due Date: {invoice.due_date}
+              </Text>
+            ) : null}
+            {taxRegionName ? (
+              <Text style={styles.invoice_date}>
+                {invoice?.regionLabel || "Place of Supply"}: {taxRegionName}
+              </Text>
+            ) : null}
           </View>
         </View>
 
@@ -366,6 +427,11 @@ const InvoicePDF = ({
                 .filter(Boolean)
                 .join(", ")}
             </Text>
+            {buyerRegNo ? (
+              <Text style={styles.gstin}>
+                {registrationLabel}: {buyerRegNo}
+              </Text>
+            ) : null}
           </View>
           <View style={styles.shipTo}>
             <Text style={styles.sectionTitle}>Ship To:</Text>
@@ -423,7 +489,7 @@ const InvoicePDF = ({
                 styles.tableHeaderCell,
               ]}
             >
-              <Text>IGST (%)</Text>
+              <Text>Tax (%)</Text>
             </View>
             <View
               style={[
@@ -432,7 +498,7 @@ const InvoicePDF = ({
                 styles.tableHeaderCell,
               ]}
             >
-              <Text>IGST Amt</Text>
+              <Text>Tax Amt</Text>
             </View>
             {showDiscount ? (
               <>
@@ -471,14 +537,11 @@ const InvoicePDF = ({
           {items.length > 0 ? (
             items.map((item: any, idx: number) => {
               const taxPercent = getTaxPercentage(item);
-              const taxAmount =
-                (Number(item?.price || 0) *
-                  Number(item?.quantity || 0) *
-                  taxPercent) /
-                100;
+              const taxAmount = getTaxAmount(item);
               const itemTotal =
+                Number(item?.total) ||
                 Number(item?.price || 0) * Number(item?.quantity || 0) +
-                taxAmount;
+                  taxAmount;
 
               return (
                 <View
@@ -497,6 +560,12 @@ const InvoicePDF = ({
                         {item.item_description}
                       </Text>
                     )}
+                    {item?.classification_code ? (
+                      <Text style={{ color: "#000000", marginTop: 2 }}>
+                        {item.classification_scheme || "HSN"}:{" "}
+                        {item.classification_code}
+                      </Text>
+                    ) : null}
                   </View>
                   <View style={[styles.tableCell, styles.colQty]}>
                     <Text>{item?.quantity || 0}</Text>
@@ -549,10 +618,21 @@ const InvoicePDF = ({
               <Text style={styles.totalLabel}>Sub Total:</Text>
               <Text style={styles.totalValue}>{formatAmount(subtotal)}</Text>
             </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Tax:</Text>
-              <Text style={styles.totalValue}>{formatAmount(totalTax)}</Text>
-            </View>
+            {Object.keys(componentSummary).length > 0
+              ? Object.entries(componentSummary).map(([label, amt]) => (
+                  <View style={styles.totalRow} key={label}>
+                    <Text style={styles.totalLabel}>{label}:</Text>
+                    <Text style={styles.totalValue}>
+                      {formatAmount(Number(amt) || 0)}
+                    </Text>
+                  </View>
+                ))
+              : (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Tax:</Text>
+                  <Text style={styles.totalValue}>{formatAmount(totalTax)}</Text>
+                </View>
+              )}
             {showDiscount ? (
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Discount:</Text>

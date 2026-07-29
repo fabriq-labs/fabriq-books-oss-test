@@ -20,6 +20,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Master from '@/pages/Master';
+import { TaxRegistrationsTab } from './TaxRegistrationsTab';
+
+const TAX_TREATMENT_OPTIONS = [
+    { value: 'registered', label: 'Registered' },
+    { value: 'export', label: 'Export / overseas' },
+    { value: 'sez', label: 'SEZ' },
+    { value: 'composition', label: 'Composition' },
+    { value: 'unregistered', label: 'Unregistered' },
+] as const;
+
 const itemMasterSchema = z.object({
     supplier_name: z.string().min(1, { message: 'Supplier name is required' }),
     supplier_address: z.string().min(1, { message: 'Supplier Address is required' }),
@@ -44,6 +54,8 @@ const itemMasterSchema = z.object({
     shipping_term_id: z.string().optional(),
     shipping_method_id: z.string().optional(),
     preferred_currency_id: z.string().optional(),
+    tax_treatment: z.string().optional(),
+    default_tax_region_id: z.string().optional().nullable(),
     buyer_review_added: z.string().min(1, { message: 'Buyer Review is required' }),
     onboarded_date: z.date({ required_error: 'Onboarded Date is required' }),
 });
@@ -74,6 +86,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
     const [availableItems, setAvailableItems] = useState<any[]>([]);
     const [isLoadingItems, setIsLoadingItems] = useState(false);
     const [itemSearchTerm, setItemSearchTerm] = useState<string>('');
+    const [packLegalEntityId, setPackLegalEntityId] = useState<string | null>(null);
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
         defaultValues: initialValues || {
@@ -95,6 +108,8 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
             shipping_term_id: '',
             shipping_method_id: '',
             preferred_currency_id: '',
+            tax_treatment: '',
+            default_tax_region_id: null,
             legal_name: ''
         },
     });
@@ -103,6 +118,35 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
             fetchingDetails(id);
         }
     }, [id])
+
+    useEffect(() => {
+        const orgId = initialValues?.org_id;
+        if (!orgId) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res: any = await viewAPI.search(
+                    'entity',
+                    'entity_view',
+                    1,
+                    50,
+                    undefined,
+                    { org_id: { eq: orgId } },
+                );
+                const rows = res?.data || [];
+                const hq =
+                    rows.find((e: any) => e.is_it_headquartres === 'Yes') ||
+                    rows.find((e: any) => e.id === orgId) ||
+                    rows[0];
+                if (!cancelled) setPackLegalEntityId(hq?.id || null);
+            } catch {
+                if (!cancelled) setPackLegalEntityId(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [initialValues?.org_id]);
 
     const fetchingDetails = (id: any) => {
         setIsLoading(true);
@@ -130,6 +174,8 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                     shipping_term_id: res.data.shipping_term_id?.toString() || '',
                     shipping_method_id: res.data.shipping_method_id?.toString() || '',
                     preferred_currency_id: res.data.preferred_currency_id || '',
+                    tax_treatment: res.data.tax_treatment || '',
+                    default_tax_region_id: res.data.default_tax_region_id || null,
                     legal_name: res.data.legal_name || ''
 
                 });
@@ -151,6 +197,8 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                 shipping_term_id: data.shipping_term_id || undefined,
                 shipping_method_id: data.shipping_method_id || undefined,
                 preferred_currency_id: data.preferred_currency_id || undefined,
+                tax_treatment: data.tax_treatment || undefined,
+                default_tax_region_id: data.default_tax_region_id || null,
             };
 
             if (!id) {
@@ -325,6 +373,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                 <Tabs defaultValue="details" className="w-full">
                     <TabsList>
                         <TabsTrigger value="details">Details</TabsTrigger>
+                        <TabsTrigger value="tax-registrations">Tax Registrations</TabsTrigger>
                         <TabsTrigger value="items">Items</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details">
@@ -704,6 +753,52 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                                         </FormItem>
                                                     )}
                                                 />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="tax_treatment"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Tax treatment</FormLabel>
+                                                            <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                                                                <FormControl>
+                                                                    <SelectTrigger>
+                                                                        <SelectValue placeholder="Select tax treatment" />
+                                                                    </SelectTrigger>
+                                                                </FormControl>
+                                                                <SelectContent>
+                                                                    {TAX_TREATMENT_OPTIONS.map((opt) => (
+                                                                        <SelectItem key={opt.value} value={opt.value}>
+                                                                            {opt.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="default_tax_region_id"
+                                                    render={() => (
+                                                        <FormItem>
+                                                            <FormLabel>Default tax region</FormLabel>
+                                                            <SearchDropDown
+                                                                instanceType="tax_region"
+                                                                instanceSourceKey="default_tax_region_id"
+                                                                instanceKey="id"
+                                                                instanceLabel="name"
+                                                                instanceValue={initialValues?.default_tax_region}
+                                                                onSelectItem={handleSelectChange}
+                                                                onClear={() => handleSelectClear('default_tax_region_id')}
+                                                                limit="20"
+                                                                searchParams="name"
+                                                                type="supplier"
+                                                            />
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
                                             </div>
 
                                             <div className="flex justify-end space-x-2">
@@ -726,6 +821,16 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                     </Form>)}
                             </CardContent>
                         </Card>
+                    </TabsContent>
+                    <TabsContent value="tax-registrations">
+                        {id ? (
+                            <TaxRegistrationsTab
+                                partyType="supplier"
+                                partyId={id}
+                                orgId={initialValues?.org_id || ''}
+                                packLegalEntityId={packLegalEntityId}
+                            />
+                        ) : null}
                     </TabsContent>
                     <TabsContent value="items">
                         <Card>
@@ -1158,6 +1263,52 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                                         onClear={() => handleSelectClear('code')}
                                                         limit="10"
                                                         searchParams="code"
+                                                        type="supplier"
+                                                    />
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="tax_treatment"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Tax treatment</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                                                        <FormControl>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select tax treatment" />
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            {TAX_TREATMENT_OPTIONS.map((opt) => (
+                                                                <SelectItem key={opt.value} value={opt.value}>
+                                                                    {opt.label}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="default_tax_region_id"
+                                            render={() => (
+                                                <FormItem>
+                                                    <FormLabel>Default tax region</FormLabel>
+                                                    <SearchDropDown
+                                                        instanceType="tax_region"
+                                                        instanceSourceKey="default_tax_region_id"
+                                                        instanceKey="id"
+                                                        instanceLabel="name"
+                                                        instanceValue={initialValues?.default_tax_region}
+                                                        onSelectItem={handleSelectChange}
+                                                        onClear={() => handleSelectClear('default_tax_region_id')}
+                                                        limit="20"
+                                                        searchParams="name"
                                                         type="supplier"
                                                     />
                                                     <FormMessage />

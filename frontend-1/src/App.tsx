@@ -59,6 +59,7 @@ import { AITemplatesPage } from "./pages/settings/AITemplatesPage";
 import { LLMTraceDetailPage } from "./components/forms/Masters/LLMTraceDetailPage";
 import { LLMTracesPage } from "./pages/settings/LLMTracesPage";
 import { TaxMasterForm } from "./components/forms/Masters/TaxMasterForm";
+import { TaxGroupForm } from "./components/forms/Masters/TaxGroupForm";
 import { ViewForm } from "./components/forms/Masters/ViewForm";
 import { PermissionForm } from "./components/forms/Masters/PermissionForm";
 import { CategoryForm } from "./components/forms/Masters/CategoryForm";
@@ -248,6 +249,13 @@ const AppRoutes: React.FC = () => {
                 <Route path="accounting/tax" element={<Master type="tax_master" view="tax_master_view" displayName="Tax" />} />
                 <Route path="tax_master/:id/view/:viewId" element={<TaxMasterForm />} />
                 <Route path="tax_master/view/:viewId" element={<TaxMasterForm />} />
+
+                <Route path="accounting/tax-groups" element={<Master type="tax_group" view="tax_group_view" displayName="Tax Groups" />} />
+                <Route path="tax_group/:id/view/:viewId" element={<TaxGroupForm />} />
+                <Route path="tax_group/view/:viewId" element={<TaxGroupForm />} />
+
+                <Route path="accounting/tax-regions" element={<Master type="tax_region" view="tax_region_view" displayName="Tax Regions" />} />
+                <Route path="accounting/tax-registrations" element={<Master type="party_tax_registration" view="party_tax_registration_view" displayName="Tax Registrations" />} />
 
 
                 <Route path="accounting/currency" element={<Master type="currency" view="currency_view" displayName="Currency" isImport={false} />} />

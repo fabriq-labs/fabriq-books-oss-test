@@ -25,6 +25,8 @@ import { useNavigate } from 'react-router-dom';
 import { useChat } from '@/contexts/ChatContext';
 import { ChatShell } from '@/components/chat/ChatShell';
 import { workflowAPI } from '@/api/api';
+import { buildNewBillCreatePayload } from '@/lib/bills/createBillDefaults';
+import { useEntity } from '@/contexts/EntityContext';
 // Mock data for procurement spend by category
 const procurementSpendData = [
     { category: 'IT Equipment', spend: 125000, color: 'hsl(210 100% 56%)' },
@@ -79,6 +81,7 @@ const ProcurementApproverDashboard = () => {
     const [timeRange, setTimeRange] = useState('6months');
     const { isChatOpen } = useChat();
     const navigate = useNavigate();
+    const { currentEntityId } = useEntity();
     const [details, setDetails] = useState<any>({});
     const [detailsForPurchaseOrder, setDetailsForPurchaseOrder] = useState<any>({});
     const [detailsForInvoice, setDetailsForInvoice] = useState<any>({});
@@ -208,14 +211,13 @@ const ProcurementApproverDashboard = () => {
     };
 
     const handleInvoiceCreate = () => {
-        workflowAPI.create("invoice", '9', {
-            status: '9',
-        })
+        void buildNewBillCreatePayload({}, { preferredLegalEntityId: currentEntityId })
+            .then((payload) => workflowAPI.create('invoice', '9', payload))
             .then((res: any) => {
-                navigate(`/purchases/bills/${res?.data?.id}/state/9`)
-            }).catch((err) => {
-                const { response } = err;
-                console.log("Error :", err.message);
+                navigate(`/purchases/bills/${res?.data?.id}/state/9`);
+            })
+            .catch((err) => {
+                console.log('Error :', err.message);
             });
     };
 

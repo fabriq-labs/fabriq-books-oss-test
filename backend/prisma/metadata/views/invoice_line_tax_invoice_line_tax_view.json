@@ -1,0 +1,63 @@
+{
+  "id": "view_invoice_line_tax_001",
+  "name": "invoice_line_tax_view",
+  "model_name": "invoice_line_tax",
+  "description": "Invoice line tax components",
+  "data_graph": {
+    "id": { "datatype": "string", "permission": "read" },
+    "invoice_line_item_id": {
+      "datatype": "string",
+      "permission": "read",
+      "displayName": "Line Item",
+      "isColumnShow": true
+    },
+    "tax_master_id": {
+      "datatype": "string",
+      "permission": "read",
+      "tableProps": {
+        "columnType": "select",
+        "selectProps": {
+          "type": "tax_master",
+          "limit": "20",
+          "instanceKey": "id",
+          "instanceType": "tax_master",
+          "searchParams": "tax_name",
+          "instanceLabel": "tax_name",
+          "instanceSourceKey": "tax_master_id"
+        }
+      },
+      "listProps": { "type": "text", "recordPath": "tax_master.tax_name" },
+      "displayName": "Tax",
+      "isColumnShow": true
+    },
+    "tax_group_id": {
+      "datatype": "string",
+      "permission": "read",
+      "displayName": "Tax Group",
+      "isColumnShow": false
+    },
+    "rate": {
+      "datatype": "float",
+      "permission": "read",
+      "tableProps": { "width": "100", "columnType": "float" },
+      "displayName": "Rate %",
+      "isColumnShow": true
+    },
+    "amount": {
+      "datatype": "float",
+      "permission": "read",
+      "tableProps": { "width": "120", "columnType": "float" },
+      "displayName": "Amount",
+      "isColumnShow": true
+    },
+    "component_type": {
+      "permission": "read",
+      "tableProps": { "width": "120", "columnType": "text" },
+      "displayName": "Component",
+      "isColumnShow": true
+    }
+  },
+  "org_id": "system",
+  "created_by": null,
+  "modified_by": null
+}

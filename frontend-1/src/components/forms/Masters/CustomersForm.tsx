@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { viewAPI } from '@/api/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
@@ -14,6 +16,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { constructObject } from '../../utils/helper';
 import { useTool } from '@/contexts/ToolContext';
 import { SearchDropDown } from '../../search_dropdown/dropdown';
+import { TaxRegistrationsTab } from './TaxRegistrationsTab';
+
+const TAX_TREATMENT_OPTIONS = [
+    { value: 'registered', label: 'Registered' },
+    { value: 'export', label: 'Export / overseas' },
+    { value: 'sez', label: 'SEZ' },
+    { value: 'composition', label: 'Composition' },
+    { value: 'unregistered', label: 'Unregistered' },
+] as const;
 
 const itemMasterSchema = z.object({
     customer_name: z.string().min(1, { message: 'Customer name is required' }),
@@ -28,6 +39,8 @@ const itemMasterSchema = z.object({
     preferred_currency_id: z.string().optional(),
     state: z.string().optional(),
     country: z.string().optional(),
+    tax_treatment: z.string().optional(),
+    default_tax_region_id: z.string().optional().nullable(),
 });
 
 type ItemMasterValues = z.infer<typeof itemMasterSchema>;
@@ -56,6 +69,7 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
     const navigate = useNavigate();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
+    const [packLegalEntityId, setPackLegalEntityId] = useState<string | null>(null);
     const { latestFormToolResponse } = useTool();
 
     const form = useForm<ItemMasterValues>({
@@ -73,8 +87,40 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
             website: '',
             payment_term_id: '',
             preferred_currency_id: '',
+            tax_treatment: '',
+            default_tax_region_id: null,
         },
     });
+
+    // Resolve HQ (or first) LE for country-pack labels on the Tax Registrations tab
+    useEffect(() => {
+        const orgId = initialValues?.org_id;
+        if (!orgId) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res: any = await viewAPI.search(
+                    'entity',
+                    'entity_view',
+                    1,
+                    50,
+                    undefined,
+                    { org_id: { eq: orgId } },
+                );
+                const rows = res?.data || [];
+                const hq =
+                    rows.find((e: any) => e.is_it_headquartres === 'Yes') ||
+                    rows.find((e: any) => e.id === orgId) ||
+                    rows[0];
+                if (!cancelled) setPackLegalEntityId(hq?.id || null);
+            } catch {
+                if (!cancelled) setPackLegalEntityId(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [initialValues?.org_id]);
 
     useEffect(() => {
         if (id) {
@@ -104,6 +150,8 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
                         website: toolResultData.website || '',
                         payment_term_id: toolResultData.payment_term_id || undefined,
                         preferred_currency_id: toolResultData.preferred_currency_id || undefined,
+                        tax_treatment: toolResultData.tax_treatment || '',
+                        default_tax_region_id: toolResultData.default_tax_region_id || null,
                     });
                 }
             }
@@ -128,6 +176,8 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
                     website: res.data.website || '',
                     payment_term_id: res.data.payment_term_id || undefined,
                     preferred_currency_id: res.data.preferred_currency_id || undefined,
+                    tax_treatment: res.data.tax_treatment || '',
+                    default_tax_region_id: res.data.default_tax_region_id || null,
                 });
                 setIsLoading(false);
             }).catch((err) => {
@@ -139,12 +189,19 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
     const handleSubmit = async (data: ItemMasterValues) => {
         try {
             setIsSubmitting(true);
+            const submissionData = {
+                ...data,
+                tax_treatment: data.tax_treatment || null,
+                default_tax_region_id: data.default_tax_region_id || null,
+                payment_term_id: data.payment_term_id || null,
+                preferred_currency_id: data.preferred_currency_id || null,
+            };
 
             if (!id) {
                 await viewAPI.create(
                     "customers",
                     viewId,
-                    data
+                    submissionData
                 );
                 toast({
                     title: "Success",
@@ -161,7 +218,7 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
                     "customers",
                     id,
                     viewId,
-                    data
+                    submissionData
                 );
                 toast({
                     title: "Success",
@@ -201,7 +258,8 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
     };
 
     const handleSelectClear = (sourceKey: any) => {
-        form.setValue(sourceKey, '', { shouldValidate: true });
+        const clearValue = sourceKey === 'default_tax_region_id' ? null : '';
+        form.setValue(sourceKey, clearValue as never, { shouldValidate: true });
     };
 
     const handleCancel = () => {
@@ -212,255 +270,323 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
         }
     };
 
-    return (
-        <>
-            <div className="mx-auto w-[70%]">
-                <div className="mb-4">
+    const detailsForm = isLoading ? (
+        <div className="space-y-6">
+            <div>
+                <Skeleton className="h-4 w-[100px] mb-2" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+            <div>
+                <Skeleton className="h-4 w-[120px] mb-2" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+        </div>
+    ) : (
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                        control={form.control}
+                        name="customer_name"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Customer Name <span className="text-red-500">*</span></FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter customer name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="customer_address"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Customer Address <span className="text-red-500">*</span></FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter customer address" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>City <span className="text-red-500">*</span></FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter city" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="state"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>State </FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter state" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="country"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Country </FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter country" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="zip_code"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Zip Code <span className="text-red-500">*</span></FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter zip code" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="primary_phone"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Primary Phone <span className="text-red-500">*</span></FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter primary phone" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="primary_email"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Primary Email <span className="text-red-500">*</span></FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter primary email" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="industry"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Industry <span className="text-red-500">*</span></FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter industry" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="website"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Website</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter website" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="payment_term_id"
+                        render={() => (
+                            <FormItem>
+                                <FormLabel>Payment Terms</FormLabel>
+                                <SearchDropDown
+                                    instanceType="payment_terms"
+                                    instanceSourceKey="payment_term_id"
+                                    instanceKey="id"
+                                    instanceLabel="payment_terms"
+                                    instanceValue={initialValues?.payment_terms}
+                                    onSelectItem={handleSelectChange}
+                                    onClear={handleSelectClear}
+                                    limit="10"
+                                    searchParams="payment_terms"
+                                    type="customers"
+                                />
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="preferred_currency_id"
+                        render={() => (
+                            <FormItem>
+                                <FormLabel>Preferred Currency</FormLabel>
+                                <SearchDropDown
+                                    instanceType="currency"
+                                    instanceSourceKey="preferred_currency_id"
+                                    instanceKey="id"
+                                    instanceLabel="code"
+                                    instanceValue={initialValues?.currency}
+                                    onSelectItem={handleSelectChange}
+                                    onClear={() => handleSelectClear('preferred_currency_id')}
+                                    limit="10"
+                                    searchParams="code"
+                                    type="customers"
+                                />
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="tax_treatment"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Tax treatment</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select tax treatment" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {TAX_TREATMENT_OPTIONS.map((opt) => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="default_tax_region_id"
+                        render={() => (
+                            <FormItem>
+                                <FormLabel>Default tax region</FormLabel>
+                                <SearchDropDown
+                                    instanceType="tax_region"
+                                    instanceSourceKey="default_tax_region_id"
+                                    instanceKey="id"
+                                    instanceLabel="name"
+                                    instanceValue={initialValues?.default_tax_region}
+                                    onSelectItem={handleSelectChange}
+                                    onClear={() => handleSelectClear('default_tax_region_id')}
+                                    limit="20"
+                                    searchParams="name"
+                                    type="customers"
+                                />
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={handleCancel}>
+                        Cancel
+                    </Button>
                     <Button
-                        variant="ghost"
-                        className="flex items-center gap-2 text-muted-foreground"
-                        onClick={handleCancel}
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="bg-primary hover:bg-primary/90"
                     >
-                        <ArrowLeft size={16} />
-                        Back to list
+                        Save
                     </Button>
                 </div>
+            </form>
+        </Form>
+    );
+
+    return (
+        <div className="mx-auto w-[70%]">
+            <div className="mb-4 flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Customer</h1>
+                    <p className="text-sm text-gray-600 mt-1">
+                        {initialValues ? 'Edit Customer' : 'Create Customer'}
+                    </p>
+                </div>
+                <Button
+                    variant="ghost"
+                    className="flex items-center gap-2 text-muted-foreground"
+                    onClick={handleCancel}
+                >
+                    <ArrowLeft size={16} />
+                    Back to list
+                </Button>
+            </div>
+
+            {id ? (
+                <Tabs defaultValue="details" className="w-full">
+                    <TabsList>
+                        <TabsTrigger value="details">Details</TabsTrigger>
+                        <TabsTrigger value="tax-registrations">Tax Registrations</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="details">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle />
+                            </CardHeader>
+                            <CardContent>{detailsForm}</CardContent>
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="tax-registrations">
+                        <TaxRegistrationsTab
+                            partyType="customer"
+                            partyId={id}
+                            orgId={initialValues?.org_id || ''}
+                            packLegalEntityId={packLegalEntityId}
+                        />
+                    </TabsContent>
+                </Tabs>
+            ) : (
                 <Card>
                     <CardHeader>
-                        <CardTitle>
-                            {initialValues ? 'Edit Customer' : 'Create Customer'}
-                        </CardTitle>
+                        <CardTitle>Create Customer</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        {isLoading ? (
-                            <div className="space-y-6">
-                                <div>
-                                    <Skeleton className="h-4 w-[100px] mb-2" />
-                                    <Skeleton className="h-10 w-full" />
-                                </div>
-                                <div>
-                                    <Skeleton className="h-4 w-[120px] mb-2" />
-                                    <Skeleton className="h-10 w-full" />
-                                </div>
-                                <div className="flex justify-end space-x-2">
-                                    <Skeleton className="h-10 w-[100px]" />
-                                    <Skeleton className="h-10 w-[100px]" />
-                                </div>
-                            </div>
-                        ) : (
-                            <Form {...form}>
-                                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <FormField
-                                            control={form.control}
-                                            name="customer_name"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Customer Name <span className="text-red-500">*</span></FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter customer name" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="customer_address"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Customer Address <span className="text-red-500">*</span></FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter customer address" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="city"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>City <span className="text-red-500">*</span></FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter city" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="state"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>State </FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter state" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="country"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Country </FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter country" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="zip_code"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Zip Code <span className="text-red-500">*</span></FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter zip code" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="primary_phone"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Primary Phone <span className="text-red-500">*</span></FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter primary phone" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="primary_email"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Primary Email <span className="text-red-500">*</span></FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter primary email" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="industry"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Industry <span className="text-red-500">*</span></FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter industry" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="website"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Website</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Enter website" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="payment_term_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Payment Terms</FormLabel>
-                                                    <SearchDropDown
-                                                        instanceType="payment_terms"
-                                                        instanceSourceKey="payment_term_id"
-                                                        instanceKey="id"
-                                                        instanceLabel="payment_terms"
-                                                        instanceValue={initialValues?.payment_terms}
-                                                        onSelectItem={handleSelectChange}
-                                                        onClear={handleSelectClear}
-                                                        limit="10"
-                                                        searchParams="payment_terms"
-                                                        type="customers"
-                                                    />
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <FormField
-                                            control={form.control}
-                                            name="preferred_currency_id"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Preferred Currency</FormLabel>
-                                                    <SearchDropDown
-                                                        instanceType="currency"
-                                                        instanceSourceKey="preferred_currency_id"
-                                                        instanceKey="id"
-                                                        instanceLabel="code"
-                                                        instanceValue={initialValues?.currency}
-                                                        onSelectItem={handleSelectChange}
-                                                        onClear={() => handleSelectClear('preferred_currency_id')}
-                                                        limit="10"
-                                                        searchParams="code"
-                                                        type="customers"
-                                                    />
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    <div className="flex justify-end space-x-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={handleCancel}
-                                        >
-                                            Cancel
-                                        </Button>
-                                        <Button
-                                            type="submit"
-                                            disabled={isSubmitting}
-                                            className="bg-primary hover:bg-primary/90"
-                                        >
-                                            Save
-                                        </Button>
-                                    </div>
-                                </form>
-                            </Form>
-                        )}
-                    </CardContent>
+                    <CardContent>{detailsForm}</CardContent>
                 </Card>
-            </div>
-        </>
+            )}
+        </div>
     );
 };
 

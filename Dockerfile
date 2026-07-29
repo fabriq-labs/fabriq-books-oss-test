@@ -153,16 +153,24 @@ WORKDIR /app
 
 COPY --from=sync-service-builder /opt/venv /opt/venv
 COPY --from=sync-service-builder /opt/fabriq-int /opt/fabriq-int
-# Venv symlinks point at python:3.12-alpine's /usr/local/bin/python; this image only has apk python3.
-RUN mkdir -p /usr/local/bin \
- && ln -sf /usr/bin/python3 /usr/local/bin/python \
- && ln -sf /usr/bin/python3 /usr/local/bin/python3
+# Venv was built on python:3.12-alpine. Do NOT point it at apk python3 (version skew
+# → ModuleNotFoundError: uvicorn even when /opt/venv/bin/uvicorn exists).
+# Bring the matching CPython 3.12 runtime + shared libs from the builder.
+COPY --from=sync-service-builder /usr/local/bin/python3.12 /usr/local/bin/python3.12
+COPY --from=sync-service-builder /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so.1.0
+COPY --from=sync-service-builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
+RUN ln -sf python3.12 /usr/local/bin/python3 \
+ && ln -sf python3.12 /usr/local/bin/python \
+ && ln -sf libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so \
+ && /opt/venv/bin/python -c "import uvicorn; print('uvicorn ok', uvicorn.__version__)"
+ENV LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 
 COPY --from=backend-builder /app /app/backend
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 COPY --from=build-info /build-info.json /app/build-info.json
 COPY --from=build-info /build-info.json /usr/share/nginx/html/build-info.json
 
+COPY nginx.main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 COPY start-with-pg.sh /start-with-pg.sh
 COPY start-external.sh /start-external.sh

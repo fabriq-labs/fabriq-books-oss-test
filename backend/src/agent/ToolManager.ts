@@ -68,7 +68,7 @@ export class ToolManager {
             createChildItem: () => createChildItemTool(auth),
             updateChildItem: () => updateChildItemTool(auth),
             advancedSqlQuery: () => advancedSqlQueryTool(auth),
-            extractInvoiceFromFile: () => extractInvoiceFromFileTool(auth),
+            extractInvoiceFromFile: () => extractInvoiceFromFileTool(auth, toolContext),
             processInvoiceFromPdf: () => processInvoiceFromPdfTool(auth),
             erpConnector: () => erpConnectorTool(auth, toolContext),
             suggestReconciliationMatches: () => suggestReconciliationMatchesTool(auth),

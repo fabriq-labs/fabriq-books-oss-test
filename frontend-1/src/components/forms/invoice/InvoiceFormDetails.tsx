@@ -5,6 +5,11 @@ import { UseFormReturn } from 'react-hook-form';
 import dayjs from 'dayjs';
 import { SearchDropDown } from '@/components/search_dropdown/dropdown';
 import { Attachment } from '@/components/attachment/Attachment';
+import {
+  BILL_INVOICE_TYPE,
+  resolvePoModeFromInvoice,
+  type BillPoMode,
+} from '@/lib/bills/poMode';
 
 
 
@@ -54,15 +59,22 @@ const InvoiceFormDetails: React.FC<PurchaseRequisitionDetailsProps> = ({ form, r
         <Card title="Invoice Details" className="h-full">
             <Form layout="vertical" className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Form.Item label="Invoice Type" className='mb-0'>
+                    <Form.Item label="PO Mode" className='mb-0'>
                         <Select
                             style={{ width: '100%' }}
-                            value={details?.invoice_type}
-                            disabled={readOnly || details?.invoice_type === 'With PO'}
-                            onChange={async (value) => {
-                                handleInputChange("invoice_type", value);
+                            value={resolvePoModeFromInvoice(details)}
+                            disabled={readOnly || resolvePoModeFromInvoice(details) === 'With PO'}
+                            onChange={async (value: BillPoMode) => {
+                                setDetails({
+                                    ...details,
+                                    invoice_type: BILL_INVOICE_TYPE,
+                                    po_mode: value,
+                                });
                                 if (!readOnly) {
-                                    await onSubmit({ invoice_type: value });
+                                    await onSubmit({
+                                      invoice_type: BILL_INVOICE_TYPE,
+                                      po_mode: value,
+                                    });
                                 }
                             }}
                             options={[
@@ -73,7 +85,7 @@ const InvoiceFormDetails: React.FC<PurchaseRequisitionDetailsProps> = ({ form, r
                     </Form.Item>
 
                     <Form.Item label="PO Number" className='mb-0'>
-                        {details?.invoice_type === 'With PO' ? (
+                        {resolvePoModeFromInvoice(details) === 'With PO' ? (
                             <SearchDropDown
                                 instanceType="purchase_order"
                                 instanceSourceKey="purchase_order_id"

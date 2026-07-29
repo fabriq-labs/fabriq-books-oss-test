@@ -30,7 +30,11 @@ import {
 } from './services/PendingActionService';
 import { getSessionTrace } from './services/SessionTraceService';
 import { sessionEventBus } from './services/SessionEventBus';
-import { formatAgentHttpError } from './utils/streamErrorMessage';
+import { formatAgentHttpError, getAgentHttpStatusCode } from './utils/streamErrorMessage';
+import {
+  buildBillUploadDataUri,
+  resolveBillUploadMime,
+} from './utils/billUploadMime';
 // Removing ai/express import since it appears to be causing issues
 // import { createStreamDataHandler } from 'ai/express';
 
@@ -312,6 +316,19 @@ export function createAgentRouter() {
         return res.status(400).json({ error: "File size must be less than 10MB" });
       }
 
+      // Normalize MIME: browsers often send empty/octet-stream for HEIC photos.
+      const mimeResolved = resolveBillUploadMime({
+        originalName: file.originalname,
+        mimetype: file.mimetype,
+      });
+      if (!mimeResolved.ok) {
+        return res.status(400).json({
+          error: mimeResolved.error,
+          message: mimeResolved.error,
+        });
+      }
+      const resolvedMime = mimeResolved.mime;
+
       // Get optional prompt and context from request body
       const prompt = req.body.prompt || 'Extract data from this file';
       let context: any = undefined;
@@ -327,19 +344,22 @@ export function createAgentRouter() {
         }
       }
 
-      logger.debug('Processing extract request', {
+      logger.info('Processing extract request', {
         userId: req.context.auth.user.id,
         orgId: req.context.auth.user.org_id,
         fileName: file.originalname,
         fileSize: file.size,
-        mimeType: file.mimetype,
-        prompt: prompt,
-        context: context
+        mimeType: resolvedMime,
+        reportedMimeType: file.mimetype,
+        mimeSource: mimeResolved.source,
+        prompt,
+        modelName: context?.modelName,
+        viewName: context?.viewName,
+        promptTypes: context?.promptTypes,
       });
 
-      // Convert file buffer to base64 data URI format for RawMessage
-      const base64Data = file.buffer.toString('base64');
-      const dataUri = `data:${file.mimetype};base64,${base64Data}`;
+      // Convert file buffer to base64 data URI — never use empty Multer MIME
+      const dataUri = buildBillUploadDataUri(resolvedMime, file.buffer);
 
       // Create RawMessage format with file part
       const fileMessage = {
@@ -349,7 +369,7 @@ export function createAgentRouter() {
           {
             type: 'file' as const,
             data: dataUri, // Base64 data URI format
-            mimeType: file.mimetype,
+            mimeType: resolvedMime,
             name: file.originalname
           }
         ]
@@ -360,7 +380,7 @@ export function createAgentRouter() {
         fileMessage,
         req.context.auth,
         [], // No previous messages for extraction
-        { ...context, maxAgentSteps: 2 }
+        { ...context, maxAgentSteps: 2, maxRetries: 1 }
       );
 
       // Extract toolResults from steps if not directly available
@@ -379,6 +399,14 @@ export function createAgentRouter() {
         }
       }
 
+      logger.info('Extract request completed', {
+        userId: req.context.auth.user.id,
+        orgId: req.context.auth.user.org_id,
+        fileName: file.originalname,
+        toolResultsCount: toolResults.length,
+        stepsCount: Array.isArray(response.steps) ? response.steps.length : 0,
+      });
+
       // Return response with content, toolResults, steps, and file metadata
       res.json({
         content: response.content,
@@ -387,7 +415,7 @@ export function createAgentRouter() {
         fileInfo: {
           fileName: file.originalname,
           fileSize: file.size,
-          mimeType: file.mimetype,
+          mimeType: resolvedMime,
           uploadedAt: new Date().toISOString()
         }
       });
@@ -416,15 +444,17 @@ export function createAgentRouter() {
         });
       }
 
+      const httpError = formatAgentHttpError(error);
+      const status = getAgentHttpStatusCode(error);
       logger.error('Error in extract request:', {
-        error: error.message,
-        stack: error.stack
+        error: httpError.error,
+        status,
+        stack: error instanceof Error ? error.stack : undefined,
+        userId: req.context?.auth?.user?.id,
+        orgId: req.context?.auth?.user?.org_id,
       });
 
-      res.status(500).json({
-        error: error.message || 'Failed to process extract request',
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      return res.status(status).json(httpError);
     }
   });
 

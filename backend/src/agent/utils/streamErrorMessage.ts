@@ -1,6 +1,12 @@
+import { APICallError } from 'ai';
+
 /**
  * AI SDK masks stream errors by default in toDataStreamResponse() → client sees
  * "An error occurred." Use getAgentStreamErrorMessage as getErrorMessage to forward details.
+ *
+ * Importantly: `result.consumeStream()` also *swallows* errors (only invokes onError).
+ * Callers that await consumeStream must capture onError and rethrow, or the HTTP
+ * handler will hang / return an empty success.
  *
  * Set AGENT_EXPOSE_ERROR_DETAILS=true to include stack traces in API/stream responses
  * (for staging/debug; not recommended on public production without access controls).
@@ -45,14 +51,68 @@ function extractProviderDetail(error: Error): string | undefined {
   return undefined;
 }
 
+function getApiCallStatusCode(error: unknown): number | undefined {
+  if (APICallError.isInstance(error) && typeof error.statusCode === 'number') {
+    return error.statusCode;
+  }
+  const cause = (error as { cause?: unknown } | null)?.cause;
+  if (cause && APICallError.isInstance(cause) && typeof cause.statusCode === 'number') {
+    return cause.statusCode;
+  }
+  return undefined;
+}
+
+export function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const name = (error as { name?: string }).name;
+  if (name === 'AbortError' || name === 'TimeoutError') return true;
+  if (error instanceof Error && /aborted|abort/i.test(error.message)) return true;
+  return false;
+}
+
+/**
+ * Map upstream LLM / stream failures to an HTTP status for non-stream routes
+ * (e.g. POST /api/agent/extract).
+ */
+export function getAgentHttpStatusCode(error: unknown): number {
+  if (isAbortError(error)) return 504;
+
+  const providerStatus = getApiCallStatusCode(error);
+  if (providerStatus === 401 || providerStatus === 403) return 502;
+  if (providerStatus === 429) return 429;
+  if (providerStatus != null && providerStatus >= 400 && providerStatus < 600) return 502;
+
+  return 500;
+}
+
 /** Message forwarded to the client in AI data stream error parts (type `3:`). */
 export function getAgentStreamErrorMessage(error: unknown): string {
   if (error == null) return 'Unknown error';
   if (typeof error === 'string') return error;
 
+  if (isAbortError(error)) {
+    return 'LLM request timed out. Please try again.';
+  }
+
   if (error instanceof Error) {
+    const providerStatus = getApiCallStatusCode(error);
     const providerDetail = extractProviderDetail(error);
-    let message = providerDetail ? `${error.message}: ${providerDetail}` : error.message;
+
+    if (providerStatus === 401 || providerStatus === 403) {
+      const detail = providerDetail || error.message;
+      const base =
+        detail.toLowerCase().includes('authentication') || detail.toLowerCase().includes('unauthorized')
+          ? detail
+          : `LLM provider authentication failed (${providerStatus}): ${detail}`;
+      const withHint = /credential|api key|user not found|unauthorized/i.test(base)
+        ? `${base.replace(/\.\s*$/, '')}. Check LLM API credentials.`
+        : `${base.replace(/\.\s*$/, '')}. Check LLM API credentials.`;
+      return withHint;
+    }
+
+    let message = providerDetail && providerDetail !== error.message
+      ? `${error.message}: ${providerDetail}`
+      : (providerDetail || error.message);
 
     if (shouldExposeAgentErrorDetails() && error.stack) {
       message = `${message}\n\n${error.stack}`;
@@ -70,4 +130,26 @@ export function formatAgentHttpError(error: unknown): { error: string; stack?: s
     return { error: errorMessage, stack: error.stack };
   }
   return { error: errorMessage };
+}
+
+/**
+ * AI SDK `consumeStream()` swallows errors. Capture them via onError and rethrow
+ * so route handlers can return a clean failure + write llm_trace.
+ */
+export async function consumeStreamAndThrowOnError(
+  result: { consumeStream: (options?: { onError?: (error: unknown) => void }) => Promise<void> },
+  onError?: (error: unknown) => void,
+): Promise<void> {
+  let streamError: unknown;
+  await result.consumeStream({
+    onError: (error) => {
+      streamError = error;
+      onError?.(error);
+    },
+  });
+  if (streamError != null) {
+    throw streamError instanceof Error
+      ? streamError
+      : new Error(getAgentStreamErrorMessage(streamError));
+  }
 }

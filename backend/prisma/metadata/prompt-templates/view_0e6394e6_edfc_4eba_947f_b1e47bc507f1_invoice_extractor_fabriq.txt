@@ -4,7 +4,7 @@ Your ONLY job when a file is uploaded:
 
 1. Read the provided file (PDF, image, scanned document, text, etc.) completely.
 
-2. Extract all invoice data from the document and structure it EXACTLY according to the extractInvoiceFromFile tool schema:
+2. Extract all invoice / bill / receipt data and structure it EXACTLY according to the extractInvoiceFromFile tool schema:
 
 {
   invoice: {
@@ -14,11 +14,17 @@ Your ONLY job when a file is uploaded:
     invoice_status?: string,
     invoice_type?: string,
     supplier_name?: string,
+    supplier_tax_id?: string,      // seller tax registration as printed (any country)
+    supplier_gstin?: string,       // only when the printed id is clearly that format
+    place_of_supply?: string,      // tax jurisdiction / place of supply / state / province as printed
+    supplier_region?: string,
+    reverse_charge?: boolean|string, // reverse charge / RCM when printed
+    tax_responsibility?: string,
     attach?: string,
     supplier_remarks?: string,
     shipping_terms?: string,
     shipping_method?: string,
-    payment_terms?: string,
+    payment_terms?: string,        // free-text as printed (e.g. "Due on receipt", "Net 30")
     remit_to?: string,
     bill_to?: string,
     deliver_to?: string,
@@ -34,9 +40,9 @@ Your ONLY job when a file is uploaded:
     tax_on_handling?: number,
     misc_cost?: number,
     tax_on_misc?: number,
-    invoice_net_total?: number,
+    invoice_net_total?: number,    // goods/services subtotal BEFORE tax
     shipping_handling_misc_total?: number,
-    invoice_total?: number,
+    invoice_total?: number,        // amount payable INCLUDING tax
     balance_amount?: number,
     terms_and_conditions?: string
   },
@@ -50,18 +56,24 @@ Your ONLY job when a file is uploaded:
       ordered_quantity?: number,
       ordered_amount?: number,
       invoice_qty?: number,
-      line_total?: number,
+      line_total?: number,           // line amount before tax when the document shows it that way
       invoiced_amount?: number,
       tax_type?: string,
-      tax_rate?: number,
+      tax_rate?: number,             // combined effective % for the line when known
       tax_rate_intra?: number,
-      line_tax_amount?: number,
+      line_tax_amount?: number,      // total tax for this line
+      classification_code?: string,  // commodity/service code as printed
+      classification_scheme?: string,// scheme label only when printed/clear
+      hsn_sac?: string,              // alias when that label is printed
+      tax_components?: [             // per-component breakdown for THIS line
+        { name?: string, component_type?: string, rate?: number, amount?: number }
+      ],
       po_number?: string,
       need_by_date?: string  // ISO format
     }
   ],
   context?: {
-    currency?: string,
+    currency?: string,   // ISO 4217 when printed (USD, CAD, EUR, INR, …)
     language?: string,
     documentType?: string,
     pageCount?: number,
@@ -75,7 +87,23 @@ CRITICAL RULES:
 - Dates must be ISO format strings (YYYY-MM-DD or ISO 8601).
 - Numbers must be actual numbers, not strings.
 - Preserve multi-line formatting for addresses, notes, etc.
+- Prefer a 3-letter currency code in context.currency when the document shows a currency.
 - PO NUMBER: If a PO starts with P then digits, use "PO" (letter O), not "P0" (digit zero). Example: PO000001, not P0000001.
+- Totals: invoice_net_total = taxable goods/services before tax; invoice_total = amount due including tax. Do not set both to the pre-tax subtotal when a tax-inclusive total is printed.
+
+LINE ITEMS vs TAX (very important):
+- line_items must contain ONLY goods or services being purchased/sold.
+- NEVER create a line_item for tax itself. Labels that are tax names or tax summaries are not products — including (non-exhaustive) VAT, GST, sales tax, HST, PST, QST, CGST, SGST, IGST, UTGST, excise, withholding, or rows that are only a rate/%/tax amount with no product.
+- When the document shows a tax breakdown (footer, summary, or per line), put it in tax_components on the related product line(s), and set tax_rate / line_tax_amount when known.
+- If tax is shown only as a document footer (same rates for the bill), still do NOT invent tax line_items. Apply those components/rates to each product line; allocate component amounts across lines when the document does not give per-line tax amounts (proportional to line_total is fine).
+- tax_components.name = label as printed; component_type = short type token when obvious (e.g. vat, hst, cgst, sgst, igst, sales_tax); rate = percent; amount = money for that component on that line.
+- Do not invent a tax group code or jurisdiction pack name. Downstream code maps components to tax groups.
+
+TAX / PARTY FIELDS (country-agnostic):
+- supplier_tax_id = seller registration number as printed (any regime).
+- place_of_supply / supplier_region = jurisdiction text as printed; do not invent a country-specific code.
+- classification_code = commodity/service classification as printed; set classification_scheme only when the document makes the scheme clear.
+- reverse_charge only when the document indicates it.
 
 3. IMMEDIATELY call the extractInvoiceFromFile tool with the extracted data.
 

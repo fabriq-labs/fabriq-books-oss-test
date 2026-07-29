@@ -10,6 +10,7 @@ import { viewAPI } from '@/api/api';
 import { useToast } from "@/components/ui/use-toast";
 import InvoiceLineItemRow from './InvoiceLineItemRow';
 import { formatCurrency } from '@/lib/formatters';
+import { suggestTaxGroupId } from '@/lib/tax/taxPack';
 
 
 /**
@@ -40,13 +41,24 @@ const InvoiceLineItems = ({
     currentLineItem,
     setCurrentLineItem,
     updateTotalAmount,
-    whorFlow
+    whorFlow,
+    showStructuredTax = false,
+    taxPack,
+    onTaxGroupSelect,
+    onClassificationBlur,
+    taxSuggestion,
+    allowPoMapping = false,
 }) => {
     const [itemDetails, setItemDetails] = useState<any>([]);
     const [isAddingItem, setIsAddingItem] = useState(false);
     const [deletingItems, setDeletingItems] = useState<string[]>([]);
     const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({});
     const { toast } = useToast();
+    // Document currency for display only — do not convert line amounts.
+    const currencyCode =
+        details?.currency?.code ||
+        details?.currency?.item?.code ||
+        'INR';
     useEffect(() => {
         console.log("details", details);
         if (details?.invoice_line_item && Array.isArray(details.invoice_line_item)) {
@@ -78,6 +90,18 @@ const InvoiceLineItems = ({
                     po_quantity: item?.purchase_order_line_item?.quantity || 0,
                     purchase_order_line_item: item?.purchase_order_line_item,
                     purchase_order_line_item_id: item?.purchase_order_line_item?.id,
+                    tax_group_id: item?.tax_group_id || item?.tax_group?.id || null,
+                    tax_group_name: item?.tax_group?.name || null,
+                    classification_code: item?.classification_code || null,
+                    classification_scheme: item?.classification_scheme || null,
+                    tax_components: Array.isArray(item?.invoice_line_tax)
+                        ? item.invoice_line_tax.map((t: any) => ({
+                            component_type: t.component_type,
+                            tax_name: t.tax_master?.tax_name || t.tax_name,
+                            rate: t.rate,
+                            amount: t.amount,
+                          }))
+                        : [],
                 }))
                 .filter((item: any) => item.id)
                 ;
@@ -180,6 +204,136 @@ const InvoiceLineItems = ({
         updateLineItemApi(id, "purchase_order_line_item", { connect: { id: poLineItemId } }, updateData);
     }, [updateLineItemApi, itemDetails, toast]);
 
+    /** Select a catalog item (item_master) without requiring a PO line mapping. */
+    const handleCatalogItemSelect = useCallback(
+        (id: string, _sourceKey: string, key: string, value: any) => {
+            const product = value?.item || value;
+            const productId = value?.[key] || product?.id;
+            if (!productId) return;
+
+            const rate = product?.unit_price || 0;
+            const defaultGroupId = product?.tax_group_id || product?.tax_group?.id || null;
+            const interstateGroupId =
+                product?.tax_group_interstate_id || product?.tax_group_interstate?.id || null;
+
+            let suggestedTaxGroupId = defaultGroupId;
+            let suggestedTaxGroupName = product?.tax_group?.name || null;
+            if (taxSuggestion?.enabled) {
+                suggestedTaxGroupId = suggestTaxGroupId({
+                    sellerRegionId: taxSuggestion.sellerRegionId,
+                    placeOfSupplyId: taxSuggestion.placeOfSupplyId,
+                    defaultTaxGroupId: defaultGroupId,
+                    interstateTaxGroupId: interstateGroupId,
+                    taxTreatment: taxSuggestion.taxTreatment,
+                    zeroRatedTaxGroupId: taxSuggestion.zeroRatedTaxGroupId,
+                });
+                if (!suggestedTaxGroupId) {
+                    suggestedTaxGroupName = null;
+                } else if (suggestedTaxGroupId === taxSuggestion.zeroRatedTaxGroupId) {
+                    suggestedTaxGroupName =
+                        taxSuggestion.zeroRatedTaxGroupName || suggestedTaxGroupId;
+                } else if (suggestedTaxGroupId === interstateGroupId) {
+                    suggestedTaxGroupName =
+                        product?.tax_group_interstate?.name || suggestedTaxGroupId;
+                } else {
+                    suggestedTaxGroupName = product?.tax_group?.name || suggestedTaxGroupId;
+                }
+            }
+
+            setItemDetails((prevItems) =>
+                prevItems.map((prevItem) =>
+                    prevItem.id === id
+                        ? {
+                              ...prevItem,
+                              product_id: productId,
+                              item_master_id: productId,
+                              item_name: product?.item_name,
+                              item_type: product?.item_type,
+                              item_description: product?.item_description,
+                              rate,
+                              uom: product?.uom?.name,
+                              item_code: product?.item_code,
+                              classification_code:
+                                  product?.classification_code ||
+                                  product?.hsn_code ||
+                                  prevItem.classification_code,
+                              classification_scheme:
+                                  product?.classification_scheme ||
+                                  prevItem.classification_scheme,
+                              tax_group_id: suggestedTaxGroupId,
+                              tax_group_name: suggestedTaxGroupName,
+                              item_total: prevItem.invoice_qty
+                                  ? prevItem.invoice_qty * rate
+                                  : 0,
+                              line_total: prevItem.invoice_qty
+                                  ? prevItem.invoice_qty * rate
+                                  : 0,
+                          }
+                        : prevItem,
+                ),
+            );
+
+            const updateData: any = {
+                item_name: product?.item_name,
+                item_type: product?.item_type,
+                item_description: product?.item_description,
+                rate,
+                // Use scalar FKs only — mixing `item_master: { connect }` with
+                // `tax_group_id` makes Prisma reject the nested update.
+                item_master_id: productId,
+            };
+            if (product?.classification_code || product?.hsn_code) {
+                updateData.classification_code =
+                    product.classification_code || product.hsn_code;
+            }
+            if (product?.classification_scheme) {
+                updateData.classification_scheme = product.classification_scheme;
+            }
+            if (suggestedTaxGroupId) {
+                updateData.tax_group_id = suggestedTaxGroupId;
+            } else if (taxSuggestion?.enabled) {
+                // Export with no zero-rated group: clear domestic group.
+                updateData.tax_group_id = null;
+            }
+
+            updateLineItemApi(id, "item_name", product?.item_name, updateData);
+        },
+        [updateLineItemApi, taxSuggestion],
+    );
+
+    const handleRateChange = useCallback((id: string, value: string) => {
+        const numericValue = value === "" ? null : parseFloat(value);
+        setItemDetails((prevItems) =>
+            prevItems.map((item) =>
+                item.id === id
+                    ? {
+                          ...item,
+                          rate: numericValue,
+                          line_total:
+                              item.invoice_qty != null && numericValue != null
+                                  ? item.invoice_qty * numericValue
+                                  : item.line_total,
+                      }
+                    : item,
+            ),
+        );
+    }, []);
+
+    const handleRateBlur = useCallback(
+        (id: string, value: string) => {
+            const numericValue = value === "" ? null : parseFloat(value);
+            const record = itemDetails.find((item) => item.id === id);
+            const lineTotal =
+                record?.invoice_qty != null && numericValue != null
+                    ? record.invoice_qty * numericValue
+                    : undefined;
+            updateLineItemApi(id, "rate", numericValue, {
+                ...(lineTotal != null ? { line_total: lineTotal } : {}),
+            });
+        },
+        [itemDetails, updateLineItemApi],
+    );
+
 
 
     const handleQuantityChange = (id: string, sourceKey: string, value: string) => {
@@ -236,8 +390,8 @@ const InvoiceLineItems = ({
         const currentStateName = whorFlow?.current_state_ref?.name || '';
         const isDraftState = currentStateName?.toLowerCase() === 'draft';
 
-        // Validation before saving
-        if (numericValue !== null) {
+        // Validation before saving — only when this line is mapped to a PO item
+        if (numericValue !== null && record.purchase_order_line_item_id) {
             const poQuantity = record.po_quantity || 0;
             const alreadyInvoicedQty = record.purchase_order_line_item?.invoice_qty || 0;
             const previousQty = normalizedPrevious || 0;
@@ -485,13 +639,26 @@ const InvoiceLineItems = ({
                     <Table className='"min-w-[1100px]"'>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[180px]">Item Name</TableHead>
-                                <TableHead className="w-[100px]">PO Qty</TableHead>
-                                <TableHead className="w-[100px]">Invoiced</TableHead>
-                                <TableHead className="w-[100px]">Available</TableHead>
+                                <TableHead className="w-[220px]">Item Name</TableHead>
+                                {allowPoMapping && (
+                                    <>
+                                        <TableHead className="w-[100px]">PO Qty</TableHead>
+                                        <TableHead className="w-[100px]">Invoiced</TableHead>
+                                        <TableHead className="w-[100px]">Available</TableHead>
+                                    </>
+                                )}
                                 <TableHead className="w-[120px]">Invoice Qty</TableHead>
                                 <TableHead className="w-[100px]">Rate</TableHead>
-                                <TableHead className="w-[120px]">Tax Rate</TableHead>
+                                {showStructuredTax && (
+                                    <TableHead className="w-[120px]">
+                                        {taxPack?.classificationLabel || 'HSN / SAC'}
+                                    </TableHead>
+                                )}
+                                <TableHead className="w-[140px]">
+                                    {showStructuredTax
+                                        ? taxPack?.taxGroupLabel || 'Tax'
+                                        : 'Tax Rate'}
+                                </TableHead>
                                 <TableHead className="w-[120px]">Line Tax Amount</TableHead>
                                 <TableHead className="w-[120px]">Line Total</TableHead>
                                 <TableHead className="w-[80px]">Actions</TableHead>
@@ -500,7 +667,13 @@ const InvoiceLineItems = ({
                         <TableBody>
                             {itemDetails.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="text-center h-24 text-muted-foreground">
+                                    <TableCell
+                                        colSpan={
+                                            (allowPoMapping ? 10 : 7) +
+                                            (showStructuredTax ? 1 : 0)
+                                        }
+                                        className="text-center h-24 text-muted-foreground"
+                                    >
                                         No items added yet.
                                     </TableCell>
                                 </TableRow>
@@ -516,37 +689,52 @@ const InvoiceLineItems = ({
                                         onTaxRateBlur={handleTaxRateBlur}
                                         onDelete={deleteLineItem}
                                         onItemChange={handleItemChange}
+                                        onCatalogItemSelect={handleCatalogItemSelect}
+                                        onRateChange={handleRateChange}
+                                        onRateBlur={handleRateBlur}
                                         onUpdateFields={handleUpdateFields}
                                         readOnly={readOnly}
                                         itemDetails={itemDetails}
                                         purchaseOrderId={details?.purchase_order_id || details?.purchase_order?.id}
                                         poLineItems={details?.purchase_order?.purchase_order_item || []}
                                         invoiceStatus={whorFlow?.current_state_ref?.name}
+                                        showStructuredTax={showStructuredTax}
+                                        taxPack={taxPack}
+                                        onTaxGroupSelect={onTaxGroupSelect}
+                                        onClassificationBlur={onClassificationBlur}
+                                        allowPoMapping={allowPoMapping}
+                                        currencyCode={currencyCode}
                                     />
                                 ))
                             )}
                         </TableBody>
                         <TableFooter>
                             <TableRow className="bg-gray-50">
-                                <TableCell colSpan={10} className="p-0">
+                                <TableCell
+                                    colSpan={
+                                        (allowPoMapping ? 10 : 7) +
+                                        (showStructuredTax ? 1 : 0)
+                                    }
+                                    className="p-0"
+                                >
                                     <div className="flex justify-end p-4 space-y-2">
                                         <div className="w-64 space-y-3">
                                             <div className="flex justify-between items-center py-2 border-b border-gray-200">
                                                 <span className="text-sm font-medium text-gray-600">Item Total :</span>
                                                 <span className="text-sm font-semibold text-gray-800">
-                                                    {formatCurrency(details?.invoice_net_total || 0)}
+                                                    {formatCurrency(details?.invoice_net_total || 0, currencyCode)}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between items-center py-2 border-b border-gray-200">
                                                 <span className="text-sm font-medium text-gray-600">Tax Total:</span>
                                                 <span className="text-sm font-semibold text-gray-800">
-                                                    {formatCurrency(details?.tax_total || 0)}
+                                                    {formatCurrency(details?.tax_total || 0, currencyCode)}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between items-center py-3 bg-violet-50 px-3 rounded-lg border-2 border-violet-200">
                                                 <span className="text-base font-bold text-violet-900">Invoice Amount:</span>
                                                 <span className="text-lg font-bold text-violet-900">
-                                                    {formatCurrency(details?.invoice_total || 0)}
+                                                    {formatCurrency(details?.invoice_total || 0, currencyCode)}
                                                 </span>
                                             </div>
                                         </div>

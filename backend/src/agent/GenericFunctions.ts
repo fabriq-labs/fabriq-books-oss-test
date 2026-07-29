@@ -253,6 +253,15 @@ export const extractInvoiceFromFileSchema = z.object({
     invoice_status: z.string().nullish(),
     invoice_type: z.string().nullish(),
     supplier_name: z.string().nullish(),
+    /** Supplier tax registration as printed (GSTIN, BN, VAT, EIN, …) */
+    supplier_tax_id: z.string().nullish(),
+    supplier_gstin: z.string().nullish(),
+    /** Place of supply / state / province as printed */
+    place_of_supply: z.string().nullish(),
+    supplier_region: z.string().nullish(),
+    /** Reverse charge / RCM hint when printed */
+    reverse_charge: z.union([z.boolean(), z.string()]).nullish(),
+    tax_responsibility: z.string().nullish(),
     attach: z.string().nullish(),
     supplier_remarks: z.string().nullish(),
     shipping_terms: z.string().nullish(),
@@ -294,6 +303,17 @@ export const extractInvoiceFromFileSchema = z.object({
     tax_rate: z.number().nullish(),
     tax_rate_intra: z.number().nullish(),
     line_tax_amount: z.number().nullish(),
+    /** HSN / SAC / classification as printed */
+    classification_code: z.string().nullish(),
+    classification_scheme: z.string().nullish(),
+    hsn_sac: z.string().nullish(),
+    /** Per-line tax components when printed (e.g. CGST 9%, SGST 9%) */
+    tax_components: z.array(z.object({
+      name: z.string().nullish(),
+      component_type: z.string().nullish(),
+      rate: z.number().nullish(),
+      amount: z.number().nullish(),
+    }).passthrough()).nullish(),
     po_number: z.string().nullish(),
     need_by_date: z.string().nullish() // date as ISO string
   }).passthrough()),
@@ -455,6 +475,9 @@ Extract the following invoice header information:
 - Invoice status (if mentioned)
 - Invoice type (e.g., purchase, sales, credit note)
 - Supplier/vendor name
+- Supplier tax registration id when printed (GSTIN, BN, VAT, EIN, etc.) as supplier_tax_id (also supplier_gstin if clearly a GSTIN)
+- Place of supply / state / province when printed (place_of_supply)
+- Reverse charge / RCM hint when printed (reverse_charge true/false)
 - Supplier address and contact details
 - Shipping terms and method
 - Payment terms
@@ -492,12 +515,16 @@ Extract the following line item information for each item:
 - Tax rate
 - Tax rate intra (if applicable)
 - Line tax amount
+- Classification / commodity code when printed (classification_code / hsn_sac; scheme only when clear)
+- Tax components on the product line when a breakdown is printed (tax_components: name, component_type, rate, amount). Never invent separate line_items for tax summary rows (VAT/GST/HST/sales tax/CGST/SGST/etc.)
 - Purchase order number (if referenced)
 - Need by date (as ISO string)
 
+Also extract document currency code in context.currency when printed (ISO 4217 when available).
+
 Also extract any attachments or references mentioned in the invoice.
 
-IMPORTANT: Extract ONLY what actually appears in the document. Do not guess or invent data. Use null/empty or omit fields that are not present. Dates should be ISO format strings. Numbers should be numbers. Return structured data matching the schema: invoice object, line_items array, and optional context object.`,
+IMPORTANT: Extract ONLY what actually appears in the document. Do not guess or invent data. Use null/empty or omit fields that are not present. Dates should be ISO format strings. Numbers should be numbers. line_items are goods/services only — put tax breakdown in tax_components, not as fake product lines. invoice_net_total is pre-tax; invoice_total includes tax. Return structured data matching the schema: invoice object, line_items array, and optional context object.`,
     parameters: extractInvoiceFromFileSchema,
   }
 ]; 

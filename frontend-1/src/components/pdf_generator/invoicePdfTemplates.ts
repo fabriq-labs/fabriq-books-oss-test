@@ -15,8 +15,8 @@ export const INVOICE_PDF_TEMPLATES: Record<
   InvoicePdfTemplate
 > = {
   india_gst: {
-    taxPercentLabel: "IGST (%)",
-    taxAmountLabel: "IGST Amt",
+    taxPercentLabel: "Tax (%)",
+    taxAmountLabel: "Tax Amt",
     dateFormat: "DD-MM-YYYY",
     bankDetailsTitle: "Bank Details:",
     bankDetailsLines: [

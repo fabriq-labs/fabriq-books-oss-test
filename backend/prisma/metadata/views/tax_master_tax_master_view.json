@@ -95,6 +95,29 @@
       },
       "displayName": "Effective From",
       "isColumnShow": true
+    },
+    "component_type": {
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "160",
+        "columnType": "text",
+        "defaultValue": ""
+      },
+      "displayName": "Component Type",
+      "isColumnShow": true
+    },
+    "is_recoverable": {
+      "datatype": "boolean",
+      "required": false,
+      "permission": "update",
+      "tableProps": {
+        "width": "120",
+        "columnType": "boolean",
+        "defaultValue": ""
+      },
+      "displayName": "Recoverable",
+      "isColumnShow": false
     }
   },
   "org_id": "52",

@@ -1,0 +1,132 @@
+// Country-agnostic structured tax (P0/P1) — see docs/tax/TAX_ARCHITECTURE.md
+
+model tax_region {
+  id          String   @id @default(dbgenerated("concat('txreg_', gen_random_uuid())")) @db.VarChar(50)
+  country_code String  @db.VarChar(2)
+  code        String   @db.VarChar(16)
+  name        String
+  region_type String?  @db.VarChar(32) // state | province | territory | …
+  org_id      String  @default("system") // system = shared seed; otherwise tenant org_id
+  created_by  String?
+  created_at  DateTime? @default(now())
+  modified_by String?
+  modified_at DateTime? @default(now())
+  assigned_to String?
+
+  entity_defaults            entity[]                 @relation("EntityDefaultTaxRegion")
+  customer_defaults          customers[]              @relation("CustomerDefaultTaxRegion")
+  supplier_defaults          supplier[]               @relation("SupplierDefaultTaxRegion")
+  party_tax_registrations    party_tax_registration[]
+  invoices_place_of_supply   invoice[]                @relation("InvoiceTaxRegion")
+  invoices_seller_region     invoice[]                @relation("InvoiceSellerTaxRegion")
+
+  @@unique([country_code, code, org_id])
+  @@index([country_code])
+}
+
+model party_tax_registration {
+  id                  String    @id @default(dbgenerated("concat('ptxr_', gen_random_uuid())")) @db.VarChar(50)
+  party_type          String // entity | customer | supplier
+  party_id            String    @db.VarChar(50)
+  scheme              String // GSTIN | GST_HST_BN | PST | QST | VAT | EIN | OTHER
+  registration_number String
+  tax_region_id       String?
+  is_primary          Boolean   @default(true)
+  effective_from      DateTime?
+  effective_to        DateTime?
+  org_id              String
+  created_by          String?
+  created_at          DateTime? @default(now())
+  modified_by         String?
+  modified_at         DateTime? @default(now())
+  assigned_to         String?
+
+  tax_region tax_region? @relation(fields: [tax_region_id], references: [id])
+
+  @@index([party_type, party_id])
+  @@index([org_id])
+}
+
+model tax_group {
+  id           String    @id @default(dbgenerated("concat('txgrp_', gen_random_uuid())")) @db.VarChar(50)
+  name         String
+  code         String
+  country_code String?   @db.VarChar(2)
+  status       String?   @default("Active")
+  org_id       String
+  created_by   String?
+  created_at   DateTime? @default(now())
+  modified_by  String?
+  modified_at  DateTime? @default(now())
+  assigned_to  String?
+
+  tax_group_component     tax_group_component[]
+  item_default            item_master[]         @relation("ItemMaster_TaxGroup")
+  item_interstate         item_master[]         @relation("ItemMaster_TaxGroupInterstate")
+  invoice_line_item       invoice_line_item[]
+  invoice_line_tax        invoice_line_tax[]
+
+  @@index([org_id])
+  @@unique([org_id, code])
+}
+
+model tax_group_component {
+  id            String    @id @default(dbgenerated("concat('txgc_', gen_random_uuid())")) @db.VarChar(50)
+  tax_group_id  String
+  tax_master_id String
+  sequence      Int       @default(1)
+  org_id        String?
+  created_by    String?
+  created_at    DateTime? @default(now())
+  modified_by   String?
+  modified_at   DateTime? @default(now())
+  assigned_to   String?
+
+  tax_group  tax_group  @relation(fields: [tax_group_id], references: [id], onDelete: Cascade)
+  tax_master tax_master @relation(fields: [tax_master_id], references: [id])
+
+  @@unique([tax_group_id, tax_master_id])
+  @@index([tax_group_id])
+}
+
+model invoice_line_tax {
+  id                   String    @id @default(dbgenerated("concat('inltx_', gen_random_uuid())")) @db.VarChar(50)
+  invoice_line_item_id String
+  tax_master_id        String
+  tax_group_id         String?
+  rate                 Float
+  amount               Float
+  component_type       String?
+  org_id               String?
+  created_by           String?
+  created_at           DateTime? @default(now())
+  modified_by          String?
+  modified_at          DateTime? @default(now())
+  assigned_to          String?
+
+  invoice_line_item invoice_line_item @relation(fields: [invoice_line_item_id], references: [id], onDelete: Cascade)
+  tax_master        tax_master        @relation(fields: [tax_master_id], references: [id])
+  tax_group         tax_group?        @relation(fields: [tax_group_id], references: [id])
+
+  @@index([invoice_line_item_id])
+}
+
+/// Per legal-entity tax country pack (IN | CA | GENERIC | …).
+/// Multi-entity tenants (e.g. IN + CA under one org_id) each get their own pack.
+model entity_tax_settings {
+  id                String    @id @default(dbgenerated("concat('enttax_', gen_random_uuid())")) @db.VarChar(50)
+  legal_entity_id   String    @unique @db.VarChar(50)
+  org_id            String // tenant id for multi-tenant filter; not the pack key
+  tax_country_pack  String    @default("GENERIC") // IN | CA | GENERIC
+  require_classification_on_taxable Boolean @default(false)
+  enable_tax_responsibility         Boolean @default(false)
+  created_by        String?
+  created_at        DateTime? @default(now())
+  modified_by       String?
+  modified_at       DateTime? @default(now())
+  assigned_to       String?
+
+  legal_entity entity @relation("EntityTaxSettings", fields: [legal_entity_id], references: [id])
+
+  @@index([org_id])
+}

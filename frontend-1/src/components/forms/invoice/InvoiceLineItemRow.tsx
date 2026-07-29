@@ -35,12 +35,32 @@ interface InvoiceLineItemRowProps {
     key: string,
     value: any,
   ) => void;
+  onCatalogItemSelect?: (
+    id: string,
+    sourceKey: string,
+    key: string,
+    value: any,
+  ) => void;
+  onRateChange?: (id: string, value: string) => void;
+  onRateBlur?: (id: string, value: string) => void;
   onUpdateFields?: (id: string, fields: Record<string, any>) => void;
   readOnly: boolean;
   itemDetails: any[];
   purchaseOrderId?: string | number;
   poLineItems?: any[];
   invoiceStatus?: string | number;
+  showStructuredTax?: boolean;
+  taxPack?: any;
+  onTaxGroupSelect?: (
+    id: string,
+    taxGroupId: string | null,
+    taxGroup?: any,
+  ) => void;
+  onClassificationBlur?: (id: string, code: string) => void;
+  /** When true, show optional PO line mapping + PO qty columns. */
+  allowPoMapping?: boolean;
+  /** Document currency code for display (e.g. INR, USD). Amounts are not converted. */
+  currencyCode?: string;
 }
 
 const InvoiceLineItemRow: React.FC<InvoiceLineItemRowProps> = ({
@@ -53,10 +73,19 @@ const InvoiceLineItemRow: React.FC<InvoiceLineItemRowProps> = ({
   onTaxRateChange,
   onTaxRateBlur,
   onItemChange,
+  onCatalogItemSelect,
+  onRateChange,
+  onRateBlur,
   readOnly,
   itemDetails,
   purchaseOrderId,
   poLineItems,
+  showStructuredTax = false,
+  taxPack,
+  onTaxGroupSelect,
+  onClassificationBlur,
+  allowPoMapping = false,
+  currencyCode = 'INR',
 }) => {
   const { toast } = useToast();
   const [showMappingDropdown, setShowMappingDropdown] = useState(false);
@@ -267,10 +296,19 @@ const InvoiceLineItemRow: React.FC<InvoiceLineItemRowProps> = ({
     return !item?.purchase_order_line_item_id && item?.item_name;
   }, [item?.purchase_order_line_item_id, item?.item_name]);
 
-  // Memoize the SearchDropDown component
+  // Memoize the item picker (+ optional PO mapping when With PO)
   const MemoizedSearchDropDown = useMemo(() => {
-    // Get the current value for the dropdown
-    const currentValue = item?.purchase_order_line_item_id
+    const catalogValue =
+      item?.item_master_id || item?.product_id
+        ? {
+            id: item.item_master_id || item.product_id,
+            item_name: item?.item_name,
+          }
+        : item?.item_name
+          ? { id: item.item_master_id || item.id, item_name: item.item_name }
+          : undefined;
+
+    const currentPoValue = item?.purchase_order_line_item_id
       ? poLineItemsForDropdown.find(
           (poItem) => poItem.id === item.purchase_order_line_item_id,
         ) || {
@@ -279,114 +317,126 @@ const InvoiceLineItemRow: React.FC<InvoiceLineItemRowProps> = ({
         }
       : "";
 
-    // If this is an unmapped item (has item_name but no purchase_order_line_item_id), show interactive mapping UI
     return (
-      <div className="relative">
-        {/* Invoice Item Name with Mapping Indicator */}
-        <Popover
-          open={showMappingDropdown}
-          onOpenChange={setShowMappingDropdown}
-        >
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className={cn(
-                "w-full text-left group",
-                "flex items-center justify-between gap-2",
-                "px-2 py-1.5 rounded-md",
-                "border border-transparent",
-                "transition-colors duration-200",
-              )}
-              disabled={isDeleting || readOnly}
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
-                  {item?.item_name ||
-                    truncateText(item?.purchase_order_line_item?.item_name)}
-                </p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  {item.purchase_order_line_item_id ? (
-                    <span className="text-xs text-gray-400 font-medium">
-                      {item?.item_name ? (
-                        <span>
-                          {truncateText(
-                            item?.purchase_order_line_item?.item_name,
-                            15,
-                          )}{" "}
-                          <span className="text-xs text-amber-700 font-medium">
-                            Change
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-xs text-amber-700 font-medium">
-                          click to change
-                        </span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-amber-700 font-medium">
-                      Map to PO item
-                    </span>
-                  )}
-                </div>
-              </div>
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 text-gray-400 flex-shrink-0 transition-transform",
-                  showMappingDropdown && "transform rotate-180",
-                )}
-              />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            className="w-80 p-3"
-            align="start"
-            side="bottom"
-            sideOffset={4}
+      <div className="space-y-1.5">
+        <SearchDropDown
+          instanceType="item_master"
+          instanceSourceKey="item_master_id"
+          instanceKey="id"
+          instanceLabel="item_name"
+          instanceValue={catalogValue}
+          onSelectItem={(sourceKey: string, key: string, value: any) => {
+            onCatalogItemSelect?.(item.id, sourceKey, key, value);
+          }}
+          onClear={() => {
+            onUpdateFields?.(item.id, {
+              item_master_id: null,
+              item_name: null,
+              rate: null,
+            });
+          }}
+          limit="10"
+          searchParams="item_name"
+          type="item_master"
+          isShowSearch
+          disabled={isDeleting || readOnly}
+          rest={{
+            placeholder: "Search catalog item...",
+          }}
+        />
+        {allowPoMapping && (
+          <Popover
+            open={showMappingDropdown}
+            onOpenChange={setShowMappingDropdown}
           >
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-700 mb-2">
-                {item.purchase_order_line_item_id
-                  ? `Change mapping for "${item?.item_name || truncateText(item?.purchase_order_line_item?.item_name)}"`
-                  : `Map invoice item "${item?.item_name}" to a PO line item:`}
-              </p>
-              <SearchDropDown
-                instanceType="purchase_order_line_item"
-                instanceSourceKey="purchase_order_line_item_id"
-                instanceKey="id"
-                instanceLabel="item_name"
-                instanceValue={currentValue}
-                defaultValue={poLineItemsForDropdown}
-                onSelectItem={
-                  item.purchase_order_line_item_id
-                    ? handleItemSelection
-                    : handlePOItemSelection
-                }
-                limit="10"
-                searchParams="item_name"
-                isShowSearch
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "w-full text-left",
+                  "flex items-center justify-between gap-2",
+                  "px-1 py-0.5 rounded",
+                  "transition-colors duration-200",
+                )}
                 disabled={isDeleting || readOnly}
-                skipApiCall
-                excludeIds={itemDetails
-                  .filter(
-                    (otherItem) =>
-                      otherItem?.id !== item?.id &&
-                      otherItem?.purchase_order_line_item_id,
-                  )
-                  .map((otherItem) => otherItem.purchase_order_line_item_id)}
-                rest={{
-                  placeholder: "Search and select PO line item...",
-                }}
-              />
-            </div>
-          </PopoverContent>
-        </Popover>
+              >
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    item.purchase_order_line_item_id
+                      ? "text-muted-foreground"
+                      : "text-amber-700",
+                  )}
+                >
+                  {item.purchase_order_line_item_id
+                    ? `PO: ${truncateText(
+                        item?.purchase_order_line_item?.item_name ||
+                          item?.item_name,
+                        24,
+                      )} (change)`
+                    : "Optional: map to PO item"}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 text-gray-400 flex-shrink-0 transition-transform",
+                    showMappingDropdown && "transform rotate-180",
+                  )}
+                />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-80 p-3"
+              align="start"
+              side="bottom"
+              sideOffset={4}
+            >
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-700 mb-2">
+                  {item.purchase_order_line_item_id
+                    ? `Change PO mapping for "${item?.item_name || truncateText(item?.purchase_order_line_item?.item_name)}"`
+                    : `Optionally map "${item?.item_name || "this line"}" to a PO line item:`}
+                </p>
+                <SearchDropDown
+                  instanceType="purchase_order_line_item"
+                  instanceSourceKey="purchase_order_line_item_id"
+                  instanceKey="id"
+                  instanceLabel="item_name"
+                  instanceValue={currentPoValue}
+                  defaultValue={poLineItemsForDropdown}
+                  onSelectItem={
+                    item.purchase_order_line_item_id
+                      ? handleItemSelection
+                      : handlePOItemSelection
+                  }
+                  limit="10"
+                  searchParams="item_name"
+                  isShowSearch
+                  disabled={isDeleting || readOnly}
+                  skipApiCall
+                  excludeIds={itemDetails
+                    .filter(
+                      (otherItem) =>
+                        otherItem?.id !== item?.id &&
+                        otherItem?.purchase_order_line_item_id,
+                    )
+                    .map((otherItem) => otherItem.purchase_order_line_item_id)}
+                  rest={{
+                    placeholder: "Search and select PO line item...",
+                  }}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
     );
   }, [
+    allowPoMapping,
     item.purchase_order_line_item_id,
     item?.item_name,
     item?.purchase_order_line_item?.item_name,
+    item?.item_master_id,
+    item?.product_id,
     item?.id,
     poLineItemsForDropdown,
     showMappingDropdown,
@@ -395,6 +445,8 @@ const InvoiceLineItemRow: React.FC<InvoiceLineItemRowProps> = ({
     handlePOItemSelection,
     handleItemSelection,
     itemDetails,
+    onCatalogItemSelect,
+    onUpdateFields,
   ]);
 
   // Calculate comparison values for the selected PO line item
@@ -464,32 +516,44 @@ const InvoiceLineItemRow: React.FC<InvoiceLineItemRowProps> = ({
 
       <TableRow className={cn(isDeleting && "opacity-50")}>
         <TableCell>{MemoizedSearchDropDown}</TableCell>
-        <TableCell>
-          <span className="text-sm font-medium">{item?.po_quantity || 0}</span>
-        </TableCell>
-        <TableCell>
-          <span className="text-sm text-gray-600">
-            {item?.purchase_order_line_item?.invoice_qty || 0}
-          </span>
-        </TableCell>
-        <TableCell>
-          {(() => {
-            const available =
-              (item?.po_quantity || 0) -
-              (item?.purchase_order_line_item?.invoice_qty || 0);
-            const colorClass =
-              available === 0
-                ? "text-red-600"
-                : available <= 5
-                  ? "text-orange-600"
-                  : "text-green-600";
-            return (
-              <span className={`text-sm font-semibold ${colorClass}`}>
-                {available}
+        {allowPoMapping && (
+          <>
+            <TableCell>
+              <span className="text-sm font-medium">
+                {item?.purchase_order_line_item_id ? item?.po_quantity || 0 : "—"}
               </span>
-            );
-          })()}
-        </TableCell>
+            </TableCell>
+            <TableCell>
+              <span className="text-sm text-gray-600">
+                {item?.purchase_order_line_item_id
+                  ? item?.purchase_order_line_item?.invoice_qty || 0
+                  : "—"}
+              </span>
+            </TableCell>
+            <TableCell>
+              {item?.purchase_order_line_item_id ? (
+                (() => {
+                  const available =
+                    (item?.po_quantity || 0) -
+                    (item?.purchase_order_line_item?.invoice_qty || 0);
+                  const colorClass =
+                    available === 0
+                      ? "text-red-600"
+                      : available <= 5
+                        ? "text-orange-600"
+                        : "text-green-600";
+                  return (
+                    <span className={`text-sm font-semibold ${colorClass}`}>
+                      {available}
+                    </span>
+                  );
+                })()
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
+            </TableCell>
+          </>
+        )}
         <TableCell>
           <Input
             type="number"
@@ -504,32 +568,110 @@ const InvoiceLineItemRow: React.FC<InvoiceLineItemRowProps> = ({
             className="w-full min-w-[80px] h-8 px-2 text-sm"
             disabled={isDeleting || readOnly}
             max={
-              (item?.po_quantity || 0) -
-              (item?.purchase_order_line_item?.invoice_qty || 0)
+              allowPoMapping && item?.purchase_order_line_item_id
+                ? (item?.po_quantity || 0) -
+                  (item?.purchase_order_line_item?.invoice_qty || 0)
+                : undefined
             }
           />
-        </TableCell>
-        <TableCell>
-          {item?.rate ? formatCurrency(item.rate) : "-"}
         </TableCell>
         <TableCell>
           <Input
             type="number"
-            value={item?.tax_rate ?? ""}
-            onChange={(e) =>
-              onTaxRateChange(item.id, "tax_rate", e.target.value)
-            }
-            onBlur={(e) => onTaxRateBlur(item.id, "tax_rate", e.target.value)}
-            placeholder="Tax Rate"
+            step="any"
+            min="0"
+            value={item?.rate ?? ""}
+            onChange={(e) => onRateChange?.(item.id, e.target.value)}
+            onBlur={(e) => onRateBlur?.(item.id, e.target.value)}
+            placeholder="Rate"
             className="w-full min-w-[80px] h-8 px-2 text-sm"
             disabled={isDeleting || readOnly}
           />
         </TableCell>
+        {showStructuredTax && (
+          <TableCell>
+            <Input
+              defaultValue={item?.classification_code ?? ""}
+              key={`cls-${item.id}-${item?.classification_code ?? ""}`}
+              onBlur={(e) =>
+                onClassificationBlur?.(item.id, e.target.value)
+              }
+              placeholder={taxPack?.classificationLabel || "HSN / SAC"}
+              className="w-full min-w-[80px] h-8 px-2 text-sm"
+              disabled={isDeleting || readOnly}
+            />
+          </TableCell>
+        )}
         <TableCell>
-          {item?.line_tax_amount ? formatCurrency(item?.line_tax_amount) : "-"}
+          {showStructuredTax ? (
+            <div className="space-y-1">
+              <SearchDropDown
+                instanceType="tax_group"
+                instanceSourceKey={`tax_group_${item.id}`}
+                instanceKey="id"
+                instanceLabel="name"
+                searchParams="name"
+                type="tax_group"
+                instanceValue={
+                  item.tax_group_id
+                    ? {
+                        id: item.tax_group_id,
+                        name: item.tax_group_name || item.tax_group_id,
+                      }
+                    : undefined
+                }
+                onSelectItem={(_sk: any, key: string, value: any) => {
+                  onTaxGroupSelect?.(
+                    item.id,
+                    value?.[key] || null,
+                    value?.item,
+                  );
+                }}
+                onClear={() => onTaxGroupSelect?.(item.id, null)}
+                limit="10"
+                isShowSearch
+                style={{ width: "100%", minHeight: "32px" }}
+                disabled={isDeleting || readOnly}
+              />
+              {item.tax_components && item.tax_components.length > 0 ? (
+                <div className="space-y-0.5">
+                  {item.tax_components.map((c: any, idx: number) => (
+                    <p
+                      key={`${item.id}-tc-${idx}`}
+                      className="text-[10px] text-muted-foreground"
+                    >
+                      {(c.component_type || c.tax_name || "tax").toUpperCase()}{" "}
+                      {c.rate}% · {formatCurrency(c.amount, currencyCode)}
+                    </p>
+                  ))}
+                </div>
+              ) : Number(item.tax_rate) ? (
+                <p className="text-[10px] text-muted-foreground">
+                  {item.tax_rate}%
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <Input
+              type="number"
+              value={item?.tax_rate ?? ""}
+              onChange={(e) =>
+                onTaxRateChange(item.id, "tax_rate", e.target.value)
+              }
+              onBlur={(e) => onTaxRateBlur(item.id, "tax_rate", e.target.value)}
+              placeholder="Tax Rate"
+              className="w-full min-w-[80px] h-8 px-2 text-sm"
+              disabled={isDeleting || readOnly}
+            />
+          )}
         </TableCell>
         <TableCell>
-          {item?.line_total ? formatCurrency(item.line_total) : "-"}
+          {item?.line_tax_amount
+            ? formatCurrency(item?.line_tax_amount, currencyCode)
+            : "-"}
+        </TableCell>
+        <TableCell>
+          {item?.line_total ? formatCurrency(item.line_total, currencyCode) : "-"}
         </TableCell>
         <TableCell>
           <Button

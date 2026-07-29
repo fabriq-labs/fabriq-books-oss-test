@@ -24,7 +24,8 @@ if [ ! -x /opt/venv/bin/uvicorn ] || [ ! -f /opt/fabriq-int/sync_service/main.py
 fi
 
 echo "Starting integration sync service on port ${INTEGRATION_SYNC_PORT} (${INTEGRATION_SYNC_URL})..."
-cd /opt/fabriq-int && /opt/venv/bin/uvicorn sync_service.main:app --host 0.0.0.0 --port "${INTEGRATION_SYNC_PORT}" &
+# Use venv python -m uvicorn (avoids broken console-script shebang if PATH/python drift).
+cd /opt/fabriq-int && /opt/venv/bin/python -m uvicorn sync_service.main:app --host 0.0.0.0 --port "${INTEGRATION_SYNC_PORT}" &
 SYNC_PID=$!
 
 echo "Waiting for integration sync service..."

@@ -25,6 +25,12 @@ import prisma from '../lib/prisma';
 import { ERPConnector } from '../lib/integrations/connectors/types';
 import { getHandler, getAllMethodNames } from './handlers/erp/registry';
 import { matchExtractedLineItemsToPO } from './invoiceMatching';
+import { billTypeAndPoMode } from '../lib/bills/poMode';
+import { calculate_invoice_total } from '../lib/actions/zeiv';
+import {
+  resolveExtractedInvoice,
+  buildBillCreatePayloads,
+} from './invoiceExtractResolve';
 import { preparePostingCreatePayload, attachLegalEntityScopeToToolResult } from './postingCreateHelpers';
 import {
   normalizeSearchParam,
@@ -1360,7 +1366,7 @@ export function processInvoiceFromPdfTool(auth: AuthContext) {
           invoice_date: extractedData.data.invoice.invoice_date,
           invoice_version: extractedData.data.invoice.invoice_version || 1,
           invoice_status: 'PENDING',
-          invoice_type: 'PURCHASE',
+          ...billTypeAndPoMode(poData ? 'With PO' : 'Without PO'),
           supplier_name: extractedData.data.invoice.supplier_name || poData?.supplier_details?.supplier_name,
           supplier_remarks: extractedData.data.invoice.supplier_remarks,
           shipping_terms: extractedData.data.invoice.shipping_terms || poData?.supplier_details?.shipping_terms?.shipping_terms,
@@ -1485,7 +1491,10 @@ export function processInvoiceFromPdfTool(auth: AuthContext) {
  * The AI SDK reads the file, extracts data according to the schema, and calls this tool with the extracted data.
  * If PO is found and all extracted line items match PO lines (by item name/code), creates the invoice and line items and returns created_invoice_id.
  */
-export function extractInvoiceFromFileTool(auth: AuthContext) {
+export function extractInvoiceFromFileTool(
+  auth: AuthContext,
+  toolContext?: { preferredLegalEntityId?: string | null; legalEntityId?: string | null; modelContext?: Record<string, any> },
+) {
   return tool({
     parameters: extractInvoiceFromFileSchema,
     description: getDescription('extractInvoiceFromFile'),
@@ -1527,6 +1536,24 @@ export function extractInvoiceFromFileTool(auth: AuthContext) {
         let createdInvoiceId: string | undefined;
         let rejectionReason: string | undefined;
 
+        const preferredLegalEntityId =
+          toolContext?.preferredLegalEntityId ||
+          toolContext?.legalEntityId ||
+          toolContext?.modelContext?.preferredLegalEntityId ||
+          toolContext?.modelContext?.legalEntityId ||
+          toolContext?.modelContext?.legal_entity_id ||
+          null;
+
+        // Resolve tax/party/currency FKs for create + FE preview (no new API).
+        let resolved: Awaited<ReturnType<typeof resolveExtractedInvoice>> | null = null;
+        try {
+          resolved = await resolveExtractedInvoice(auth, params, { preferredLegalEntityId });
+        } catch (resolveErr) {
+          logger.warn('extractInvoiceFromFile resolve failed; continuing without resolved FKs', {
+            error: resolveErr instanceof Error ? resolveErr.message : 'Unknown error',
+          });
+        }
+
         if (!poNumber) {
           rejectionReason = 'No PO number found on invoice';
         } else if (!purchaseOrder) {
@@ -1551,50 +1578,33 @@ export function extractInvoiceFromFileTool(auth: AuthContext) {
             }
 
             if (allMatched && mapping.length === params.line_items.length) {
-              const inv = params.invoice || {};
-              const invoiceDate = inv.invoice_date
-                ? (typeof inv.invoice_date === 'string' ? new Date(inv.invoice_date) : inv.invoice_date)
-                : new Date();
-              const invoiceData: any = {
-                invoice_type: 'With PO',
-                status: '9',
-                invoice_number: inv.invoice_number,
-                invoice_date: invoiceDate,
-                supplier_name: inv.supplier_name,
-                payment_terms: inv.payment_terms,
-                shipping_terms: inv.shipping_terms,
-                shipping_method: inv.shipping_method,
-                po_number: purchaseOrder.po_number ?? poNumber,
-                purchase_order_id: purchaseOrder.id,
-                invoice_net_total: inv.invoice_net_total ?? inv.invoice_total,
-                invoice_total: inv.invoice_total ?? inv.invoice_net_total,
-                additional_tax: inv.additional_tax ?? 0,
-                shipping_cost: inv.shipping_cost ?? 0,
-                terms_and_conditions: inv.terms_and_conditions,
-                org_id: auth.user?.org_id,
-                created_by: auth.user?.id,
-                modified_by: auth.user?.id
-              };
+              const effectiveResolved =
+                resolved ||
+                ({
+                  lines: params.line_items.map(() => ({ match: 'none' as const })),
+                } as Awaited<ReturnType<typeof resolveExtractedInvoice>>);
 
-              const lineItemsPayload = params.line_items.map((line: any, i: number) => ({
-                item_name: line.item_name,
-                item_number: line.item_number,
-                item_description: line.item_description,
-                item_type: line.item_type,
-                rate: line.rate ?? 0,
-                ordered_quantity: line.ordered_quantity ?? line.quantity ?? line.invoice_qty,
-                ordered_amount: line.ordered_amount ?? line.line_total ?? line.invoiced_amount,
-                invoice_qty: line.invoice_qty ?? line.quantity ?? line.ordered_quantity,
-                line_total: line.line_total ?? line.invoiced_amount ?? line.ordered_amount,
-                tax_rate: line.tax_rate,
-                line_tax_amount: line.line_tax_amount,
-                po_number: purchaseOrder.po_number ?? poNumber,
-                purchase_order_item_id: mapping[i]?.poLineItemId,
-                need_by_date: line.need_by_date ? (typeof line.need_by_date === 'string' ? new Date(line.need_by_date) : line.need_by_date) : undefined
-              }));
+              // Prefer supplier from PO when present
+              if (purchaseOrder.supplier_id && !effectiveResolved.supplier_id) {
+                effectiveResolved.supplier_id = purchaseOrder.supplier_id;
+              }
+              if (purchaseOrder.supplier_details?.supplier_name && !effectiveResolved.supplier_name) {
+                effectiveResolved.supplier_name = purchaseOrder.supplier_details.supplier_name;
+              }
+
+              const { invoicePayload, linePayloads } = buildBillCreatePayloads({
+                extracted: params,
+                resolved: effectiveResolved,
+                withPO: true,
+                purchaseOrderId: purchaseOrder.id,
+                poNumber: purchaseOrder.po_number ?? poNumber,
+                poLineMapping: mapping.map((m: any) => ({ poLineItemId: m?.poLineItemId })),
+                orgId: auth.user?.org_id,
+                userId: auth.user?.id,
+              });
 
               const createdInvoiceIdFromTx = await prisma.$transaction(async (tx: any) => {
-                const createdInvoiceResult = await modelService.create('invoice', auth, invoiceData, {}, tx);
+                const createdInvoiceResult = await modelService.create('invoice', auth, invoicePayload, {}, tx);
                 if (!createdInvoiceResult.success || !createdInvoiceResult.data?.id) {
                   throw new Error(createdInvoiceResult.error ?? 'Failed to create invoice');
                 }
@@ -1604,20 +1614,31 @@ export function extractInvoiceFromFileTool(auth: AuthContext) {
                   createdInvoice.id,
                   'invoice_line_item',
                   auth,
-                  lineItemsPayload,
+                  linePayloads,
                   {},
                   tx
                 );
                 if (!addResult.success) {
                   throw new Error(addResult.error ?? 'Failed to add invoice line items');
                 }
+                // ensure totals even if ADD side-path skipped (same tx)
+                await calculate_invoice_total(
+                  auth,
+                  'invoice',
+                  createdInvoice.id,
+                  ['invoice_qty', 'rate', 'tax_rate', 'tax_group_id'],
+                  {},
+                  tx,
+                );
                 return createdInvoice.id;
               });
 
               createdInvoiceId = createdInvoiceIdFromTx;
               logger.info('Auto-created invoice from extracted data with PO match', {
                 invoiceId: createdInvoiceId,
-                lineItemCount: lineItemsPayload.length
+                lineItemCount: linePayloads.length,
+                supplier_id: invoicePayload.supplier_id,
+                currency_id: invoicePayload.currency_id,
               });
             }
           } catch (createError) {
@@ -1633,7 +1654,8 @@ export function extractInvoiceFromFileTool(auth: AuthContext) {
         // Build response data with invoice and purchase order details
         const responseData: any = {
           ...params,
-          ...(purchaseOrder ? { purchase_order: purchaseOrder } : {})
+          ...(purchaseOrder ? { purchase_order: purchaseOrder } : {}),
+          ...(resolved ? { resolved } : {}),
         };
         const baseMessage = `Invoice extracted successfully. Found ${params.line_items?.length || 0} line items. ${purchaseOrder ? 'Purchase order found.' : 'No purchase order found.'} `;
         const message = createdInvoiceId
