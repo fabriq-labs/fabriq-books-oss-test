@@ -46,6 +46,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Setting up / deploying the system | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) |
 | Container image build & run (Dockerfile, GHCR, compose) | [docs/BUILD_AND_DEPLOY.md](./docs/BUILD_AND_DEPLOY.md) |
 | Railway: Artifact Registry image + Vertex/Gemini auth | [docs/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./docs/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md) |
+| Railway logs / debug from Cursor agent (`RAILWAY_TOKEN`) | [.cursor/skills/railway-debug/SKILL.md](./.cursor/skills/railway-debug/SKILL.md) · [docs/BUILD_AND_DEPLOY.md](./docs/BUILD_AND_DEPLOY.md) (§ Cursor / cloud-agent access) |
 | Authentication issues or changes | [docs/AUTHENTICATION.md](./docs/AUTHENTICATION.md) |
 | Workflow engine questions | [docs/WORKFLOWS.md](./docs/WORKFLOWS.md) |
 | AI agent / LLM integration | [docs/AI_AGENT.md](./docs/AI_AGENT.md) |
