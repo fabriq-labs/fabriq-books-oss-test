@@ -30,3 +30,7 @@ jobs:
       no_cache: ${{ inputs.no_cache }}
     secrets:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    # Top-level caller must grant what nested reusable jobs request (GHCR push).
+    permissions:
+      contents: read
+      packages: write
