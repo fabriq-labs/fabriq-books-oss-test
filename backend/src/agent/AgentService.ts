@@ -33,23 +33,6 @@ const DEFAULT_MAX_STEPS = 5;
 /** Hard cap for streamText consume (extract / non-SSE). Override via AGENT_STREAM_TIMEOUT_MS. */
 const DEFAULT_STREAM_TIMEOUT_MS = 120_000;
 
-/**
- * Cap completion tokens for agent generateText/streamText calls.
- * Some LLM gateways reserve credits against max_tokens; leaving the model
- * default (often 65536) can 402 when remaining credits are slightly lower.
- * Override via AGENT_MAX_OUTPUT_TOKENS (falls back to LLM_MAX_OUTPUT_TOKENS).
- */
-const DEFAULT_AGENT_MAX_OUTPUT_TOKENS = 8192;
-
-function getAgentMaxOutputTokens(): number {
-  const raw = parseInt(
-    process.env.AGENT_MAX_OUTPUT_TOKENS || process.env.LLM_MAX_OUTPUT_TOKENS || '',
-    10
-  );
-  if (Number.isFinite(raw) && raw > 0) return raw;
-  return DEFAULT_AGENT_MAX_OUTPUT_TOKENS;
-}
-
 // When a session targets a specific goal_model, only include these related models
 // in the system prompt to reduce noise and improve LLM accuracy
 const RELATED_MODELS: Record<string, string[]> = {
@@ -310,7 +293,6 @@ export class AgentService {
         messages: allMessages as any,
         tools,
         maxSteps,  // Configurable via AGENT_MAX_STEPS env
-        maxTokens: getAgentMaxOutputTokens(),
 
         onStepFinish: async ({ text, toolCalls, stepType }) => {
           if (!sessionId) return;
@@ -744,7 +726,6 @@ export class AgentService {
         messages: allMessages as any, // Includes system prompt + session history (matches handleRequest pattern)
         tools,
         maxSteps,  // Configurable via AGENT_MAX_STEPS env
-        maxTokens: getAgentMaxOutputTokens(),
 
         onError: ({ error }) => {
           logger.error('streamText error during agent chat', {
@@ -981,7 +962,6 @@ export class AgentService {
         messages: processedMessages as any,
         tools,
         maxSteps,
-        maxTokens: getAgentMaxOutputTokens(),
         abortSignal: abortController.signal,
         maxRetries: typeof context?.maxRetries === 'number' ? context.maxRetries : 1,
         onError: ({ error }) => {
