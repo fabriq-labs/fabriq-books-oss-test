@@ -59,6 +59,30 @@ export class GracefulShutdown {
 
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
+
+    // Async stream failures should be handled at the route layer; this is a
+    // last-resort log so one rejected promise does not take down the API.
+    process.on('unhandledRejection', (reason) => {
+      const message =
+        reason instanceof Error
+          ? reason.message
+          : typeof reason === 'string'
+            ? reason
+            : JSON.stringify(reason);
+      logger.error('Unhandled promise rejection (process kept alive)', {
+        error: message,
+        stack: reason instanceof Error ? reason.stack : undefined,
+      });
+    });
+
+    // Fatal sync exceptions: exit so start-*.sh's backend watchdog can respawn Node.
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught exception — exiting so process supervisor can restart', {
+        error: error?.message,
+        stack: error?.stack,
+      });
+      process.exit(1);
+    });
   }
 
   /**

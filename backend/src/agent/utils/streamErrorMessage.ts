@@ -79,6 +79,8 @@ export function getAgentHttpStatusCode(error: unknown): number {
 
   const providerStatus = getApiCallStatusCode(error);
   if (providerStatus === 401 || providerStatus === 403) return 502;
+  // Some LLM gateways return 402 when the key lacks credits for reserved max_tokens.
+  if (providerStatus === 402) return 402;
   if (providerStatus === 429) return 429;
   if (providerStatus != null && providerStatus >= 400 && providerStatus < 600) return 502;
 
@@ -108,6 +110,14 @@ export function getAgentStreamErrorMessage(error: unknown): string {
         ? `${base.replace(/\.\s*$/, '')}. Check LLM API credentials.`
         : `${base.replace(/\.\s*$/, '')}. Check LLM API credentials.`;
       return withHint;
+    }
+
+    if (providerStatus === 402) {
+      const detail = providerDetail || error.message;
+      if (/credits|max_tokens|afford/i.test(detail)) {
+        return `LLM provider out of credits or max_tokens too high (402): ${detail}`;
+      }
+      return `LLM provider payment/credits error (402): ${detail}`;
     }
 
     let message = providerDetail && providerDetail !== error.message

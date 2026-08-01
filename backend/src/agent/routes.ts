@@ -30,7 +30,11 @@ import {
 } from './services/PendingActionService';
 import { getSessionTrace } from './services/SessionTraceService';
 import { sessionEventBus } from './services/SessionEventBus';
-import { formatAgentHttpError, getAgentHttpStatusCode } from './utils/streamErrorMessage';
+import {
+  formatAgentHttpError,
+  getAgentHttpStatusCode,
+  getAgentStreamErrorMessage,
+} from './utils/streamErrorMessage';
 import {
   buildBillUploadDataUri,
   resolveBillUploadMime,
@@ -133,13 +137,6 @@ export function createAgentRouter() {
   // Streaming chat endpoint
   router.post('/chat/stream', authMiddleware, async (req: Request, res) => {
     try {
-      logger.info('Received streaming chat request', {
-        path: req.path,
-        method: req.method,
-        headers: req.headers,
-        body: req.body
-      });
-
       if (!req.context?.auth?.user) {
         return res.status(401).json({ error: "Unauthorized: Missing auth context" });
       }
@@ -161,8 +158,7 @@ export function createAgentRouter() {
         userId: req.context.auth.user.id,
         orgId: req.context.auth.user.org_id,
         messagesCount: messages.length,
-        latestMessage: latestMessage,
-        context: context,
+        contextModelName: context?.modelName,
         sessionId: sessionId,
       });
 
@@ -199,7 +195,54 @@ export function createAgentRouter() {
           } catch (error) {
             this.destroy(error as Error);
           }
+        },
+        destroy(error, callback) {
+          reader.cancel().catch(() => undefined).finally(() => callback(error));
+        },
+      });
+
+      // Unhandled 'error' on a piped Readable crashes the Node process (exit 1).
+      // LLM provider failures (e.g. 402 credit/max_tokens) must be absorbed here.
+      const failSessionBestEffort = async () => {
+        if (!sessionId) return;
+        try {
+          const session = await prisma.agent_session.findUnique({
+            where: { id: sessionId },
+            select: { status: true },
+          });
+          if (session && (session.status === 'planning' || session.status === 'executing')) {
+            await prisma.agent_session.update({
+              where: { id: sessionId },
+              data: { status: 'failed', completed_at: new Date() },
+            });
+          }
+        } catch { /* best-effort */ }
+      };
+
+      readable.on('error', (error) => {
+        logger.error('Streaming chat readable error', {
+          error: getAgentStreamErrorMessage(error),
+          sessionId,
+          userId: req.context?.auth?.user?.id,
+        });
+        void failSessionBestEffort();
+        if (!res.headersSent) {
+          res.status(getAgentHttpStatusCode(error)).json(formatAgentHttpError(error));
+          return;
         }
+        if (!res.writableEnded) {
+          try {
+            res.write(`data: ${JSON.stringify(formatAgentHttpError(error))}\n\n`);
+          } catch { /* ignore */ }
+          res.end();
+        }
+      });
+
+      res.on('error', (error) => {
+        logger.error('Streaming chat response error', {
+          error: error instanceof Error ? error.message : String(error),
+          sessionId,
+        });
       });
 
       // Pipe the readable stream to the response
@@ -207,9 +250,9 @@ export function createAgentRouter() {
 
     } catch (error: any) {
       logger.error('Error in streaming chat request:', {
-        error: error.message,
-        stack: error.stack,
-        requestBody: req.body
+        error: error?.message || getAgentStreamErrorMessage(error),
+        stack: error?.stack,
+        sessionId: req.body?.sessionId,
       });
 
       // Defensively mark session failed if it is still in a running state.
@@ -232,11 +275,12 @@ export function createAgentRouter() {
       }
 
       const httpError = formatAgentHttpError(error);
+      const status = getAgentHttpStatusCode(error);
 
       // If headers haven't been sent yet, send error as JSON
       if (!res.headersSent) {
-        res.status(500).json(httpError);
-      } else {
+        res.status(status).json(httpError);
+      } else if (!res.writableEnded) {
         // If headers were sent, send error as SSE
         res.write(`data: ${JSON.stringify(httpError)}\n\n`);
         res.end();

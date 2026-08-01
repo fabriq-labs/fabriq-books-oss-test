@@ -43,6 +43,28 @@ describe('streamErrorMessage', () => {
     expect(getAgentHttpStatusCode(err)).toBe(429);
   });
 
+  it('maps provider 402 credit/max_tokens errors clearly', () => {
+    const err = new APICallError({
+      message: 'Payment Required',
+      url: 'https://llm.example.test/api/v1/chat/completions', // pragma: allowlist secret
+      requestBodyValues: {},
+      statusCode: 402,
+      responseBody: JSON.stringify({
+        error: {
+          message:
+            'This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 63278.',
+          code: 402,
+        },
+      }),
+      isRetryable: false,
+    });
+
+    expect(getAgentHttpStatusCode(err)).toBe(402);
+    expect(getAgentStreamErrorMessage(err)).toContain('credits');
+    expect(getAgentStreamErrorMessage(err)).toContain('max_tokens');
+    expect(formatAgentHttpError(err).error).toContain('402');
+  });
+
   it('rethrows errors swallowed by AI SDK consumeStream', async () => {
     const providerError = new APICallError({
       message: 'Unauthorized',

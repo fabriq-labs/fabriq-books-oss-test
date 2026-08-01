@@ -24,10 +24,19 @@ if [ "${INTEGRATION_SYNC_ENABLED}" != "false" ]; then
 fi
 sh /start-sync-service.sh
 
-echo "Starting backend on port ${BACKEND_PORT}..."
+echo "Starting backend on port ${BACKEND_PORT} (with auto-restart)..."
 cd /app/backend
-BACKEND_PORT="${BACKEND_PORT}" node dist/index.js &
-BACKEND_PID=$!
+(
+  while true; do
+    BACKEND_PORT="${BACKEND_PORT}" node dist/index.js &
+    BACKEND_PID=$!
+    echo "Backend started with pid ${BACKEND_PID}"
+    wait "${BACKEND_PID}"
+    EXIT_CODE=$?
+    echo "WARNING: Backend (pid ${BACKEND_PID}) exited with code ${EXIT_CODE}; restarting in 2s..."
+    sleep 2
+  done
+) &
 
 echo "Waiting for backend..."
 for i in $(seq 1 30); do
