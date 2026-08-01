@@ -721,6 +721,10 @@ export class AgentService {
         ];
       }
 
+      // Provider errors (e.g. 402) are delivered via the data stream (HTTP 200) and
+      // invoke onError — they do NOT throw into the outer catch. Track them so we
+      // mark the session failed and skip success-path persistence/onFinish.
+      let streamError: unknown;
       const result = streamText({
         model: getModel('agent'),
         messages: allMessages as any, // Includes system prompt + session history (matches handleRequest pattern)
@@ -728,16 +732,40 @@ export class AgentService {
         maxSteps,  // Configurable via AGENT_MAX_STEPS env
 
         onError: ({ error }) => {
+          streamError = error;
+          const errorMessage = getAgentStreamErrorMessage(error);
           logger.error('streamText error during agent chat', {
-            error: getAgentStreamErrorMessage(error),
+            error: errorMessage,
             userId: auth.user?.id,
             sessionId,
             modelName: context?.modelName,
           });
+
+          // Fail the session immediately so the workbench does not stay on "planning".
+          const effectiveSessionId = sessionId || context?.sessionId;
+          if (effectiveSessionId) {
+            void this.markSessionFailed(effectiveSessionId, errorMessage);
+          }
+
+          llmTraceLogger.logTrace({
+            orgId: auth.user?.org_id || 'default',
+            userId: auth.user?.id,
+            sessionId: effectiveSessionId,
+            modelName: context?.modelName,
+            viewName: context?.viewName,
+            recordId: context?.recordId,
+            queryType: classification.type,
+            question: questionText,
+            llmModel: llmModelId,
+            result: { text: '', steps: [], usage: { promptTokens: 0, completionTokens: 0 } },
+            durationMs: Date.now() - startTime,
+            status: 'error',
+            errorMessage,
+          }).catch(() => { });
         },
 
         onStepFinish: async ({ text, toolCalls }) => {
-          if (!sessionId) return;
+          if (!sessionId || streamError) return;
           try {
             const sess = await getAgentSession(sessionId);
             for (const tc of toolCalls ?? []) {
@@ -762,6 +790,9 @@ export class AgentService {
 
         // LLM trace logging — fires when stream completes
         onFinish: async ({ text, usage, steps }) => {
+          // Failures are traced in onError; do not persist a success turn.
+          if (streamError) return;
+
           const durationMs = Date.now() - startTime;
           llmTraceLogger.logTrace({
             orgId: auth.user?.org_id || 'default',
@@ -867,28 +898,11 @@ export class AgentService {
       logger.error('Error handling streaming request', error);
 
       const effectiveSessionId = sessionId || context?.sessionId;
+      const errorMessage = getAgentStreamErrorMessage(error);
 
       // Mark the session failed immediately — don't wait for the 5-min watchdog
       if (effectiveSessionId) {
-        try {
-          const session = await prisma.agent_session.findUnique({
-            where: { id: effectiveSessionId },
-            select: { status: true, org_id: true },
-          });
-          if (session && (session.status === 'planning' || session.status === 'executing')) {
-            await prisma.agent_session.update({
-              where: { id: effectiveSessionId },
-              data: { status: 'failed', completed_at: new Date() },
-            });
-            sessionTimeoutService.cancel(effectiveSessionId);
-            sessionEventBus.emitSessionEvent(effectiveSessionId, session.org_id, 'session_status_changed', {
-              status: 'failed',
-              reason: (error as Error).message,
-            });
-          }
-        } catch (updateErr) {
-          logger.error('Failed to mark session as failed', { sessionId: effectiveSessionId, updateErr });
-        }
+        await this.markSessionFailed(effectiveSessionId, errorMessage);
       }
 
       // Fire-and-forget: log error trace with correct session_id
@@ -906,11 +920,38 @@ export class AgentService {
           result: { text: '', steps: [], usage: { promptTokens: 0, completionTokens: 0 } },
           durationMs: 0,
           status: 'error',
-          errorMessage: (error as Error).message,
+          errorMessage,
         }).catch(() => { });
       } catch { /* ignore */ }
 
       throw error;
+    }
+  }
+
+  /**
+   * Mark a workbench session failed after a provider/stream error.
+   * Safe to call multiple times; only transitions planning/executing → failed.
+   */
+  private async markSessionFailed(sessionId: string, reason: string): Promise<void> {
+    try {
+      const session = await prisma.agent_session.findUnique({
+        where: { id: sessionId },
+        select: { status: true, org_id: true },
+      });
+      if (!session || (session.status !== 'planning' && session.status !== 'executing')) {
+        return;
+      }
+      await prisma.agent_session.update({
+        where: { id: sessionId },
+        data: { status: 'failed', completed_at: new Date() },
+      });
+      sessionTimeoutService.cancel(sessionId);
+      sessionEventBus.emitSessionEvent(sessionId, session.org_id, 'session_status_changed', {
+        status: 'failed',
+        reason,
+      });
+    } catch (updateErr) {
+      logger.error('Failed to mark session as failed', { sessionId, updateErr });
     }
   }
 
