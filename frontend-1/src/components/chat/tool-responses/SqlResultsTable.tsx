@@ -44,7 +44,10 @@ export const SqlResultsTable: React.FC<SqlResultsTableProps> = ({
     columns,
     resultType
 }) => {
-    if (!data || data.length === 0) {
+    const rows = Array.isArray(data) ? data : [];
+    const cols = Array.isArray(columns) ? columns : [];
+
+    if (rows.length === 0) {
         return (
             <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border">
                 <p>No data returned from the query</p>
@@ -95,7 +98,7 @@ export const SqlResultsTable: React.FC<SqlResultsTableProps> = ({
                         SQL Query Results
                     </h3>
                     <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
-                        {data.length} row{data.length !== 1 ? 's' : ''}
+                        {rows.length} row{rows.length !== 1 ? 's' : ''}
                     </span>
                 </div>
             </div>
@@ -104,7 +107,7 @@ export const SqlResultsTable: React.FC<SqlResultsTableProps> = ({
                 <table className="w-full">
                     <thead className="bg-gray-50">
                         <tr>
-                            {columns.map((column, index) => (
+                            {cols.map((column, index) => (
                                 <th
                                     key={index}
                                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200"
@@ -115,12 +118,12 @@ export const SqlResultsTable: React.FC<SqlResultsTableProps> = ({
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {data.map((row, rowIndex) => (
+                        {rows.map((row, rowIndex) => (
                             <tr
                                 key={rowIndex}
                                 className="hover:bg-gray-50 transition-colors"
                             >
-                                {columns.map((column, colIndex) => (
+                                {cols.map((column, colIndex) => (
                                     <td
                                         key={colIndex}
                                         className="px-4 py-3 text-sm text-gray-900 border-b border-gray-100"

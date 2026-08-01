@@ -24,12 +24,13 @@ import { createERPConnector } from '../lib/integrations/connectors/index';
 import prisma from '../lib/prisma';
 import { ERPConnector } from '../lib/integrations/connectors/types';
 import { getHandler, getAllMethodNames } from './handlers/erp/registry';
-import { matchExtractedLineItemsToPO } from './invoiceMatching';
+import { matchExtractedLineItemsToPO, productLinesForPoMatch } from './invoiceMatching';
 import { billTypeAndPoMode } from '../lib/bills/poMode';
 import { calculate_invoice_total } from '../lib/actions/zeiv';
 import {
   resolveExtractedInvoice,
   buildBillCreatePayloads,
+  sanitizeChargeTaxFields,
 } from './invoiceExtractResolve';
 import { preparePostingCreatePayload, attachLegalEntityScopeToToolResult } from './postingCreateHelpers';
 import {
@@ -1498,11 +1499,20 @@ export function extractInvoiceFromFileTool(
   return tool({
     parameters: extractInvoiceFromFileSchema,
     description: getDescription('extractInvoiceFromFile'),
-    execute: async (params: { invoice: any; line_items: any[]; context?: any }, _options) => {
+    execute: async (
+      params: {
+        invoice: any;
+        line_items: any[];
+        charges?: any[] | null;
+        context?: any;
+      },
+      _options,
+    ) => {
       try {
         logger.debug('Received extracted invoice data', {
           hasInvoice: !!params.invoice,
           lineItemsCount: params.line_items?.length || 0,
+          chargesCount: params.charges?.length || 0,
           hasContext: !!params.context,
           poNumber: params.invoice?.po_number
         });
@@ -1569,19 +1579,22 @@ export function extractInvoiceFromFileTool(
             });
             const poLineItems = (poItemsResult.success && poItemsResult.data ? poItemsResult.data : []) as any[];
 
-            const { allMatched, mapping } = matchExtractedLineItemsToPO(params.line_items, poLineItems);
+            // Match catalog goods only — taxable charges may be unmapped on With PO bills.
+            const productLines = productLinesForPoMatch(params.line_items);
+            const { allMatched, mapping } = matchExtractedLineItemsToPO(productLines, poLineItems);
 
-            if (!allMatched || mapping.length !== params.line_items.length) {
-              const extractedNames = params.line_items.map((li: any) => li.item_name || li.item_number || '(unnamed)');
+            if (!allMatched || mapping.length !== productLines.length) {
+              const extractedNames = productLines.map((li: any) => li.item_name || li.item_number || '(unnamed)');
               const poNames = poLineItems.map((li: any) => li.item_name || li.item_code || '(unnamed)');
               rejectionReason = `Line items do not match PO. Invoice items: [${extractedNames.join(', ')}]. PO items: [${poNames.join(', ')}]`;
             }
 
-            if (allMatched && mapping.length === params.line_items.length) {
+            if (allMatched && mapping.length === productLines.length) {
               const effectiveResolved =
                 resolved ||
                 ({
                   lines: params.line_items.map(() => ({ match: 'none' as const })),
+                  charges: (params.charges || []).map(() => ({ match: 'none' as const })),
                 } as Awaited<ReturnType<typeof resolveExtractedInvoice>>);
 
               // Prefer supplier from PO when present
@@ -1652,8 +1665,12 @@ export function extractInvoiceFromFileTool(
         }
 
         // Build response data with invoice and purchase order details
+        const sanitizedCharges = Array.isArray(params.charges)
+          ? params.charges.map((c: any) => sanitizeChargeTaxFields(c))
+          : params.charges;
         const responseData: any = {
           ...params,
+          ...(sanitizedCharges !== undefined ? { charges: sanitizedCharges } : {}),
           ...(purchaseOrder ? { purchase_order: purchaseOrder } : {}),
           ...(resolved ? { resolved } : {}),
         };

@@ -6,10 +6,34 @@ export function normalizeItemKey(s: string | null | undefined): string {
   return s.trim().toLowerCase();
 }
 
+/** True for extract charge rows / synthetic charge lines (not PO catalog goods). */
+export function isChargeLine(line: { item_type?: string | null } | null | undefined): boolean {
+  const t = String(line?.item_type || '')
+    .trim()
+    .toLowerCase();
+  return (
+    t === 'charge' ||
+    t === 'service_charge' ||
+    t === 'fee' ||
+    t === 'convenience_fee' ||
+    t === 'tip' ||
+    t === 'other_charge'
+  );
+}
+
+/** Product lines only — used for PO all-match auto-create (charges are allowed unmapped). */
+export function productLinesForPoMatch<T extends { item_type?: string | null }>(
+  extractedLineItems: T[] | null | undefined,
+): T[] {
+  return (extractedLineItems || []).filter((l) => !isChargeLine(l));
+}
+
 /**
  * Match extracted invoice line items to PO line items by item name or item code only.
  * Quantity, rate, and totals are not used for matching (they may vary).
  * Each PO line is used at most once.
+ * Callers should pass product lines only (see productLinesForPoMatch) so taxable
+ * service charges do not block auto-create.
  * @returns { allMatched: boolean, mapping: Array<{ poLineItemId: string }> } - one entry per extracted line with matched PO line id, or empty if not all matched.
  */
 export function matchExtractedLineItemsToPO(

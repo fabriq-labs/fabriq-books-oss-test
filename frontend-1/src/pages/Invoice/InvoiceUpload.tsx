@@ -117,6 +117,21 @@ interface ParsedData {
             po_number?: string;
             need_by_date?: string;
         }>;
+        charges?: Array<{
+            charge_type?: string;
+            label?: string;
+            amount?: number;
+            charge_percent?: number;
+            taxable?: boolean;
+            tax_rate?: number;
+            line_tax_amount?: number;
+            tax_components?: Array<{
+                name?: string;
+                component_type?: string;
+                rate?: number;
+                amount?: number;
+            }>;
+        }>;
         context: {
             currency?: string;
             language?: string;
@@ -144,6 +159,13 @@ interface ParsedData {
                 line_tax_amount?: number | null;
                 classification_code?: string | null;
                 classification_scheme?: string | null;
+                match?: string;
+            }>;
+            charges?: Array<{
+                tax_group_id?: string | null;
+                tax_group_code?: string | null;
+                tax_rate?: number | null;
+                line_tax_amount?: number | null;
                 match?: string;
             }>;
         };
@@ -271,8 +293,10 @@ export const InvoiceUpload: React.FC = () => {
                 data: {
                     invoice: extractedData.invoice || {},
                     line_items: extractedData.line_items || [],
+                    charges: (extractedData as { charges?: ParsedData['data']['charges'] }).charges || [],
                     context: extractedData.context || {},
                     purchase_order: extractedData.purchase_order || {},
+                    resolved: (extractedData as { resolved?: ParsedData['data']['resolved'] }).resolved,
                 },
                 metaData: {
                     modelName: 'invoice',
@@ -493,6 +517,7 @@ export const InvoiceUpload: React.FC = () => {
         try {
             const invoice = parsedData.data.invoice;
             const lineItems = parsedData.data.line_items || [];
+            const charges = parsedData.data.charges || [];
             const resolved = parsedData.data.resolved;
 
             // Persist tax / party / currency from extract resolve; default Without PO.
@@ -550,7 +575,20 @@ export const InvoiceUpload: React.FC = () => {
 
             const invoiceId = createResponse.data.id;
 
-            if (lineItems.length > 0) {
+            const chargeTypeLabel = (chargeType?: string, label?: string) => {
+                const printed = String(label || '').trim();
+                if (printed) return printed;
+                const key = String(chargeType || 'service_charge').trim().toLowerCase();
+                if (key === 'convenience_fee') return 'Convenience fee';
+                if (key === 'tip') return 'Tip';
+                if (key === 'freight') return 'Freight';
+                if (key === 'handling') return 'Handling';
+                if (key === 'misc' || key === 'other' || key === 'other_charge') return 'Charge';
+                if (key === 'fee') return 'Fee';
+                return 'Service charge';
+            };
+
+            if (lineItems.length > 0 || charges.length > 0) {
                 for (let i = 0; i < lineItems.length; i++) {
                     const lineItem = lineItems[i];
                     const lr = resolved?.lines?.[i];
@@ -586,6 +624,35 @@ export const InvoiceUpload: React.FC = () => {
                                 lineItem?.ordered_quantity ||
                                 0,
                             need_by_date: lineItem?.need_by_date,
+                        },
+                    );
+                }
+
+                // Taxable fees (service charge, etc.) — same line table, item_type=charge
+                for (let i = 0; i < charges.length; i++) {
+                    const charge = charges[i];
+                    const cr = resolved?.charges?.[i];
+                    const amount = Number(charge?.amount);
+                    if (!Number.isFinite(amount)) continue;
+                    const name = chargeTypeLabel(charge?.charge_type, charge?.label);
+                    await viewAPI.addChild(
+                        'invoice',
+                        invoiceId,
+                        'invoice_view',
+                        'invoice_line_item',
+                        {
+                            item_name: name,
+                            item_description: name,
+                            item_type: 'charge',
+                            rate: amount,
+                            ordered_quantity: 1,
+                            ordered_amount: amount,
+                            invoice_qty: 1,
+                            line_total: amount,
+                            tax_rate: cr ? (cr.tax_rate ?? 0) : (charge?.tax_rate ?? 0),
+                            line_tax_amount:
+                                cr?.line_tax_amount ?? charge?.line_tax_amount ?? undefined,
+                            tax_group_id: cr?.tax_group_id || undefined,
                         },
                     );
                 }
@@ -932,12 +999,20 @@ export const InvoiceUpload: React.FC = () => {
                                     </CardContent>
                                 </Card>
 
-                                {/* Line Items Card */}
-                                {parsedData.data.line_items && parsedData.data.line_items.length > 0 && (
+                                {/* Line Items Card (products + taxable charges) */}
+                                {((parsedData.data.line_items && parsedData.data.line_items.length > 0) ||
+                                    (parsedData.data.charges && parsedData.data.charges.length > 0)) && (
                                     <Card>
                                         <CardHeader>
-                                            <CardTitle>Line Items ({parsedData.data.line_items.length})</CardTitle>
-                                            <CardDescription>Invoice line items extracted from uploaded file</CardDescription>
+                                            <CardTitle>
+                                                Line Items (
+                                                {(parsedData.data.line_items?.length || 0) +
+                                                    (parsedData.data.charges?.length || 0)}
+                                                )
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Goods/services and taxable charges extracted from the uploaded file
+                                            </CardDescription>
                                         </CardHeader>
                                         <CardContent>
                                             <div className="overflow-x-auto">
@@ -969,7 +1044,7 @@ export const InvoiceUpload: React.FC = () => {
                                                             const taxRate = lr?.tax_rate ?? item.tax_rate;
                                                             const taxGroup = lr?.tax_group_code;
                                                             return (
-                                                            <tr key={index} className="border-b hover:bg-gray-50">
+                                                            <tr key={`line-${index}`} className="border-b hover:bg-gray-50">
                                                                 <td className="p-3 text-sm text-gray-900">{item.item_name || '-'}</td>
                                                                 <td className="p-3 text-sm text-gray-600">{item.item_description || '-'}</td>
                                                                 <td className="p-3 text-sm text-gray-900">{hsn}</td>
@@ -991,6 +1066,50 @@ export const InvoiceUpload: React.FC = () => {
                                                                     {currencyLabel}{(item.line_total || item.invoiced_amount || 0).toLocaleString()}
                                                                 </td>
                                                             </tr>
+                                                            );
+                                                        })}
+                                                        {(parsedData.data.charges || []).map((charge, index) => {
+                                                            const cr = parsedData.data.resolved?.charges?.[index];
+                                                            const currencyLabel =
+                                                                parsedData.data.resolved?.currency_code ||
+                                                                parsedData.data.context?.currency ||
+                                                                '';
+                                                            const name =
+                                                                String(charge.label || '').trim() ||
+                                                                (String(charge.charge_type || '')
+                                                                    .replace(/_/g, ' ')
+                                                                    .replace(/\b\w/g, (c) => c.toUpperCase()) ||
+                                                                    'Service charge');
+                                                            const taxRate = cr ? cr.tax_rate : charge.tax_rate;
+                                                            const taxGroup = cr?.tax_group_code;
+                                                            return (
+                                                                <tr key={`charge-${index}`} className="border-b hover:bg-gray-50">
+                                                                    <td className="p-3 text-sm text-gray-900">{name}</td>
+                                                                    <td className="p-3 text-sm text-gray-600">Charge</td>
+                                                                    <td className="p-3 text-sm text-gray-900">-</td>
+                                                                    <td className="p-3 text-sm text-gray-900 text-right">1</td>
+                                                                    <td className="p-3 text-sm text-gray-900 text-right">
+                                                                        {currencyLabel}{(charge.amount || 0).toLocaleString()}
+                                                                    </td>
+                                                                    <td className="p-3 text-sm text-gray-900 text-right">
+                                                                        {taxGroup
+                                                                            ? taxGroup
+                                                                            : taxRate != null
+                                                                              ? `${taxRate}%`
+                                                                              : '-'}
+                                                                    </td>
+                                                                    <td className="p-3 text-sm text-gray-900 text-right">
+                                                                        {currencyLabel}
+                                                                        {(
+                                                                            cr?.line_tax_amount ??
+                                                                            charge.line_tax_amount ??
+                                                                            0
+                                                                        ).toLocaleString()}
+                                                                    </td>
+                                                                    <td className="p-3 text-sm font-semibold text-gray-900 text-right">
+                                                                        {currencyLabel}{(charge.amount || 0).toLocaleString()}
+                                                                    </td>
+                                                                </tr>
                                                             );
                                                         })}
                                                     </tbody>

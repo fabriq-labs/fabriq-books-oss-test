@@ -349,8 +349,7 @@ export default function TenantAdministrationPage() {
       const res = await adminAPI.devOptionsSyncMetadata();
       const v = res.stats.views;
       const p = res.stats.promptTemplates;
-      const c = res.stats.currencies;
-      const summary = `Views: ${v.created} created, ${v.updated} updated, ${v.errors} errors. Prompts: ${p.created} created, ${p.updated} updated, ${p.errors} errors. Currencies: ${res.currenciesSeeded ? "seeded" : "skipped"} (${c.total} total). Agent templates: ${res.agentTemplatesSeeded ? "seeded" : "skipped"}.`;
+      const summary = `Views: ${v.created} created, ${v.updated} updated, ${v.errors} errors. Prompts: ${p.created} created, ${p.updated} updated, ${p.errors} errors.`;
       setLastSyncStats(summary);
       toast({ title: "Metadata synced", description: res.message });
     } catch (err) {
@@ -503,12 +502,12 @@ export default function TenantAdministrationPage() {
         <CardHeader>
           <CardTitle>Sync metadata &amp; templates</CardTitle>
           <CardDescription>
-            Syncs views, prompt templates, currencies, and agent templates from the backend repo. Safe to repeat — uses upserts.
+            Syncs views and prompt templates from the backend repo into this database (upserts). Currencies and agent templates are terminal-only: <code className="text-xs">npm run seed-sql-metadata</code> from <code className="text-xs">backend/</code>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button onClick={handleSyncMetadata} disabled={syncing}>
-            {syncing ? "Syncing…" : "Sync views, prompts & agent templates"}
+            {syncing ? "Syncing…" : "Sync views & prompt templates"}
           </Button>
           {lastSyncStats && (
             <p className="text-sm rounded-md border bg-muted/30 p-3 font-mono text-xs">

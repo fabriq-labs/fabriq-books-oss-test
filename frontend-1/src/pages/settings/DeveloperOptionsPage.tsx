@@ -20,8 +20,7 @@ export default function DeveloperOptionsPage() {
       const res = await adminAPI.devOptionsSyncMetadata();
       const v = res.stats.views;
       const p = res.stats.promptTemplates;
-      const c = res.stats.currencies;
-      const summary = `Views: ${v.created} created, ${v.updated} updated, ${v.errors} errors. Prompt templates: ${p.created} created, ${p.updated} updated, ${p.errors} errors. Currencies: ${res.currenciesSeeded ? "seeded" : "skipped"} (${c.total} total). Agent templates: ${res.agentTemplatesSeeded ? "seeded" : "skipped"}.`;
+      const summary = `Views: ${v.created} created, ${v.updated} updated, ${v.errors} errors. Prompt templates: ${p.created} created, ${p.updated} updated, ${p.errors} errors.`;
       setLastStats(summary);
       toast({
         title: "Metadata synced",
@@ -53,14 +52,13 @@ export default function DeveloperOptionsPage() {
           <CardTitle>Sync metadata from repo</CardTitle>
           <CardDescription>
             Runs the same steps as <code className="text-xs">npm run sync-metadata</code> (views and prompt
-            templates from <code className="text-xs">backend/prisma/metadata/</code>), then applies{" "}
-            <code className="text-xs">seed-agent-templates.sql</code> for system agent templates. Safe to repeat;
-            agent templates use upserts.
+            templates from <code className="text-xs">backend/prisma/metadata/</code>). Currencies and agent
+            templates: terminal only — <code className="text-xs">npm run seed-sql-metadata</code>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button onClick={handleSyncMetadata} disabled={syncing}>
-            {syncing ? "Syncing…" : "Sync views, prompts & agent templates"}
+            {syncing ? "Syncing…" : "Sync views & prompt templates"}
           </Button>
           {lastStats && (
             <p className="text-sm text-muted-foreground rounded-md border bg-muted/30 p-3 font-mono text-xs">

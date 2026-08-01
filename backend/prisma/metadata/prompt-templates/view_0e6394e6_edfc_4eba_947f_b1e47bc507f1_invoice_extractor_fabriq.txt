@@ -72,6 +72,20 @@ Your ONLY job when a file is uploaded:
       need_by_date?: string  // ISO format
     }
   ],
+  charges?: [                       // taxable fees — NOT catalog goods, NOT tax rows
+    {
+      charge_type?: string,         // service_charge | convenience_fee | tip | freight | handling | misc | other
+      label?: string,               // short name WITHOUT the fee % (e.g. "Service Charge", not "Service Charge @ 10%")
+      amount?: number,              // fee money BEFORE tax — REQUIRED when a fee is printed (e.g. 69.5)
+      charge_percent?: number,      // fee calculation % as printed (e.g. 10 for "@ 10%"). NOT tax.
+      taxable?: boolean,            // true when the document taxes this fee (footer GST usually includes it)
+      tax_rate?: number,            // GST/VAT combined % on the fee — NEVER copy charge_percent here
+      line_tax_amount?: number,     // tax amount on this fee when printed / allocated
+      tax_components?: [            // tax breakdown for THIS fee (same shape as line tax_components)
+        { name?: string, component_type?: string, rate?: number, amount?: number }
+      ]
+    }
+  ],
   context?: {
     currency?: string,   // ISO 4217 when printed (USD, CAD, EUR, INR, …)
     language?: string,
@@ -91,12 +105,16 @@ CRITICAL RULES:
 - PO NUMBER: If a PO starts with P then digits, use "PO" (letter O), not "P0" (digit zero). Example: PO000001, not P0000001.
 - Totals: invoice_net_total = taxable goods/services before tax; invoice_total = amount due including tax. Do not set both to the pre-tax subtotal when a tax-inclusive total is printed.
 
-LINE ITEMS vs TAX (very important):
-- line_items must contain ONLY goods or services being purchased/sold.
+LINE ITEMS vs CHARGES vs TAX (very important):
+- line_items must contain ONLY goods or services being purchased/sold (catalog products).
 - NEVER create a line_item for tax itself. Labels that are tax names or tax summaries are not products — including (non-exhaustive) VAT, GST, sales tax, HST, PST, QST, CGST, SGST, IGST, UTGST, excise, withholding, or rows that are only a rate/%/tax amount with no product.
-- When the document shows a tax breakdown (footer, summary, or per line), put it in tax_components on the related product line(s), and set tax_rate / line_tax_amount when known.
-- If tax is shown only as a document footer (same rates for the bill), still do NOT invent tax line_items. Apply those components/rates to each product line; allocate component amounts across lines when the document does not give per-line tax amounts (proportional to line_total is fine).
-- tax_components.name = label as printed; component_type = short type token when obvious (e.g. vat, hst, cgst, sgst, igst, sales_tax); rate = percent; amount = money for that component on that line.
+- Put service charge, convenience fee, tip, or similar surcharges in charges[] — not in line_items and not as tax rows. Allow multiple charges when the document shows several.
+- SERVICE CHARGE % ≠ TAX %: A row like "Service Charge @ 10%" = 69.50 means charge_percent=10 and amount=69.5. The 10 is how the fee was computed from the net; it is NOT GST/VAT. Do NOT set tax_rate=10 for that reason. Record the money (69.5); charge_percent is optional/informational.
+- If a charge is taxable, set taxable=true and fill tax_components / tax_rate / line_tax_amount from GST/VAT printed on the fee OR from the document footer rates that apply to (net + charges). Prefer receipt contents; when the fee is in the taxable base with the goods, apply the same CGST/SGST (or VAT) rates/components to the charge as to the product lines.
+- When the document shows a tax breakdown (footer, summary, or per line) on products, put it in tax_components on the related product line(s), and set tax_rate / line_tax_amount when known.
+- If tax is shown only as a document footer (same rates for the bill), still do NOT invent tax line_items. Apply those components/rates to each product line (and to taxable charges when the fee is taxed the same way); allocate component amounts across lines+charges when the document does not give per-line tax amounts (proportional to amount is fine).
+- Example (restaurant receipt): Net 695, Service Charge @ 10% = 69.5, CGST 2.5% = 19.11, SGST 2.5% = 19.11, Total 803 → three product lines with tax_rate 5 and tax_components CGST 2.5 + SGST 2.5; one charge { label: "Service Charge", amount: 69.5, charge_percent: 10, taxable: true, tax_rate: 5, tax_components: CGST 2.5 + SGST 2.5 }. Never put 10 in tax_rate.
+- tax_components.name = label as printed; component_type = short type token when obvious (e.g. vat, hst, cgst, sgst, igst, sales_tax); rate = percent; amount = money for that component on that line or charge.
 - Do not invent a tax group code or jurisdiction pack name. Downstream code maps components to tax groups.
 
 TAX / PARTY FIELDS (country-agnostic):

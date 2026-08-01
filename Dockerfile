@@ -42,7 +42,7 @@ RUN apk add --no-cache python3 make g++
 COPY backend/package*.json ./
 COPY backend/prisma ./prisma/
 
-RUN npm install
+RUN npm ci
 
 COPY backend/ ./
 
@@ -81,12 +81,9 @@ COPY --from=source /src/backend/integrations/sync_service ./sync_service
 
 ENV PYTHONPATH=/opt/fabriq-int
 
-# Stage 2b: Git + image metadata for debugging (SHA, message, commit date, branches, build time, tag)
-# Stage 2b: Image metadata for debugging (monorepo commit, ref, build time, tag)
+# Stage 2b: Image metadata JSON (env-only — do not COPY app trees or this stage
+# invalidates on every code change and slows the build for no benefit).
 FROM node:20-alpine AS build-info
-WORKDIR /work
-COPY backend /src/backend
-COPY frontend-1 /src/frontend-1
 COPY docker-build-info.js /docker-build-info.js
 
 ARG SOURCE_REF=unknown
@@ -96,7 +93,7 @@ ARG SOURCE_COMMIT_MESSAGE_B64=
 ARG SOURCE_COMMIT_DATE=
 ARG BUILD_TIME
 ARG IMAGE_TAG=unknown
-# Bust cache when CI passes a new value (e.g. commit SHA).
+# Bust this stage only (not runtime apk / npm) when CI passes a new commit.
 ARG CACHEBUST=1
 
 ENV SOURCE_REF=${SOURCE_REF}
@@ -110,21 +107,12 @@ RUN BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
     export BUILD_TIME && \
     node /docker-build-info.js
 
-# Stage 3: Final image (nginx + node + PostgreSQL; start script chosen by USE_EMBEDDED_PG)
-FROM nginx:alpine
+# Stage 3a: OS + pinned Node runtime deps.
+# Keep this stage free of per-build ARG/LABEL (BUILD_TIME, IMAGE_TAG, SOURCE_*) so
+# code-only CI rebuilds can CACHED the heavy apk (postgres, tesseract, gcc, …).
+FROM nginx:alpine AS runtime-deps
 
 ARG NODE_RUNTIME_VERSION=24.14.1
-ARG BUILD_TIME
-ARG IMAGE_TAG=unknown
-ARG SOURCE_REF=unknown
-
-LABEL org.opencontainers.image.created="${BUILD_TIME}"
-LABEL org.opencontainers.image.title="fabriq"
-LABEL fabriq.source.ref="${SOURCE_REF}"
-LABEL fabriq.backend.branch="${SOURCE_REF}"
-LABEL fabriq.frontend.branch="${SOURCE_REF}"
-LABEL fabriq.image.tag="${IMAGE_TAG}"
-LABEL fabriq.node.runtime="${NODE_RUNTIME_VERSION}"
 
 RUN apk add --no-cache \
     wget \
@@ -150,6 +138,11 @@ RUN ln -sf /usr/local/bin/node /usr/bin/node \
  && node -v | grep -q "v${NODE_RUNTIME_VERSION}"
 
 WORKDIR /app
+
+# Stage 3: Final image (app layers + labels; start script chosen by USE_EMBEDDED_PG)
+FROM runtime-deps
+
+ARG NODE_RUNTIME_VERSION=24.14.1
 
 COPY --from=sync-service-builder /opt/venv /opt/venv
 COPY --from=sync-service-builder /opt/fabriq-int /opt/fabriq-int
@@ -180,6 +173,19 @@ RUN chmod +x /start.sh /start-with-pg.sh /start-external.sh /start-sync-service.
 
 RUN mkdir -p /app/backend/logs
 RUN mkdir -p /var/lib/postgresql/data && chown -R postgres:postgres /var/lib/postgresql
+
+# Per-build metadata LAST so LABEL/ARG changes do not invalidate apk / Node above.
+ARG BUILD_TIME
+ARG IMAGE_TAG=unknown
+ARG SOURCE_REF=unknown
+
+LABEL org.opencontainers.image.created="${BUILD_TIME}"
+LABEL org.opencontainers.image.title="fabriq"
+LABEL fabriq.source.ref="${SOURCE_REF}"
+LABEL fabriq.backend.branch="${SOURCE_REF}"
+LABEL fabriq.frontend.branch="${SOURCE_REF}"
+LABEL fabriq.image.tag="${IMAGE_TAG}"
+LABEL fabriq.node.runtime="${NODE_RUNTIME_VERSION}"
 
 # Python sync API (POST /sync). Start scripts export INTEGRATION_SYNC_URL when the service is enabled.
 EXPOSE 8080 8081

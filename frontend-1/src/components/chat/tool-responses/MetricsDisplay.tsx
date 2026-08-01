@@ -12,8 +12,9 @@ interface Column {
 }
 
 interface MetricsDisplayProps {
-    data: any[];
-    columns: Column[];
+    /** Single-row metrics object, or legacy array-of-rows shape. */
+    data: Record<string, unknown> | any[];
+    columns?: Column[];
     toolName: string;
     description?: string;
     hideToolBadge?: boolean;
@@ -29,7 +30,13 @@ export const MetricsDisplay: React.FC<MetricsDisplayProps> = ({
     const { formatCurrency, getBaseCurrencyCode } = useCurrencyFormatting();
     const sessionCurrency = getBaseCurrencyCode(); // Get currency from user session
 
-    if (!data || data.length === 0) {
+    const isEmptyArray = Array.isArray(data) && data.length === 0;
+    const isEmptyObject =
+        data != null &&
+        typeof data === 'object' &&
+        !Array.isArray(data) &&
+        Object.keys(data).length === 0;
+    if (data == null || isEmptyArray || isEmptyObject) {
         return null;
     }
 

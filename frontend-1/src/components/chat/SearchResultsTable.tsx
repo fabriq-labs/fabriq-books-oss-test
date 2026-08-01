@@ -68,7 +68,7 @@ export const SearchResultsTable: React.FC<SearchResultsTableProps> = ({
         );
     }, [handleView]);
 
-    if (!data || data.length === 0) {
+    if (!Array.isArray(data) || data.length === 0) {
         return <div className="text-center py-4 text-gray-500">No results found</div>;
     }
 

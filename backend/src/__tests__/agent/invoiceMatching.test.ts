@@ -1,6 +1,8 @@
 import {
   normalizeItemKey,
   matchExtractedLineItemsToPO,
+  isChargeLine,
+  productLinesForPoMatch,
 } from '../../agent/invoiceMatching';
 
 describe('invoiceMatching', () => {
@@ -102,6 +104,20 @@ describe('invoiceMatching', () => {
       );
       expect(result.allMatched).toBe(false);
       expect(result.mapping).toHaveLength(0);
+    });
+
+    it('productLinesForPoMatch drops charge rows so fees do not block all-match', () => {
+      const extracted = [
+        { item_number: 'WDG-001', item_name: 'Widget A' },
+        { item_name: 'Service charge', item_type: 'charge' },
+        { item_name: 'Convenience fee', item_type: 'service_charge' },
+      ];
+      expect(isChargeLine(extracted[1])).toBe(true);
+      const products = productLinesForPoMatch(extracted);
+      expect(products).toHaveLength(1);
+      const result = matchExtractedLineItemsToPO(products, poLineItems);
+      expect(result.allMatched).toBe(true);
+      expect(result.mapping[0].poLineItemId).toBe('po_item_1');
     });
   });
 });

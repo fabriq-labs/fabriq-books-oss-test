@@ -100,10 +100,12 @@ Workflow: **Docker build and push (GHCR)**.
 
 **Image:** `ghcr.io/<owner-lowercase>/<repo-lowercase>:<tag>` (human-readable tag includes branch/ref + timestamp). Find packages under the repository on GitHub.
 
+**Build cache (code-only speed):** Layer cache is shared across branches via a fixed GHA scope (`fabriq-docker`) plus a GHCR `:buildcache` image. The Dockerfile keeps heavy `apk`/Node runtime deps in a `runtime-deps` stage **without** per-build `BUILD_TIME`/`IMAGE_TAG` labels, so code-only changes should hit `CACHED` for `npm ci`/`apk` and only rebuild compile + final app copy. First build (or `no_cache`) is still a full ~8–12 minute cold build.
+
 **Tags pushed per build:**
 - `<branch>-<UTC timestamp>` — unique, immutable tag for this build (e.g. `demo-20260615-180530`); used for rollback/traceability
 - `<branch>-latest` — stable tag that always points at the most recent build for that branch (e.g. `demo-latest`); use this for Railway's "Automatically update to latest tag" or any other tag-polling deploy
-
+- `buildcache` — BuildKit cache image (not a runnable app); used only by CI
 This workflow does **not** deploy to any cloud by itself. Pull the image from GHCR on your host (Railway, Fly, raw VM, Cloud Run with GHCR auth, etc.) and set runtime env vars there.
 
 ### Build + deploy to Railway

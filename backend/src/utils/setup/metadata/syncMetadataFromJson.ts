@@ -1,8 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
-import { runSeedAgentTemplatesSql } from './seedAgentTemplatesSql';
-import { runSeedCurrenciesSql } from './seedCurrenciesSql';
 
 const prisma = new PrismaClient();
 
@@ -17,15 +15,10 @@ export interface SyncMetadataCounts {
   errors: number;
 }
 
+/** Views + prompt templates only (safe for Tenant Admin / container — no `npx`). */
 export interface SyncMetadataResult {
   views: SyncMetadataCounts;
   promptTemplates: SyncMetadataCounts;
-  currencies: {
-    seeded: boolean;
-    total: number;
-  };
-  /** True after `prisma/seed-agent-templates.sql` was applied successfully. */
-  agentTemplatesSeeded: boolean;
 }
 
 export async function main(
@@ -40,8 +33,6 @@ export async function main(
   const result: SyncMetadataResult = {
     views: emptyCounts(),
     promptTemplates: emptyCounts(),
-    currencies: { seeded: false, total: 0 },
-    agentTemplatesSeeded: false,
   };
 
   try {
@@ -279,20 +270,9 @@ export async function main(
       console.log(`   Total Errors: ${totalViewsErrors + totalTemplatesErrors}`);
     }
     console.log('');
-
-    console.log('💱 Seeding global currencies (prisma/seed-currencies.sql)...');
-    console.log('');
-    runSeedCurrenciesSql(backendRoot);
-    result.currencies.total = await prisma.currency.count();
-    result.currencies.seeded = true;
-    console.log('✅ Currencies seed complete (seed-currencies.sql).');
-    console.log('');
-
-    console.log('🤖 Seeding system agent templates (prisma/seed-agent-templates.sql)...');
-    console.log('');
-    runSeedAgentTemplatesSql(backendRoot);
-    result.agentTemplatesSeeded = true;
-    console.log('✅ Agent templates seed complete (seed-agent-templates.sql).');
+    console.log(
+      'Note: currencies + agent templates are not part of this sync. From backend/ run: npm run seed-sql-metadata'
+    );
     console.log('');
 
     return result;

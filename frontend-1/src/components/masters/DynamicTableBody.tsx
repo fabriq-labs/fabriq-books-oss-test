@@ -111,7 +111,7 @@ const DynamicTableBody: React.FC<DynamicTableBodyProps> = ({
 
     return (
         <TableBody>
-            {data?.map((row) => {
+            {(Array.isArray(data) ? data : []).map((row) => {
                 const isExpanded = expandedRows.has(row.id);
                 const hasExpandableContent = enableCollapsible && expandableColumns.length > 0;
 

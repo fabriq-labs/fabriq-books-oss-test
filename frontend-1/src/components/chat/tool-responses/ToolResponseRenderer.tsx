@@ -323,24 +323,41 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({
 
                 // Switch case based on uiHint
                 switch (uiHint) {
-                    case 'table':
+                    case 'table': {
+                        // Single-row analyticsQuery may store resultType=metrics with an
+                        // object payload while still labeling uiHint=table. Route that to
+                        // MetricsDisplay; table components require arrays.
+                        const isObjectPayload =
+                            data != null && typeof data === 'object' && !Array.isArray(data);
+                        if (resultType === 'metrics' || isObjectPayload) {
+                            return wrapToolResult(
+                                <MetricsDisplay
+                                    data={data}
+                                    columns={columns}
+                                    toolName={tool.toolName}
+                                    description={description}
+                                    hideToolBadge
+                                />
+                            );
+                        }
                         if (resultType === 'sql_result') {
                             return wrapToolResult(
                                 <SqlResultsTable
-                                    data={data}
-                                    columns={columns}
+                                    data={Array.isArray(data) ? data : []}
+                                    columns={Array.isArray(columns) ? columns : []}
                                     resultType={resultType}
                                 />
                             );
                         }
                         return wrapToolResult(
                             <SearchResultsTable
-                                data={data}
+                                data={Array.isArray(data) ? data : []}
                                 columns={columns}
                                 modelName={tool.result.model}
                                 metadata={tool.result.metaData}
                             />
                         );
+                    }
 
                     case 'chart':
                         return wrapToolResult(

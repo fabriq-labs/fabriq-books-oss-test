@@ -1,6 +1,6 @@
 /**
- * Sync views and prompt templates from JSON files, then apply prisma/seed-agent-templates.sql
- * (same order as setup-db after JSON metadata).
+ * Sync views and prompt templates from JSON (+ matching .txt for prompts).
+ * Currencies / agent templates: `npm run seed-sql-metadata` (terminal only).
  * Usage: npm run sync-metadata
  */
 export { main, type SyncMetadataResult, type SyncMetadataCounts } from '../src/utils/setup/metadata/syncMetadataFromJson';

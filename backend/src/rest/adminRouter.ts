@@ -397,10 +397,8 @@ adminRouter.post(
         return res.status(200).json({
           success: true,
           message:
-            'Views, prompt templates, and agent templates were synced from the repo into this database.',
+            'Views and prompt templates were synced from the repo into this database. Currencies and agent templates: run `npm run seed-sql-metadata` from backend/ (terminal).',
           stats,
-          currenciesSeeded: stats.currencies.seeded,
-          agentTemplatesSeeded: stats.agentTemplatesSeeded,
         });
       } catch (err: any) {
         logger.error('dev-options sync-metadata failed', {

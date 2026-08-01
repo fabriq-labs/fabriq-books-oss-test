@@ -41,6 +41,123 @@ export type ExtractedLineItem = {
   [key: string]: unknown;
 };
 
+/** Non-catalog fees (service charge, convenience fee, …) — taxable like product lines. */
+export type ExtractedCharge = {
+  charge_type?: string | null;
+  label?: string | null;
+  amount?: number | null;
+  /**
+   * Fee calculation % printed on the document (e.g. "Service Charge @ 10%").
+   * Informational only — NEVER treat as GST/VAT tax_rate.
+   */
+  charge_percent?: number | null;
+  taxable?: boolean | null;
+  tax_rate?: number | null;
+  line_tax_amount?: number | null;
+  tax_components?: ExtractedTaxComponent[] | null;
+  [key: string]: unknown;
+};
+
+/**
+ * Drop tax_rate when it is clearly the fee % mis-copied as tax
+ * (same number as charge_percent, no real tax_components).
+ */
+export function sanitizeChargeTaxFields(charge: ExtractedCharge): ExtractedCharge {
+  const chargePct =
+    charge.charge_percent != null && Number.isFinite(Number(charge.charge_percent))
+      ? Number(charge.charge_percent)
+      : null;
+  const taxRate =
+    charge.tax_rate != null && Number.isFinite(Number(charge.tax_rate))
+      ? Number(charge.tax_rate)
+      : null;
+  const components = Array.isArray(charge.tax_components)
+    ? charge.tax_components.filter(
+        (c) =>
+          c &&
+          ((c.rate != null && Number.isFinite(Number(c.rate))) ||
+            (c.amount != null && Number.isFinite(Number(c.amount)))),
+      )
+    : [];
+
+  if (
+    taxRate != null &&
+    chargePct != null &&
+    Math.abs(taxRate - chargePct) < 1e-6 &&
+    components.length === 0
+  ) {
+    return {
+      ...charge,
+      tax_rate: null,
+      line_tax_amount: null,
+    };
+  }
+
+  // Infer charge_percent from label "… @ 10%" when LLM stuffed that % into tax_rate only
+  if (taxRate != null && components.length === 0 && chargePct == null) {
+    const label = String(charge.label || '');
+    const m = label.match(/@\s*(\d+(?:\.\d+)?)\s*%/i);
+    if (m && Math.abs(Number(m[1]) - taxRate) < 1e-6) {
+      return {
+        ...charge,
+        charge_percent: taxRate,
+        tax_rate: null,
+        line_tax_amount: null,
+        label: label.replace(/\s*@\s*\d+(?:\.\d+)?\s*%/i, '').trim() || charge.label,
+      };
+    }
+  }
+
+  return charge;
+}
+
+const CHARGE_TYPE_LABELS: Record<string, string> = {
+  service_charge: 'Service charge',
+  convenience_fee: 'Convenience fee',
+  tip: 'Tip',
+  freight: 'Freight',
+  handling: 'Handling',
+  misc: 'Miscellaneous charge',
+  other: 'Charge',
+  other_charge: 'Charge',
+  fee: 'Fee',
+};
+
+/** Map extract `charges[]` into synthetic line items (`item_type = charge`). */
+export function chargesToLineItems(
+  charges: ExtractedCharge[] | null | undefined,
+): ExtractedLineItem[] {
+  return (charges || [])
+    .map((raw) => {
+      const c = sanitizeChargeTaxFields(raw);
+      const amount = c.amount != null ? Number(c.amount) : NaN;
+      if (!Number.isFinite(amount)) return null;
+      const typeKey = String(c.charge_type || 'service_charge')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '_');
+      const label =
+        String(c.label || '').trim() ||
+        CHARGE_TYPE_LABELS[typeKey] ||
+        CHARGE_TYPE_LABELS.service_charge;
+      return {
+        item_name: label,
+        item_description: label,
+        item_type: 'charge',
+        rate: amount,
+        invoice_qty: 1,
+        ordered_quantity: 1,
+        ordered_amount: amount,
+        line_total: amount,
+        invoiced_amount: amount,
+        tax_rate: c.tax_rate != null ? Number(c.tax_rate) : null,
+        line_tax_amount: c.line_tax_amount != null ? Number(c.line_tax_amount) : null,
+        tax_components: Array.isArray(c.tax_components) ? c.tax_components : null,
+      } as ExtractedLineItem;
+    })
+    .filter((x): x is ExtractedLineItem => x != null);
+}
+
 export type ExtractedInvoice = {
   invoice_number?: string | null;
   invoice_date?: string | Date | null;
@@ -73,6 +190,8 @@ export type ExtractedContext = {
 export type ResolveExtractedInvoiceInput = {
   invoice?: ExtractedInvoice | null;
   line_items?: ExtractedLineItem[] | null;
+  /** Taxable fees (service charge, etc.) — not product line_items */
+  charges?: ExtractedCharge[] | null;
   context?: ExtractedContext | null;
 };
 
@@ -100,7 +219,10 @@ export type ResolvedInvoiceExtract = {
   place_of_supply?: string | null;
   /** Matched payment_terms master id when extracted text matches a term label */
   payment_terms_id?: string | null;
+  /** Parallel to extracted.line_items */
   lines: ResolvedLineItem[];
+  /** Parallel to extracted.charges (after chargesToLineItems tax resolve) */
+  charges: ResolvedLineItem[];
 };
 
 /** Normalize printed tax labels to component_type-ish tokens (cgst/sgst/igst/…). */
@@ -472,6 +594,66 @@ async function resolveTaxRegionId(
   return row?.id ?? null;
 }
 
+type TaxGroupPool = Awaited<ReturnType<typeof loadTaxGroupsWithComponents>>;
+
+function resolveLineTax(
+  line: ExtractedLineItem,
+  groups: TaxGroupPool,
+): ResolvedLineItem {
+  const { classification_code, classification_scheme } = classificationFromLine(line);
+  const components = Array.isArray(line.tax_components) ? line.tax_components : [];
+  let matched = components.length
+    ? matchTaxGroupIdByComponents(components, groups)
+    : null;
+
+  // If LLM put a single component type on tax_type + tax_rate
+  if (!matched && line.tax_type && line.tax_rate != null) {
+    matched = matchTaxGroupIdByComponents(
+      [{ name: String(line.tax_type), rate: Number(line.tax_rate) }],
+      groups,
+    );
+  }
+
+  if (!matched && components.length === 0 && line.tax_rate != null) {
+    matched = matchTaxGroupIdByFlatRate(Number(line.tax_rate), groups);
+  }
+
+  if (matched) {
+    return {
+      tax_group_id: matched.id,
+      tax_group_code: matched.code,
+      tax_rate: line.tax_rate != null ? Number(line.tax_rate) : null,
+      line_tax_amount:
+        line.line_tax_amount != null ? Number(line.line_tax_amount) : null,
+      classification_code,
+      classification_scheme,
+      match: 'tax_group',
+    };
+  }
+
+  if (line.tax_rate != null && Number.isFinite(Number(line.tax_rate))) {
+    return {
+      tax_group_id: null,
+      tax_rate: Number(line.tax_rate),
+      line_tax_amount:
+        line.line_tax_amount != null ? Number(line.line_tax_amount) : null,
+      classification_code,
+      classification_scheme,
+      match: 'tax_rate',
+    };
+  }
+
+  return {
+    tax_group_id: null,
+    tax_rate: null,
+    line_tax_amount:
+      line.line_tax_amount != null ? Number(line.line_tax_amount) : null,
+    classification_code,
+    classification_scheme,
+    match: 'none',
+  };
+}
+
 /**
  * Resolve extracted invoice fields to FK-ready values for bill create.
  * @param options.preferredLegalEntityId — global entity selector (falls back to HQ)
@@ -483,11 +665,15 @@ export async function resolveExtractedInvoice(
 ): Promise<ResolvedInvoiceExtract> {
   const orgId = auth.user?.org_id;
   if (!orgId) {
-    return { lines: (extracted.line_items || []).map(() => ({ match: 'none' })) };
+    return {
+      lines: (extracted.line_items || []).map(() => ({ match: 'none' })),
+      charges: chargesToLineItems(extracted.charges).map(() => ({ match: 'none' })),
+    };
   }
 
   const invoice = extracted.invoice || {};
   const lines = extracted.line_items || [];
+  const chargeLines = chargesToLineItems(extracted.charges);
   const context = extracted.context || {};
 
   const preferredFromContext =
@@ -539,60 +725,12 @@ export async function resolveExtractedInvoice(
   }
 
   const groups = await loadTaxGroupsWithComponents(orgId);
-  const resolvedLines: ResolvedLineItem[] = lines.map((line) => {
-    const { classification_code, classification_scheme } = classificationFromLine(line);
-    const components = Array.isArray(line.tax_components) ? line.tax_components : [];
-    let matched = components.length
-      ? matchTaxGroupIdByComponents(components, groups)
-      : null;
-
-    // If LLM put a single component type on tax_type + tax_rate
-    if (!matched && line.tax_type && line.tax_rate != null) {
-      matched = matchTaxGroupIdByComponents(
-        [{ name: String(line.tax_type), rate: Number(line.tax_rate) }],
-        groups,
-      );
-    }
-
-    if (!matched && components.length === 0 && line.tax_rate != null) {
-      matched = matchTaxGroupIdByFlatRate(Number(line.tax_rate), groups);
-    }
-
-    if (matched) {
-      return {
-        tax_group_id: matched.id,
-        tax_group_code: matched.code,
-        tax_rate: line.tax_rate != null ? Number(line.tax_rate) : null,
-        line_tax_amount:
-          line.line_tax_amount != null ? Number(line.line_tax_amount) : null,
-        classification_code,
-        classification_scheme,
-        match: 'tax_group',
-      };
-    }
-
-    if (line.tax_rate != null && Number.isFinite(Number(line.tax_rate))) {
-      return {
-        tax_group_id: null,
-        tax_rate: Number(line.tax_rate),
-        line_tax_amount:
-          line.line_tax_amount != null ? Number(line.line_tax_amount) : null,
-        classification_code,
-        classification_scheme,
-        match: 'tax_rate',
-      };
-    }
-
-    return {
-      tax_group_id: null,
-      tax_rate: null,
-      line_tax_amount:
-        line.line_tax_amount != null ? Number(line.line_tax_amount) : null,
-      classification_code,
-      classification_scheme,
-      match: 'none',
-    };
-  });
+  const resolvedLines: ResolvedLineItem[] = lines.map((line) =>
+    resolveLineTax(line, groups),
+  );
+  const resolvedCharges: ResolvedLineItem[] = chargeLines.map((line) =>
+    resolveLineTax(line, groups),
+  );
 
   const resolved: ResolvedInvoiceExtract = {
     supplier_id: supplier.supplier_id,
@@ -608,6 +746,7 @@ export async function resolveExtractedInvoice(
     place_of_supply: placeText,
     payment_terms_id: await resolvePaymentTermsId(orgId, invoice.payment_terms),
     lines: resolvedLines,
+    charges: resolvedCharges,
   };
 
   logger.debug('Resolved extracted invoice', {
@@ -615,6 +754,7 @@ export async function resolveExtractedInvoice(
     currency_id: resolved.currency_id,
     tax_region_id: resolved.tax_region_id,
     lineMatches: resolvedLines.map((l) => l.match),
+    chargeMatches: resolvedCharges.map((l) => l.match),
   });
 
   return resolved;
@@ -681,8 +821,11 @@ export function buildBillCreatePayloads(opts: {
     invoicePayload.modified_by = opts.userId;
   }
 
-  const linePayloads = lines.map((line, i) => {
-    const lr = r.lines[i] || {};
+  const toLinePayload = (
+    line: ExtractedLineItem,
+    lr: ResolvedLineItem,
+    poLineItemId?: string | null,
+  ): Record<string, unknown> => {
     const qty = line.invoice_qty ?? line.quantity ?? line.ordered_quantity ?? 0;
     const payload: Record<string, unknown> = {
       item_name: line.item_name ?? undefined,
@@ -705,12 +848,25 @@ export function buildBillCreatePayloads(opts: {
           : line.need_by_date
         : undefined,
     };
-    if (withPO && opts.poLineMapping?.[i]?.poLineItemId) {
-      payload.purchase_order_item_id = opts.poLineMapping[i]!.poLineItemId;
+    if (withPO && poLineItemId) {
+      payload.purchase_order_item_id = poLineItemId;
       payload.po_number = opts.poNumber || inv.po_number || undefined;
     }
     return payload;
-  });
+  };
 
-  return { invoicePayload, linePayloads };
+  const productPayloads = lines.map((line, i) =>
+    toLinePayload(
+      line,
+      r.lines[i] || {},
+      opts.poLineMapping?.[i]?.poLineItemId,
+    ),
+  );
+
+  const chargeLines = chargesToLineItems(opts.extracted.charges);
+  const chargePayloads = chargeLines.map((line, i) =>
+    toLinePayload(line, r.charges?.[i] || {}, null),
+  );
+
+  return { invoicePayload, linePayloads: [...productPayloads, ...chargePayloads] };
 }

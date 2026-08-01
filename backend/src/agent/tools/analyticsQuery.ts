@@ -457,6 +457,11 @@ export function analyticsQueryTool(auth: AuthContext, toolContext?: AnalyticsToo
           effectiveUiHint = uiHint || 'card';
         }
 
+        // Only unwrap to a single object when the UI will render metrics.
+        // If the model explicitly requested uiHint=table, keep an array so table
+        // components (which call .map) do not crash on a plain object.
+        const useMetricsShape = resultType === 'metrics' && effectiveUiHint === 'metrics';
+
         return {
           tool: 'analyticsQuery',
           step,
@@ -464,7 +469,7 @@ export function analyticsQueryTool(auth: AuthContext, toolContext?: AnalyticsToo
           reasoning,
           success: true,
           resultType,
-          data: resultType === 'metrics' ? safeData[0] : safeData,
+          data: useMetricsShape ? safeData[0] : safeData,
           columns,
           rowCount,
           uiHint: effectiveUiHint,

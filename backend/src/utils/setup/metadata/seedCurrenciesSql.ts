@@ -5,6 +5,7 @@ import * as path from 'path';
 /**
  * Applies `prisma/seed-currencies.sql` via `prisma db execute` (same as setup-db Step 1.7).
  * Uses ON CONFLICT (code) DO UPDATE; safe to repeat.
+ * Terminal only (`npm run seed-sql-metadata`) — not used by Tenant Admin sync.
  */
 export function runSeedCurrenciesSql(backendRoot: string): void {
   const sqlPath = path.join(backendRoot, 'prisma', 'seed-currencies.sql');

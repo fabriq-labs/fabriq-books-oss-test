@@ -324,8 +324,11 @@ export const LLMTraceDetailPage: React.FC = () => {
     );
   }
 
-  const steps = (trace.steps || []).sort((a, b) => a.step_number - b.step_number);
+  const steps = (Array.isArray(trace.steps) ? trace.steps : [])
+    .slice()
+    .sort((a, b) => a.step_number - b.step_number);
   const allToolInvocations = parseTraceStepsToolInvocations(steps);
+  const toolsCalled = Array.isArray(trace.tools_called) ? trace.tools_called : [];
   const userLabel = userDisplay?.name?.trim() || formatUserIdFallback(trace.user_id);
   const userSubtext = userDisplay?.email || (userDisplay?.name ? undefined : trace.user_id);
 
@@ -438,9 +441,9 @@ export const LLMTraceDetailPage: React.FC = () => {
               )}
             </DetailField>
             <DetailField label="Tools called">
-              {trace.tools_called && trace.tools_called.length > 0 ? (
+              {toolsCalled.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {trace.tools_called.map((tool) => (
+                  {toolsCalled.map((tool) => (
                     <Badge key={tool} variant="secondary" className="font-normal">
                       {tool}
                     </Badge>

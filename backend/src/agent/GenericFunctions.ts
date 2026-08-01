@@ -317,6 +317,26 @@ export const extractInvoiceFromFileSchema = z.object({
     po_number: z.string().nullish(),
     need_by_date: z.string().nullish() // date as ISO string
   }).passthrough()),
+  /**
+   * Taxable non-catalog fees (service charge, convenience fee, …).
+   * Never put these in line_items; never put tax summary rows here either.
+   */
+  charges: z.array(z.object({
+    charge_type: z.string().nullish(), // service_charge | convenience_fee | tip | freight | handling | misc | other
+    label: z.string().nullish(),
+    amount: z.number().nullish(), // fee money BEFORE tax — e.g. 69.5 for "Service Charge @ 10%" of 695
+    /** Fee calculation % as printed (e.g. 10). NOT GST/VAT — never copy into tax_rate. */
+    charge_percent: z.number().nullish(),
+    taxable: z.boolean().nullish(),
+    tax_rate: z.number().nullish(), // GST/VAT % on the fee when known — NOT charge_percent
+    line_tax_amount: z.number().nullish(),
+    tax_components: z.array(z.object({
+      name: z.string().nullish(),
+      component_type: z.string().nullish(),
+      rate: z.number().nullish(),
+      amount: z.number().nullish(),
+    }).passthrough()).nullish(),
+  }).passthrough()).nullish(),
   context: z.object({
     currency: z.string().nullish(),
     language: z.string().nullish(),
@@ -520,11 +540,13 @@ Extract the following line item information for each item:
 - Purchase order number (if referenced)
 - Need by date (as ISO string)
 
+Also extract taxable fees into charges[] (not line_items): service charge, convenience fee, tip, similar surcharges. Put the fee money in amount (e.g. 69.5). If the document shows "Service Charge @ 10%", put 10 in charge_percent — never in tax_rate. tax_rate / tax_components are GST/VAT on the fee (often the same as product lines from a footer), not the fee calculation %.
+
 Also extract document currency code in context.currency when printed (ISO 4217 when available).
 
 Also extract any attachments or references mentioned in the invoice.
 
-IMPORTANT: Extract ONLY what actually appears in the document. Do not guess or invent data. Use null/empty or omit fields that are not present. Dates should be ISO format strings. Numbers should be numbers. line_items are goods/services only — put tax breakdown in tax_components, not as fake product lines. invoice_net_total is pre-tax; invoice_total includes tax. Return structured data matching the schema: invoice object, line_items array, and optional context object.`,
+IMPORTANT: Extract ONLY what actually appears in the document. Do not guess or invent data. Use null/empty or omit fields that are not present. Dates should be ISO format strings. Numbers should be numbers. line_items are goods/services only — put tax breakdown in tax_components, and put service charges / fees in charges[], not as fake product lines. invoice_net_total is pre-tax; invoice_total includes tax. Return structured data matching the schema: invoice object, line_items array, optional charges array, and optional context object.`,
     parameters: extractInvoiceFromFileSchema,
   }
 ]; 

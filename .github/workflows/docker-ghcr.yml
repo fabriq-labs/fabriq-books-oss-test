@@ -112,6 +112,15 @@ jobs:
             IMAGE_TAG=${{ steps.build_meta.outputs.image_tag }}
             CACHEBUST=${{ github.sha }}
           no-cache: ${{ inputs.no_cache || false }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Shared scope across branches so feature-branch builds reuse npm/apk layers.
+          # Registry buildcache survives GHA cache eviction and is more reliable for multi-stage.
+          cache-from: |
+            type=gha,scope=fabriq-docker
+            type=registry,ref=${{ steps.image.outputs.image }}:buildcache
+          cache-to: |
+            type=gha,mode=max,scope=fabriq-docker
+            type=registry,ref=${{ steps.image.outputs.image }}:buildcache,mode=max,ignore-error=true
+          # Skip SBOM/provenance attestations — they inflate export time without helping app deploys.
+          provenance: false
+          sbom: false
           platforms: linux/amd64
