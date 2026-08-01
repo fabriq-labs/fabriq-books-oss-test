@@ -1,0 +1,32 @@
+# Deploy the `dev` branch image to the Railway dev service.
+# Run from the `dev` branch: Actions → Deploy (dev) → Run workflow.
+
+name: Deploy (dev)
+
+on:
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: Skip Docker layer cache (fresh build)
+        default: false
+        type: boolean
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require dev branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "dev" ]; then
+            echo "This workflow must be run from the 'dev' branch (got '${GITHUB_REF_NAME}')." >&2
+            exit 1
+          fi
+
+  deploy:
+    needs: guard
+    uses: ./.github/workflows/deploy-railway.yml
+    with:
+      service_id: b82e07e5-9532-43f3-b15a-797403b7fc92
+      no_cache: ${{ inputs.no_cache }}
+    secrets:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

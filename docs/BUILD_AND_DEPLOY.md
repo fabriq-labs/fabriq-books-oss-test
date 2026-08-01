@@ -110,43 +110,53 @@ This workflow does **not** deploy to any cloud by itself. Pull the image from GH
 
 ### Build + deploy to Railway
 
-Workflow: **Build and deploy (Railway)** (`.github/workflows/deploy-railway.yml`).
+Reusable core: **Build and deploy (Railway)** (`.github/workflows/deploy-railway.yml`)
+— `workflow_call` only. Thin callers pass the Railway **service UUID** and share
+one secret (`RAILWAY_TOKEN`):
 
-1. Calls `docker-ghcr.yml` (reusable) to build/push — including the mutable
-   `<branch>-latest` tag (e.g. `demo-latest`).
-2. Runs `railway redeploy` so Railway re-pulls that tag and picks up the new
-   digest. The image URL on the Railway service is **not** changed by CI.
+| Caller | Branch to run from | Service UUID | Expected image tag |
+|--------|--------------------|--------------|--------------------|
+| `deploy-dev.yml` → **Deploy (dev)** | `dev` | `b82e07e5-9532-43f3-b15a-797403b7fc92` | `…:dev-latest` |
+| `deploy-prod.yml` → **Deploy (prod)** | `prod` | `36f474f5-fc9f-4ab7-866b-61800eb3c318` | `…:prod-latest` |
+
+Flow:
+
+1. Caller validates the branch name, then calls `deploy-railway.yml`.
+2. `docker-ghcr.yml` builds/pushes `<branch>-latest` (and a timestamp tag).
+3. `railway redeploy --from-source` re-pulls that tag. CI does **not** change
+   the image URL on the Railway service.
 
 #### One-time Railway service setup
 
-1. Create/open a service → source **Docker Image** (not GitHub Repo).
-2. Set image to:
-   `ghcr.io/<owner-lowercase>/<repo-lowercase>:<branch>-latest`  
-   Example for the `demo` branch: `ghcr.io/<owner>/<repo>:demo-latest`
-3. Under **Source → Registry Credentials**, add a GitHub PAT with
-   `read:packages` (private GHCR). Do not reuse a write token from CI.
-4. Deploy once manually so the first pull succeeds.
+For each env service:
+
+1. Source = **Docker Image** (not GitHub Repo).
+2. Image =
+   - Dev: `ghcr.io/fabriq-labs/fabriq-ws-setup:dev-latest`
+   - Prod: `ghcr.io/fabriq-labs/fabriq-ws-setup:prod-latest`
+3. **Registry Credentials** = GitHub PAT with `read:packages`.
+4. First successful **Deploy (dev)** / **Deploy (prod)** creates the tag and
+   redeploys.
 
 #### GitHub Actions secrets
 
-Add under **GitHub → repository → Settings → Secrets and variables → Actions**:
+**Settings → Secrets and variables → Actions**:
 
 | Secret | Where to get it | Notes |
 |--------|-----------------|--------|
-| `RAILWAY_TOKEN` | Railway → your **project** → **Settings → Tokens** → create a **Project Token** for the target environment | Scoped to one project + environment; preferred for CI. Account tokens also work but are broader. |
-| `RAILWAY_SERVICE_ID` | Railway → open the service → **Settings**, or from the service URL / `railway service` | Service **name** or **ID** both work with `railway redeploy --service`. |
+| `RAILWAY_TOKEN` | Railway → project → **Settings → Tokens** → **Project Token** for the shared environment | One token for both callers. Must see both service UUIDs. |
 
-You do **not** need `RAILWAY_PROJECT_ID` or `RAILWAY_ENVIRONMENT_ID` for this
-flow — a project token already targets one environment.
+Service IDs live in the caller workflow YAML (not secrets). Remove obsolete
+`RAILWAY_SERVICE_ID` / `RAILWAY_PROJECT_ID` / `RAILWAY_ENVIRONMENT_ID` if present.
 
-#### Run the workflow
+#### Run a deploy
 
-**Actions → Build and deploy (Railway) → Run workflow** (optional “no cache”).
-After a successful build, the deploy job redeploys the Railway service.
+1. Open **Actions**.
+2. Select **Deploy (dev)** or **Deploy (prod)**.
+3. Choose branch **`dev`** or **`prod`** respectively → **Run workflow**.
 
-Alternative (no CI redeploy): enable Railway **Image Auto Updates** on the
-same `<branch>-latest` tag. Detection can lag by up to a few hours and may
-wait for a maintenance window.
+Alternative (no CI redeploy): Railway **Image Auto Updates** on the same
+`<branch>-latest` tag (can lag by hours / maintenance window).
 
 ---
 

@@ -1,30 +1,37 @@
-# Build the GHCR image (via docker-ghcr.yml) and redeploy a Railway Docker-image service.
+# Reusable: build GHCR image and redeploy a Railway Docker-image service.
 #
 # Flow (Option B — mutable tag + CLI redeploy):
-#   1. Build/push image tags including <branch>-latest (e.g. demo-latest)
-#   2. railway redeploy pulls that tag again and picks up the new digest
+#   1. Build/push via docker-ghcr.yml (tags include <branch>-latest)
+#   2. railway redeploy --from-source pulls that tag's new digest
 #
-# Required repo secrets:
-#   RAILWAY_TOKEN       - Railway project token (Project Settings → Tokens)
-#   RAILWAY_SERVICE_ID  - Railway service name or ID to redeploy
+# Callers pass service_id (UUID). Only RAILWAY_TOKEN is a secret.
 #
-# One-time Railway UI setup:
-#   Service source = "Deploy from Docker Image"
-#   Image          = ghcr.io/<owner>/<repo>:<branch>-latest  (e.g. ...:demo-latest)
-#   Registry creds = GitHub PAT with read:packages (private GHCR)
+# One-time Railway UI setup per service:
+#   Source = Docker Image
+#   Image  = ghcr.io/<owner>/<repo>:<branch>-latest
+#   Creds  = GitHub PAT with read:packages
 
 name: Build and deploy (Railway)
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
+      service_id:
+        description: Railway service UUID to redeploy
+        required: true
+        type: string
       no_cache:
         description: Skip Docker layer cache (fresh build)
-        default: false
+        required: false
         type: boolean
+        default: false
+    secrets:
+      RAILWAY_TOKEN:
+        description: Railway project token for the target environment
+        required: true
 
 concurrency:
-  group: deploy-railway-${{ github.ref }}
+  group: deploy-railway-${{ github.ref }}-${{ inputs.service_id }}
   cancel-in-progress: false
 
 jobs:
@@ -45,24 +52,38 @@ jobs:
       - name: Redeploy Railway service (pull latest image digest)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          SERVICE_ID: ${{ inputs.service_id }}
           STABLE_TAG: ${{ needs.build.outputs.stable_tag }}
           IMAGE: ${{ needs.build.outputs.image }}
         run: |
           set -euo pipefail
 
-          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+          RAILWAY_TOKEN="$(printf '%s' "${RAILWAY_TOKEN:-}" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          SERVICE_ID="$(printf '%s' "${SERVICE_ID:-}" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          export RAILWAY_TOKEN
+
+          if [ -z "${RAILWAY_TOKEN}" ]; then
             echo "Missing secret RAILWAY_TOKEN" >&2
+            echo "Create a Project Token: Railway → Project → Settings → Tokens" >&2
             exit 1
           fi
-          if [ -z "${RAILWAY_SERVICE_ID:-}" ]; then
-            echo "Missing secret RAILWAY_SERVICE_ID" >&2
+          if [ -z "${SERVICE_ID}" ]; then
+            echo "Missing input service_id" >&2
             exit 1
           fi
 
-          echo "Built ${IMAGE}:${STABLE_TAG} — redeploying Railway service ${RAILWAY_SERVICE_ID}"
-          echo "Railway must already point at ${IMAGE}:${STABLE_TAG} (or the same mutable tag for this branch)."
+          echo "Built ${IMAGE}:${STABLE_TAG} — redeploying Railway service '${SERVICE_ID}'"
+          echo "Railway must already point at ${IMAGE}:${STABLE_TAG}."
 
-          npx -y @railway/cli@latest redeploy \
-            --service "${RAILWAY_SERVICE_ID}" \
-            --yes
+          echo "Services visible to RAILWAY_TOKEN:"
+          npx -y @railway/cli@latest service list --json || npx -y @railway/cli@latest service list || true
+
+          if ! npx -y @railway/cli@latest redeploy \
+            --service "${SERVICE_ID}" \
+            --from-source \
+            --yes; then
+            echo >&2
+            echo "Redeploy failed. Check that service_id exists in the project/environment" >&2
+            echo "bound to RAILWAY_TOKEN, and that the service image is ${IMAGE}:${STABLE_TAG}." >&2
+            exit 1
+          fi
