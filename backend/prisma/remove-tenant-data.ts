@@ -1,22 +1,33 @@
 #!/usr/bin/env npx ts-node
 /**
- * Remove all data for a given tenant (org).
- * Opposite of running setup-indian-demo.ts (or setup-nri-demo.ts) with --data-only:
- * deletes every record scoped by org_id, plus the org itself.
+ * Remove tenant (org) data OR a single legal entity and related transactions.
  *
- * Usage:
+ * Tenant (org) wipe — deletes every org_id-scoped row, then the org:
  *   npx ts-node prisma/remove-tenant-data.ts org_indian_demo
  *   npx ts-node prisma/remove-tenant-data.ts org_indian_demo --confirm
+ *   npm run remove-tenant-data -- org_indian_demo --confirm
  *
- * Without --confirm, the script prints what would be deleted and exits.
+ * Legal entity wipe — invoices, bills, postings, COA, org-structure for one entity:
+ *   npx ts-node prisma/remove-tenant-data.ts --legal-entity=org_mumbai_branch
+ *   npx ts-node prisma/remove-tenant-data.ts --legal-entity=org_mumbai_branch --confirm
+ *   npm run remove-tenant-data -- --legal-entity=org_us_office --confirm
+ *
+ * Without --confirm, prints what would be deleted and exits (dry run).
  */
 
 import prisma from '../src/lib/prisma';
+import { removeLegalEntityData } from '../src/utils/setup/removeLegalEntityData';
 
-// Parse CLI: npm run script passes node + ts-node + script path; org_id is the first arg that looks like an id (e.g. org_indian_demo)
-const rest = process.argv.slice(2).filter((a) => a && !a.startsWith('--'));
+const argv = process.argv.slice(2);
+const CONFIRM = argv.includes('--confirm');
+const legalEntityFlag = argv.find((a) => a.startsWith('--legal-entity='));
+const LEGAL_ENTITY_ID = legalEntityFlag
+  ? legalEntityFlag.split('=').slice(1).join('=').trim()
+  : undefined;
+
+// Parse org id: first non-flag arg that looks like an id (not a path / .ts file)
+const rest = argv.filter((a) => a && !a.startsWith('--'));
 const ORG_ID_ARG = rest.find((a) => !a.includes('/') && !a.endsWith('.ts')) ?? rest[0];
-const CONFIRM = process.argv.includes('--confirm');
 
 /**
  * Tables with org_id, in FK-safe deletion order (children before parents).
@@ -105,7 +116,9 @@ async function deleteMany(model: string, where: object): Promise<number> {
 
 async function removeTenantData(orgId: string) {
   if (!orgId) {
-    console.error('Usage: npx ts-node prisma/remove-tenant-data.ts <org_id> [--confirm]');
+    console.error('Usage:');
+    console.error('  npx ts-node prisma/remove-tenant-data.ts <org_id> [--confirm]');
+    console.error('  npx ts-node prisma/remove-tenant-data.ts --legal-entity=<entity_id> [--confirm]');
     console.error('Example: npx ts-node prisma/remove-tenant-data.ts org_indian_demo --confirm');
     process.exit(1);
   }
@@ -190,8 +203,34 @@ async function removeTenantData(orgId: string) {
   console.log(`\nDone. Removed ${total} record(s) for tenant ${orgId}.`);
 }
 
+async function runLegalEntityMode(entityId: string) {
+  if (!entityId) {
+    console.error('Usage: npx ts-node prisma/remove-tenant-data.ts --legal-entity=<entity_id> [--confirm]');
+    process.exit(1);
+  }
+
+  const result = await removeLegalEntityData(entityId, { confirm: CONFIRM });
+
+  if (result.dryRun) {
+    console.log(`Would delete legal entity: ${result.entityId} (${result.entityName})`);
+    console.log(`Tenant org_id: ${result.orgId}`);
+    console.log('Run with --confirm to perform deletion.');
+    for (const [name, c] of Object.entries(result.counts)) {
+      if (c > 0) console.log(`  ${name}: ${c}`);
+    }
+    console.log(`  total (incl. zero steps omitted above when confirming): ${result.total}`);
+    return;
+  }
+
+  console.log(`\nDone. Removed ${result.total} record(s) for legal entity ${result.entityId}.`);
+}
+
 if (require.main === module) {
-  removeTenantData(ORG_ID_ARG ?? '')
+  const run = LEGAL_ENTITY_ID
+    ? runLegalEntityMode(LEGAL_ENTITY_ID)
+    : removeTenantData(ORG_ID_ARG ?? '');
+
+  run
     .then(() => process.exit(0))
     .catch((err) => {
       console.error(err);
@@ -201,3 +240,4 @@ if (require.main === module) {
 }
 
 export { removeTenantData };
+export { removeLegalEntityData } from '../src/utils/setup/removeLegalEntityData';

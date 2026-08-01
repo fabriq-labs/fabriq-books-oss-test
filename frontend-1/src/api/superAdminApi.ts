@@ -96,6 +96,67 @@ export interface SeedModelDataResponse {
   counts: { created: number; updated: number; total: number };
 }
 
+export interface IndianDemoReconStatus {
+  orgExists: boolean;
+  orgId: string;
+  orgName: string | null;
+  checkingAccountExists: boolean;
+  reconPostingCount: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  aiCategorizedCount: number;
+  confirmCreatedReceiptCount: number;
+}
+
+export interface IndianDemoReconStatusResponse {
+  success: boolean;
+  status: IndianDemoReconStatus;
+}
+
+export interface ResetIndianDemoReconciliationResult {
+  orgId: string;
+  deletedPostings: number;
+  deletedConfirmReceipts: number;
+  reloadedPostings: number;
+}
+
+export interface ResetIndianDemoReconciliationResponse {
+  success: boolean;
+  message: string;
+  result: ResetIndianDemoReconciliationResult;
+}
+
+export interface LegalEntitySummary {
+  id: string;
+  organizationName: string;
+  orgId: string;
+  isHeadquarters: boolean;
+  country: string | null;
+  invoiceCount: number;
+  postingCount: number;
+  accountCount: number;
+}
+
+export interface ListLegalEntitiesResponse {
+  success: boolean;
+  entities: LegalEntitySummary[];
+}
+
+export interface RemoveLegalEntityResult {
+  entityId: string;
+  entityName: string;
+  orgId: string;
+  dryRun: boolean;
+  counts: Record<string, number>;
+  total: number;
+}
+
+export interface RemoveLegalEntityResponse {
+  success: boolean;
+  message?: string;
+  result: RemoveLegalEntityResult;
+}
+
 // ── Admin API ─────────────────────────────────────────────────────────────────
 
 export const adminAPI = {
@@ -127,4 +188,33 @@ export const adminAPI = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  getIndianDemoReconStatus: () =>
+    adminFetch<IndianDemoReconStatusResponse>('/api/admin/demo-data/indian-demo/status'),
+
+  resetIndianDemoReconciliation: () =>
+    adminFetch<ResetIndianDemoReconciliationResponse>(
+      '/api/admin/demo-data/indian-demo/reset-reconciliation',
+      { method: 'POST' }
+    ),
+
+  listLegalEntities: (orgId?: string) => {
+    const q = orgId ? `?orgId=${encodeURIComponent(orgId)}` : '';
+    return adminFetch<ListLegalEntitiesResponse>(`/api/admin/demo-data/legal-entities${q}`);
+  },
+
+  previewDropLegalEntity: (entityId: string) =>
+    adminFetch<RemoveLegalEntityResponse>(
+      `/api/admin/demo-data/legal-entities/${encodeURIComponent(entityId)}/preview`,
+      { method: 'POST' }
+    ),
+
+  dropLegalEntity: (entityId: string) =>
+    adminFetch<RemoveLegalEntityResponse>(
+      `/api/admin/demo-data/legal-entities/${encodeURIComponent(entityId)}/drop`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ confirm: entityId }),
+      }
+    ),
 };

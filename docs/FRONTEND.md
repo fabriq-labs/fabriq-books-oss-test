@@ -390,6 +390,7 @@ const customRowRenderer = useMemo(
 
 ```
 /settings/tenant-admin     → TenantAdministrationPage (COA setup, metadata sync, onboard tenant, DB reset)
+/settings/demo-data        → DemoDataManagementPage (indian-demo recon reset, drop legal entity)
 /settings/workflows        → WorkflowManagementPage
 /settings/views            → Views master
 /settings/permissions      → Permissions master

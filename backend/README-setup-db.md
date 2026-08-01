@@ -86,6 +86,26 @@ cd backend
 npx ts-node prisma/remove-tenant-data.ts org_indian_demo --confirm
 ```
 
+## Remove one legal entity (and related transactions)
+
+Deletes invoices, bills, postings, COA accounts, org-structure, and the `entity` row for one legal entity. Keeps the tenant `org` and shared masters (customers, suppliers, items, users).
+
+**Preview:**
+
+```bash
+cd backend
+npm run remove-tenant-data -- --legal-entity=org_mumbai_branch
+```
+
+**Delete:**
+
+```bash
+cd backend
+npm run remove-tenant-data -- --legal-entity=org_mumbai_branch --confirm
+```
+
+Also available in the UI: **Super Admin → Demo Data Management** (`/settings/demo-data`).
+
 ### Org ids by demo
 
 

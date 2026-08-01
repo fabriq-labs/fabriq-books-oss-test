@@ -165,6 +165,7 @@ const superAdminNavItems: MasterNavItem[] = [
       { label: 'AI Templates', path: '/settings/ai-templates' },
       { label: 'LLM Traces', path: '/settings/llm-traces' },
       { label: 'Tenant Administration', path: '/settings/tenant-admin' },
+      { label: 'Demo Data Management', path: '/settings/demo-data' },
       { label: 'Currency', path: '/accounting/currency' },
     ],
   },

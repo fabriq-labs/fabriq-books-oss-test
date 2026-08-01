@@ -298,6 +298,7 @@ curl -X POST http://localhost:4000/api/auth/login \
 - **Opening balances**: `opening-balances/*.csv` — FY2024-25 closing (2025-03-31) for India entities, CY2024 closing (2024-12-31) for US; imported as `OPENING_BALANCE` migration journal on setup.
 - **Reconciliation bank lines**: `posting.csv` — 24 one-sided lines on HQ Checking (1102); `DEMO:` descriptions; `post_demo_01`–`05` pre-matched to receipts; `post_demo_21`–`24` for invoice/receipt matching in UI/agent.
 - **Reset reconciliation only**: `npx ts-node setup-indian-demo.ts --reset-postings` (does not touch FY journals).
+  - Same action is available in the UI: **Super Admin → Demo Data Management** (`/settings/demo-data`).
 
 ### Planned Additions
 1. **Invoice Templates**: Indian GST-compliant invoice formats
