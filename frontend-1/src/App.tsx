@@ -105,6 +105,7 @@ import { InboxPage } from "./pages/workbench/InboxPage";
 import { GoalSetter } from "./components/workbench/GoalSetter";
 import { ExchangeRateForm } from "./components/forms/Masters/ExchangeRateForm";
 import { CurrencyForm } from "./components/forms/Masters/CurrencyForm";
+import ClarificationCardPreview from "./pages/dev/ClarificationCardPreview";
 // Create a client
 const queryClient = new QueryClient();
 
@@ -154,6 +155,11 @@ const AppRoutes: React.FC = () => {
               <Route path="/sign-in" element={<PublicAuthRoute><SignInPage /></PublicAuthRoute>} />
               <Route path="/signup" element={<PublicAuthRoute><SignInPage /></PublicAuthRoute>} />
               <Route path="/auth" element={<PublicAuthRoute><SignInPage /></PublicAuthRoute>} />
+
+              {/* Dev-only UI harness (no auth) — ClarificationCard dropdown */}
+              {import.meta.env.DEV && (
+                <Route path="/dev/clarification-preview" element={<ClarificationCardPreview />} />
+              )}
 
               {/* Protected routes with AppLayout */}
               <Route path="/" element={

@@ -122,8 +122,11 @@ allowed_tools: ["getAnalyticsContext", "analyticsQuery", "categorizePostings", "
 
 **Example `atpl_reconcile`**:
 ```json
-allowed_tools: ["getAnalyticsContext", "analyticsQuery", "suggestReconciliationMatches", "queueActions"]
+allowed_tools: ["searchRecords", "getAnalyticsContext", "analyticsQuery", "suggestReconciliationMatches", "queueActions", "requestClarification"]
 ```
+
+`searchRecords` is allowlisted for performant account id lookup; unreconciled
+posting QUERY steps still use `analyticsQuery` per the template prompt.
 
 ---
 
@@ -232,14 +235,19 @@ input.
 **Parameters**:
 ```typescript
 {
-  question: string,             // Clear question for the user. Include what was searched and available options.
-  context?: Record<string, any> // Optional structured context: searched_for, available_options, etc.
+  question: string,             // Clear question for the user
+  context?: Record<string, any> // Optional: searched_for, available, account_ids, etc.
+  input_schema?: {              // Optional UI schema — prefer for multi-choice
+    type?: 'single_select' | 'multi_select' | 'text' | 'date' | 'date_range',
+    options?: { id: string, label: string }[]  // workbench shows a dropdown when ≥2
+  }
 }
 ```
 
 **Side effects**:
 - Sets `session.status = 'awaiting_input'`
-- Writes `session.clarification_request = { question, context, step_index: current_step_index }`
+- Writes `session.clarification_request = { question, context, input_schema, step_index: current_step_index }`
+  (legacy `context.available` / `context.account_ids` are promoted into `input_schema.options` when omitted)
 - Cancels the session timeout watchdog (user may take time to respond)
 
 **Does NOT call `completeStep`** — the session stays on the current step.

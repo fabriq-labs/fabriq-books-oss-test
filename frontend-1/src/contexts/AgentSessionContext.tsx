@@ -13,13 +13,26 @@ export interface PlanStep {
   requires_approval: boolean;
 }
 
+export interface ClarificationOption {
+  id: string;
+  label: string;
+}
+
+export interface ClarificationInputSchema {
+  type?: 'single_select' | 'multi_select' | 'text' | 'date' | 'date_range';
+  options?: ClarificationOption[];
+}
+
 export interface ClarificationRequest {
   question: string;
   context: {
     searched_for?: string;
-    available?: string[];
+    available?: Array<string | ClarificationOption>;
+    account_ids?: Record<string, string>;
     [key: string]: any;
   };
+  /** Present when the agent passed structured choices (e.g. account id/label pairs). */
+  input_schema?: ClarificationInputSchema | null;
   step_index: number;
 }
 
