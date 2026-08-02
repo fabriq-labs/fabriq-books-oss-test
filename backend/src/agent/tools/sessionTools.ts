@@ -393,25 +393,67 @@ export function queueActionsTool(sessionId: string, auth: AuthContext) {
 
 export function requestClarificationTool(sessionId: string, _auth: AuthContext) {
   return tool({
-    description: `Pause the session and ask the user a clarifying question. Use this ONLY from a query step when a query returned 0 rows because the user's input was ambiguous (e.g. wrong account name, underspecified entity). Before calling this tool, run a broader query to find candidate options. Then call this tool with the question and the available options. Do NOT call completeStep — the session pauses until the user responds via the UI.`,
+    description: `Pause the session and ask the user a clarifying question. Use this ONLY from a query step when a query returned 0 rows because the user's input was ambiguous (e.g. wrong account name, underspecified entity). Before calling this tool, run a broader query to find candidate options. Then call this tool with the question and structured options (input_schema.single_select with {id, label} pairs) so the UI can show a dropdown. Do NOT call completeStep — the session pauses until the user responds via the UI.`,
     parameters: z.object({
       question: z.string()
-        .describe('Clear question for the user. Include what was searched for and list the available options.'),
+        .describe('Clear question for the user. Include what was searched for.'),
       context: z.record(z.any()).optional()
         .describe('Structured context: { searched_for: string, available: string[] }. Stored for later steps.'),
+      input_schema: z.object({
+        type: z.enum(['single_select', 'multi_select', 'text', 'date', 'date_range']).optional()
+          .describe('UI control type. Use single_select when the user must pick one of several candidates.'),
+        options: z.array(z.object({
+          id: z.string().describe('Stable id to submit (e.g. acco_…)'),
+          label: z.string().describe('Human-readable label shown in the dropdown'),
+        })).optional()
+          .describe('Choices for single_select / multi_select (max 7).'),
+      }).optional()
+        .describe('Optional UI schema. Prefer single_select + options for account disambiguation.'),
     }),
-    execute: async ({ question, context }) => {
+    execute: async ({ question, context, input_schema }) => {
       logger.info('requestClarification called', { sessionId, question: question.substring(0, 100) });
 
       const session = await getAgentSession(sessionId);
 
+      // Promote legacy context shapes into input_schema.options when the model omitted it
+      let resolvedSchema = input_schema ?? null;
+      const ctx = context ?? {};
+      if (!resolvedSchema?.options?.length) {
+        const accountIds = ctx.account_ids;
+        if (accountIds && typeof accountIds === 'object' && !Array.isArray(accountIds)) {
+          const options = Object.entries(accountIds as Record<string, unknown>)
+            .filter(([id, name]) => typeof id === 'string' && id && name != null)
+            .map(([id, name]) => ({ id, label: String(name) }));
+          if (options.length > 0) {
+            resolvedSchema = { type: 'single_select', options };
+          }
+        } else if (Array.isArray(ctx.available)) {
+          const options = (ctx.available as unknown[])
+            .map((item) => {
+              if (typeof item === 'string') return { id: item, label: item };
+              if (item && typeof item === 'object' && 'id' in item && 'label' in item) {
+                const o = item as { id: unknown; label: unknown };
+                return { id: String(o.id), label: String(o.label) };
+              }
+              return null;
+            })
+            .filter((o): o is { id: string; label: string } => o != null && !!o.id && !!o.label);
+          if (options.length > 0) {
+            resolvedSchema = { type: 'single_select', options };
+          }
+        }
+      }
+
+      const clarification_request = {
+        question,
+        context: ctx,
+        input_schema: resolvedSchema,
+        step_index: session.current_step_index ?? 0,
+      };
+
       await updateAgentSession(sessionId, {
         status: 'awaiting_input',
-        clarification_request: {
-          question,
-          context: context ?? {},
-          step_index: session.current_step_index ?? 0,
-        },
+        clarification_request,
       });
 
       // Cancel the timeout — re-armed when user responds via /clarify
@@ -419,11 +461,7 @@ export function requestClarificationTool(sessionId: string, _auth: AuthContext) 
 
       sessionEventBus.emitSessionEvent(sessionId, session.org_id, 'session_status_changed', {
         status: 'awaiting_input',
-        clarification_request: {
-          question,
-          context: context ?? {},
-          step_index: session.current_step_index ?? 0,
-        },
+        clarification_request,
       });
 
       return {

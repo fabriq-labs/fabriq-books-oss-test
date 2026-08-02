@@ -35,14 +35,20 @@ When asking the user to choose between options, call requestClarification with i
 - type "text": open-ended answer or when narrowing is needed
 - type "date" / "date_range": for time filters
 
+For account choices, ALWAYS pass input_schema.type = "single_select" with options {id, label}
+where id is the account id (acco_…) and label disambiguates duplicates
+(e.g. "Checking Account (HQ)", "Checking Account (Mumbai Branch)").
+The workbench UI shows these as a dropdown. Prefer this over listing options only in the question text.
+
 7-option rule: if a query returns more than 7 candidates, do NOT list them.
 Use type "text" and ask the user to type a narrowing keyword. Re-query, then use single_select once ≤7 results remain.
 
-After receiving the user''s answer (a label string), match it against input_schema.options stored in accumulated_context.clarifications to recover the correct id. Never guess or derive ids.
+After receiving the user''s answer, treat an acco_… / id-shaped answer as the selected id directly.
+If the answer is a label string, match it against input_schema.options stored in accumulated_context.clarifications to recover the correct id. Never guess or derive ids.
 
 PLAN STRUCTURE:
 Your plan MUST have these steps in this exact order when status is ''planning'':
-1. QUERY step: Find the relevant accounts (use analyticsQuery with broad ILIKE search)
+1. QUERY step: Find the relevant accounts (use searchRecords on account — NOT analyticsQuery)
 2. QUERY step: Find unreconciled postings for those accounts
 3. ANALYSIS step: Suggest reconciliation matches (call suggestReconciliationMatches)
 4. ACTION step: Queue reconciliation actions (system auto-creates pending actions)
@@ -53,7 +59,11 @@ Do NOT create plans with fewer than 5 steps. The ACTION step is mandatory even t
 WORKFLOW -- follow these steps exactly:
 
 QUERY steps:
-1. Use analyticsQuery to find the relevant accounts. Use broad ILIKE keyword search on account name -- the user''s description may be approximate. If multiple accounts match, use requestClarification with input_schema (per best practice above).
+1. Use searchRecords on the account model to find the relevant accounts (name icontains / filters).
+   This is the preferred performant id lookup — do NOT use analyticsQuery for account discovery.
+   If multiple accounts match, call requestClarification with input_schema single_select and
+   options as {id, label} pairs (per best practice above). Do NOT call searchRecords for
+   unreconciled posting lists — that is the next step.
 2. Use analyticsQuery to find unreconciled postings for those accounts and the requested date range. Store the posting IDs and account IDs in accumulated_context_update.
 
 ANALYSIS step:
@@ -105,7 +115,7 @@ $$,
 'Which account or date range? e.g. "HDFC account", "March 2024"',
 'supervised', true, 2,
 ARRAY['posting', 'account', 'payment_receipt', 'invoice'],
-ARRAY['getAnalyticsContext', 'analyticsQuery', 'suggestReconciliationMatches', 'queueActions', 'requestClarification'],
+ARRAY['searchRecords', 'getAnalyticsContext', 'analyticsQuery', 'suggestReconciliationMatches', 'queueActions', 'requestClarification'],
 NOW()),
 
 -- 3. Analyse Spending
