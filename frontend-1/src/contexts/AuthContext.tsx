@@ -104,7 +104,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Redirect to login if not authenticated and not on an auth route
     const publicAuthRoutes = ['/auth', '/sign-in', '/signup'];
-    if (!loading && !user && !publicAuthRoutes.includes(location.pathname)) {
+    // Dev-only harnesses (ClarificationCard preview, etc.)
+    const isDevPublicRoute =
+      import.meta.env.DEV && location.pathname.startsWith('/dev/');
+    if (!loading && !user && !publicAuthRoutes.includes(location.pathname) && !isDevPublicRoute) {
       navigate('/sign-in');
     }
   }, [user, loading, location.pathname, navigate]);
