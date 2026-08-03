@@ -1,8 +1,9 @@
 import React from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { LogOut, BarChart3, TrendingUp } from "lucide-react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { LogOut, Monitor, BarChart3, TrendingUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { setMobileOptedOut } from "@/config/mobileRoutes";
 
 const TABS = [
   { to: "/m/investments/portfolio", label: "Portfolio", icon: BarChart3 },
@@ -17,21 +18,37 @@ const routeTitles: Record<string, string> = {
 export const MobileLayout: React.FC = () => {
   const { logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const title = routeTitles[location.pathname] ?? "Fabriq";
+
+  const switchToDesktop = () => {
+    setMobileOptedOut(true);
+    navigate("/", { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Fixed top bar */}
       <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-40">
         <h1 className="text-base font-semibold text-slate-900">{title}</h1>
-        <button
-          type="button"
-          onClick={logout}
-          aria-label="Log out"
-          className="p-2 -mr-2 text-slate-500 active:text-slate-800"
-        >
-          <LogOut className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={switchToDesktop}
+            aria-label="Switch to full site"
+            className="p-2 text-slate-500 active:text-slate-800"
+          >
+            <Monitor className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            aria-label="Log out"
+            className="p-2 -mr-2 text-slate-500 active:text-slate-800"
+          >
+            <LogOut className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* Scrollable content */}
