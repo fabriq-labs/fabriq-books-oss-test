@@ -1,6 +1,12 @@
 "use client";
 
-import { Loader2, RefreshCw, Lock, Unlock } from "lucide-react";
+import { Loader2, RefreshCw, ChevronDown, Lock, Unlock } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/formatters";
 import { useEntity } from "@/contexts/EntityContext";
@@ -169,6 +175,7 @@ export default function MobileOptionsIncome() {
     loading,
     syncing,
     fetchReport,
+    syncAndRefresh,
     currency,
     closedRows,
     openRows,
@@ -192,14 +199,33 @@ export default function MobileOptionsIncome() {
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <button
-            onClick={() => void fetchReport()}
-            disabled={loading || syncing}
-            className="flex items-center justify-center h-9 w-9 shrink-0 rounded-md border border-slate-300 bg-white active:bg-slate-50"
-            aria-label="Refresh"
-          >
-            {loading || syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </button>
+          <div className="flex shrink-0">
+            <button
+              onClick={() => void fetchReport()}
+              disabled={loading || syncing}
+              className="flex items-center justify-center h-9 w-9 rounded-l-md border border-slate-300 bg-white active:bg-slate-50"
+              aria-label="Refresh"
+            >
+              {loading || syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  disabled={loading || syncing}
+                  className="flex items-center justify-center h-9 w-6 rounded-r-md border border-l-0 border-slate-300 bg-white active:bg-slate-50"
+                  aria-label="More refresh options"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => void syncAndRefresh()}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sync &amp; Refresh
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <ReportAccountFilter
           selectedAccount={selectedAccount}
