@@ -664,13 +664,38 @@ export async function getOptionsIncome(
       org_id: orgId,
       is_active: true,
       ...(effectiveAccountIds !== null ? { account_id: { in: effectiveAccountIds } } : {}),
+      ...(connectionId ? { source_system_id: connectionId } : {}),
     },
     select: {
+      id: true,
       account_id: true,
       instrument_id: true,
+      quantity: true,
+      average_cost: true,
       unrealized_pnl: true,
       current_price: true,
+      market_value: true,
       currency_id: true,
+      last_updated: true,
+      account: { select: { name: true } },
+      instrument: {
+        select: {
+          id: true,
+          symbol: true,
+          name: true,
+          type: true,
+          current_price: true,
+          price_currency_id: true,
+          external_symbol_id: true,
+          underlying: {
+            select: {
+              symbol: true,
+              current_price: true,
+              price_currency_id: true,
+            },
+          },
+        },
+      },
     },
   });
   const holdingMap = new Map(
@@ -838,8 +863,19 @@ export async function getOptionsIncome(
       last_trade_date: bucket.last_trade_date,
     };
 
-    if (isClosed) closedPositions.push(positionRow);
-    else openPositions.push(positionRow);
+    const holding = holdingMap.get(`${bucket.account_id}:${bucket.instrument_id}`);
+    const holdingQty = holding != null ? Number(holding.quantity) : null;
+    const holdingStillOpen = holdingQty != null && Math.abs(holdingQty) >= 0.0001;
+
+    // Trade history can lag closes/expiries — only keep open when an active holding confirms it.
+    if (isClosed) {
+      closedPositions.push(positionRow);
+    } else if (holdingStillOpen) {
+      openPositions.push({
+        ...positionRow,
+        position_qty: holdingQty ?? bucket.position_qty,
+      });
+    }
 
     const rounds = splitRoundTrips(bucket.trades);
     const closedTradeIds = new Set(
@@ -871,17 +907,16 @@ export async function getOptionsIncome(
       });
     }
 
-    if (!isClosed) {
+    if (!isClosed && holdingStillOpen && holding) {
       for (const trade of bucket.trades) {
         if (!trade.inPeriod || closedTradeIds.has(trade.trade_id)) continue;
         const costs = costsFromLegs([trade]);
-        const holding = holdingMap.get(`${bucket.account_id}:${bucket.instrument_id}`);
         const bucketCurrencyId = accountCurrencyMap.get(bucket.account_id);
-        const holdingRate = await getRate(holding?.currency_id ?? bucketCurrencyId);
+        const holdingRate = await getRate(holding.currency_id ?? bucketCurrencyId);
         const unrealizedPnl =
-          holding?.unrealized_pnl != null ? Number(holding.unrealized_pnl) * holdingRate : null;
+          holding.unrealized_pnl != null ? Number(holding.unrealized_pnl) * holdingRate : null;
         const optionCurrentPrice =
-          holding?.current_price != null
+          holding.current_price != null
             ? Number(holding.current_price) * holdingRate
             : bucket.option_current_price;
         openTransactions.push({
@@ -893,7 +928,7 @@ export async function getOptionsIncome(
           instrument_name: bucket.instrument_name,
           underlying_symbol: bucket.underlying_symbol,
           quantity: trade.quantity,
-          position_qty: bucket.position_qty,
+          position_qty: holdingQty ?? bucket.position_qty,
           position_status: 'open',
           acquisition_cost: costs.acquisition_cost,
           sale_cost: costs.sale_cost,
@@ -909,6 +944,98 @@ export async function getOptionsIncome(
         });
       }
     }
+  }
+
+  // Holdings can land before Questrade activities — synthesize open rows when we have
+  // no trade history at all for that account+instrument.
+  const tradedKeys = new Set(positions.keys());
+  for (const holding of holdingRows) {
+    const instrument = holding.instrument;
+    if (!instrument || !isOptionInstrument(instrument.type, instrument.symbol)) continue;
+    const qty = Number(holding.quantity);
+    if (Math.abs(qty) < 0.0001) continue;
+    const key = `${holding.account_id}:${holding.instrument_id}`;
+    if (tradedKeys.has(key)) continue;
+
+    const currencyId = holding.currency_id ?? accountCurrencyMap.get(holding.account_id);
+    const rate = await getRate(currencyId);
+    const absQty = Math.abs(qty);
+    const avgCost = Number(holding.average_cost) * rate;
+    const premium = absQty * avgCost * 100;
+    const isShort = qty < 0;
+    const tradeType: 'BUY' | 'SELL' = isShort ? 'SELL' : 'BUY';
+    const tradeDate = (holding.last_updated ?? new Date()).toISOString().split('T')[0];
+    const inPeriod = tradeDate >= startDate && tradeDate <= endDate;
+    const syntheticTrade: ConvertedTrade = {
+      trade_id: `holding_${holding.id}`,
+      type: tradeType,
+      quantity: absQty,
+      price: avgCost,
+      amount: premium,
+      value_date: tradeDate,
+      inPeriod,
+    };
+    const costs = costsFromLegs([syntheticTrade]);
+    const periodIncome = inPeriod ? costs.profit_loss : 0;
+    const underlying = instrument.underlying as {
+      symbol?: string;
+      current_price?: { toString(): string } | null;
+      price_currency_id?: string | null;
+    } | null;
+    const underlyingRate = await getRate(underlying?.price_currency_id ?? currencyId);
+    const underlyingPrice =
+      underlying?.current_price != null ? Number(underlying.current_price) * underlyingRate : null;
+    const optionRate = await getRate(instrument.price_currency_id ?? currencyId);
+    const optionPrice =
+      holding.current_price != null
+        ? Number(holding.current_price) * rate
+        : instrument.current_price != null
+          ? Number(instrument.current_price) * optionRate
+          : null;
+    const unrealizedPnl =
+      holding.unrealized_pnl != null ? Number(holding.unrealized_pnl) * rate : null;
+
+    openTransactions.push({
+      account_id: holding.account_id,
+      account_name: holding.account?.name ?? holding.account_id,
+      instrument_id: instrument.id,
+      external_symbol_id: instrument.external_symbol_id ?? null,
+      symbol: instrument.symbol,
+      instrument_name: instrument.name,
+      underlying_symbol: underlying?.symbol ?? parseUnderlyingSymbolFromOption(instrument.symbol),
+      quantity: absQty,
+      position_qty: qty,
+      position_status: 'open',
+      acquisition_cost: costs.acquisition_cost,
+      sale_cost: costs.sale_cost,
+      profit_loss: costs.profit_loss,
+      open_leg: legFromTrade(syntheticTrade),
+      close_leg: null,
+      trade_date: tradeDate,
+      underlying_current_price: underlyingPrice,
+      option_current_price: optionPrice,
+      strike_price: parseStrikeFromOption(instrument.symbol),
+      option_type: parseOptionTypeFromOption(instrument.symbol),
+      unrealized_pnl: unrealizedPnl,
+    });
+
+    openPositions.push({
+      account_id: holding.account_id,
+      account_name: holding.account?.name ?? holding.account_id,
+      instrument_id: instrument.id,
+      symbol: instrument.symbol,
+      instrument_name: instrument.name,
+      underlying_symbol: underlying?.symbol ?? parseUnderlyingSymbolFromOption(instrument.symbol),
+      position_status: 'open',
+      position_qty: qty,
+      income_received: periodIncome,
+      cumulative_income: costs.profit_loss,
+      premium_collected: inPeriod && isShort ? premium : 0,
+      premium_paid: inPeriod && !isShort ? premium : 0,
+      opened_date: tradeDate,
+      closed_date: null,
+      last_trade_date: tradeDate,
+    });
   }
 
   const sortTransactions = (a: OptionsIncomeTransactionRow, b: OptionsIncomeTransactionRow) =>

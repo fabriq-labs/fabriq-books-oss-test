@@ -168,7 +168,13 @@ export function mapActivity(accountExternalId: string, activity: QtActivity): Br
   }
   const type = resolveTradeType(activity);
   const instrument: BrokerInstrumentDTO | undefined = activity.symbol
-    ? { symbol: activity.symbol, name: activity.symbol, type: 'STOCK', currencyCode: activity.currency }
+    ? {
+        symbol: activity.symbol,
+        name: activity.symbol,
+        type: mapInstrumentType(activity.type, activity.symbol),
+        currencyCode: activity.currency,
+        externalSymbolId: activity.symbolId,
+      }
     : undefined;
 
   return {

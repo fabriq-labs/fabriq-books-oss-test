@@ -149,6 +149,33 @@ For each env service:
 Service IDs live in the caller workflow YAML (not secrets). Remove obsolete
 `RAILWAY_SERVICE_ID` / `RAILWAY_PROJECT_ID` / `RAILWAY_ENVIRONMENT_ID` if present.
 
+#### Cursor / cloud-agent access (logs + debug)
+
+Agents can inspect Railway **without** redeploying by using the Railway CLI and a
+**project token**. This is the supported path for Cursor Cloud Agents:
+
+| Need | How |
+|------|-----|
+| Auth | Set Cursor secret `RAILWAY_TOKEN` (same Project Token as Actions) at [Cloud Agents → Secrets](https://cursor.com/dashboard/cloud-agents) |
+| Service target | Pass `--service <uuid>` (dev/prod IDs above) |
+| Skill | `.cursor/skills/railway-debug/SKILL.md` |
+| Local/IDE MCP | `.cursor/mcp.json` → `railway` stdio server (`npx @railway/cli mcp`) reads `RAILWAY_TOKEN` |
+
+Useful read-only commands:
+
+```bash
+npx -y @railway/cli@latest logs --service b82e07e5-9532-43f3-b15a-797403b7fc92 -n 200
+npx -y @railway/cli@latest deployment list --service b82e07e5-9532-43f3-b15a-797403b7fc92 --json
+npx -y @railway/cli@latest ssh --service b82e07e5-9532-43f3-b15a-797403b7fc92 -- sh -c 'wget -qO- "http://127.0.0.1:${NGINX_PORT:-8080}/health"'
+```
+
+Notes:
+
+- Railway’s **remote** MCP (`https://mcp.railway.com`) uses **OAuth** and does **not**
+  accept project tokens — fine for interactive IDE login, not for headless cloud agents.
+- Do not commit tokens. Prefer shell + Cursor Secrets for cloud agents; configure the
+  dashboard MCP `env` with the literal token only if you want stdio MCP on cloud.
+
 #### Run a deploy
 
 1. Open **Actions**.
