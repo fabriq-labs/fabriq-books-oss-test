@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ConfigProvider } from 'antd';
 import { ChatProvider } from "./contexts/ChatContext";
 import { ChatAuthSync } from "./components/chat/ChatAuthSync";
@@ -99,6 +99,8 @@ import OptionsIncomeReport from "./pages/investments/OptionsIncomeReport";
 import MobilePortfolio from "./pages/investments/mobile/MobilePortfolio";
 import MobileOptionsIncome from "./pages/investments/mobile/MobileOptionsIncome";
 import { MobileLayout } from "./components/layout/MobileLayout";
+import { MobileRedirectGate } from "./components/layout/MobileRedirectGate";
+import { getSafeRedirectTarget } from "./lib/authRedirect";
 import Transactions from "./pages/Transactions";
 import { ReportControllerProvider } from "./contexts/ReportControllerContext";
 import { PaymentReceiptForm } from "./components/forms/Masters/PaymentReceiptForm";
@@ -125,13 +127,16 @@ const antTheme = {
 
 const PublicAuthRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { loading, isMeApiLoading, isAuthenticated } = useAuth();
+  const location = useLocation();
 
   if (loading || isMeApiLoading) {
     return <Loading message="Loading user data..." />;
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    // Single source of truth for post-login destination — avoids racing
+    // with any other navigate() call fired around the same auth-state flip.
+    return <Navigate to={getSafeRedirectTarget(location.search)} replace />;
   }
 
   return <>{children}</>;
@@ -179,7 +184,9 @@ const AppRoutes: React.FC = () => {
               {/* Protected routes with AppLayout */}
               <Route path="/" element={
                 <ProtectedRouteWithLoading>
-                  <AppLayout />
+                  <MobileRedirectGate>
+                    <AppLayout />
+                  </MobileRedirectGate>
                 </ProtectedRouteWithLoading>
               }>
                 {/* Unified Dashboard - shows different dashboards based on user role */}

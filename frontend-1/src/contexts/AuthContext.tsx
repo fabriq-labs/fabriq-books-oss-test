@@ -6,6 +6,7 @@ import { userAPI } from '@/api/api';
 import { userStorage } from '@/utils/userStorage';
 import Cookies from 'js-cookie';
 import { triggerChatReset } from '@/utils/chatSessionBridge';
+import { buildSignInRedirect } from '@/lib/authRedirect';
 
 // Type for the API response structure
 interface UserAPIResponse {
@@ -108,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isDevPublicRoute =
       import.meta.env.DEV && location.pathname.startsWith('/dev/');
     if (!loading && !user && !publicAuthRoutes.includes(location.pathname) && !isDevPublicRoute) {
-      navigate('/sign-in');
+      navigate(buildSignInRedirect(location.pathname, location.search));
     }
   }, [user, loading, location.pathname, navigate]);
 
@@ -147,8 +148,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         triggerChatReset();
         toast.success('Login successful!');
-        // 2f. Navigate to dashboard
-        navigate('/');
+        // 2f. Post-login navigation is handled by PublicAuthRoute (App.tsx),
+        // which reads the same ?redirect= param once isAuthenticated flips —
+        // keeping a single source of truth avoids a navigation race here.
       } else {
         throw new Error('Failed to fetch user data after login');
       }
