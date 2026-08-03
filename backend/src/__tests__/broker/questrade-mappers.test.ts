@@ -98,5 +98,23 @@ describe('questrade_mappers', () => {
       });
       expect(dto).toBeNull();
     });
+
+    it('maps option activities to OPTION instrument type with symbolId', () => {
+      const dto = mapActivity(accountId, {
+        tradeDate: '2026-08-03T00:00:00.000000-04:00',
+        action: 'Sell',
+        symbol: 'META28Aug26P550.00',
+        symbolId: 76879217,
+        quantity: -1,
+        price: 10,
+        netAmount: 999.98,
+        currency: 'USD',
+        type: 'Trades',
+      });
+      expect(dto).not.toBeNull();
+      expect(dto!.type).toBe('SELL');
+      expect(dto!.instrument?.type).toBe('OPTION');
+      expect(dto!.instrument?.externalSymbolId).toBe(76879217);
+    });
   });
 });

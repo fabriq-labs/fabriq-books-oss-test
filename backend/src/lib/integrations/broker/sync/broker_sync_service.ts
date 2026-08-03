@@ -20,6 +20,8 @@ import {
 import { isOptionSymbol } from '../option_symbol';
 
 const FIRST_SYNC_BACKFILL_DAYS = 90;
+/** Re-fetch recent activities on every sync so same-day / delayed Questrade activity rows are not missed after last_sync_at advances. Idempotent via deterministic trade_id. */
+const ACTIVITY_OVERLAP_DAYS = 7;
 
 export interface SyncReport {
   startedAt: string;
@@ -68,7 +70,7 @@ export async function runBrokerSync(connectionId: string, orgId: string): Promis
   const legalEntityId = connection.legal_entity_id ?? null;
   const lastSyncAt = connection.last_sync_at;
   const activityStart = lastSyncAt
-    ? new Date(lastSyncAt)
+    ? new Date(lastSyncAt.getTime() - ACTIVITY_OVERLAP_DAYS * 24 * 60 * 60 * 1000)
     : new Date(startedAt.getTime() - FIRST_SYNC_BACKFILL_DAYS * 24 * 60 * 60 * 1000);
 
   try {
