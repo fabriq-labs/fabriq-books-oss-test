@@ -96,6 +96,9 @@ import PersonalIncomeReport from "./pages/reports/PersonalIncomeReport";
 import MonthlyTrialBalance from "./pages/reports/MonthlyTrialBalance";
 import InvestmentsPortfolio from "./pages/investments/InvestmentsPortfolio";
 import OptionsIncomeReport from "./pages/investments/OptionsIncomeReport";
+import MobilePortfolio from "./pages/investments/mobile/MobilePortfolio";
+import MobileOptionsIncome from "./pages/investments/mobile/MobileOptionsIncome";
+import { MobileLayout } from "./components/layout/MobileLayout";
 import Transactions from "./pages/Transactions";
 import { ReportControllerProvider } from "./contexts/ReportControllerContext";
 import { PaymentReceiptForm } from "./components/forms/Masters/PaymentReceiptForm";
@@ -160,6 +163,18 @@ const AppRoutes: React.FC = () => {
               {import.meta.env.DEV && (
                 <Route path="/dev/clarification-preview" element={<ClarificationCardPreview />} />
               )}
+
+              {/* Mobile-friendly routes (limited feature set) */}
+              <Route path="/m" element={
+                <ProtectedRouteWithLoading>
+                  <MobileLayout />
+                </ProtectedRouteWithLoading>
+              }>
+                <Route index element={<Navigate to="investments/portfolio" replace />} />
+                <Route path="investments/portfolio" element={<MobilePortfolio />} />
+                <Route path="investments/options-income" element={<MobileOptionsIncome />} />
+                <Route path="*" element={<Navigate to="investments/portfolio" replace />} />
+              </Route>
 
               {/* Protected routes with AppLayout */}
               <Route path="/" element={
