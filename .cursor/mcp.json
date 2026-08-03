@@ -5,6 +5,13 @@
       "headers": {
         "X-API-Key": "fabriq-us-ca-demo-user_daniel_lee"
       }
+    },
+    "railway": {
+      "command": "npx",
+      "args": ["-y", "@railway/cli@latest", "mcp"],
+      "env": {
+        "RAILWAY_TOKEN": "${env:RAILWAY_TOKEN}"
+      }
     }
   }
 }

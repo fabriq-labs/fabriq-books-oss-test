@@ -478,7 +478,7 @@ The `api_server` is returned by Questrade per-token and can change between sessi
 - `GET v1/accounts/{id}/activities` has a **30-day maximum window** per request
 - The sync chunks date ranges into ≤30-day windows automatically (`chunkWindows()` in `questrade_connector.ts`)
 - **First sync**: 90-day backfill (3 windows × N accounts)
-- **Subsequent syncs**: from `last_sync_at` forward
+- **Subsequent syncs**: from `last_sync_at` minus a **7-day overlap** forward (activities can lag positions on the same trading day; overlap is safe because trade upserts are idempotent)
 
 ### Deterministic trade ID
 
