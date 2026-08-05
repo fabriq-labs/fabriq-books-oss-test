@@ -324,6 +324,8 @@ LLM call. Full diagnostic workflow: [11-OBSERVABILITY.md](./11-OBSERVABILITY.md)
 | `prompt_tokens` | Tokens in prompt |
 | `completion_tokens` | Tokens in completion |
 | `total_tokens` | Total |
+| `cached_prompt_tokens` | Input tokens served from the provider prompt cache at a discount (OpenAI `cachedPromptTokens` / Anthropic `cacheReadInputTokens` / Google `cachedContentTokenCount`); `null` when the provider reports no caching. Summed across steps. See [11-OBSERVABILITY.md](./11-OBSERVABILITY.md#prompt-cache-accounting) |
+| `cache_creation_tokens` | Input tokens written to the cache at a premium (Anthropic `cacheCreationInputTokens`); `null` for providers with no distinct write metric |
 | `duration_ms` | Total execution time |
 | `steps_count` | Number of tool-call rounds |
 | `tools_called` | String[] of tool names used |
@@ -338,6 +340,7 @@ LLM call. Full diagnostic workflow: [11-OBSERVABILITY.md](./11-OBSERVABILITY.md)
 |--------|---------|
 | `trace_id` | FK to `llm_trace` |
 | `step_number` | 1-based |
+| `cached_prompt_tokens` / `cache_creation_tokens` | Per-step prompt-cache counts (same semantics as `llm_trace`) |
 | `tool_calls` | `[{toolName, args}]` |
 | `tool_results` | `[{toolName, result_preview}]` |
 | `sql_queries` | `[{sql, description, reasoning}]` extracted from tool calls |
