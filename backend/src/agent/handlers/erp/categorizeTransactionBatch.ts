@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import { generateObject } from 'ai';
 import { getModel, getModelId } from '../../../lib/ai/modelProvider';
+import { extractCacheUsage } from '../../../lib/ai/usage';
 import { ERPMethodHandler } from './types';
 import { ERPConnector } from '../../../lib/integrations/connectors/types';
 import { AuthContext } from '../../../auth/types';
@@ -156,10 +157,12 @@ async function bulkCategorizeWithLLM(
   postings: PostingForCategorization[],
   accounts: AccountsGrouped,
   orgId: string
-): Promise<{ results: Map<number, BulkCategorizationItem>; usage: { promptTokens?: number; completionTokens?: number } }> {
+): Promise<{ results: Map<number, BulkCategorizationItem>; usage: { promptTokens?: number; completionTokens?: number; cachedPromptTokens?: number; cacheCreationTokens?: number } }> {
   const results = new Map<number, BulkCategorizationItem>();
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
+  let totalCachedPromptTokens = 0;
+  let totalCacheCreationTokens = 0;
 
   // Process in chunks of BULK_LLM_BATCH_SIZE
   const batchSize = CATEGORIZATION_CONFIG.BULK_LLM_BATCH_SIZE;
@@ -179,9 +182,12 @@ async function bulkCategorizeWithLLM(
         prompt: userPrompt,
       });
 
-      // Track token usage
+      // Track token usage (including prompt-cache accounting from provider metadata)
       totalPromptTokens += llmResult.usage?.promptTokens ?? 0;
       totalCompletionTokens += llmResult.usage?.completionTokens ?? 0;
+      const chunkCache = extractCacheUsage((llmResult as any).providerMetadata);
+      totalCachedPromptTokens += chunkCache.cachedPromptTokens ?? 0;
+      totalCacheCreationTokens += chunkCache.cacheCreationTokens ?? 0;
 
       // Map results back to original indices
       for (const cat of llmResult.object.categorizations) {
@@ -214,6 +220,8 @@ async function bulkCategorizeWithLLM(
     usage: {
       promptTokens: totalPromptTokens || undefined,
       completionTokens: totalCompletionTokens || undefined,
+      cachedPromptTokens: totalCachedPromptTokens || undefined,
+      cacheCreationTokens: totalCacheCreationTokens || undefined,
     },
   };
 }
@@ -493,7 +501,7 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
       // Step 5: Bulk LLM categorization — split by direction so each sub-batch gets
       // only the relevant account subset (A5): money_out → expense+liability,
       // money_in → income+asset.
-      let llmTokenUsage: { promptTokens?: number; completionTokens?: number } = {};
+      let llmTokenUsage: { promptTokens?: number; completionTokens?: number; cachedPromptTokens?: number; cacheCreationTokens?: number } = {};
       let llmCategorizedCount = 0;
 
       if (postingsNeedingLLM.length > 0) {
@@ -539,10 +547,12 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
         const applyLLMResults = async (
           queue: { posting: PostingForCategorization; originalIndex: number }[],
           llmResults: Map<number, BulkCategorizationItem>,
-          usage: { promptTokens?: number; completionTokens?: number }
+          usage: { promptTokens?: number; completionTokens?: number; cachedPromptTokens?: number; cacheCreationTokens?: number }
         ) => {
           llmTokenUsage.promptTokens = (llmTokenUsage.promptTokens ?? 0) + (usage.promptTokens ?? 0);
           llmTokenUsage.completionTokens = (llmTokenUsage.completionTokens ?? 0) + (usage.completionTokens ?? 0);
+          llmTokenUsage.cachedPromptTokens = (llmTokenUsage.cachedPromptTokens ?? 0) + (usage.cachedPromptTokens ?? 0);
+          llmTokenUsage.cacheCreationTokens = (llmTokenUsage.cacheCreationTokens ?? 0) + (usage.cacheCreationTokens ?? 0);
 
           for (let llmIndex = 0; llmIndex < queue.length; llmIndex++) {
             const { posting, originalIndex } = queue[llmIndex];
@@ -693,7 +703,12 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
         result: {
           text: `Categorized ${summary.categorized_count}, applied ${summary.applied_count}, skipped ${summary.skipped_count}, errors ${summary.error_count}`,
           steps: [],
-          usage: { promptTokens: llmTokenUsage.promptTokens ?? 0, completionTokens: llmTokenUsage.completionTokens ?? 0 },
+          usage: {
+            promptTokens: llmTokenUsage.promptTokens ?? 0,
+            completionTokens: llmTokenUsage.completionTokens ?? 0,
+            cachedPromptTokens: llmTokenUsage.cachedPromptTokens ?? null,
+            cacheCreationTokens: llmTokenUsage.cacheCreationTokens ?? null,
+          },
         },
         durationMs,
         status: 'success',

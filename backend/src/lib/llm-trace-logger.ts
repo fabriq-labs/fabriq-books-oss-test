@@ -1,5 +1,6 @@
 import prisma from './prisma';
 import logger from '../utils/logger';
+import { extractCacheUsage, resolveCacheUsage, type CacheUsage } from './ai/usage';
 
 interface TraceStep {
   toolCalls?: Array<{
@@ -15,6 +16,8 @@ interface TraceStep {
     promptTokens: number;
     completionTokens: number;
   };
+  /** Provider-specific metadata (carries prompt-cache token counts). */
+  providerMetadata?: Record<string, any>;
 }
 
 interface LogTraceParams {
@@ -30,7 +33,15 @@ interface LogTraceParams {
   result: {
     text: string;
     steps: TraceStep[];
-    usage: { promptTokens: number; completionTokens: number };
+    usage: {
+      promptTokens: number;
+      completionTokens: number;
+      /** Optional pre-computed cache usage (e.g. paths that don't expose steps). */
+      cachedPromptTokens?: number | null;
+      cacheCreationTokens?: number | null;
+    };
+    /** Top-level provider metadata (fallback when steps carry no metadata). */
+    providerMetadata?: Record<string, any>;
   };
   durationMs: number;
   status: 'success' | 'error';
@@ -57,6 +68,16 @@ class LLMTraceLogger {
         ? promptTokens + completionTokens
         : null;
 
+      // Prompt-cache accounting: prefer an explicit pre-computed value, else
+      // derive from per-step / top-level provider metadata.
+      const cacheUsage: CacheUsage =
+        result.usage?.cachedPromptTokens != null || result.usage?.cacheCreationTokens != null
+          ? {
+              cachedPromptTokens: result.usage.cachedPromptTokens ?? null,
+              cacheCreationTokens: result.usage.cacheCreationTokens ?? null,
+            }
+          : resolveCacheUsage({ steps: result.steps, providerMetadata: result.providerMetadata });
+
       // Collect all unique tool names called across steps
       const toolsCalled = this.extractToolsCalled(result.steps);
 
@@ -76,6 +97,8 @@ class LLMTraceLogger {
             prompt_tokens: promptTokens,
             completion_tokens: completionTokens,
             total_tokens: totalTokens,
+            cached_prompt_tokens: cacheUsage.cachedPromptTokens,
+            cache_creation_tokens: cacheUsage.cacheCreationTokens,
             duration_ms: durationMs,
             steps_count: result.steps.length,
             tools_called: toolsCalled,
@@ -91,12 +114,15 @@ class LLMTraceLogger {
             const toolCalls = this.extractToolCalls(step);
             const toolResults = this.extractToolResults(step);
             const sqlQueries = this.extractSqlQueries(step);
+            const stepCache = extractCacheUsage(step.providerMetadata);
 
             return {
               trace_id: trace.id,
               step_number: index,
               prompt_tokens: step.usage?.promptTokens ?? null,
               completion_tokens: step.usage?.completionTokens ?? null,
+              cached_prompt_tokens: stepCache.cachedPromptTokens,
+              cache_creation_tokens: stepCache.cacheCreationTokens,
               tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
               tool_results: toolResults.length > 0 ? toolResults : undefined,
               sql_queries: sqlQueries.length > 0 ? sqlQueries : undefined,

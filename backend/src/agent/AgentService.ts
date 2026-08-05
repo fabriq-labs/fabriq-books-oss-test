@@ -398,6 +398,7 @@ export class AgentService {
           text: result.text,
           steps: result.steps as any,
           usage: result.usage,
+          providerMetadata: result.providerMetadata as any,
         },
         durationMs,
         status: 'success',
@@ -789,7 +790,7 @@ export class AgentService {
         },
 
         // LLM trace logging — fires when stream completes
-        onFinish: async ({ text, usage, steps }) => {
+        onFinish: async ({ text, usage, steps, providerMetadata }) => {
           // Failures are traced in onError; do not persist a success turn.
           if (streamError) return;
 
@@ -808,6 +809,7 @@ export class AgentService {
               text,
               steps: steps as any,
               usage,
+              providerMetadata: providerMetadata as any,
             },
             durationMs,
             status: 'success',
@@ -1016,7 +1018,7 @@ export class AgentService {
             llmModel: llmModelId,
           });
         },
-        onFinish: ({ text, usage, steps }) => {
+        onFinish: ({ text, usage, steps, providerMetadata }) => {
           // Success-only: failures are traced in the catch path below.
           if (streamError) return;
           const durationMs = Date.now() - startTime;
@@ -1030,7 +1032,7 @@ export class AgentService {
             queryType: classification.type,
             question: questionText,
             llmModel: llmModelId,
-            result: { text, steps: steps as any, usage },
+            result: { text, steps: steps as any, usage, providerMetadata: providerMetadata as any },
             durationMs,
             status: 'success',
           }).catch(() => { });
