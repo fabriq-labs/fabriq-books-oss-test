@@ -749,7 +749,12 @@ export async function getOptionsIncome(
     const price = Number(trade.price);
     const netAmount = trade.net_amount != null ? Number(trade.net_amount) : null;
     const cashFlow = tradeCashFlow(trade.type, qty, price, netAmount);
-    const currencyId = accountCurrencyMap.get(account_id);
+    // Accounts can hold mixed-currency positions (e.g. Questrade combined/margin
+    // accounts hold both CAD and USD instruments) — use the instrument's own
+    // currency first; only fall back to the account-level guess if it's unset.
+    const currencyId =
+      (instrument as { price_currency_id?: string | null }).price_currency_id ??
+      accountCurrencyMap.get(account_id);
     const rate = await getRate(currencyId);
     const convertedCashFlow = cashFlow * rate;
     const qtyDelta = signedQuantity(trade.type, qty);
