@@ -168,10 +168,18 @@ RULES:
 `;
 
 /**
- * Build the session context block injected into the system prompt.
- * Compact header every turn (~50 tokens); full plan on first turn and after createPlan.
+ * Build the DYNAMIC session state block (goal / status / accumulated context, plus
+ * the full plan on the first turn and right after createPlan).
+ *
+ * Prompt-cache note: this block is intentionally the *volatile* part of the
+ * system prompt and contains NO static instructions. The static
+ * `SESSION_DIRECTIVE` is appended by the caller BEFORE this block so that the
+ * cacheable prefix (base prompt + tool guidelines + SESSION_DIRECTIVE) stays
+ * byte-identical across turns while only this trailing state block changes. See
+ * [docs/agent/04-PROMPT_SYSTEM.md]. Compact header every turn (~50 tokens); full
+ * plan on first turn and after createPlan.
  */
-export function buildSessionContextBlock(
+export function buildSessionStateBlock(
   session: {
     goal: string;
     mode: string;
@@ -199,10 +207,10 @@ Accumulated: ${JSON.stringify(session.accumulated_context ?? {})}
 `;
 
   if (isFirstTurn || justCreatedPlan) {
-    return header + `\n## Full Plan\n${JSON.stringify(plan ?? [], null, 2)}\n` + SESSION_DIRECTIVE;
+    return header + `\n## Full Plan\n${JSON.stringify(plan ?? [], null, 2)}\n`;
   }
 
-  return header + SESSION_DIRECTIVE;
+  return header;
 }
 
 /**

@@ -59,7 +59,18 @@ export function getAppTimezoneOffsetMinutes(): number {
 }
 
 export function computeDatePlaceholders(now = new Date()): DatePlaceholderMap {
-  const currentDate = now.toISOString();
+  // Prompt-cache stability: `{{currentDate}}` is embedded dozens of times in the
+  // large base prompt, so a millisecond-precision value (`now.toISOString()`)
+  // made the whole cached prefix unique on every request. Truncate to the top of
+  // the current hour: stable across all turns of a session and within provider
+  // prompt-cache TTLs, while remaining a full ISO timestamp on the SAME UTC
+  // calendar day as `now` (minute truncation never changes the date), so
+  // downstream date-bound normalization (SearchDateBounds, which keys off
+  // sameUtcDate with the real `now`) is unaffected. Postings are day-granular, so
+  // an upper bound at the top of the hour never excludes real rows.
+  const stableNow = new Date(now);
+  stableNow.setUTCMinutes(0, 0, 0);
+  const currentDate = stableNow.toISOString();
   const tzOffset = getAppTimezoneOffsetMinutes();
   const localNow = new Date(now.getTime() + tzOffset * 60 * 1000);
   const ly = localNow.getUTCFullYear();
