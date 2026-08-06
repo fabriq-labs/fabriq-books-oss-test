@@ -12,6 +12,8 @@ import { useEntity } from "@/contexts/EntityContext";
 import {
   usePortfolio,
   toNative,
+  holdingKey,
+  mergeHoldingsByInstrument,
   type HoldingRow,
   type AccountSummary,
 } from "./data/usePortfolioData";
@@ -154,7 +156,7 @@ function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row, i) => {
+          {rows.map((row) => {
             const currency = row.native_currency_code ?? "USD";
             const rate = row.conversion_rate || 1;
             const avgCost    = toNative(row.average_cost, rate);
@@ -164,14 +166,18 @@ function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
             const pnlPositive = (unrPnl ?? 0) >= 0;
 
             return (
-              <TableRow key={`${row.account_id}-${row.symbol}-${i}`} className="border-b border-slate-100 hover:bg-slate-50">
+              <TableRow key={holdingKey(row)} className="border-b border-slate-100 hover:bg-slate-50">
                 {/* Symbol + currency + account stacked */}
                 <TableCell className="py-2 px-3">
                   <span className="text-xs font-semibold text-slate-900">{row.symbol}</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] text-slate-400 font-medium">{currency}</span>
-                    <span className="text-[10px] text-slate-300">·</span>
-                    <span className="text-[10px] text-slate-400 truncate max-w-[120px]">{row.account_name}</span>
+                    {row.account_name && (
+                      <>
+                        <span className="text-[10px] text-slate-300">·</span>
+                        <span className="text-[10px] text-slate-400 truncate max-w-[120px]">{row.account_name}</span>
+                      </>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="py-2 px-3 text-xs text-right font-mono text-slate-700">
@@ -232,11 +238,15 @@ export default function InvestmentsPortfolio() {
     ? dayjs(data.last_sync_at).format("MMM D, YYYY h:mm A")
     : null;
 
-  const visibleEquity = (data?.equity ?? []).filter(
-    h => accountFilter === "__all__" || h.account_id === accountFilter
+  const visibleEquity = mergeHoldingsByInstrument(
+    (data?.equity ?? []).filter(
+      h => accountFilter === "__all__" || h.account_id === accountFilter
+    )
   );
-  const visibleOptions = (data?.options ?? []).filter(
-    h => accountFilter === "__all__" || h.account_id === accountFilter
+  const visibleOptions = mergeHoldingsByInstrument(
+    (data?.options ?? []).filter(
+      h => accountFilter === "__all__" || h.account_id === accountFilter
+    )
   );
   const visibleCash = (data?.cash ?? []).filter(
     h => accountFilter === "__all__" || h.account_id === accountFilter

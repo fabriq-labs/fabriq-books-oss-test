@@ -50,6 +50,43 @@ export function toNative(converted: number | null, rate: number): number | null 
   return converted / rate;
 }
 
+/** Group key for merging holdings at instrument level (symbol + native currency). */
+export function holdingKey(row: HoldingRow): string {
+  return `${row.symbol}::${row.native_currency_code ?? "USD"}`;
+}
+
+/** Merge rows that share the same symbol and native currency (quantity-weighted avg cost). */
+export function mergeHoldingsByInstrument(rows: HoldingRow[]): HoldingRow[] {
+  const order: string[] = [];
+  const groups = new Map<string, HoldingRow[]>();
+
+  for (const row of rows) {
+    const key = holdingKey(row);
+    if (!groups.has(key)) order.push(key);
+    groups.get(key)?.push(row) ?? groups.set(key, [row]);
+  }
+
+  return order.map((key) => {
+    const group = groups.get(key)!;
+    if (group.length === 1) return group[0];
+
+    const totalQty = group.reduce((sum, r) => sum + r.quantity, 0);
+    const totalCostBasis = group.reduce((sum, r) => sum + r.quantity * r.average_cost, 0);
+    const accountIds = new Set(group.map((r) => r.account_id));
+    const first = group[0];
+
+    return {
+      ...first,
+      account_id: accountIds.size === 1 ? first.account_id : "",
+      account_name: accountIds.size === 1 ? first.account_name : "",
+      quantity: totalQty,
+      average_cost: totalQty > 0 ? totalCostBasis / totalQty : 0,
+      market_value: group.reduce((sum, r) => sum + (r.market_value ?? 0), 0),
+      unrealized_pnl: group.reduce((sum, r) => sum + (r.unrealized_pnl ?? 0), 0),
+    };
+  });
+}
+
 // ── Hook ───────────────────────────────────────────────────────────────────────
 
 export function usePortfolio(

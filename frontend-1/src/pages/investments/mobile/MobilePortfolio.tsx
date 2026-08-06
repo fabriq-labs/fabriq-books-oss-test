@@ -9,6 +9,8 @@ import { useEntity } from "@/contexts/EntityContext";
 import {
   usePortfolio,
   toNative,
+  holdingKey,
+  mergeHoldingsByInstrument,
   type HoldingRow,
   type AccountSummary,
 } from "../data/usePortfolioData";
@@ -81,7 +83,8 @@ function HoldingCard({ row }: { row: HoldingRow }) {
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-900 truncate">{row.symbol}</p>
           <p className="text-[11px] text-slate-400 truncate">
-            {currency} · {row.account_name}
+            {currency}
+            {row.account_name ? ` · ${row.account_name}` : ""}
           </p>
         </div>
         <div className="text-right shrink-0">
@@ -107,8 +110,8 @@ function HoldingsList({ rows }: { rows: HoldingRow[] }) {
   }
   return (
     <div className="space-y-2">
-      {rows.map((row, i) => (
-        <HoldingCard key={`${row.account_id}-${row.symbol}-${i}`} row={row} />
+      {rows.map((row) => (
+        <HoldingCard key={holdingKey(row)} row={row} />
       ))}
     </div>
   );
@@ -167,8 +170,12 @@ export default function MobilePortfolio() {
 
   const lastSynced = data?.last_sync_at ? dayjs(data.last_sync_at).format("MMM D, h:mm A") : null;
 
-  const visibleEquity = (data?.equity ?? []).filter((h) => accountFilter === "__all__" || h.account_id === accountFilter);
-  const visibleOptions = (data?.options ?? []).filter((h) => accountFilter === "__all__" || h.account_id === accountFilter);
+  const visibleEquity = mergeHoldingsByInstrument(
+    (data?.equity ?? []).filter((h) => accountFilter === "__all__" || h.account_id === accountFilter)
+  );
+  const visibleOptions = mergeHoldingsByInstrument(
+    (data?.options ?? []).filter((h) => accountFilter === "__all__" || h.account_id === accountFilter)
+  );
   const visibleCash = (data?.cash ?? []).filter((h) => accountFilter === "__all__" || h.account_id === accountFilter);
   const filteredMarketValue = visibleEquity.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
   const filteredCash = visibleCash.reduce((sum, h) => sum + (h.market_value ?? 0), 0);
