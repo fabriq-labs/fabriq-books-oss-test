@@ -305,6 +305,80 @@ Response shape:
 
 ---
 
+## Options Income Report (`/investments/options-income`)
+
+**Backend**: `getOptionsIncome()` in `backend/src/lib/reports/investments.ts`  
+**UI**: `frontend-1/src/pages/investments/OptionsIncomeReport.tsx` (desktop), `mobile/MobileOptionsIncome.tsx`
+
+### What it shows
+
+| Section | Source | Meaning |
+|---|---|---|
+| **Open** | Trade legs in the selected date range + active holdings | Period premium cash flows; unrealized marks on open legs |
+| **Closed** | Completed trade round-trips | Realized P/L when opening and closing legs net position to zero |
+
+Closed rows are built from **trade history only** (`splitRoundTrips()` over synced `BUY`/`SELL` activities). The UI displays `closed.transactions` (round-trip rows), not a separate positions list.
+
+Open rows are suppressed when the holding is flat (`quantity ≈ 0`), even if trade history still shows an open leg.
+
+### Report API
+
+```
+POST /api/report/options_income
+Body: {
+  "filters": {
+    "from_date": "2026-01-01",
+    "to_date": "2026-12-31",
+    "report_currency": "USD",
+    "legal_entity_id": "<optional>",
+    "connection_id": "<optional>",
+    "account_id": "<optional>"
+  }
+}
+```
+
+### Currency conversion (closed P/L stability)
+
+Trade cash flows are converted to `report_currency` using **`instrument.price_currency_id` first**, falling back to a per-account currency guess from holdings only when that field is null.
+
+Mixed-currency Questrade accounts (CAD cash + USD options) previously picked the account currency from an **unordered** holdings query, so closed P/L could drift between syncs even when trades were unchanged. Fixed in commit `509961e` (Aug 2026).
+
+Ensure option instruments have `price_currency_id` set (e.g. backfill `USD` for US-listed options). Sync sets it via `updateInstrumentMarketData()` when a position is present; instruments that only appear in trade history may still have a null `price_currency_id` until backfilled.
+
+### Known gap: closed position missing until activity syncs
+
+**Symptom**: A buy-to-close (or expiry) removes the position from **Open** on the portfolio / options income report, but the round-trip does **not** appear under **Closed** until a later sync (or never, if the activity is filtered).
+
+**Cause**: Questrade **positions** and **activities** are separate APIs. Sync order per account:
+
+1. `getPositions()` → holding `quantity = 0`, `realized_pnl` updated
+2. `getActivities()` → `trade` rows (may lag hours behind positions)
+
+The report requires a **complete** open + close pair in `trade` to emit a closed row. If only the opening leg is synced, the bucket still has non-zero `position_qty` from trades while the holding is flat — so the position is excluded from both open and closed.
+
+**Workaround**: Re-run **Sync & Refresh** after Questrade publishes the closing activity (usually within 24–48 hours). No data loss — the holding already records `realized_pnl`.
+
+**Not implemented (by design, low priority)**: Synthesizing a closed round-trip from `holding.realized_pnl` when trade history is incomplete. Acceptable minor inconsistency; revisit if activity lag becomes frequent or activities are dropped by the mapper.
+
+**Debug checklist**:
+
+```sql
+-- Trades for a symbol (expect BUY + SELL for a closed short)
+SELECT t.type, t.quantity, t.net_amount, t.value_date::date, i.symbol
+FROM trade t
+JOIN instrument i ON i.id = t.instrument_id
+WHERE i.symbol = '<OPTION_SYMBOL>'
+ORDER BY t.value_date;
+
+-- Holding should show qty 0 and realized_pnl after close
+SELECT h.quantity, h.realized_pnl, h.last_updated, i.symbol
+FROM holding h
+JOIN instrument i ON i.id = h.instrument_id
+WHERE i.symbol = '<OPTION_SYMBOL>';
+```
+
+---
+
 ## Option Chain Cache and MCP
 
 Fabriq exposes investment data to AI clients via the MCP server at `POST /api/mcp` (see [MCP.md](../agent/MCP.md)).
@@ -479,6 +553,7 @@ The `api_server` is returned by Questrade per-token and can change between sessi
 - The sync chunks date ranges into ≤30-day windows automatically (`chunkWindows()` in `questrade_connector.ts`)
 - **First sync**: 90-day backfill (3 windows × N accounts)
 - **Subsequent syncs**: from `last_sync_at` minus a **7-day overlap** forward (activities can lag positions on the same trading day; overlap is safe because trade upserts are idempotent)
+- **Positions vs activities**: Closing a position often updates `holding` (qty → 0) before the matching `BUY`/`SELL` activity appears in `trade`. See [Options Income Report — known gap](#known-gap-closed-position-missing-until-activity-syncs).
 
 ### Deterministic trade ID
 
@@ -587,3 +662,5 @@ Auth: `X-API-Key` header (user API key). See [MCP.md](../agent/MCP.md).
 | **Re-auth UX** | Portfolio page does not surface a visible warning when `last_sync_status.status === 'reauth_required'` |
 | **MCP trade execution** | Option chain tools are read-only analysis; no order placement |
 | **Option chain on all symbols** | Not every holding has Questrade-listed options — agent should handle `NO_OPTIONS` gracefully |
+| **Options income — closed lag** | Closed round-trips need both legs in `trade`. Holdings can show flat + `realized_pnl` before the closing activity syncs; position disappears from Open but may not appear in Closed until the next activity import. See [Options Income Report](#options-income-report) |
+| **Options income — currency backfill** | Closed P/L conversion uses `instrument.price_currency_id`; null values fall back to a non-deterministic per-account guess. Backfill USD (or correct currency) on option instruments when needed |

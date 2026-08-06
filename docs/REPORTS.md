@@ -146,6 +146,7 @@ Follow the pattern in `frontend-1/src/pages/reports/IncomeStatement.tsx`:
 | `my_feed` | zeiv.ts | _(none)_ | Workflow history for the current user |
 | `portfolio_summary` | investments.ts | `report_currency`, `legal_entity_id` / `legal_entity_ids` _(optional)_, `connection_id` _(optional)_ | `{ equity, options, cash, accounts, totals, last_sync_at }` |
 | `investment_trades` | investments.ts | `from_date`, `to_date`, `connection_id` _(optional)_ | Flat trade rows from broker sync |
+| `options_income` | investments.ts | `from_date`, `to_date`, `report_currency`, `legal_entity_id` / `legal_entity_ids` _(optional)_, `connection_id` _(optional)_, `account_id` _(optional)_ | Open premium cash flows + closed round-trip realized P/L — see [INVESTMENTS.md](./book-keeping/INVESTMENTS.md#options-income-report) |
 
 ---
 
