@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Menu, UserRound, LogOut, MessageSquare } from "lucide-react";
+import { Menu, UserRound, LogOut, MessageSquare, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserData } from '@/hooks/useUserData';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { useChat } from '@/contexts/ChatContext';
+import { useIsMobileDevice } from '@/hooks/useIsMobileDevice';
+import { isMobileOptedOut, setMobileOptedOut } from '@/config/mobileRoutes';
 import { User } from '@/models/User';
 import {
   DropdownMenu,
@@ -32,6 +34,13 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
   const { logout } = useAuth();
   const { isTenantAdmin } = useUserRoles();
   const { toggleChat } = useChat();
+  const isMobileDevice = useIsMobileDevice();
+  const showSwitchToMobile = isMobileDevice && isMobileOptedOut();
+
+  const handleSwitchToMobile = () => {
+    setMobileOptedOut(false);
+    navigate("/", { replace: true });
+  };
   const {
     user,
     getUserName,
@@ -130,6 +139,15 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
               >
 
               </DropdownMenuItem>
+              {showSwitchToMobile && (
+                <DropdownMenuItem
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={handleSwitchToMobile}
+                >
+                  <Smartphone className="h-4 w-4" />
+                  <span>Switch to mobile site</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="flex items-center gap-2 cursor-pointer text-destructive"
