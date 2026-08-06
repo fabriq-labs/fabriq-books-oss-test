@@ -12,7 +12,18 @@ on:
         type: boolean
 
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require prod branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "prod" ]; then
+            echo "This workflow must be run from the 'prod' branch (got '${GITHUB_REF_NAME}')." >&2
+            exit 1
+          fi
+
   deploy:
+    needs: guard
     uses: ./.github/workflows/deploy-railway.yml
     with:
       service_id: 36f474f5-fc9f-4ab7-866b-61800eb3c318
