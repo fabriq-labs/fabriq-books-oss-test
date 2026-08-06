@@ -71,6 +71,13 @@ export interface TableTotals {
 
 export const OPTION_CONTRACT_SIZE = 100;
 
+/** Investment/brokerage accounts tagged with type "Equity" in chart of accounts. */
+export function isEquityInvestmentAccount(account: { type?: string | string[] | null }): boolean {
+  if (!account?.type) return false;
+  const types = Array.isArray(account.type) ? account.type : [account.type];
+  return types.some((t) => String(t).toLowerCase() === "equity");
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 export function resolveEntityFYType(
@@ -197,6 +204,12 @@ export function useOptionsIncomeReport({ entities, currentEntityId, entityLoadin
     [currentEntityId]
   );
 
+  const accountFilterOptions = useCallback(
+    (items: { type?: string | string[] | null }[]) =>
+      items.filter((item) => isEquityInvestmentAccount(item)),
+    []
+  );
+
   useEffect(() => {
     setSelectedFY(getCurrentFYOption(fyType));
   }, [fyType]);
@@ -285,6 +298,7 @@ export function useOptionsIncomeReport({ entities, currentEntityId, entityLoadin
     selectedAccount,
     setSelectedAccount,
     accountAdditionalFilters,
+    accountFilterOptions,
     openPositionFilter,
     setOpenPositionFilter,
     data,

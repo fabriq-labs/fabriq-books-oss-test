@@ -174,6 +174,7 @@ export default function MobileOptionsIncome() {
     selectedAccount,
     setSelectedAccount,
     accountAdditionalFilters,
+    accountFilterOptions,
     openPositionFilter,
     setOpenPositionFilter,
     data,
@@ -237,6 +238,7 @@ export default function MobileOptionsIncome() {
           onAccountChange={setSelectedAccount}
           onAccountClear={() => setSelectedAccount(null)}
           accountAdditionalFilters={accountAdditionalFilters}
+          accountFilterOptions={accountFilterOptions}
           accountKey={currentEntityId ?? "all-entities"}
           className="w-full"
         />

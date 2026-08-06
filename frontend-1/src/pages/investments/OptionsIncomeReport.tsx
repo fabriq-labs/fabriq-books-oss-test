@@ -447,6 +447,7 @@ export default function OptionsIncomeReport() {
     selectedAccount,
     setSelectedAccount,
     accountAdditionalFilters,
+    accountFilterOptions,
     openPositionFilter,
     setOpenPositionFilter,
     data,
@@ -531,6 +532,7 @@ export default function OptionsIncomeReport() {
           onAccountChange={setSelectedAccount}
           onAccountClear={() => setSelectedAccount(null)}
           accountAdditionalFilters={accountAdditionalFilters}
+          accountFilterOptions={accountFilterOptions}
           accountKey={currentEntityId ?? "all-entities"}
           className="w-full"
         />
