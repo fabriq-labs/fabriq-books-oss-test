@@ -105,6 +105,11 @@ function OpenPositionCard({ row, currency }: { row: OptionsIncomeTransactionRow;
           <span className="text-slate-400">—</span>
         )}
       </div>
+      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+        <span>
+          Mark {row.option_current_price != null ? formatCurrency(row.option_current_price, currency) : "—"}
+        </span>
+      </div>
     </div>
   );
 }
