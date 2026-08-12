@@ -15,12 +15,20 @@ essential for debugging unexpected agent behaviour.
 
 ```
 Final system prompt =
-  [Layer 1: template.system_prompt]     ← task-specific instructions
+  [Layer 1: template.system_prompt]     ← task-specific instructions   (STATIC)
   + "---"
-  + [Layer 2: base prompt from DB]      ← global rules + model descriptions
-  + [Layer 3: session context block]    ← current status, plan, accumulated data
-  + [Layer 4: SESSION_DIRECTIVE]        ← exact behavioural decision tree
+  + [Layer 2: base prompt from DB]      ← global rules + model descs    (STATIC)
+  + [Layer 4: SESSION_DIRECTIVE]        ← exact behavioural decision tree (STATIC)
+  + [Layer 3: session state block]      ← current status, plan, accumulated data (DYNAMIC)
 ```
+
+> **Prompt-cache ordering (Phase 1):** the static `SESSION_DIRECTIVE` is emitted
+> *before* the dynamic session state block so the entire static prefix
+> (Layers 1 + 2 + 4) stays byte-identical across turns and can be served from the
+> provider prompt cache. Only the trailing state block (Layer 3) changes per turn.
+> The dynamic state block is produced by `buildSessionStateBlock(...)`; the static
+> `SESSION_DIRECTIVE` is appended by `AgentService` just before it. See
+> [11-OBSERVABILITY.md — Prompt-cache accounting](./11-OBSERVABILITY.md#prompt-cache-accounting).
 
 Layers 3 and 4 only apply to **session** calls. A non-session (conversational
 chat) call uses Layers 1–2 only, and Layer 1 is also absent unless a template
@@ -245,14 +253,15 @@ templates found" and the session fails immediately. Seeded Books prompts use
 
 ---
 
-## Layer 3: Session Context Block
+## Layer 3: Session State Block
 
-**Function**: `buildSessionContextBlock(session, isFirstTurn, justCreatedPlan)`
-in `prompt/constants.ts`
+**Function**: `buildSessionStateBlock(session, isFirstTurn, justCreatedPlan)`
+in `prompt/constants.ts` (returns the DYNAMIC state only — the static
+`SESSION_DIRECTIVE` is Layer 4 and is emitted before this block).
 
 Signature:
 ```typescript
-buildSessionContextBlock(
+buildSessionStateBlock(
   session: { goal, mode, status, current_step_index, plan, accumulated_context, pending_actions_count },
   isFirstTurn: boolean,       // true if no agent_message rows exist for this session yet
   justCreatedPlan: boolean    // true if the last assistant message called createPlan
@@ -292,8 +301,10 @@ for how this fits into the turn-by-turn loop.
 
 **Source**: `SESSION_DIRECTIVE` constant in `prompt/constants.ts`
 
-Always appended after the session context block. It is a decision tree
-telling the LLM exactly what to do based on current `status` and step type:
+Appended to the static base prompt **before** the dynamic Layer 3 state block
+(so it stays in the cacheable prefix — see the prompt-cache note in the
+[Overview](#overview)). It is a decision tree telling the LLM exactly what to do
+based on current `status` and step type:
 
 ```
 CRITICAL RULE: If a plan already exists, NEVER call createPlan again.

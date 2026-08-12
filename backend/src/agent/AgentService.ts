@@ -17,7 +17,7 @@ import {
   createAgentMessage,
   listAgentMessages,
 } from './services/SessionService';
-import { buildSessionContextBlock, shouldAutoContinue } from './prompt/constants';
+import { buildSessionStateBlock, SESSION_DIRECTIVE, shouldAutoContinue } from './prompt/constants';
 import { sessionEventBus } from './services/SessionEventBus';
 import { sessionTimeoutService } from './services/SessionTimeoutService';
 import {
@@ -231,8 +231,10 @@ export class AgentService {
             (tc: any) => tc.name === 'createPlan' || tc.toolName === 'createPlan'
           );
 
-        const sessionBlock = buildSessionContextBlock(session, isFirstTurn, justCreatedPlan);
-        finalSystemPrompt = finalSystemPrompt + '\n' + sessionBlock;
+        // Static SESSION_DIRECTIVE stays in the cacheable prefix; only the dynamic
+        // state block (goal/status/accumulated_context/plan) trails it.
+        const sessionStateBlock = buildSessionStateBlock(session, isFirstTurn, justCreatedPlan);
+        finalSystemPrompt = finalSystemPrompt + '\n' + SESSION_DIRECTIVE + '\n' + sessionStateBlock;
 
         logger.info('Session context injected', {
           sessionId,
@@ -678,8 +680,10 @@ export class AgentService {
           sessionMessages[sessionMessages.length - 1]?.tool_calls?.some?.(
             (tc: any) => tc.name === 'createPlan' || tc.toolName === 'createPlan'
           );
-        const sessionBlock = buildSessionContextBlock(session, isFirstTurn, justCreatedPlan);
-        finalSystemPrompt = finalSystemPrompt + '\n' + sessionBlock;
+        // Static SESSION_DIRECTIVE stays in the cacheable prefix; only the dynamic
+        // state block (goal/status/accumulated_context/plan) trails it.
+        const sessionStateBlock = buildSessionStateBlock(session, isFirstTurn, justCreatedPlan);
+        finalSystemPrompt = finalSystemPrompt + '\n' + SESSION_DIRECTIVE + '\n' + sessionStateBlock;
 
         // Emit step_started for the current step
         const currentStep = (session.plan as any[])?.[session.current_step_index ?? 0];
