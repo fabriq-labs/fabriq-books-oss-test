@@ -483,6 +483,15 @@ model llm_trace {
   total_tokens      Int?
   duration_ms       Int?
 
+  // Prompt-cache accounting (populated from provider usage metadata; null when the
+  // provider reports no caching). cached_prompt_tokens = input tokens served from
+  // cache at a discount (OpenAI cachedPromptTokens / Anthropic cacheReadInputTokens /
+  // Google cachedContentTokenCount). cache_creation_tokens = tokens written to the
+  // cache at a premium (Anthropic cacheCreationInputTokens); null for providers with
+  // no distinct write metric.
+  cached_prompt_tokens  Int?
+  cache_creation_tokens Int?
+
   steps_count  Int?
   tools_called String[]
 
@@ -514,6 +523,10 @@ model llm_trace_step {
   prompt_tokens     Int?
   completion_tokens Int?
   duration_ms       Int?
+
+  // Prompt-cache accounting for this step (see llm_trace for field semantics).
+  cached_prompt_tokens  Int?
+  cache_creation_tokens Int?
 
   tool_calls   Json? // [{toolName, args}]
   tool_results Json? // [{toolName, result_preview}]

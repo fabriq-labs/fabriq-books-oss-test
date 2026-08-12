@@ -19,6 +19,8 @@ Per call (`llm_trace`):
   `getModelId(task)` — see [10-LIBRARIES_AND_PROVIDERS.md](./10-LIBRARIES_AND_PROVIDERS.md))
 - Token counts (`prompt_tokens` / `completion_tokens` / `total_tokens`),
   `duration_ms`
+- Prompt-cache counts (`cached_prompt_tokens` / `cache_creation_tokens`) — see
+  [Prompt-cache accounting](#prompt-cache-accounting)
 - `tools_called` (all tool names used across all steps)
 - `response_text`, `status` (`success`/`error`), `error_message`
 
@@ -29,6 +31,67 @@ Per tool-call round within a call (`llm_trace_step`):
 
 Full column reference:
 [08-DATA_MODELS.md — llm_trace and llm_trace_step](./08-DATA_MODELS.md#llm_trace-and-llm_trace_step).
+
+---
+
+## Prompt-cache accounting
+
+The Vercel AI SDK reports base token counts in `result.usage`
+(`promptTokens`/`completionTokens`) but exposes prompt-cache accounting only
+through provider-specific `providerMetadata`. `backend/src/lib/ai/usage.ts`
+normalises those shapes into two provider-agnostic numbers, and
+`llmTraceLogger` persists them on `llm_trace` (and per-step on
+`llm_trace_step`):
+
+| Column | Meaning | Provider source |
+|--------|---------|-----------------|
+| `cached_prompt_tokens` | Input tokens **read** from cache (billed at a discount) | OpenAI `cachedPromptTokens`, Anthropic `cacheReadInputTokens`, Google `cachedContentTokenCount`, Bedrock `cacheReadInputTokens` |
+| `cache_creation_tokens` | Input tokens **written** to cache (billed at a premium) | Anthropic `cacheCreationInputTokens`, Bedrock `cacheWriteInputTokens`; `null` elsewhere |
+
+Key points:
+- Counts are **summed across steps** — the SDK's top-level `providerMetadata`
+  reflects only the final step, so multi-step agent turns must be aggregated
+  (`sumCacheUsageFromSteps`). `cached_prompt_tokens` is a subset of
+  `prompt_tokens`, not additional to it.
+- `null` means the provider reported no caching (either unsupported, below the
+  provider's minimum cacheable prefix, or a cold prefix). `0` is normalised to
+  `null`.
+- The extractor is defensive: it reads documented keys first, then falls back
+  to a shallow scan for `*cache*` numeric keys so a provider/SDK rename still
+  yields a best-effort number.
+
+### Measuring cache effectiveness
+
+```sql
+-- Prompt-cache hit rate + estimated cached-input share, by model (last 7 days)
+SELECT llm_model,
+       COUNT(*)                                              AS calls,
+       SUM(prompt_tokens)                                    AS prompt_tokens,
+       SUM(COALESCE(cached_prompt_tokens, 0))                AS cached_tokens,
+       ROUND(100.0 * SUM(COALESCE(cached_prompt_tokens, 0))
+             / NULLIF(SUM(prompt_tokens), 0), 1)             AS cached_pct,
+       SUM(COALESCE(cache_creation_tokens, 0))               AS cache_write_tokens
+FROM llm_trace
+WHERE created_at > now() - interval '7 days'
+GROUP BY llm_model
+ORDER BY prompt_tokens DESC;
+
+-- Sessions with the most re-sent (uncached) prompt tokens — top caching targets
+SELECT session_id,
+       COUNT(*)                                              AS turns,
+       SUM(prompt_tokens)                                    AS prompt_tokens,
+       SUM(COALESCE(cached_prompt_tokens, 0))                AS cached_tokens
+FROM llm_trace
+WHERE session_id IS NOT NULL
+GROUP BY session_id
+ORDER BY (SUM(prompt_tokens) - SUM(COALESCE(cached_prompt_tokens, 0))) DESC
+LIMIT 20;
+```
+
+Use `cached_pct` as the primary KPI when rolling out prompt caching (see the
+caching implementation plan): it should climb from ~0% toward the theoretical
+ceiling (static-prefix share of each turn) as prefix stability and provider
+cache breakpoints are enabled.
 
 ---
 
