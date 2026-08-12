@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Clock, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sessionAPI } from '@/api/api';
 import type { AgentSession } from '@/contexts/AgentSessionContext';
+import { AssistantMessageRenderer } from '@/components/chat/AssistantMessageRenderer';
 import { StepCard } from './StepCard';
 import { TraceViewer, type SessionTrace } from './TraceViewer';
 
@@ -10,16 +11,53 @@ interface CompletedViewProps {
   session: AgentSession;
 }
 
+/** Ignore short stubs like "Spending report generated successfully." */
+const MIN_REPORT_CHARS = 80;
+
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${Math.round(ms / 1000)}s`;
   return `${Math.round(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 }
 
+function pickReportContent(messages: Array<{ role?: string; content?: string }> | null): string | null {
+  if (!Array.isArray(messages) || messages.length === 0) return null;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    if (msg?.role !== 'assistant') continue;
+    const text = typeof msg.content === 'string' ? msg.content.trim() : '';
+    if (text.length >= MIN_REPORT_CHARS) return text;
+  }
+  return null;
+}
+
 export const CompletedView: React.FC<CompletedViewProps> = ({ session }) => {
   const [showTrace, setShowTrace] = useState(false);
   const [trace, setTrace] = useState<SessionTrace | null>(null);
   const [traceLoading, setTraceLoading] = useState(false);
+  const [reportContent, setReportContent] = useState<string | null>(null);
+  const [reportLoading, setReportLoading] = useState(true);
+
+  // Load the last substantive assistant message as the session report
+  useEffect(() => {
+    let cancelled = false;
+    setReportLoading(true);
+    setReportContent(null);
+
+    sessionAPI.getMessages(session.id)
+      .then((messages) => {
+        if (cancelled) return;
+        setReportContent(pickReportContent(messages));
+      })
+      .catch(() => {
+        if (!cancelled) setReportContent(null);
+      })
+      .finally(() => {
+        if (!cancelled) setReportLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [session.id]);
 
   // Fetch trace when panel opens
   useEffect(() => {
@@ -39,9 +77,9 @@ export const CompletedView: React.FC<CompletedViewProps> = ({ session }) => {
     : null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-auto">
       {/* Success banner */}
-      <div className="px-6 py-5 border-b bg-green-50/50">
+      <div className="px-6 py-5 border-b bg-green-50/50 shrink-0">
         <div className="flex items-start gap-3">
           <CheckCircle2 className="h-6 w-6 text-green-500 mt-0.5 shrink-0" />
           <div>
@@ -63,9 +101,26 @@ export const CompletedView: React.FC<CompletedViewProps> = ({ session }) => {
         </div>
       </div>
 
+      {/* Final report — last assistant message (already persisted for analytical sessions) */}
+      {(reportLoading || reportContent) && (
+        <div className="px-6 py-5 border-b shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <FileText className="h-4 w-4 text-gray-500" />
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Report</p>
+          </div>
+          {reportLoading ? (
+            <p className="text-xs text-gray-400">Loading report…</p>
+          ) : reportContent ? (
+            <div className="rounded-lg border bg-white px-4 py-4">
+              <AssistantMessageRenderer content={reportContent} className="text-sm text-gray-800" />
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* Step cards — same V2 philosophy as executing view */}
       {plan.length > 0 && (
-        <div className="px-5 py-4 space-y-2 border-b">
+        <div className="px-5 py-4 space-y-2 border-b shrink-0">
           {plan.map((step) => (
             <StepCard
               key={step.index}
@@ -93,7 +148,7 @@ export const CompletedView: React.FC<CompletedViewProps> = ({ session }) => {
         </Button>
 
         {showTrace && (
-          <div className="mt-3 rounded-lg border overflow-auto flex-1">
+          <div className="mt-3 rounded-lg border overflow-auto flex-1 min-h-[200px]">
             {traceLoading ? (
               <p className="text-xs text-gray-400 p-4">Loading trace…</p>
             ) : trace ? (
