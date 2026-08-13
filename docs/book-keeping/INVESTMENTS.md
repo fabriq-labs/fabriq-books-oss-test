@@ -323,6 +323,16 @@ Open rows are suppressed when the holding is flat (`quantity ≈ 0`), even if tr
 
 Open transaction rows include **`holding_id`** (and `instrument_id`) so the UI and LLM traces can key off the holding. The instrument remains reachable via `holding.instrument_id`.
 
+Open short-call rows also include **covered-call detection** (same brokerage account only):
+
+| Field | Meaning |
+|---|---|
+| `is_covered_call` | `true` when long underlying qty ≥ `abs(position_qty) * 100` |
+| `strategy` | `covered_call` / `naked_short_call` / `long_call` / `short_put` / `long_put` / `option` |
+| `underlying_qty`, `shares_needed`, `underlying_average_cost`, `underlying_market_value` | Coverage snapshot for LLM / UI |
+
+This is an in-memory lookup against holdings already loaded for the report (no extra broker calls).
+
 ### Position detail LLM chat (Theta)
 
 Clicking an **open** row opens `OptionPositionDetailModal`, which streams analysis through `/api/agent/chat/stream` with:
@@ -334,9 +344,9 @@ Clicking an **open** row opens `OptionPositionDetailModal`, which streams analys
 | `recordId` | row `holding_id` |
 | `promptTypes` | `['options_analysis']` |
 
-Live Greeks are fetched once via `POST /api/investments/option-quote` and re-sent as `modelContext` each turn — `agent_model_tool_config` for `holding` has an empty tool list on purpose.
+Live Greeks are fetched once via `POST /api/investments/option-quote` **before** the first LLM turn (skeleton shown meanwhile). Covered-call fields from the report row are merged into `modelContext`. The holding tool config exposes **`getOptionChain`** so the model can screen roll candidates.
 
-Resulting `llm_trace` rows use `model_name='holding'` and `record_id=<holding_id>`. Prompt file: `prisma/metadata/prompt-templates/view_d63012d4_*_options_analysis_fabriq.*` (applied by **Sync metadata**). Tool config: `prisma/seed-agent-model-tools.sql` (`amtc_holding`).
+Resulting `llm_trace` rows use `model_name='holding'` and `record_id=<holding_id>`. Prompt file: `prisma/metadata/prompt-templates/view_d63012d4_*_options_analysis_fabriq.*` (applied by **Sync metadata**). Tool config: `prisma/seed-agent-model-tools.sql` (`amtc_holding` → `getOptionChain`).
 
 ### Report API
 

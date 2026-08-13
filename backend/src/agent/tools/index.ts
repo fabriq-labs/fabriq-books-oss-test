@@ -1,6 +1,6 @@
 /**
  * Agent Tools - Analytics and Query Tools
- * 
+ *
  * This folder contains specialized tools for analytical queries
  * that require schema context and multi-step reasoning.
  */
@@ -21,3 +21,4 @@ export {
 } from './sessionTools';
 export { categorizePostingsTool } from './categorizePostings';
 export { runFinancialReportTool, runFinancialReportSchema } from './runFinancialReport';
+export { getOptionChainTool, getOptionChainAgentSchema } from './getOptionChain';

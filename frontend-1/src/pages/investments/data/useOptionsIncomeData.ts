@@ -43,6 +43,20 @@ export interface OptionsIncomeTransactionRow {
   strike_price?: number | null;
   option_type?: "C" | "P" | null;
   unrealized_pnl?: number | null;
+  is_covered_call?: boolean;
+  strategy?:
+    | "covered_call"
+    | "naked_short_call"
+    | "long_call"
+    | "short_put"
+    | "long_put"
+    | "option";
+  underlying_instrument_id?: string | null;
+  underlying_holding_id?: string | null;
+  underlying_qty?: number | null;
+  underlying_average_cost?: number | null;
+  underlying_market_value?: number | null;
+  shares_needed?: number | null;
 }
 
 export interface OptionsIncomeSection {

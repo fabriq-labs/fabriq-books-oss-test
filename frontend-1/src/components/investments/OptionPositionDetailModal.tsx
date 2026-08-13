@@ -41,6 +41,20 @@ export interface OpenOptionRow {
   strike_price?: number | null;
   option_type?: "C" | "P" | null;
   unrealized_pnl?: number | null;
+  is_covered_call?: boolean;
+  strategy?:
+    | "covered_call"
+    | "naked_short_call"
+    | "long_call"
+    | "short_put"
+    | "long_put"
+    | "option";
+  underlying_instrument_id?: string | null;
+  underlying_holding_id?: string | null;
+  underlying_qty?: number | null;
+  underlying_average_cost?: number | null;
+  underlying_market_value?: number | null;
+  shares_needed?: number | null;
 }
 
 interface LiveQuote {
@@ -113,8 +127,8 @@ function fmtNum(v: number | null | undefined, decimals = 4): string {
  * placeholders. Only defined values are included — the prompt template conditionally
  * omits any section whose key is absent, so a failed/partial quote degrades gracefully.
  */
-function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<string, string | number> {
-  const ctx: Record<string, string | number> = {
+function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<string, string | number | boolean> {
+  const ctx: Record<string, string | number | boolean> = {
     symbol: row.symbol,
     underlyingSymbol: row.underlying_symbol ?? row.symbol,
     optionType: row.option_type === "P" ? "Put" : row.option_type === "C" ? "Call" : "Option",
@@ -128,6 +142,14 @@ function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<
   if (row.underlying_current_price != null) ctx.underlyingCurrentPrice = row.underlying_current_price;
   if (row.option_current_price != null) ctx.optionMarkPrice = row.option_current_price;
   if (row.unrealized_pnl != null) ctx.unrealizedPnl = row.unrealized_pnl;
+  if (row.strategy) ctx.strategy = row.strategy;
+  if (row.is_covered_call) {
+    ctx.isCoveredCall = true;
+    if (row.underlying_qty != null) ctx.underlyingQty = row.underlying_qty;
+    if (row.shares_needed != null) ctx.sharesNeeded = row.shares_needed;
+    if (row.underlying_average_cost != null) ctx.underlyingAverageCost = row.underlying_average_cost;
+    if (row.underlying_market_value != null) ctx.underlyingMarketValue = row.underlying_market_value;
+  }
 
   if (quote) {
     if (quote.delta != null) ctx.delta = quote.delta;
@@ -250,11 +272,15 @@ function computeStatusPills(row: OpenOptionRow, quote: LiveQuote | null, dte: nu
 
 export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
   const [quote, setQuote] = useState<LiveQuote | null>(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
+  // Start true so the first LLM turn waits for the Questrade fetch to settle.
+  const [quoteLoading, setQuoteLoading] = useState(true);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const analysisInitiated = useRef(false);
+  const modelContextRef = useRef<Record<string, string | number | boolean>>(
+    buildModelContext(row, null)
+  );
 
   const dte = daysToExpiry(row.symbol);
   const expiry = parseExpiry(row.symbol);
@@ -276,9 +302,17 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
     ? Math.abs(quote.theta) * Math.abs(row.position_qty) * 100
     : null;
 
+  /* Keep modelContext fresh for experimental_prepareRequestBody (avoids stale closure). */
+  useEffect(() => {
+    modelContextRef.current = buildModelContext(row, quote);
+  }, [row, quote]);
+
   /* Fetch live quote */
   const fetchQuote = useCallback(async () => {
-    if (!row.instrument_id) return;
+    if (!row.instrument_id) {
+      setQuoteLoading(false);
+      return;
+    }
     setQuoteLoading(true);
     setQuoteError(null);
     try {
@@ -298,19 +332,11 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
 
   /*
    * Streaming analysis chat — routed through the shared in-app agent endpoint
-   * (/api/agent/chat/stream) instead of a bespoke route. No sessionId/chatId is
-   * sent, so this is the "conversational chat, non-persistent" path: history
-   * lives only in this component's React state (useChat's `messages`) and is
-   * gone once the modal closes. The position + live Greeks are fetched exactly
-   * once above (fetchQuote) and re-sent as `modelContext` on every turn — the
-   * LLM never fetches quotes itself (see modelName: 'holding' tool config,
-   * which has an empty tool list on purpose).
-   *
-   * Traces are keyed to the holding (`model_name=holding`, `record_id=holding_id`);
-   * the instrument is reachable via `holding.instrument_id`.
+   * (/api/agent/chat/stream). First turn waits until quote fetch settles so
+   * Greeks are in modelContext. Covered-call / underlying fields come from the
+   * options_income row. getOptionChain is available for roll questions.
    */
   const authToken = Cookies.get("__session");
-  const modelContext = buildModelContext(row, quote);
   const { messages, append, isLoading, input, setInput } = useChat({
     api: `${import.meta.env.VITE_API_BASE_URL || ""}/api/agent/chat/stream`,
     headers: authToken
@@ -326,22 +352,21 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
         viewName: "holding_view",
         recordId: row.holding_id ?? undefined,
         promptTypes: ["options_analysis"],
-        modelContext,
+        modelContext: modelContextRef.current,
       },
     }),
   });
 
-  /* Kick off first analysis turn once quote is available */
+  /* Kick off first analysis turn once quote fetch has settled (success or failure). */
   useEffect(() => {
     if (analysisInitiated.current) return;
-    // Start analysis once quote fetch has completed (success or failure — we proceed either way)
     if (quoteLoading) return;
     analysisInitiated.current = true;
     void append({
       role: "user",
       content: `Analyse this ${row.option_type === "P" ? "short put" : row.option_type === "C" ? "short call" : "option"} position on ${row.underlying_symbol ?? row.symbol}. Is the theta decaying nicely? Any risks I should watch?`,
     });
-  }, [quoteLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [quoteLoading, append, row.option_type, row.underlying_symbol, row.symbol]);
 
   /* Auto-scroll chat to bottom */
   useEffect(() => {
@@ -367,6 +392,8 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
   };
 
   const statusPills = computeStatusPills(row, quote, dte);
+  const showAnalysisSkeleton =
+    quoteLoading || (isLoading && messages.filter((m) => m.role === "assistant").length === 0);
 
   /* Backdrop close */
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -399,6 +426,11 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded border uppercase tracking-wide bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
                 {isShort ? "Short" : "Long"} · {Math.abs(row.position_qty)} contracts
               </span>
+              {row.is_covered_call && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded border uppercase tracking-wide bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-800">
+                  Covered call
+                </span>
+              )}
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded border uppercase tracking-wide bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">
                 Open
               </span>
@@ -606,6 +638,18 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
 
               {/* Message thread */}
               <div className="space-y-4">
+                {showAnalysisSkeleton && (
+                  <div className="space-y-3 animate-pulse" aria-hidden>
+                    <div className="h-3 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-3 w-full rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-3 w-5/6 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-3 w-4/5 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+                    <p className="text-[11px] text-slate-400 pt-1">
+                      {quoteLoading ? "Loading live Greeks…" : "Analysing position…"}
+                    </p>
+                  </div>
+                )}
                 {messages.map((msg, i) => {
                   if (msg.role === "user") {
                     // Hide the auto-generated first analysis prompt

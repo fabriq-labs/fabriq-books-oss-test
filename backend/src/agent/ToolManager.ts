@@ -32,6 +32,7 @@ import {
     requestClarificationTool,
     categorizePostingsTool,
     runFinancialReportTool,
+    getOptionChainTool,
 } from './tools';
 import { QueryClassification } from './utils/questionClassifier';
 import logger from '../utils/logger';
@@ -74,6 +75,7 @@ export class ToolManager {
             suggestReconciliationMatches: () => suggestReconciliationMatchesTool(auth),
             categorizePostings: () => categorizePostingsTool(auth),
             runFinancialReport: () => runFinancialReportTool(auth, toolContext),
+            getOptionChain: () => getOptionChainTool(auth),
             searchItems: () => searchItemsTool(auth),
             searchSuppliers: () => searchSuppliersTool(auth),
             searchDepartments: () => searchDepartmentsTool(auth),

@@ -5,7 +5,7 @@
   "is_default": true,
   "version": 1,
   "priority": 0,
-  "context": "Options Income position detail modal — Theta persona on a holding record; live Greeks + position context via modelContext; no tools. llm_trace: model_name=holding, record_id=holding_id",
+  "context": "Options Income position detail modal — Theta persona on a holding record; live Greeks + covered-call context via modelContext; getOptionChain for rolls. llm_trace: model_name=holding, record_id=holding_id",
   "created_by": null,
   "modified_by": null,
   "org_id": "52",

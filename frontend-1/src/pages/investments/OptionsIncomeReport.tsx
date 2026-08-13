@@ -73,9 +73,16 @@ function ProceedsCell({ row, currency }: { row: OptionsIncomeTransactionRow; cur
 function OptionCell({ row }: { row: OptionsIncomeTransactionRow }) {
   return (
     <div className="font-medium text-slate-900 text-sm leading-tight min-w-[9rem]">
-      {row.symbol}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span>{row.symbol}</span>
+        {row.is_covered_call && (
+          <span className="text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">
+            Covered
+          </span>
+        )}
+      </div>
       {row.underlying_symbol && (
-        <sub className="ml-1 text-[10px] font-normal text-slate-400 not-italic align-baseline">
+        <sub className="ml-0 text-[10px] font-normal text-slate-400 not-italic align-baseline">
           {row.underlying_symbol}
         </sub>
       )}

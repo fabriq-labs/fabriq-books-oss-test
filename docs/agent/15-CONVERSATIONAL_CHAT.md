@@ -209,7 +209,7 @@ export interface PageContext {
 | Account form | `account` | `AccountForm.tsx` (hardcoded) |
 | Bank Transactions | `posting` | `BankTransactions.tsx` + `selectedAccountId` |
 | Dashboard | `posting` | `FabriqDashboard` → `buildDefaultPostingChatContext()` |
-| Options Income (position modal) | `holding` | `OptionPositionDetailModal.tsx` — `recordId=holding_id`, `promptTypes=['options_analysis']` |
+| Options Income position modal | `holding` | `OptionPositionDetailModal.tsx` — `recordId=holding_id`, `promptTypes=['options_analysis']`, tool `getOptionChain` for rolls |
 | No page context | `posting` | `ChatUI` fallback via `buildDefaultPostingChatContext()` |
 
 **Dashboard does not infer model from typed text.** `modelName` is pre-set to `posting`;
@@ -223,7 +223,7 @@ export interface PageContext {
 | Bank Transactions | `{ selectedAccountId, selectedAccountName, legalEntityId, … }` |
 | Account form (edit) | `{ accountName, accountCode, legal_entity_id, currencyCode }` |
 | Posting list | `{ legalEntityId, legalEntityName }` |
-| Options Income position modal | Position + live Greeks (`symbol`, `delta`, `theta`, …); no tools — quotes fetched once by the FE |
+| Options Income position modal | Position + live Greeks + covered-call fields (`strategy`, `underlyingQty`, …); `getOptionChain` for rolls |
 
 ### `promptTypes` — default vs analytics
 

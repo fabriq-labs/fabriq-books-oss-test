@@ -111,6 +111,27 @@ export interface OptionsIncomeTransactionRow {
   strike_price?: number | null;
   option_type?: 'C' | 'P' | null;
   unrealized_pnl?: number | null;
+  /**
+   * Open short-call rows only. True when the same brokerage account holds
+   * long underlying shares covering abs(position_qty) * 100.
+   */
+  is_covered_call?: boolean;
+  /** Strategy label for UI / LLM context (open rows). */
+  strategy?:
+    | 'covered_call'
+    | 'naked_short_call'
+    | 'long_call'
+    | 'short_put'
+    | 'long_put'
+    | 'option';
+  underlying_instrument_id?: string | null;
+  underlying_holding_id?: string | null;
+  /** Underlying share qty in the same account (open short-call coverage lookup). */
+  underlying_qty?: number | null;
+  underlying_average_cost?: number | null;
+  underlying_market_value?: number | null;
+  /** Shares required to fully cover: abs(position_qty) * 100. */
+  shares_needed?: number | null;
 }
 
 export interface OptionsIncomePositionRow {
@@ -485,6 +506,119 @@ function emptyOptionsIncomeSection(): OptionsIncomeSection {
   };
 }
 
+/** Equity option contract multiplier (shares per contract). */
+export const OPTION_CONTRACT_SIZE = 100;
+
+type HoldingCoverageRow = {
+  id: string;
+  account_id: string;
+  instrument_id: string;
+  quantity: { toString(): string } | number;
+  average_cost: { toString(): string } | number | null;
+  market_value: { toString(): string } | number | null;
+  currency_id: string | null;
+  instrument: {
+    id: string;
+    symbol: string;
+    underlying_instrument_id?: string | null;
+    underlying?: { id: string; symbol: string } | null;
+  } | null;
+};
+
+export type OptionStrategyLabel =
+  | 'covered_call'
+  | 'naked_short_call'
+  | 'long_call'
+  | 'short_put'
+  | 'long_put'
+  | 'option';
+
+function strategyForOption(optionType: 'C' | 'P' | null, positionQty: number): OptionStrategyLabel {
+  if (optionType === 'C') return positionQty < 0 ? 'naked_short_call' : 'long_call';
+  if (optionType === 'P') return positionQty < 0 ? 'short_put' : 'long_put';
+  return 'option';
+}
+
+/**
+ * Same-account covered-call check: short call is covered when long underlying
+ * qty >= abs(contracts) * 100. Cheap — uses holdings already loaded for the report.
+ */
+async function resolveCoverageFields(params: {
+  accountId: string;
+  positionQty: number;
+  optionType: 'C' | 'P' | null;
+  underlyingInstrumentId: string | null | undefined;
+  underlyingSymbol: string | null | undefined;
+  holdingMap: Map<string, HoldingCoverageRow>;
+  holdingRows: HoldingCoverageRow[];
+  getRate: (currencyId: string | null | undefined) => Promise<number>;
+}): Promise<
+  Pick<
+    OptionsIncomeTransactionRow,
+    | 'is_covered_call'
+    | 'strategy'
+    | 'underlying_instrument_id'
+    | 'underlying_holding_id'
+    | 'underlying_qty'
+    | 'underlying_average_cost'
+    | 'underlying_market_value'
+    | 'shares_needed'
+  >
+> {
+  const { accountId, positionQty, optionType, holdingMap, holdingRows, getRate } = params;
+  const strategyBase = strategyForOption(optionType, positionQty);
+
+  let underlyingId = params.underlyingInstrumentId ?? null;
+  if (!underlyingId && params.underlyingSymbol) {
+    const equityMatch = holdingRows.find((h) => {
+      if (h.account_id !== accountId || h.instrument?.symbol !== params.underlyingSymbol) return false;
+      const type = (h.instrument as { type?: string } | null)?.type ?? '';
+      return !isOptionInstrument(type, params.underlyingSymbol!);
+    });
+    underlyingId = equityMatch?.instrument_id ?? null;
+  }
+
+  if (optionType !== 'C' || positionQty >= 0) {
+    return {
+      strategy: strategyBase,
+      is_covered_call: false,
+      underlying_instrument_id: underlyingId,
+      underlying_holding_id: null,
+      underlying_qty: null,
+      underlying_average_cost: null,
+      underlying_market_value: null,
+      shares_needed: null,
+    };
+  }
+
+  const sharesNeeded = Math.abs(positionQty) * OPTION_CONTRACT_SIZE;
+  const underlyingHolding = underlyingId
+    ? holdingMap.get(`${accountId}:${underlyingId}`)
+    : undefined;
+  const underlyingQty = underlyingHolding != null ? Number(underlyingHolding.quantity) : null;
+  const isCovered =
+    underlyingQty != null && underlyingQty > 0 && underlyingQty + 1e-9 >= sharesNeeded;
+
+  const rate = underlyingHolding ? await getRate(underlyingHolding.currency_id) : 1;
+
+  return {
+    strategy: isCovered ? 'covered_call' : 'naked_short_call',
+    is_covered_call: isCovered,
+    underlying_instrument_id: underlyingId,
+    underlying_holding_id: underlyingHolding?.id ?? null,
+    underlying_qty: underlyingQty,
+    underlying_average_cost:
+      underlyingHolding?.average_cost != null
+        ? Number(underlyingHolding.average_cost) * rate
+        : null,
+    underlying_market_value:
+      underlyingHolding?.market_value != null
+        ? Number(underlyingHolding.market_value) * rate
+        : null,
+    shares_needed: sharesNeeded,
+  };
+}
+
 type ConvertedTrade = {
   trade_id: string;
   type: 'BUY' | 'SELL';
@@ -641,8 +775,10 @@ export async function getOptionsIncome(
           current_price: true,
           price_currency_id: true,
           external_symbol_id: true,
+          underlying_instrument_id: true,
           underlying: {
             select: {
+              id: true,
               symbol: true,
               current_price: true,
               price_currency_id: true,
@@ -690,8 +826,10 @@ export async function getOptionsIncome(
           current_price: true,
           price_currency_id: true,
           external_symbol_id: true,
+          underlying_instrument_id: true,
           underlying: {
             select: {
+              id: true,
               symbol: true,
               current_price: true,
               price_currency_id: true,
@@ -718,6 +856,7 @@ export async function getOptionsIncome(
     account_id: string;
     account_name: string;
     instrument_id: string;
+    underlying_instrument_id: string | null;
     external_symbol_id: number | null;
     symbol: string;
     instrument_name: string;
@@ -774,10 +913,15 @@ export async function getOptionsIncome(
 
     let bucket = positions.get(key);
     const underlying = instrument.underlying as {
+      id?: string;
       symbol?: string;
       current_price?: { toString(): string } | null;
       price_currency_id?: string | null;
     } | null;
+    const underlyingInstrumentId =
+      (instrument as { underlying_instrument_id?: string | null }).underlying_instrument_id ??
+      underlying?.id ??
+      null;
     const underlyingRate = await getRate(underlying?.price_currency_id ?? currencyId);
     const underlyingPrice =
       underlying?.current_price != null ? Number(underlying.current_price) * underlyingRate : null;
@@ -792,6 +936,7 @@ export async function getOptionsIncome(
         account_id,
         account_name: trade.account?.name ?? account_id,
         instrument_id: instrument.id,
+        underlying_instrument_id: underlyingInstrumentId,
         external_symbol_id: (instrument as { external_symbol_id?: number | null }).external_symbol_id ?? null,
         symbol: instrument.symbol,
         instrument_name: instrument.name,
@@ -816,6 +961,9 @@ export async function getOptionsIncome(
     } else {
       if (underlyingPrice != null) bucket.underlying_current_price = underlyingPrice;
       if (optionPrice != null) bucket.option_current_price = optionPrice;
+      if (!bucket.underlying_instrument_id && underlyingInstrumentId) {
+        bucket.underlying_instrument_id = underlyingInstrumentId;
+      }
     }
 
     bucket.trades.push(convertedTrade);
@@ -929,6 +1077,19 @@ export async function getOptionsIncome(
           holding.current_price != null
             ? Number(holding.current_price) * holdingRate
             : bucket.option_current_price;
+        const coverage = await resolveCoverageFields({
+          accountId: bucket.account_id,
+          positionQty: holdingQty ?? bucket.position_qty,
+          optionType: bucket.option_type,
+          underlyingInstrumentId:
+            bucket.underlying_instrument_id ??
+            (holding.instrument as { underlying_instrument_id?: string | null } | null)
+              ?.underlying_instrument_id,
+          underlyingSymbol: bucket.underlying_symbol,
+          holdingMap: holdingMap as Map<string, HoldingCoverageRow>,
+          holdingRows: holdingRows as HoldingCoverageRow[],
+          getRate,
+        });
         openTransactions.push({
           account_id: bucket.account_id,
           account_name: bucket.account_name,
@@ -952,6 +1113,7 @@ export async function getOptionsIncome(
           strike_price: bucket.strike_price,
           option_type: bucket.option_type,
           unrealized_pnl: unrealizedPnl,
+          ...coverage,
         });
       }
     }
@@ -1005,6 +1167,21 @@ export async function getOptionsIncome(
           : null;
     const unrealizedPnl =
       holding.unrealized_pnl != null ? Number(holding.unrealized_pnl) * rate : null;
+    const optionType = parseOptionTypeFromOption(instrument.symbol);
+    const underlyingSymbol =
+      underlying?.symbol ?? parseUnderlyingSymbolFromOption(instrument.symbol);
+    const coverage = await resolveCoverageFields({
+      accountId: holding.account_id,
+      positionQty: qty,
+      optionType,
+      underlyingInstrumentId:
+        (instrument as { underlying_instrument_id?: string | null }).underlying_instrument_id ??
+        (underlying as { id?: string } | null)?.id,
+      underlyingSymbol,
+      holdingMap: holdingMap as Map<string, HoldingCoverageRow>,
+      holdingRows: holdingRows as HoldingCoverageRow[],
+      getRate,
+    });
 
     openTransactions.push({
       account_id: holding.account_id,
@@ -1014,7 +1191,7 @@ export async function getOptionsIncome(
       external_symbol_id: instrument.external_symbol_id ?? null,
       symbol: instrument.symbol,
       instrument_name: instrument.name,
-      underlying_symbol: underlying?.symbol ?? parseUnderlyingSymbolFromOption(instrument.symbol),
+      underlying_symbol: underlyingSymbol,
       quantity: absQty,
       position_qty: qty,
       position_status: 'open',
@@ -1027,8 +1204,9 @@ export async function getOptionsIncome(
       underlying_current_price: underlyingPrice,
       option_current_price: optionPrice,
       strike_price: parseStrikeFromOption(instrument.symbol),
-      option_type: parseOptionTypeFromOption(instrument.symbol),
+      option_type: optionType,
       unrealized_pnl: unrealizedPnl,
+      ...coverage,
     });
 
     openPositions.push({

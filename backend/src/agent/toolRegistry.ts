@@ -22,6 +22,7 @@ export const AGENT_TOOL_CATALOG: ToolCatalogEntry[] = [
   { name: 'getAnalyticsContext', label: 'Analytics Context', description: 'Schema and relationship context for analytics', category: 'analytics' },
   { name: 'analyticsQuery', label: 'Analytics Query', description: 'Run analytical SQL queries', category: 'analytics' },
   { name: 'runFinancialReport', label: 'Financial Report', description: 'Trial balance / monthly trial balance / income statement', category: 'finance' },
+  { name: 'getOptionChain', label: 'Option Chain', description: 'Live Questrade option chain for roll / covered-call screening', category: 'finance' },
   { name: 'suggestReconciliationMatches', label: 'Reconciliation Matches', description: 'Suggest bank posting matches', category: 'finance' },
   { name: 'categorizePostings', label: 'Categorize Postings', description: 'Batch categorise uncategorised postings', category: 'finance' },
   { name: 'extractInvoiceFromFile', label: 'Extract Invoice', description: 'Extract invoice data from uploaded file', category: 'erp' },
