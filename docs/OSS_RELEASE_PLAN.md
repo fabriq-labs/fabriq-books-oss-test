@@ -1,7 +1,7 @@
 # Fabriq Books — Open Source Release Plan (Thin Public Repo)
 
 **Status:** Planning — not implemented  
-**Last updated:** 2026-08-13  
+**Last updated:** 2026-08-13 (§2 locked decisions added from planning sessions)  
 **Audience:** Maintainers reviewing scope before creating the public `oss` branch
 
 ---
@@ -22,9 +22,155 @@ This document captures:
 
 **Out of scope for this plan:** license choice (decision required), legal review, secret scrubbing checklist execution.
 
+**Canonical plan doc:** This file is the single source of truth for OSS planning. Verbal agreements from planning sessions are recorded in §2. Reviewers (Grok, humans, Cloud Agents) should start here—not chat history.
+
 ---
 
-## 2. Product thesis (OSS v1)
+## 2. Locked decisions (planning sessions — do not re-litigate without explicit override)
+
+These were agreed while scoping the public `oss` branch. Implementation and docs should follow them unless §17 “Still open” is resolved differently and this section is updated.
+
+### 2.1 What “open source release” means here
+
+| Locked | Detail |
+|--------|--------|
+| **Release type** | **Source code** on a public tree (`oss` branch / public repo), not a commercial SKU with hidden modules |
+| **No UI hiding** | Feature flags and sidebar hiding are **rejected** for OSS. Omitted capability = **not in the published repository** (Phase A), not invisible menu items |
+| **Must ship functionality** | v1 cannot be an empty metadata framework. Minimum loop: COA → bank/manual journals → categorize → reports |
+| **Docs specificity** | Every OSS doc maps to **shipped** code: exact sidebar paths, field labels, Prisma models, API/report ids, and `oss-books` seed IDs |
+| **Seed specificity** | Demo data is **bookkeeping-only** (`oss-books`). Do not reuse `indian-demo`, `perfin-demo`, `us-ca-demo`, or `nri` as OSS defaults |
+
+### 2.2 Repository and branch strategy
+
+| Locked | Detail |
+|--------|--------|
+| **Approach** | **Thin public repo**—delete out-of-scope code/docs; not “full repo with hidden modules” as the primary OSS story |
+| **Base branch** | `prod` |
+| **OSS branch name** | `oss` (long-lived product branch; not `agentc/*`) |
+| **Divergence model** | Subtract modules on `oss`; `prod` remains full commercial line |
+| **Merge policy** | Cherry-pick platform fixes `prod` → `oss`; avoid blind `prod` → `oss` merges |
+| **Public releases** | Git tags on `oss` (e.g. `v0.1.0-alpha`, `v1.0.0`) |
+
+### 2.3 Scope: what OSS v1 is
+
+| Locked | Detail |
+|--------|--------|
+| **Core product** | **Bookkeeping** (double-entry, COA, transactions, bank import, opening balances, core reports) |
+| **AI in v1** | **Yes from day one**—conversational chat + categorization; not a later add-on |
+| **Platform** | Keep **most of the metadata platform** (CRUD, views, permissions, workflows engine, filters, import, multi-tenant, multi-entity) |
+| **Platform docs** | Keep and **trim** platform docs; do not ship ERP/integration GTM packs |
+| **Phase A first** | **Code thin, schema full** for first public tag; Phase B only after Phase A is stable |
+| **Prod vs OSS story** | Prod = full FinOps/ERP optional layers; OSS = **standalone books** |
+
+### 2.4 Explicitly out of OSS v1 public tree
+
+Delete (Phase A), do not hide:
+
+- ERP forward sync (Python `backend/integrations/**`, Airbyte, DBT, `datalake`)
+- ERP reverse sync connectors and Connections UI / sync button
+- Sales (O2C): customers, quotes, SO, sales invoices, receipts, credit notes, delivery challans
+- Purchases (P2P): suppliers, PR, PO, bills
+- Investments: portfolio, broker sync, options, mobile `/m` routes
+- Email ingest → invoice, Slack agent routes (experimental in prod)
+- Commercial docs: `positioning/`, `INTEGRATIONS.md`, `RAILWAY_*`, `QUESTRADE_*`, ERP onboarding workbooks
+
+### 2.5 Reconciliation without AR/AP (locked)
+
+| Locked | Detail |
+|--------|--------|
+| **OSS reconcile model** | **Categorize + confirm (bank-only)** for v1—not invoice/receipt matching |
+| **`UNMATCHED`** | Imported bank line; contra account missing or unclear |
+| **`SUGGESTED`** | AI proposed contra account; not yet accepted |
+| **`CONFIRMED`** | User or approved agent accepted categorization |
+| **`MATCHED` → invoice/receipt** | **Do not document or seed** until AR/AP module returns |
+| **Seed** | No `payment_receipt_id` / invoice linkage in `oss-books` |
+| **Agent** | Replace prod `atpl_reconcile` with bank-only template; omit `suggestReconciliationMatches` from default posting tools until AR exists |
+| **Domain** | “Category” on a posting = **contra account**—document in `CATEGORIZATION.md` |
+
+### 2.6 AI and Workbench (locked)
+
+| Locked | Detail |
+|--------|--------|
+| **Chat** | Ship `ChatShell`, `chat_thread`, page context on Transactions/Accounts |
+| **Workbench** | **Ship in v1** with categorize / book-transactions templates |
+| **Workbench reconcile** | **Do not ship** prod invoice-reconcile inbox story in v1 |
+| **Tools in** | `categorizePostings`, `searchRecords`, `advancedSqlQuery`, `runFinancialReport`, `analyticsQuery`, `getAnalyticsContext` |
+| **Tools out** | `erpConnector`, invoice PDF extract, prod reconcile template, email/Slack |
+| **LLM code** | **No new OSS LLM code**—use `modelProvider.ts` |
+| **LLM credentials** | Deployer sets env vars; Fabriq does not bundle hosted LLM for OSS |
+| **Backends** | Document all supported backends from `modelProvider.ts` in `docs/ai/LLM_SETUP.md` (see also `docs/agent/10-LIBRARIES_AND_PROVIDERS.md`) |
+| **Quickstart** | Must not **require** Vertex or Railway; GCP remains optional |
+| **MCP (optional)** | Read-only `list_accounts`, `get_trial_balance` only—not portfolio/options tools |
+
+### 2.7 Seed `oss-books` (locked)
+
+| Locked | Detail |
+|--------|--------|
+| **Profile** | `--demo-data=oss-books` in `backend/prisma/setup-OSS-BOOKS/` |
+| **Org / entity** | `org_oss_demo`; **one** USD legal entity for v1 |
+| **Users** | `admin@example.com` / `admin123` + one bookkeeper |
+| **COA** | ~40–60 accounts |
+| **Postings** | ~3 months, ~80–120 lines (categorized, uncategorized, partial AI scores) |
+| **FX** | USD-only for v1 (document clearly) |
+| **Sample** | `samples/bank-statement-q1.csv` |
+| **Excluded** | customers, suppliers, items, invoices, POs, holdings, ERP connections |
+| **OSS setup-db** | Default `oss-books`; drop `indian-demo`, `both`, `nri` from OSS repo |
+| **IDs doc** | `docs/bookkeeping/SEED_REFERENCE.md` for all stable ids |
+
+**Do not use:** `indian-demo` (full ERP volume), `perfin-demo` (no postings in script), `us-ca-demo` / `nri` (tax/ERP).
+
+### 2.8 Documentation (locked)
+
+| Locked | Detail |
+|--------|--------|
+| **User guide** | Four sessions: overview, common, accounting, reports only |
+| **Agent docs** | Distill to `docs/ai/`; do not ship full `docs/agent/01–15` |
+| **Each doc lists** | Sidebar path, models, API/report id, AI behavior, seed ids |
+| **Datagraph UI builder** | Not in OSS v1 (design-only in prod) |
+
+### 2.9 Docker, platform leftovers (locked)
+
+| Locked | Detail |
+|--------|--------|
+| **OSS Dockerfile** | Slim—no Python sync service |
+| **Verify** | `docker-compose.verify.yml` (Postgres only) |
+| **Keep Phase A** | `source_system` + encryption middleware |
+| **Cleanup** | Legacy Supabase imports in some frontend services—remove or document during OSS cut |
+
+### 2.10 Verification — Cloud Agent, not laptop (locked)
+
+| Locked | Detail |
+|--------|--------|
+| **Runner** | Cursor Cloud Agent on VM—not maintainer laptop as definition of done |
+| **Command** | `npm run verify:oss` |
+| **Gate** | API: login, posting CRUD, trial balance, balance sheet (no browser) |
+| **Postgres** | Docker in VM + committed `.env.test`; no prod/Railway secret required |
+| **No LLM in default gate** | Optional `verify:oss:ai` |
+| **Not the gate** | Playwright workbench E2E, `test:suite`, `indian-demo`, manual browser |
+| **CI** | Same command as Cloud Agent |
+| **Skill** | `.cursor/skills/oss-verify/SKILL.md` linked from `AGENTS.md` |
+
+### 2.11 Adding features back (locked expectations)
+
+| Locked | Detail |
+|--------|--------|
+| **Mechanism** | Merge from `prod` or sibling repo—not UI unhide |
+| **ERP forward sync** | Hard (Python, Airbyte, DBT, ops) |
+| **Sync without sales/purchases UI** | Broken UX |
+| **Rule** | ERP sync needs sales/purchases; Plaid fits bookkeeping; investments separate |
+
+### 2.12 Review workflow (locked)
+
+| Locked | Detail |
+|--------|--------|
+| **Review input** | This markdown file—not chat history |
+| **Grok pass 1** | Strategic review of §2–§17 |
+| **Grok pass 2** | §19 path-level checklist after scope agreed |
+| **Updates** | Edit §2 and §17 when decisions change |
+
+---
+
+## 3. Product thesis (OSS v1)
 
 **Self-hosted double-entry bookkeeping with bank import, AI categorization, conversational chat, core financial reports, and optional Workbench sessions.**
 
@@ -39,7 +185,7 @@ Positioning docs frame prod as “agentic FinOps on top of ERPs.” OSS frames a
 
 ---
 
-## 3. Branch and repository strategy
+## 4. Branch and repository strategy
 
 | Item | Plan |
 |------|------|
@@ -61,7 +207,7 @@ git push -u origin oss
 
 ---
 
-## 4. Thin repo: two phases
+## 5. Thin repo: two phases
 
 | Phase | What changes | Prisma schema | OSS clarity | Merge-back difficulty |
 |-------|----------------|---------------|-------------|------------------------|
@@ -72,7 +218,7 @@ git push -u origin oss
 
 ---
 
-## 5. What stays in the public repo
+## 6. What stays in the public repo
 
 ### 5.1 Platform engine
 
@@ -143,7 +289,7 @@ OSS deploy docs should list all four providers. OSS quickstart should **not requ
 
 ---
 
-## 6. What gets deleted from the public repo (Phase A)
+## 7. What gets deleted from the public repo (Phase A)
 
 | Area | Representative paths |
 |------|------------------------|
@@ -162,7 +308,7 @@ OSS deploy docs should list all four providers. OSS quickstart should **not requ
 
 ---
 
-## 7. Reconciliation without sales/AP (OSS v1 decision)
+## 8. Reconciliation without sales/AP (locked — see §2.5)
 
 Without sales/purchases, **do not** ship invoice/receipt matching as the primary reconcile story.
 
@@ -183,7 +329,7 @@ Do not document `MATCHED` → invoice/receipt until an AR module ships.
 
 ---
 
-## 8. Seed data: `oss-books` (new — do not reuse indian-demo)
+## 9. Seed data: `oss-books` (new — do not reuse indian-demo)
 
 Existing profiles are wrong for OSS bookkeeping:
 
@@ -225,7 +371,7 @@ Existing profiles are wrong for OSS bookkeeping:
 
 ---
 
-## 9. Agent seeds (OSS-specific SQL)
+## 10. Agent seeds (OSS-specific SQL)
 
 Do not ship prod `seed-agent-templates.sql` verbatim.
 
@@ -244,7 +390,7 @@ Do not ship prod `seed-agent-templates.sql` verbatim.
 
 ---
 
-## 10. Documentation layout (OSS repo)
+## 11. Documentation layout (OSS repo)
 
 **Principle:** Every doc maps to shipped code. No sales/purchases sessions in OSS user guide.
 
@@ -300,10 +446,11 @@ Each bookkeeping doc should state: **sidebar path**, **models**, **API surface**
 
 ---
 
-## 11. Navigation (OSS app)
+## 12. Navigation (OSS app)
 
 ```
 Dashboard (chat-forward)
+Workbench (categorize / book-transactions — §2.6)
 Accounting
   - Transactions
   - Bank Transactions
@@ -318,11 +465,11 @@ Settings
   - (Optional super-admin: Views, Permissions, AI templates)
 ```
 
-No Sales, Purchases, Investments, Connections, Workbench (if deferred), or ERP settings.
+No Sales, Purchases, Investments, Connections, or ERP settings.
 
 ---
 
-## 12. What will work (after Phase A + oss-books)
+## 13. What will work (after Phase A + oss-books)
 
 | Flow | Expected |
 |------|----------|
@@ -344,7 +491,7 @@ No Sales, Purchases, Investments, Connections, Workbench (if deferred), or ERP s
 
 ---
 
-## 13. What will break or need explicit fixes
+## 14. What will break or need explicit fixes
 
 | Issue | Cause | OSS plan fix |
 |-------|--------|--------------|
@@ -362,7 +509,7 @@ Phase B (schema trim) adds: migration conflicts, orphaned metadata views, missed
 
 ---
 
-## 14. Consequences
+## 15. Consequences
 
 ### Maintainers
 
@@ -400,7 +547,7 @@ Investments       →  separate module
 
 ---
 
-## 15. Suggested versioning
+## 16. Suggested versioning
 
 | Tag | Scope |
 |-----|--------|
@@ -410,25 +557,28 @@ Investments       →  separate module
 
 ---
 
-## 16. Open decisions (review before implementation)
+## 17. Still open (review before implementation)
+
+Locked items are in §2. Resolve these and move outcomes into §2 when decided:
 
 1. **License** (Apache 2.0, MIT, AGPL, dual-license with prod)
-2. **Phase A only vs Phase B** in first public tag
-3. **Workbench in v1** vs conversational chat only
-4. **Reconciliation story** — bank-only confirm (recommended) vs thin AR slice
-5. **MCP in v1** — keep read-only ledger tools or omit entirely
-6. **Plaid** — delete routes vs keep unmounted code in Phase A
-7. **Multi-brand** — Fabriq only vs keep Zeiv config
-8. **Super-admin** — expose views/permissions editor as “framework” story or restrict
-9. **`prod` ↔ `oss` long-term** — permanent fork vs merge OSS core back to prod
+2. **Phase B in first public tag** — §2 locks Phase A first; confirm Phase B is not in `v0.1.0-alpha`
+3. **MCP in v1** — keep read-only ledger tools (§2.6 optional) or omit entirely
+4. **Plaid** — delete routes vs keep unmounted code in Phase A
+5. **Multi-brand** — Fabriq only vs keep Zeiv config
+6. **Super-admin** — expose views/permissions editor as “framework” story or restrict
+7. **`prod` ↔ `oss` long-term** — permanent fork vs merge OSS core back to prod
+8. **Public repo layout** — public `oss` branch only vs separate GitHub repo vs mirror
+
+**No longer open (see §2):** thin repo vs hide; bookkeeping + AI scope; `oss-books` seed; bank-only reconcile; Workbench with categorize in v1; Cloud API verify; LLM via existing `modelProvider`.
 
 ---
 
-## 17. Implementation sequence (when approved)
+## 18. Implementation sequence (when approved)
 
 | Step | Action |
 |------|--------|
-| 0 | Lock open decisions (§16) |
+| 0 | Lock remaining items in §17 |
 | 1 | Path-level keep/delete inventory (spreadsheet or Grok-generated list) |
 | 2 | License + secret scrub plan |
 | 3 | Create `oss` from `prod`; set repo visibility |
@@ -443,9 +593,9 @@ Investments       →  separate module
 
 ---
 
-## 18. Grok / review prompt (optional)
+## 19. Grok / review prompt (optional)
 
-Use when curating the path-level checklist:
+Use when curating the path-level checklist (after strategic review of §2–§17):
 
 > Thin OSS repo for Fabriq Books: fork from `prod`, **delete** (not hide) code outside core bookkeeping + platform + AI. Single demo `oss-books` (1 org, 1 entity, ~50 COA accounts, 3 months bank postings, uncategorized lines for AI). Agent: conversational chat + categorize + optional Workbench; **no** invoice reconcile. Docs: `docs/platform`, `docs/bookkeeping`, `docs/ai`, `docs/deploy`, 4 user-guide sessions. LLM: existing modelProvider backends (no new OSS LLM code). Produce: (1) path keep/delete list, (2) oss-books seed file list with row counts, (3) doc outline with menu paths, (4) `test:oss` file list, (5) Phase A vs B recommendation.
 
@@ -567,4 +717,4 @@ GitHub Actions (or Cursor Cloud on PR) runs the **same** `npm run verify:oss` as
 
 ---
 
-*End of plan. Update this file as decisions in §16 are resolved.*
+*End of plan. Update §2 when locking new decisions; update §17 when resolving open items.*
