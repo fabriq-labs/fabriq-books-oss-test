@@ -1,7 +1,7 @@
 # Fabriq Books — Open Source Release Plan
 
 **Status:** Planning — not implemented  
-**Last updated:** 2026-08-13 (decisions locked: v1.0.0 only, AGPL, separate public remote, thin at all layers, Plaid in, Zeiv out)  
+**Last updated:** 2026-08-13 (MCP ledger tools in v1.0.0)  
 **Audience:** Maintainers and reviewers. This file is the single source of truth. Do not use chat history.
 
 **Release target:** **v1.0.0** only. Intermediate alpha tags are optional implementation checkpoints, not a second product.
@@ -10,7 +10,7 @@
 
 ## 1. What we are shipping
 
-**Fabriq Books v1.0.0 (OSS):** self-hosted double-entry bookkeeping with AI (chat, categorization, Workbench, document extraction for bank/posting documents), Plaid bank feeds, and core financial reports.
+**Fabriq Books v1.0.0 (OSS):** self-hosted double-entry bookkeeping with AI (chat, categorization, Workbench, document extraction for bank/posting documents), Plaid bank feeds, MCP (read-only ledger tools), and core financial reports.
 
 Not an empty framework. Not a hidden full ERP. **Thin at every layer:** UI, HTTP API, Prisma schema, seeds, tests, Docker, and docs. Omitted modules are **deleted** from the public tree—not feature-flagged, not left as dead routes.
 
@@ -35,7 +35,7 @@ Do not re-litigate these without an explicit override and an edit to this sectio
 | LLM | Existing `modelProvider.ts` only. Deployer sets env vars. No new OSS LLM stack. Quickstart must not require Vertex or Railway |
 | Banking | **Plaid in v1.0.0** plus CSV/PDF bank import |
 | Brand | **Fabriq only.** Drop Zeiv config and brand assets from the public tree |
-| MCP | **Omit** from v1.0.0 (keeps the tree thin) |
+| MCP | **Ship** read-only bookkeeping tools (`list_accounts`, `get_trial_balance`). **No** portfolio / options / broker MCP tools |
 | Super-admin | **Expose** views / permissions / AI templates — that is the metadata platform for contributors |
 | Reconcile | **Categorize + confirm (bank-only).** No invoice/receipt matching. Statuses: `UNMATCHED` / `SUGGESTED` / `CONFIRMED`. Do not seed or document `MATCHED` → document |
 | Category meaning | User-facing “category” = **contra account**. Keep or drop `category` / `category_group` tables only if they serve reports; do not teach two competing meanings in the user guide |
@@ -57,7 +57,7 @@ Not “hide the menu.” Not “delete UI but keep schema and APIs.”
 | Docs | Only platform + bookkeeping + AI + deploy + 4 user-guide sessions. No positioning, ERP, Railway, broker handoffs |
 | Brand | No Zeiv |
 
-**Keep (small, needed):** metadata engine, workflows engine (seed **no** PR/PO/invoice flows), `source_system` if Plaid/connections need it, Plaid schema and routes, agent session/chat tables.
+**Keep (small, needed):** metadata engine, workflows engine (seed **no** PR/PO/invoice flows), `source_system` if Plaid/connections need it, Plaid schema and routes, agent session/chat tables, MCP router + ledger tools.
 
 ### 2.3 What is deleted (not hidden)
 
@@ -69,7 +69,7 @@ Not “hide the menu.” Not “delete UI but keep schema and APIs.”
 - Zeiv brand (`frontend-1/config/zeiv/`)
 - Commercial docs: `positioning/`, `INTEGRATIONS.md`, `RAILWAY_*`, `QUESTRADE_*`, ERP onboarding workbooks
 - Full `docs/agent/01–15` — distill into `docs/ai/`
-- MCP server (v1.0.0)
+- Investment / broker MCP tools (portfolio, options, option chain) — keep the MCP HTTP server and ledger tools only
 
 **Bank / Plaid stay.** Settings → bank connections (Plaid) stay. ERP “Connections” / sync button go.
 
@@ -112,7 +112,7 @@ Every user-facing doc lists: sidebar path, models, API or report id, AI behavior
 
 **User guide — four sessions only:** overview, common (filters/import), accounting (incl. Plaid + bank import), reports.
 
-**AI docs:** chat, categorize, Workbench, LLM setup, bank/posting document extraction.
+**AI docs:** chat, categorize, Workbench, LLM setup, bank/posting document extraction, MCP (API key + tools).
 
 No sales, purchases, investments, or ERP sessions.
 
@@ -136,7 +136,7 @@ Settings
   - Views, Permissions, AI templates (super-admin / framework)
 ```
 
-No Sales, Purchases, Investments, ERP connections, Zeiv, MCP UI.
+No Sales, Purchases, Investments, or ERP connections. MCP is an API (`POST /api/mcp`), not a sidebar app.
 
 ### 2.9 Verification (Cursor Cloud Agent — not a laptop)
 
@@ -144,7 +144,7 @@ No Sales, Purchases, Investments, ERP connections, Zeiv, MCP UI.
 |------|--------|
 | Definition of done | Cloud Agent on the VM runs `npm run verify:oss` and it exits 0 |
 | Command | Start Postgres (`docker-compose.verify.yml`) → `setup-db.js --demo-data=oss-books --skip-tests --env=test` → Jest API suite |
-| Suite | Login, account list, posting CRUD, trial balance, balance sheet (accounting equation). Use real report ids the UI uses |
+| Suite | Login, account list, posting CRUD, trial balance, balance sheet (accounting equation). Use real report ids the UI uses. Optional: MCP `list_accounts` / `get_trial_balance` with seed API key |
 | Style | In-process HTTP (supertest) + seed admin JWT. No Playwright, no computerUse, no LLM in the default gate |
 | DB | Committed `.env.test` → local Docker Postgres. **Never** `force-reset` Railway/prod |
 | Optional | `verify:oss:ai` if LLM env is set; Plaid live tests only with Plaid sandbox secrets |
@@ -160,7 +160,7 @@ Merge or copy from private `prod` into `oss`, or a sibling repo. Not UI unhide.
 | Sales / purchases | Schema + UI + seeds come back together |
 | ERP sync | Needs sales/purchases **and** Python/Airbyte/DBT — high cost |
 | Investments | Separate slice |
-| MCP | Add later if wanted |
+| Extra MCP tools | Add later (e.g. more reports); v1.0.0 is ledger read-only |
 
 ---
 
@@ -172,6 +172,7 @@ Merge or copy from private `prod` into `oss`, or a sibling repo. Not UI unhide.
 | Categorize postings (chat, bulk, import) | Yes | — |
 | Workbench (categorize, book transactions) | Yes | Invoice/receipt match Workbench |
 | Document extraction | Bank statement PDF/CSV → postings | Sales invoice / purchase bill extract |
+| MCP | `list_accounts`, `get_trial_balance` (API key) | Investment / options tools |
 | Reports via agent | `runFinancialReport`, analytics tools | — |
 | LLM providers | Existing factory (Vertex, OpenAI, multi-model gateway, custom URL) | Hosted Fabriq LLM |
 
@@ -200,7 +201,7 @@ docs/
   OSS_RELEASE_PLAN.md           # this file (may stay for maintainers or move private)
   platform/                     # architecture, backend, frontend, auth, workflows, filters, import
   bookkeeping/                  # overview, COA, transactions, bank import, Plaid, categorize, opening balances, reports, SEED_REFERENCE
-  ai/                           # overview, chat, categorize, workbench, LLM setup, document extraction
+  ai/                           # overview, chat, categorize, workbench, LLM setup, document extraction, MCP
   deploy/                       # self-host, slim Docker (no Railway/ERP)
   user-guide/                   # 4 sessions only
 ```
@@ -218,6 +219,7 @@ docs/
 - Core reports
 - Multi-entity selector (N entities)
 - Super-admin views/permissions
+- MCP `list_accounts` / `get_trial_balance` (API key)
 - `verify:oss`
 
 **Must be done in the cut (or it is not thin):**
@@ -268,7 +270,7 @@ No other product-scope questions.
 
 ## 9. Prompt for a path-level checklist (after this plan)
 
-> Fabriq Books OSS v1.0.0: AGPL, thin at **all** layers (UI, API allowlist, Prisma, seeds, tests, Docker, docs). Keep bookkeeping, Plaid, agent (chat, categorize, Workbench, bank/posting document extract). Delete sales, purchases, investments, ERP sync, Zeiv, MCP. Multi-entity supported. Seed `oss-books`. Public repo is a **new remote**, `oss` branch only, squashed/filtered history. Produce: (1) keep/delete path list, (2) Prisma models to remove vs keep, (3) `oss-books` file list, (4) `verify:oss` test steps, (5) doc file list with sidebar paths.
+> Fabriq Books OSS v1.0.0: AGPL, thin at **all** layers (UI, API allowlist, Prisma, seeds, tests, Docker, docs). Keep bookkeeping, Plaid, agent (chat, categorize, Workbench, bank/posting document extract), MCP ledger tools (`list_accounts`, `get_trial_balance`). Delete sales, purchases, investments, ERP sync, Zeiv, investment MCP tools. Multi-entity supported. Seed `oss-books`. Public repo is a **new remote**, `oss` branch only, squashed/filtered history. Produce: (1) keep/delete path list, (2) Prisma models to remove vs keep, (3) `oss-books` file list, (4) `verify:oss` test steps, (5) doc file list with sidebar paths.
 
 ---
 
