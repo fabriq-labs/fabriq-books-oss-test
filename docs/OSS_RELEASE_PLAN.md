@@ -1,7 +1,7 @@
 # Fabriq Books — Open Source Release Plan
 
 **Status:** Planning — not implemented  
-**Last updated:** 2026-08-13 (MCP ledger tools in v1.0.0)  
+**Last updated:** 2026-08-13 (doc extract = bank PDFs only)  
 **Audience:** Maintainers and reviewers. This file is the single source of truth. Do not use chat history.
 
 **Release target:** **v1.0.0** only. Intermediate alpha tags are optional implementation checkpoints, not a second product.
@@ -31,7 +31,7 @@ Do not re-litigate these without an explicit override and an edit to this sectio
 | AI — conversational chat | Ship (`ChatShell`, `chat_thread`, page context on Transactions / Accounts / Dashboard) |
 | AI — categorization | Ship (`categorizePostings`, import-time LLM categorize, Workbench categorize) |
 | AI — Workbench | Ship (`/workbench`, categorize + book-transactions templates). **No** invoice/receipt match inbox |
-| AI — document extraction | Ship extractors that produce **postings / bank lines** (bank statement PDF/CSV pipeline). **Not** sales-invoice / bill extract (no sales or purchases module). If invoice-style extract is required later, that is a scope change |
+| AI — document extraction | **Bank statement PDF/CSV only** (confirmed). No invoice, bill, or receipt-capture extract in v1.0.0 |
 | LLM | Existing `modelProvider.ts` only. Deployer sets env vars. No new OSS LLM stack. Quickstart must not require Vertex or Railway |
 | Banking | **Plaid in v1.0.0** plus CSV/PDF bank import |
 | Brand | **Fabriq only.** Drop Zeiv config and brand assets from the public tree |
@@ -244,8 +244,9 @@ Everything in §2 is locked. Remaining:
 
 1. **Legal pass** — AGPL vs existing dependencies (do before first public push).
 2. **Secret / customer-data scrub** — CSVs and git history before the public remote exists.
-3. **Invoice-style PDF extract** — **out** unless product later adds a posting-only “receipt capture” that does not revive the invoice module. Confirm if that was intended by “doc extraction.”
-4. **Whether `category` / `category_group` stay** — keep if reports need them; otherwise contra-account only.
+3. **Whether `category` / `category_group` stay** — keep if reports need them; otherwise contra-account only.
+
+**Resolved:** document extraction = bank statement PDF/CSV only (not invoices/receipts).
 
 No other product-scope questions.
 
