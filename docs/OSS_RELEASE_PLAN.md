@@ -436,7 +436,8 @@ Investments       →  separate module
 | 5 | Trim metadata views + `setup-workflows-oss` + agent OSS SQL seeds |
 | 6 | Implement `setup-OSS-BOOKS/` + wire `setup-db.js` |
 | 7 | OSS doc tree + user-guide subset |
-| 8 | `test:oss` + CI |
+| 8 | `verify:oss` (API acceptance) + `.cursor/skills/oss-verify/SKILL.md` |
+| 8b | `.cursor/environment.json` — Postgres + `verify:oss` in install (see §20) |
 | 9 | Verify cold-start matrix (§12) |
 | 10 | Tag `v0.1.0-alpha` |
 
@@ -450,7 +451,110 @@ Use when curating the path-level checklist:
 
 ---
 
-## 19. Related prod documentation
+## 20. Verification on Cursor Cloud Agents (not local laptop)
+
+OSS “done” is proven by a **Cloud Agent** on the remote VM, without relying on your laptop, a browser, or an external production database.
+
+### 20.1 Design principles for cloud
+
+| Principle | Why |
+|-----------|-----|
+| **One command** | Agent runs `npm run verify:oss` from repo root; no manual steps |
+| **API-first** | Jest hits REST + reports; no Playwright by default |
+| **Self-contained Postgres** | Spin up Postgres in Docker inside the VM; do not require hosted `DATABASE_URL` secrets |
+| **No LLM in default gate** | Categorize/import AI is optional `verify:oss:ai` |
+| **No GUI** | Do not use computerUse / Playwright for the release gate |
+| **Deterministic seed** | `oss-books` + `oss-books-config.json` with stable IDs |
+
+Playwright and Workbench E2E stay **out of the default cloud path** (they need LLM, indian-demo users, and a browser stack).
+
+### 20.2 What the cloud agent runs
+
+```bash
+# From repo root — sole definition of “OSS verify passed”
+npm run verify:oss
+```
+
+**`verify:oss` should chain:**
+
+1. **Start Postgres** (if not already running) — e.g. `docker compose -f docker-compose.verify.yml up -d postgres`
+2. **Bootstrap DB** — `cd backend && node setup-db.js --demo-data=oss-books --skip-tests --env=test`
+3. **API acceptance** — `OSS_VERIFY=1 npm run test:oss` (Jest, `runInBand`)
+
+Optional (not default):
+
+- `npm run verify:oss:ai` — bank import or categorize with LLM env configured
+- `npm run test:e2e:oss` — only if environment build installs Playwright + Chromium
+
+### 20.3 API acceptance suite (Tier 1 — required)
+
+**Location:** `backend/src/__tests__/oss/oss-acceptance.test.ts`  
+**Config:** `backend/src/__tests__/test-configs/oss-books-config.json` (stable seed IDs)  
+**Gate:** `OSS_VERIFY=1`
+
+| Step | Check |
+|------|--------|
+| Login | `POST /api/auth/login` with seed admin → JWT |
+| List accounts | Search/list via REST + view metadata |
+| Posting CRUD | Create balanced journal line, read, update description, delete/cleanup |
+| Trial balance | `POST /api/report/trial_balance` — rows present, debits ≈ credits |
+| Balance sheet | `POST /api/report/...` (balance sheet endpoint as UI uses) — accounting equation holds for seed |
+| Income statement | Optional row count / classification smoke |
+
+**Implementation style:** `supertest` against the Express app (in-process, no separate `npm run dev` step) **or** ModelService + auth login service for speed. Prefer **supertest + login** so HTTP auth is exercised.
+
+**npm scripts:**
+
+- `backend`: `"test:oss": "OSS_VERIFY=1 jest src/__tests__/oss --runInBand --forceExit"`
+- root: `"verify:oss": "node scripts/verify-oss.mjs"` (or shell script orchestrating compose + setup-db + test:oss)
+
+### 20.4 Environment setup (`.cursor/environment.json`)
+
+Commit repo-managed environment config so **every Cloud Agent** on `oss` gets the same verify path:
+
+| Piece | Purpose |
+|-------|---------|
+| `install` | `npm run install:all`, ensure Docker available, pull `postgres:16-alpine` |
+| `start` or verify script | Not required for API-only verify if tests use supertest |
+| `docker-compose.verify.yml` | Minimal: Postgres on `localhost:5432`, db `fabriq_verify`, user/password fixed in `.env.test` |
+
+**`.env.test` for verify** (committed, no secrets):
+
+- `DATABASE_URL=postgresql://fabriq:fabriq@localhost:5432/fabriq_verify`
+- LLM vars **omitted** for default verify
+
+Cloud Agent secrets (`DATABASE_URL` for prod/Railway) should **not** be required for OSS verify.
+
+### 20.5 Agent skill
+
+**`.cursor/skills/oss-verify/SKILL.md`** — Cloud Agents read this before claiming OSS work complete:
+
+1. Preconditions: Docker, Node 20, on `oss` branch
+2. Run `npm run verify:oss`
+3. Expected: exit 0, Jest summary all green
+4. On failure: read setup-db output, compare `oss-books-config.json` to `SEED_REFERENCE.md`
+5. Do **not** skip verify because “no local Postgres on laptop” — compose provides Postgres
+6. LLM tests only when explicitly asked
+
+Reference this skill from root `AGENTS.md` under OSS section.
+
+### 20.6 What cloud agents should not use as the gate
+
+| Avoid | Reason |
+|-------|--------|
+| `npm run test:suite` | ERP modules removed from OSS |
+| `frontend-1` Playwright workbench E2E | LLM + indian-demo user + browser |
+| `setup-db --demo-data=indian-demo` | Wrong scope and volume |
+| Manual login in browser | Not automatable as default gate |
+| External Railway/prod DB | Destructive `db push --force-reset` |
+
+### 20.7 CI parity
+
+GitHub Actions (or Cursor Cloud on PR) runs the **same** `npm run verify:oss` as the coding agent — same compose file, same seed, same Jest file. No separate “CI-only” harness.
+
+---
+
+## 21. Related prod documentation
 
 | Topic | Prod doc (reference while planning) |
 |-------|-------------------------------------|
