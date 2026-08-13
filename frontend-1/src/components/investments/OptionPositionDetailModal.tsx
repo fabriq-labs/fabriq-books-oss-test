@@ -22,6 +22,8 @@ export interface OpenOptionRow {
   account_id: string;
   account_name: string;
   instrument_id: string;
+  /** Holding that owns this open option position — used as llm_trace.record_id. */
+  holding_id?: string | null;
   external_symbol_id?: number | null;
   symbol: string;
   instrument_name: string;
@@ -301,8 +303,11 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
    * lives only in this component's React state (useChat's `messages`) and is
    * gone once the modal closes. The position + live Greeks are fetched exactly
    * once above (fetchQuote) and re-sent as `modelContext` on every turn — the
-   * LLM never fetches quotes itself (see modelName: 'instrument' tool config,
+   * LLM never fetches quotes itself (see modelName: 'holding' tool config,
    * which has an empty tool list on purpose).
+   *
+   * Traces are keyed to the holding (`model_name=holding`, `record_id=holding_id`);
+   * the instrument is reachable via `holding.instrument_id`.
    */
   const authToken = Cookies.get("__session");
   const modelContext = buildModelContext(row, quote);
@@ -317,9 +322,9 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
     experimental_prepareRequestBody: ({ messages: msgs }) => ({
       messages: msgs,
       context: {
-        modelName: "instrument",
-        viewName: "instrument_view",
-        recordId: row.instrument_id,
+        modelName: "holding",
+        viewName: "holding_view",
+        recordId: row.holding_id ?? undefined,
         promptTypes: ["options_analysis"],
         modelContext,
       },

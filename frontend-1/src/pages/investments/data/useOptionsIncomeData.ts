@@ -23,6 +23,8 @@ export interface OptionsIncomeTransactionRow {
   account_id: string;
   account_name: string;
   instrument_id: string;
+  /** Active holding for this account+instrument when one exists (open rows always set). */
+  holding_id?: string | null;
   external_symbol_id?: number | null;
   symbol: string;
   instrument_name: string;

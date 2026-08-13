@@ -22,7 +22,7 @@ export function createInvestmentsRouter(): Router {
    * Called once by the frontend when the position detail modal opens. The result is
    * used both for the Greeks panel and passed into the LLM chat as modelContext —
    * the LLM never fetches quotes itself (see backend/prisma/seed-agent-model-tools.sql,
-   * model_name 'instrument': no tools configured).
+   * model_name 'holding': no tools configured).
    */
   router.post('/option-quote', authMiddleware, async (req: Request, res: Response) => {
     const auth = getAuthContext(req);

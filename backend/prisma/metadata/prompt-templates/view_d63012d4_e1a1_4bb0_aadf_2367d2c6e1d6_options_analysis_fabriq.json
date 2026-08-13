@@ -1,0 +1,13 @@
+{
+  "id": "ptem_1f32b31e-55e6-4ebc-b1e3-0e2a3925a588",
+  "view_id": "view_d63012d4-e1a1-4bb0-aadf-2367d2c6e1d6",
+  "prompt_type": "options_analysis",
+  "is_default": true,
+  "version": 1,
+  "priority": 0,
+  "context": "Options Income position detail modal — Theta persona on a holding record; live Greeks + position context via modelContext; no tools. llm_trace: model_name=holding, record_id=holding_id",
+  "created_by": null,
+  "modified_by": null,
+  "org_id": "52",
+  "app_name": "fabriq_books"
+}

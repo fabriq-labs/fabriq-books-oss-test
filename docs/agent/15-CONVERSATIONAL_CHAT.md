@@ -209,6 +209,7 @@ export interface PageContext {
 | Account form | `account` | `AccountForm.tsx` (hardcoded) |
 | Bank Transactions | `posting` | `BankTransactions.tsx` + `selectedAccountId` |
 | Dashboard | `posting` | `FabriqDashboard` → `buildDefaultPostingChatContext()` |
+| Options Income (position modal) | `holding` | `OptionPositionDetailModal.tsx` — `recordId=holding_id`, `promptTypes=['options_analysis']` |
 | No page context | `posting` | `ChatUI` fallback via `buildDefaultPostingChatContext()` |
 
 **Dashboard does not infer model from typed text.** `modelName` is pre-set to `posting`;
@@ -222,6 +223,7 @@ export interface PageContext {
 | Bank Transactions | `{ selectedAccountId, selectedAccountName, legalEntityId, … }` |
 | Account form (edit) | `{ accountName, accountCode, legal_entity_id, currencyCode }` |
 | Posting list | `{ legalEntityId, legalEntityName }` |
+| Options Income position modal | Position + live Greeks (`symbol`, `delta`, `theta`, …); no tools — quotes fetched once by the FE |
 
 ### `promptTypes` — default vs analytics
 
@@ -232,6 +234,7 @@ export interface PageContext {
 | `default` | CRUD, list filters, `createRecord` / `searchRecords` rules |
 | `analytics` | `analyticsQuery` SQL patterns, aggregates, trial balance via `runFinancialReport` |
 | `reconciliation` | Bank reconciliation (Bank Transactions page) |
+| `options_analysis` | Theta persona for open option holdings (Options Income detail modal) |
 
 **Defaults in this project:**
 
@@ -239,10 +242,12 @@ export interface PageContext {
 |---------|---------------|
 | Dashboard / finance chat | `['analytics', 'default']` via `buildDefaultPostingChatContext` or `enrichFinanceChatContext` |
 | Bank Transactions | `['reconciliation', 'analytics', 'default']` |
+| Options Income position modal | `['options_analysis']` on `holding_view` |
 | Posting/account pages (no explicit set) | `['analytics', 'default']` via enrichment |
 | Backend fallback (if empty) | `['analytics', 'default']` in `AgentService` |
 
 Posting templates: `backend/prisma/metadata/prompt-templates/view_d8b6c832-*` (`posting_view`).
+Options analysis: `view_d63012d4_*_options_analysis_fabriq.*` (`holding_view`).
 
 `PageContext.promptTypes` from the frontend **wins** over any `classifyQuestion()` suggestion.
 `classifyQuestion()` is used for `llm_trace.query_type` logging only.

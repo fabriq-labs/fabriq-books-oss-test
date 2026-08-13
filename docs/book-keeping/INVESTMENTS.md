@@ -321,6 +321,23 @@ Closed rows are built from **trade history only** (`splitRoundTrips()` over sync
 
 Open rows are suppressed when the holding is flat (`quantity ≈ 0`), even if trade history still shows an open leg.
 
+Open transaction rows include **`holding_id`** (and `instrument_id`) so the UI and LLM traces can key off the holding. The instrument remains reachable via `holding.instrument_id`.
+
+### Position detail LLM chat (Theta)
+
+Clicking an **open** row opens `OptionPositionDetailModal`, which streams analysis through `/api/agent/chat/stream` with:
+
+| Context field | Value |
+|---|---|
+| `modelName` | `holding` |
+| `viewName` | `holding_view` |
+| `recordId` | row `holding_id` |
+| `promptTypes` | `['options_analysis']` |
+
+Live Greeks are fetched once via `POST /api/investments/option-quote` and re-sent as `modelContext` each turn — `agent_model_tool_config` for `holding` has an empty tool list on purpose.
+
+Resulting `llm_trace` rows use `model_name='holding'` and `record_id=<holding_id>`. Prompt file: `prisma/metadata/prompt-templates/view_d63012d4_*_options_analysis_fabriq.*` (applied by **Sync metadata**). Tool config: `prisma/seed-agent-model-tools.sql` (`amtc_holding`).
+
 ### Report API
 
 ```

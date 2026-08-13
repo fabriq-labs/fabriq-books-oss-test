@@ -426,7 +426,7 @@ Prefer this for premium / open-options income analysis. Use `get_portfolio_summa
 
 **Notes for agents:**
 
-- Open may have **multiple transaction rows per instrument** (one per unmatched period leg). Group by `instrument_id` / `symbol` when counting positions.
+- Open may have **multiple transaction rows per instrument** (one per unmatched period leg). Group by `holding_id` / `instrument_id` / `symbol` when counting positions. Open rows include `holding_id` when an active holding exists.
 - `summary.open_unrealized_pnl` and per-row `mark_to_market_unrealized_pnl` use option mark × qty × 100 vs premium (same as the UI). Holding `unrealized_pnl` on rows may differ slightly.
 - `summary` always includes open/closed counts even when `section=open` (closed detail omitted from `data`).
 

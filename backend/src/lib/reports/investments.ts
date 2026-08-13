@@ -87,6 +87,8 @@ export interface OptionsIncomeTransactionRow {
   account_id: string;
   account_name: string;
   instrument_id: string;
+  /** Active holding for this account+instrument when one exists (open rows always set). */
+  holding_id?: string | null;
   /** Questrade integer symbolId — present on open rows when available. */
   external_symbol_id?: number | null;
   symbol: string;
@@ -115,6 +117,7 @@ export interface OptionsIncomePositionRow {
   account_id: string;
   account_name: string;
   instrument_id: string;
+  holding_id?: string | null;
   symbol: string;
   instrument_name: string;
   underlying_symbol: string | null;
@@ -850,10 +853,15 @@ export async function getOptionsIncome(
 
     if (!include) continue;
 
+    const holding = holdingMap.get(`${bucket.account_id}:${bucket.instrument_id}`);
+    const holdingQty = holding != null ? Number(holding.quantity) : null;
+    const holdingStillOpen = holdingQty != null && Math.abs(holdingQty) >= 0.0001;
+
     const positionRow: OptionsIncomePositionRow = {
       account_id: bucket.account_id,
       account_name: bucket.account_name,
       instrument_id: bucket.instrument_id,
+      holding_id: holding?.id ?? null,
       symbol: bucket.symbol,
       instrument_name: bucket.instrument_name,
       underlying_symbol: bucket.underlying_symbol,
@@ -867,10 +875,6 @@ export async function getOptionsIncome(
       closed_date: bucket.closed_date,
       last_trade_date: bucket.last_trade_date,
     };
-
-    const holding = holdingMap.get(`${bucket.account_id}:${bucket.instrument_id}`);
-    const holdingQty = holding != null ? Number(holding.quantity) : null;
-    const holdingStillOpen = holdingQty != null && Math.abs(holdingQty) >= 0.0001;
 
     // Trade history can lag closes/expiries — only keep open when an active holding confirms it.
     if (isClosed) {
@@ -897,6 +901,7 @@ export async function getOptionsIncome(
         account_id: bucket.account_id,
         account_name: bucket.account_name,
         instrument_id: bucket.instrument_id,
+        holding_id: holding?.id ?? null,
         symbol: bucket.symbol,
         instrument_name: bucket.instrument_name,
         underlying_symbol: bucket.underlying_symbol,
@@ -928,6 +933,7 @@ export async function getOptionsIncome(
           account_id: bucket.account_id,
           account_name: bucket.account_name,
           instrument_id: bucket.instrument_id,
+          holding_id: holding.id,
           external_symbol_id: bucket.external_symbol_id,
           symbol: bucket.symbol,
           instrument_name: bucket.instrument_name,
@@ -1004,6 +1010,7 @@ export async function getOptionsIncome(
       account_id: holding.account_id,
       account_name: holding.account?.name ?? holding.account_id,
       instrument_id: instrument.id,
+      holding_id: holding.id,
       external_symbol_id: instrument.external_symbol_id ?? null,
       symbol: instrument.symbol,
       instrument_name: instrument.name,
@@ -1028,6 +1035,7 @@ export async function getOptionsIncome(
       account_id: holding.account_id,
       account_name: holding.account?.name ?? holding.account_id,
       instrument_id: instrument.id,
+      holding_id: holding.id,
       symbol: instrument.symbol,
       instrument_name: instrument.name,
       underlying_symbol: underlying?.symbol ?? parseUnderlyingSymbolFromOption(instrument.symbol),

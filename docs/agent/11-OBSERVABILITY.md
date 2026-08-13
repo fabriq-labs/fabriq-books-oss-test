@@ -23,6 +23,10 @@ Per call (`llm_trace`):
   [Prompt-cache accounting](#prompt-cache-accounting)
 - `tools_called` (all tool names used across all steps)
 - `response_text`, `status` (`success`/`error`), `error_message`
+- **Record linkage** (when the caller passes page/record context): `model_name`,
+  `view_name`, `record_id` — e.g. Options Income analysis uses
+  `model_name='holding'` + `record_id=<holding_id>` so you can list all traces
+  for that holding. Callers that omit context leave these null.
 
 Per tool-call round within a call (`llm_trace_step`):
 - `tool_calls` (with args), `tool_results` (preview)
@@ -199,6 +203,13 @@ GROUP BY llm_model;
 SELECT id, question, status, tools_called, total_tokens, duration_ms, created_at
 FROM llm_trace
 WHERE session_id = '<SESSION_ID>'
+ORDER BY created_at ASC;
+
+-- All LLM calls for one holding (Options Income position analysis)
+SELECT id, question, status, total_tokens, duration_ms, created_at
+FROM llm_trace
+WHERE model_name = 'holding'
+  AND record_id = '<HOLDING_ID>'
 ORDER BY created_at ASC;
 
 -- Step-level SQL the agent actually ran

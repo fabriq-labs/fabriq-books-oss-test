@@ -91,10 +91,10 @@ INSERT INTO agent_model_tool_config (
   NOW()
 ),
 (
-  'amtc_instrument',
-  'instrument',
-  'Instrument / Option Position Analysis',
-  'Prompts: instrument_view (view_0498aa82) — options_analysis. No tools: position + live Greeks are pushed in via modelContext by the frontend (fetched once, deterministically) before the chat turn, so the LLM never needs — and should never trigger — its own quote fetch or DB lookup for this conversation.',
+  'amtc_holding',
+  'holding',
+  'Holding / Option Position Analysis',
+  'Prompts: holding_view (view_d63012d4) — options_analysis. No tools: position + live Greeks are pushed in via modelContext by the frontend (fetched once, deterministically) before the chat turn, so the LLM never needs — and should never trigger — its own quote fetch or DB lookup for this conversation. llm_trace uses model_name=holding and record_id=holding_id (instrument is reachable via holding.instrument_id).',
   ARRAY[]::text[],
   false,
   true,
@@ -122,3 +122,6 @@ ON CONFLICT (model_name) DO UPDATE SET
   is_active = EXCLUDED.is_active,
   sort_order = EXCLUDED.sort_order,
   modified_at = NOW();
+
+-- Options analysis moved from instrument → holding (Aug 2026). Drop legacy row if present.
+DELETE FROM agent_model_tool_config WHERE model_name = 'instrument';

@@ -317,7 +317,9 @@ LLM call. Full diagnostic workflow: [11-OBSERVABILITY.md](./11-OBSERVABILITY.md)
 | `session_id` | FK to `agent_session` |
 | `org_id` | Multi-tenancy |
 | `user_id` | Who triggered the call |
-| `model_name` | Business model context e.g. `posting` |
+| `model_name` | Business model context e.g. `posting`, `holding` (from request `context.modelName`) |
+| `view_name` | View that scoped the prompt e.g. `holding_view` (from `context.viewName`) |
+| `record_id` | Specific business record when the call is record-scoped (from `context.recordId`). Example: Options Income position analysis sets `model_name=holding` and `record_id=<holding_id>` so all turns for that position are queryable; instrument is reachable via `holding.instrument_id`. Often null for list/chat/batch paths that only pass `model_name`. |
 | `query_type` | `analytical` or `transactional` (see [04-PROMPT_SYSTEM.md — Question Routing](./04-PROMPT_SYSTEM.md#question-routing-conversational-chat)) |
 | `question` | The user's question |
 | `llm_model` | LLM model ID actually used (provider-dependent — see [10-LIBRARIES_AND_PROVIDERS.md](./10-LIBRARIES_AND_PROVIDERS.md)) |
