@@ -55,6 +55,8 @@ export interface OpenOptionRow {
   underlying_average_cost?: number | null;
   underlying_market_value?: number | null;
   shares_needed?: number | null;
+  holding_average_cost?: number | null;
+  holding_market_value?: number | null;
 }
 
 interface LiveQuote {
@@ -122,34 +124,53 @@ function fmtNum(v: number | null | undefined, decimals = 4): string {
 }
 
 /**
- * Flatten the position row + already-fetched quote into the flat key/value shape
- * consumed by the `options_analysis` prompt_template's {{context.modelContext.KEY}}
- * placeholders. Only defined values are included — the prompt template conditionally
- * omits any section whose key is absent, so a failed/partial quote degrades gracefully.
+ * Flatten holding + instrument + open trade + underlying stock leg + quote into
+ * flat modelContext keys for options_analysis. Always include stock-leg fields
+ * when present — not only when is_covered_call — so assignment / P&L math works.
  */
 function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<string, string | number | boolean> {
   const ctx: Record<string, string | number | boolean> = {
     symbol: row.symbol,
+    instrumentName: row.instrument_name,
     underlyingSymbol: row.underlying_symbol ?? row.symbol,
     optionType: row.option_type === "P" ? "Put" : row.option_type === "C" ? "Call" : "Option",
     positionQty: row.position_qty,
+    contracts: Math.abs(row.position_qty),
     accountName: row.account_name,
+    accountId: row.account_id,
   };
+
+  if (row.holding_id) ctx.holdingId = row.holding_id;
+  if (row.instrument_id) ctx.instrumentId = row.instrument_id;
+  if (row.underlying_instrument_id) ctx.underlyingInstrumentId = row.underlying_instrument_id;
+  if (row.underlying_holding_id) ctx.underlyingHoldingId = row.underlying_holding_id;
+
+  if (row.strategy) ctx.strategy = row.strategy;
+  if (row.is_covered_call) ctx.isCoveredCall = true;
+
   if (row.strike_price != null) ctx.strike = row.strike_price;
-  if (row.open_leg?.value_date) ctx.entryDate = row.open_leg.value_date;
-  if (row.open_leg?.price != null) ctx.entryPrice = row.open_leg.price;
+  if (row.holding_average_cost != null) ctx.optionAverageCost = row.holding_average_cost;
+  if (row.holding_market_value != null) ctx.optionMarketValue = row.holding_market_value;
+
+  if (row.open_leg) {
+    ctx.entryTradeId = row.open_leg.trade_id;
+    ctx.entryTradeType = row.open_leg.type;
+    ctx.entryDate = row.open_leg.value_date;
+    ctx.entryPrice = row.open_leg.price;
+    ctx.entryQuantity = row.open_leg.quantity;
+    ctx.entryPremiumAmount = row.open_leg.amount;
+  }
   if (row.sale_cost != null) ctx.premiumCollected = row.sale_cost;
+  if (row.acquisition_cost != null) ctx.premiumPaid = row.acquisition_cost;
+
   if (row.underlying_current_price != null) ctx.underlyingCurrentPrice = row.underlying_current_price;
   if (row.option_current_price != null) ctx.optionMarkPrice = row.option_current_price;
   if (row.unrealized_pnl != null) ctx.unrealizedPnl = row.unrealized_pnl;
-  if (row.strategy) ctx.strategy = row.strategy;
-  if (row.is_covered_call) {
-    ctx.isCoveredCall = true;
-    if (row.underlying_qty != null) ctx.underlyingQty = row.underlying_qty;
-    if (row.shares_needed != null) ctx.sharesNeeded = row.shares_needed;
-    if (row.underlying_average_cost != null) ctx.underlyingAverageCost = row.underlying_average_cost;
-    if (row.underlying_market_value != null) ctx.underlyingMarketValue = row.underlying_market_value;
-  }
+
+  if (row.underlying_qty != null) ctx.underlyingQty = row.underlying_qty;
+  if (row.shares_needed != null) ctx.sharesNeeded = row.shares_needed;
+  if (row.underlying_average_cost != null) ctx.underlyingAverageCost = row.underlying_average_cost;
+  if (row.underlying_market_value != null) ctx.underlyingMarketValue = row.underlying_market_value;
 
   if (quote) {
     if (quote.delta != null) ctx.delta = quote.delta;

@@ -130,8 +130,12 @@ export interface OptionsIncomeTransactionRow {
   underlying_qty?: number | null;
   underlying_average_cost?: number | null;
   underlying_market_value?: number | null;
-  /** Shares required to fully cover: abs(position_qty) * 100. */
+  /** Shares required to fully cover a short call: abs(position_qty) * 100. */
   shares_needed?: number | null;
+  /** Option holding average_cost in report currency (open rows). */
+  holding_average_cost?: number | null;
+  /** Option holding market_value in report currency (open rows). */
+  holding_market_value?: number | null;
 }
 
 export interface OptionsIncomePositionRow {
@@ -540,8 +544,10 @@ function strategyForOption(optionType: 'C' | 'P' | null, positionQty: number): O
 }
 
 /**
- * Same-account covered-call check: short call is covered when long underlying
- * qty >= abs(contracts) * 100. Cheap — uses holdings already loaded for the report.
+ * Same-account coverage + underlying stock-leg snapshot.
+ * For short calls: is_covered_call when long underlying qty >= abs(contracts) * 100.
+ * Underlying holding fields are attached whenever a matching same-account equity
+ * holding exists (so the LLM can use cost basis for assignment / called-away math).
  */
 async function resolveCoverageFields(params: {
   accountId: string;
@@ -566,7 +572,6 @@ async function resolveCoverageFields(params: {
   >
 > {
   const { accountId, positionQty, optionType, holdingMap, holdingRows, getRate } = params;
-  const strategyBase = strategyForOption(optionType, positionQty);
 
   let underlyingId = params.underlyingInstrumentId ?? null;
   if (!underlyingId && params.underlyingSymbol) {
@@ -578,31 +583,26 @@ async function resolveCoverageFields(params: {
     underlyingId = equityMatch?.instrument_id ?? null;
   }
 
-  if (optionType !== 'C' || positionQty >= 0) {
-    return {
-      strategy: strategyBase,
-      is_covered_call: false,
-      underlying_instrument_id: underlyingId,
-      underlying_holding_id: null,
-      underlying_qty: null,
-      underlying_average_cost: null,
-      underlying_market_value: null,
-      shares_needed: null,
-    };
-  }
-
-  const sharesNeeded = Math.abs(positionQty) * OPTION_CONTRACT_SIZE;
   const underlyingHolding = underlyingId
     ? holdingMap.get(`${accountId}:${underlyingId}`)
     : undefined;
   const underlyingQty = underlyingHolding != null ? Number(underlyingHolding.quantity) : null;
+  const isShortCall = optionType === 'C' && positionQty < 0;
+  const sharesNeeded = isShortCall ? Math.abs(positionQty) * OPTION_CONTRACT_SIZE : null;
   const isCovered =
-    underlyingQty != null && underlyingQty > 0 && underlyingQty + 1e-9 >= sharesNeeded;
+    isShortCall &&
+    underlyingQty != null &&
+    underlyingQty > 0 &&
+    sharesNeeded != null &&
+    underlyingQty + 1e-9 >= sharesNeeded;
+
+  const strategyBase = strategyForOption(optionType, positionQty);
+  const strategy: OptionStrategyLabel = isCovered ? 'covered_call' : strategyBase;
 
   const rate = underlyingHolding ? await getRate(underlyingHolding.currency_id) : 1;
 
   return {
-    strategy: isCovered ? 'covered_call' : 'naked_short_call',
+    strategy,
     is_covered_call: isCovered,
     underlying_instrument_id: underlyingId,
     underlying_holding_id: underlyingHolding?.id ?? null,
@@ -1113,6 +1113,10 @@ export async function getOptionsIncome(
           strike_price: bucket.strike_price,
           option_type: bucket.option_type,
           unrealized_pnl: unrealizedPnl,
+          holding_average_cost:
+            holding.average_cost != null ? Number(holding.average_cost) * holdingRate : null,
+          holding_market_value:
+            holding.market_value != null ? Number(holding.market_value) * holdingRate : null,
           ...coverage,
         });
       }
@@ -1206,6 +1210,8 @@ export async function getOptionsIncome(
       strike_price: parseStrikeFromOption(instrument.symbol),
       option_type: optionType,
       unrealized_pnl: unrealizedPnl,
+      holding_average_cost: holding.average_cost != null ? Number(holding.average_cost) * rate : null,
+      holding_market_value: holding.market_value != null ? Number(holding.market_value) * rate : null,
       ...coverage,
     });
 

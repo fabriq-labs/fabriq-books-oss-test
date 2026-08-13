@@ -223,7 +223,7 @@ export interface PageContext {
 | Bank Transactions | `{ selectedAccountId, selectedAccountName, legalEntityId, … }` |
 | Account form (edit) | `{ accountName, accountCode, legal_entity_id, currencyCode }` |
 | Posting list | `{ legalEntityId, legalEntityName }` |
-| Options Income position modal | Position + live Greeks + covered-call fields (`strategy`, `underlyingQty`, …); `getOptionChain` for rolls |
+| Options Income position modal | Full package: option holding/instrument ids, open trade leg, strategy, underlying stock leg (qty, avg cost, MV), live Greeks; `getOptionChain` for rolls |
 
 ### `promptTypes` — default vs analytics
 
