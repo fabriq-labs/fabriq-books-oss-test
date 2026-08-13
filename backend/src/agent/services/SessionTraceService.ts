@@ -34,6 +34,10 @@ interface TraceToolResult {
 
 interface TraceLLMStep {
   step_number: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  cached_prompt_tokens: number | null;
+  cache_creation_tokens: number | null;
   tool_calls: TraceToolCall[];
   tool_results: TraceToolResult[];
   sql_queries: any[];
@@ -50,6 +54,10 @@ interface TraceUsage {
   total_llm_calls: number;
   total_prompt_tokens: number;
   total_completion_tokens: number;
+  /** Sum of provider cache-read tokens across traces (subset of prompt tokens). */
+  total_cached_prompt_tokens: number;
+  /** Sum of provider cache-write tokens (Anthropic/Bedrock); often 0 on Gemini. */
+  total_cache_creation_tokens: number;
   total_duration_ms: number;
   tools_used: string[];
   sql_queries_count: number;
@@ -156,6 +164,10 @@ export async function getSessionTrace(sessionId: string): Promise<SessionTrace> 
       }));
       return {
         step_number: s.step_number,
+        prompt_tokens: s.prompt_tokens,
+        completion_tokens: s.completion_tokens,
+        cached_prompt_tokens: s.cached_prompt_tokens,
+        cache_creation_tokens: s.cache_creation_tokens,
         tool_calls: toolCalls,
         tool_results: toolResults,
         sql_queries: (s.sql_queries as any[]) || [],
@@ -170,6 +182,8 @@ export async function getSessionTrace(sessionId: string): Promise<SessionTrace> 
       llm_model: trace.llm_model,
       prompt_tokens: trace.prompt_tokens,
       completion_tokens: trace.completion_tokens,
+      cached_prompt_tokens: trace.cached_prompt_tokens,
+      cache_creation_tokens: trace.cache_creation_tokens,
       steps_count: trace.steps_count,
       tools_called: trace.tools_called,
       response_text: trace.response_text,
@@ -221,6 +235,14 @@ export async function getSessionTrace(sessionId: string): Promise<SessionTrace> 
     total_llm_calls: traces.length,
     total_prompt_tokens: traces.reduce((sum, t) => sum + (t.prompt_tokens || 0), 0),
     total_completion_tokens: traces.reduce((sum, t) => sum + (t.completion_tokens || 0), 0),
+    total_cached_prompt_tokens: traces.reduce(
+      (sum, t) => sum + (t.cached_prompt_tokens || 0),
+      0
+    ),
+    total_cache_creation_tokens: traces.reduce(
+      (sum, t) => sum + (t.cache_creation_tokens || 0),
+      0
+    ),
     total_duration_ms: traces.reduce((sum, t) => sum + (t.duration_ms || 0), 0),
     tools_used: Array.from(allToolsUsed).sort(),
     sql_queries_count: totalSqlQueries,

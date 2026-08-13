@@ -37,6 +37,8 @@ interface TraceRow {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+  cached_prompt_tokens?: number | null;
+  cache_creation_tokens?: number | null;
   tools_called?: string[];
   steps_count?: number;
   model_name?: string;
@@ -631,11 +633,21 @@ export const LLMTracesPage: React.FC = () => {
                           <TooltipTrigger asChild>
                             <span className="cursor-default underline decoration-dotted underline-offset-2">
                               {formatTokens(trace.total_tokens)}
+                              {trace.cached_prompt_tokens != null &&
+                                trace.cached_prompt_tokens > 0 && (
+                                  <span className="ml-1 text-emerald-600">
+                                    · {formatTokens(trace.cached_prompt_tokens)} c
+                                  </span>
+                                )}
                             </span>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="text-xs">
-                            {formatTokens(trace.prompt_tokens)} prompt /{" "}
-                            {formatTokens(trace.completion_tokens)} completion
+                            {formatTokens(trace.prompt_tokens)} prompt
+                            {trace.cached_prompt_tokens != null &&
+                            trace.cached_prompt_tokens > 0
+                              ? ` (${formatTokens(trace.cached_prompt_tokens)} cached)`
+                              : ""}{" "}
+                            / {formatTokens(trace.completion_tokens)} completion
                           </TooltipContent>
                         </Tooltip>
                       </td>

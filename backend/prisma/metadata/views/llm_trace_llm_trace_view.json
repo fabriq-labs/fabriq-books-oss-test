@@ -24,7 +24,9 @@
         "error_message": "read",
         "prompt_tokens": "read",
         "response_text": "read",
-        "completion_tokens": "read"
+        "completion_tokens": "read",
+        "cached_prompt_tokens": "read",
+        "cache_creation_tokens": "read"
       },
       "dataType": "table",
       "displayName": "Steps",
@@ -220,6 +222,20 @@
       "required": false,
       "permission": "read",
       "displayName": "Input Tokens",
+      "isColumnShow": false
+    },
+    "cached_prompt_tokens": {
+      "dataType": "int",
+      "required": false,
+      "permission": "read",
+      "displayName": "Cached Prompt Tokens",
+      "isColumnShow": false
+    },
+    "cache_creation_tokens": {
+      "dataType": "int",
+      "required": false,
+      "permission": "read",
+      "displayName": "Cache Creation Tokens",
       "isColumnShow": false
     },
     "response_text": {

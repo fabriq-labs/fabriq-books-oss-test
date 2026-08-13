@@ -9,6 +9,10 @@ import {
   Code2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  estimateGemini35FlashCost,
+  formatUsd,
+} from '@/lib/llmTokenCost';
 
 // ── Types (mirror SessionTraceService) ────────────────────────
 
@@ -16,6 +20,8 @@ export interface TraceUsage {
   total_llm_calls: number;
   total_prompt_tokens: number;
   total_completion_tokens: number;
+  total_cached_prompt_tokens?: number;
+  total_cache_creation_tokens?: number;
   total_duration_ms: number;
   tools_used: string[];
   sql_queries_count: number;
@@ -60,12 +66,30 @@ function formatTime(iso: string): string {
 // ── Sub-components ─────────────────────────────────────────────
 
 function UsageStats({ usage }: { usage: TraceUsage }) {
+  const cached = usage.total_cached_prompt_tokens ?? 0;
+  const prompt = usage.total_prompt_tokens || 0;
+  const cachedPct = prompt > 0 && cached > 0 ? Math.round((100 * cached) / prompt) : null;
+  const cost = estimateGemini35FlashCost({
+    promptTokens: usage.total_prompt_tokens,
+    completionTokens: usage.total_completion_tokens,
+    cachedPromptTokens: usage.total_cached_prompt_tokens,
+  });
+
   const stats = [
     { label: 'LLM calls', value: String(usage.total_llm_calls) },
     { label: 'Prompt tokens', value: formatTokens(usage.total_prompt_tokens) },
+    ...(cached > 0
+      ? [{ label: cachedPct != null ? `Cached (${cachedPct}%)` : 'Cached tokens', value: formatTokens(cached) }]
+      : []),
     { label: 'Completion tokens', value: formatTokens(usage.total_completion_tokens) },
     { label: 'Duration', value: formatDurationMs(usage.total_duration_ms) },
     { label: 'SQL queries', value: String(usage.sql_queries_count) },
+    ...(cost.savings > 0
+      ? [{
+          label: `Est. saved vs full rate`,
+          value: formatUsd(cost.savings),
+        }]
+      : []),
   ];
 
   return (
@@ -109,6 +133,11 @@ function LLMCallEntry({ entry, index }: { entry: TraceTimelineEntry; index: numb
           {entry.prompt_tokens > 0 && (
             <span>{formatTokens(entry.prompt_tokens)} in</span>
           )}
+          {entry.cached_prompt_tokens > 0 && (
+            <span className="text-emerald-600">
+              {formatTokens(entry.cached_prompt_tokens)} cached
+            </span>
+          )}
           {entry.completion_tokens > 0 && (
             <span>{formatTokens(entry.completion_tokens)} out</span>
           )}
@@ -138,7 +167,22 @@ function LLMCallEntry({ entry, index }: { entry: TraceTimelineEntry; index: numb
         <div className="border-t border-gray-100 bg-gray-50 divide-y divide-gray-100">
           {steps.map((step, si) => (
             <div key={si} className="px-4 py-3 space-y-1.5">
-              <p className="text-[11px] font-medium text-gray-500">Step {step.step_number}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-[11px] font-medium text-gray-500">Step {step.step_number}</p>
+                {step.prompt_tokens > 0 && (
+                  <span className="text-[10px] text-gray-400">
+                    {formatTokens(step.prompt_tokens)} in
+                    {step.cached_prompt_tokens > 0 && (
+                      <span className="text-emerald-600">
+                        {' '}· {formatTokens(step.cached_prompt_tokens)} cached
+                      </span>
+                    )}
+                    {step.completion_tokens > 0 && (
+                      <span> · {formatTokens(step.completion_tokens)} out</span>
+                    )}
+                  </span>
+                )}
+              </div>
 
               {/* Tool calls */}
               {(step.tool_calls || []).map((tc: any, tci: number) => (

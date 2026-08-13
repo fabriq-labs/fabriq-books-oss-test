@@ -50,6 +50,26 @@
       "displayName": "Completion Tokens",
       "isColumnShow": true
     },
+    "cached_prompt_tokens": {
+      "orderNo": 3,
+      "datatype": "number",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "120",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Cached Prompt Tokens",
+      "isColumnShow": false
+    },
+    "cache_creation_tokens": {
+      "datatype": "number",
+      "required": false,
+      "permission": "read",
+      "displayName": "Cache Creation Tokens",
+      "isColumnShow": false
+    },
     "duration_ms": {
       "orderNo": 4,
       "datatype": "number",

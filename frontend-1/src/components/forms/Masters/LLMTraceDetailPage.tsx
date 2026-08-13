@@ -31,12 +31,18 @@ import {
   parseTraceToolInvocations,
   parseTraceStepsToolInvocations,
 } from "@/lib/traceToolResults";
+import {
+  estimateGemini35FlashCost,
+  formatUsd,
+} from "@/lib/llmTokenCost";
 
 interface TraceStep {
   id: string;
   step_number: number;
   prompt_tokens?: number;
   completion_tokens?: number;
+  cached_prompt_tokens?: number | null;
+  cache_creation_tokens?: number | null;
   duration_ms?: number;
   tool_calls?: any;
   tool_results?: any;
@@ -56,6 +62,8 @@ interface TraceData {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+  cached_prompt_tokens?: number | null;
+  cache_creation_tokens?: number | null;
   steps_count?: number;
   tools_called?: string[];
   model_name?: string;
@@ -149,6 +157,11 @@ function StepCard({ step }: { step: TraceStep }) {
             <Badge variant="outline" className="font-normal">
               <Cpu className="h-3 w-3 mr-1" />
               {formatTokens(step.prompt_tokens)} + {formatTokens(step.completion_tokens)} tokens
+            </Badge>
+          )}
+          {step.cached_prompt_tokens != null && step.cached_prompt_tokens > 0 && (
+            <Badge variant="outline" className="font-normal text-emerald-700 border-emerald-200">
+              {formatTokens(step.cached_prompt_tokens)} cached
             </Badge>
           )}
           {step.duration_ms != null && (
@@ -331,6 +344,20 @@ export const LLMTraceDetailPage: React.FC = () => {
   const toolsCalled = Array.isArray(trace.tools_called) ? trace.tools_called : [];
   const userLabel = userDisplay?.name?.trim() || formatUserIdFallback(trace.user_id);
   const userSubtext = userDisplay?.email || (userDisplay?.name ? undefined : trace.user_id);
+  const cachedPrompt = trace.cached_prompt_tokens ?? 0;
+  const promptTokens = trace.prompt_tokens ?? 0;
+  const cachedPct =
+    promptTokens > 0 && cachedPrompt > 0
+      ? Math.round((100 * cachedPrompt) / promptTokens)
+      : null;
+  const isGeminiFlash = /gemini-3\.5-flash/i.test(trace.llm_model || "");
+  const costEstimate = isGeminiFlash
+    ? estimateGemini35FlashCost({
+        promptTokens: trace.prompt_tokens,
+        completionTokens: trace.completion_tokens,
+        cachedPromptTokens: trace.cached_prompt_tokens,
+      })
+    : null;
 
   return (
     <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
@@ -413,8 +440,33 @@ export const LLMTraceDetailPage: React.FC = () => {
                 <p className="text-xs text-muted-foreground">
                   {formatTokens(trace.prompt_tokens)} in · {formatTokens(trace.completion_tokens)} out
                 </p>
+                {cachedPrompt > 0 && (
+                  <p className="text-xs text-emerald-700">
+                    {formatTokens(cachedPrompt)} cached
+                    {cachedPct != null ? ` (${cachedPct}% of prompt)` : ""}
+                    {trace.cache_creation_tokens != null && trace.cache_creation_tokens > 0 && (
+                      <> · {formatTokens(trace.cache_creation_tokens)} cache write</>
+                    )}
+                  </p>
+                )}
               </div>
             </DetailField>
+            {costEstimate && costEstimate.savings > 0 && (
+              <DetailField label="Est. cost (OpenRouter)">
+                <div className="space-y-0.5">
+                  <p className="font-medium">{formatUsd(costEstimate.costWithCache)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    vs {formatUsd(costEstimate.costWithoutCache)} without cache
+                  </p>
+                  <p className="text-xs text-emerald-700">
+                    Saved {formatUsd(costEstimate.savings)}
+                    {costEstimate.savingsPct != null
+                      ? ` (${costEstimate.savingsPct.toFixed(0)}%)`
+                      : ""}
+                  </p>
+                </div>
+              </DetailField>
+            )}
             <DetailField label="User">
               <div className="inline-flex items-start gap-1.5">
                 <User className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
