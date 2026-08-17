@@ -5,7 +5,7 @@
   "is_default": true,
   "version": 1,
   "priority": 0,
-  "context": "Options Income position modal — Theta on holding; full holding/instrument/trade/underlying stock-leg + Greeks in modelContext; getOptionChain for rolls. llm_trace: model_name=holding, record_id=holding_id",
+  "context": "Options Income position modal — Theta on holding; full holding/instrument/option trade/underlying stock lots + Greeks in modelContext; getOptionChain for rolls. llm_trace: model_name=holding, record_id=holding_id",
   "created_by": null,
   "modified_by": null,
   "org_id": "52",

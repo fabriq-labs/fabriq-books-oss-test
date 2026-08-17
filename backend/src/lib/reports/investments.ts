@@ -5,6 +5,15 @@ import {
   parseStrikeFromOption,
   parseOptionTypeFromOption,
 } from '../integrations/broker/option_symbol';
+import {
+  OPTION_CONTRACT_SIZE,
+  remainingLongLots,
+  strategyForOption,
+  type CoverageTradeLeg,
+  type OptionStrategyLabel,
+} from './optionsCoverage';
+
+export { OPTION_CONTRACT_SIZE, type OptionStrategyLabel } from './optionsCoverage';
 
 export interface PortfolioInstrumentSnapshot {
   id: string;
@@ -136,6 +145,11 @@ export interface OptionsIncomeTransactionRow {
   holding_average_cost?: number | null;
   /** Option holding market_value in report currency (open rows). */
   holding_market_value?: number | null;
+  /**
+   * FIFO remaining long lots of the same-account underlying that still make up
+   * the current share position (open rows, when stock trades exist).
+   */
+  underlying_trades?: OptionsIncomeTradeLeg[];
 }
 
 export interface OptionsIncomePositionRow {
@@ -510,9 +524,6 @@ function emptyOptionsIncomeSection(): OptionsIncomeSection {
   };
 }
 
-/** Equity option contract multiplier (shares per contract). */
-export const OPTION_CONTRACT_SIZE = 100;
-
 type HoldingCoverageRow = {
   id: string;
   account_id: string;
@@ -529,20 +540,6 @@ type HoldingCoverageRow = {
   } | null;
 };
 
-export type OptionStrategyLabel =
-  | 'covered_call'
-  | 'naked_short_call'
-  | 'long_call'
-  | 'short_put'
-  | 'long_put'
-  | 'option';
-
-function strategyForOption(optionType: 'C' | 'P' | null, positionQty: number): OptionStrategyLabel {
-  if (optionType === 'C') return positionQty < 0 ? 'naked_short_call' : 'long_call';
-  if (optionType === 'P') return positionQty < 0 ? 'short_put' : 'long_put';
-  return 'option';
-}
-
 /**
  * Same-account coverage + underlying stock-leg snapshot.
  * For short calls: is_covered_call when long underlying qty >= abs(contracts) * 100.
@@ -557,6 +554,7 @@ async function resolveCoverageFields(params: {
   underlyingSymbol: string | null | undefined;
   holdingMap: Map<string, HoldingCoverageRow>;
   holdingRows: HoldingCoverageRow[];
+  equityTradesByKey: Map<string, CoverageTradeLeg[]>;
   getRate: (currencyId: string | null | undefined) => Promise<number>;
 }): Promise<
   Pick<
@@ -569,9 +567,11 @@ async function resolveCoverageFields(params: {
     | 'underlying_average_cost'
     | 'underlying_market_value'
     | 'shares_needed'
+    | 'underlying_trades'
   >
 > {
-  const { accountId, positionQty, optionType, holdingMap, holdingRows, getRate } = params;
+  const { accountId, positionQty, optionType, holdingMap, holdingRows, equityTradesByKey, getRate } =
+    params;
 
   let underlyingId = params.underlyingInstrumentId ?? null;
   if (!underlyingId && params.underlyingSymbol) {
@@ -601,6 +601,10 @@ async function resolveCoverageFields(params: {
 
   const rate = underlyingHolding ? await getRate(underlyingHolding.currency_id) : 1;
 
+  const underlyingTrades = underlyingId
+    ? remainingLongLots(equityTradesByKey.get(`${accountId}:${underlyingId}`) ?? [])
+    : [];
+
   return {
     strategy,
     is_covered_call: isCovered,
@@ -616,6 +620,7 @@ async function resolveCoverageFields(params: {
         ? Number(underlyingHolding.market_value) * rate
         : null,
     shares_needed: sharesNeeded,
+    underlying_trades: underlyingTrades.length > 0 ? underlyingTrades.map(legFromTrade) : undefined,
   };
 }
 
@@ -629,7 +634,7 @@ type ConvertedTrade = {
   inPeriod: boolean;
 };
 
-function legFromTrade(trade: ConvertedTrade): OptionsIncomeTradeLeg {
+function legFromTrade(trade: CoverageTradeLeg): OptionsIncomeTradeLeg {
   return {
     trade_id: trade.trade_id,
     type: trade.type,
@@ -881,6 +886,35 @@ export async function getOptionsIncome(
   const periodStart = new Date(startDate);
   const periodEnd = new Date(endDate + 'T23:59:59Z');
 
+  const equityTradesByKey = new Map<string, CoverageTradeLeg[]>();
+  for (const trade of trades) {
+    const instrument = trade.instrument;
+    const account_id = trade.account_id;
+    if (!instrument || !account_id) continue;
+    if (isOptionInstrument(instrument.type, instrument.symbol)) continue;
+    const qty = Number(trade.quantity);
+    const price = Number(trade.price);
+    const netAmount = trade.net_amount != null ? Number(trade.net_amount) : null;
+    const cashFlow =
+      netAmount != null ? netAmount : qty * price * (trade.type === 'SELL' ? 1 : -1);
+    const currencyId =
+      (instrument as { price_currency_id?: string | null }).price_currency_id ??
+      accountCurrencyMap.get(account_id);
+    const rate = await getRate(currencyId);
+    const key = `${account_id}:${instrument.id}`;
+    const converted: CoverageTradeLeg = {
+      trade_id: trade.id,
+      type: trade.type as 'BUY' | 'SELL',
+      quantity: qty,
+      price: price * rate,
+      amount: Math.abs(cashFlow * rate),
+      value_date: trade.value_date.toISOString().split('T')[0],
+    };
+    const list = equityTradesByKey.get(key);
+    if (list) list.push(converted);
+    else equityTradesByKey.set(key, [converted]);
+  }
+
   for (const trade of optionTrades) {
     const account_id = trade.account_id!;
     const instrument = trade.instrument!;
@@ -1088,6 +1122,7 @@ export async function getOptionsIncome(
           underlyingSymbol: bucket.underlying_symbol,
           holdingMap: holdingMap as Map<string, HoldingCoverageRow>,
           holdingRows: holdingRows as HoldingCoverageRow[],
+          equityTradesByKey,
           getRate,
         });
         openTransactions.push({
@@ -1184,6 +1219,7 @@ export async function getOptionsIncome(
       underlyingSymbol,
       holdingMap: holdingMap as Map<string, HoldingCoverageRow>,
       holdingRows: holdingRows as HoldingCoverageRow[],
+      equityTradesByKey,
       getRate,
     });
 

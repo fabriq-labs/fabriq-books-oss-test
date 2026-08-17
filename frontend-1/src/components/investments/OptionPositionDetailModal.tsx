@@ -57,6 +57,7 @@ export interface OpenOptionRow {
   shares_needed?: number | null;
   holding_average_cost?: number | null;
   holding_market_value?: number | null;
+  underlying_trades?: TradeLeg[];
 }
 
 interface LiveQuote {
@@ -127,8 +128,9 @@ function fmtNum(v: number | null | undefined, decimals = 4): string {
  * Flatten holding + instrument + open trade + underlying stock leg + quote into
  * flat modelContext keys for options_analysis. Always include stock-leg fields
  * when present — not only when is_covered_call — so assignment / P&L math works.
+ * Arrays are preformatted as strings because prompt placeholders stringify values.
  */
-function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<string, string | number | boolean> {
+export function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<string, string | number | boolean> {
   const ctx: Record<string, string | number | boolean> = {
     symbol: row.symbol,
     instrumentName: row.instrument_name,
@@ -172,6 +174,15 @@ function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<
   if (row.underlying_average_cost != null) ctx.underlyingAverageCost = row.underlying_average_cost;
   if (row.underlying_market_value != null) ctx.underlyingMarketValue = row.underlying_market_value;
 
+  if (row.underlying_trades && row.underlying_trades.length > 0) {
+    ctx.underlyingTrades = formatUnderlyingTrades(row.underlying_trades);
+    ctx.underlyingTradeCount = row.underlying_trades.length;
+    const firstLot = row.underlying_trades[0];
+    ctx.underlyingEntryDate = firstLot.value_date;
+    ctx.underlyingEntryPrice = firstLot.price;
+    ctx.underlyingEntryQuantity = firstLot.quantity;
+  }
+
   if (quote) {
     if (quote.delta != null) ctx.delta = quote.delta;
     if (quote.gamma != null) ctx.gamma = quote.gamma;
@@ -186,6 +197,45 @@ function buildModelContext(row: OpenOptionRow, quote: LiveQuote | null): Record<
   }
 
   return ctx;
+}
+
+const MAX_UNDERLYING_TRADES_IN_CONTEXT = 40;
+
+function trimNum(n: number, decimals: number): string {
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(decimals).replace(/\.?0+$/, "");
+}
+
+export function formatUnderlyingTrades(legs: TradeLeg[]): string {
+  const shown = legs.slice(0, MAX_UNDERLYING_TRADES_IN_CONTEXT);
+  const lines = shown.map(
+    (leg) =>
+      `${leg.value_date} ${leg.type} ${trimNum(leg.quantity, 4)} @ ${trimNum(leg.price, 4)} (cash ${trimNum(leg.amount, 2)}; id ${leg.trade_id})`
+  );
+  if (legs.length > shown.length) {
+    lines.push(`… ${legs.length - shown.length} more lot(s) omitted`);
+  }
+  return lines.join("\n");
+}
+
+/** First-turn user message. Must name covered calls explicitly — otherwise Theta treats them as naked shorts. */
+export function initialAnalysisPrompt(row: OpenOptionRow): string {
+  const underlying = row.underlying_symbol ?? row.symbol;
+  if (row.is_covered_call) {
+    const contracts = Math.abs(row.position_qty);
+    const shareBit =
+      row.underlying_qty != null ? ` vs ${row.underlying_qty} long shares` : " vs long underlying shares";
+    return `Analyse this covered call on ${underlying} (short ${contracts} call(s)${shareBit}). Treat it as a covered call, not a naked short. Is the theta decaying nicely? Any risks I should watch?`;
+  }
+  const kind =
+    row.strategy === "naked_short_call"
+      ? "naked short call"
+      : row.option_type === "P"
+        ? "short put"
+        : row.option_type === "C"
+          ? "short call"
+          : "option";
+  return `Analyse this ${kind} position on ${underlying}. Is the theta decaying nicely? Any risks I should watch?`;
 }
 
 function fmtPct(v: number | null | undefined): string {
@@ -385,9 +435,9 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
     analysisInitiated.current = true;
     void append({
       role: "user",
-      content: `Analyse this ${row.option_type === "P" ? "short put" : row.option_type === "C" ? "short call" : "option"} position on ${row.underlying_symbol ?? row.symbol}. Is the theta decaying nicely? Any risks I should watch?`,
+      content: initialAnalysisPrompt(row),
     });
-  }, [quoteLoading, append, row.option_type, row.underlying_symbol, row.symbol]);
+  }, [quoteLoading, append, row]);
 
   /* Auto-scroll chat to bottom */
   useEffect(() => {
@@ -505,6 +555,54 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
                 </div>
               ))}
             </div>
+
+            {(row.is_covered_call || row.underlying_qty != null) && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                  <span className="text-[10px] font-bold tracking-widest uppercase text-slate-400">
+                    {row.is_covered_call ? "Covered-call stock leg" : "Underlying stock leg"}
+                  </span>
+                </div>
+                <div className="rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50/60 dark:bg-violet-950/20 p-3 space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <MetricCard
+                      label="Shares"
+                      value={row.underlying_qty != null ? String(row.underlying_qty) : "—"}
+                      sub={row.shares_needed != null ? `Need ${row.shares_needed} to cover` : undefined}
+                    />
+                    <MetricCard
+                      label="Avg cost"
+                      value={row.underlying_average_cost != null ? formatCurrency(row.underlying_average_cost, currency) : "—"}
+                      sub="per share"
+                    />
+                    <MetricCard
+                      label="Market value"
+                      value={row.underlying_market_value != null ? formatCurrency(row.underlying_market_value, currency) : "—"}
+                    />
+                  </div>
+                  {row.underlying_trades && row.underlying_trades.length > 0 && (
+                    <div className="pt-1">
+                      <div className="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-1">
+                        Remaining lots
+                      </div>
+                      <ul className="space-y-0.5 text-[11px] font-mono text-slate-700 dark:text-slate-300">
+                        {row.underlying_trades.slice(0, 8).map((lot) => (
+                          <li key={lot.trade_id}>
+                            {lot.value_date} {lot.type} {lot.quantity} @ {formatCurrency(lot.price, currency)}
+                          </li>
+                        ))}
+                        {row.underlying_trades.length > 8 && (
+                          <li className="text-slate-400">
+                            … {row.underlying_trades.length - 8} more lot(s)
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Greeks */}
             <div>

@@ -59,6 +59,7 @@ export interface OptionsIncomeTransactionRow {
   shares_needed?: number | null;
   holding_average_cost?: number | null;
   holding_market_value?: number | null;
+  underlying_trades?: OptionsIncomeTradeLeg[];
 }
 
 export interface OptionsIncomeSection {
