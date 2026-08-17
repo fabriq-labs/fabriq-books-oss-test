@@ -16,6 +16,11 @@ import { ActionBuilderRegistry } from './ActionBuilderRegistry';
 import { ReportFormatterRegistry } from './ReportFormatterRegistry';
 import { ReconciliationActionBuilder } from './ReconciliationActionBuilder';
 import { ReconciliationReportFormatter } from './ReconciliationReportFormatter';
+import { TaxPackageBooksReadyBuilder, TaxPackageSendBuilder } from './TaxPackageBuilders';
+import { TaxPackageReportFormatter } from './TaxPackageReportFormatter';
 
+ActionBuilderRegistry.register(TaxPackageBooksReadyBuilder);
+ActionBuilderRegistry.register(TaxPackageSendBuilder);
 ActionBuilderRegistry.register(ReconciliationActionBuilder);
+ReportFormatterRegistry.register(TaxPackageReportFormatter);
 ReportFormatterRegistry.register(ReconciliationReportFormatter);

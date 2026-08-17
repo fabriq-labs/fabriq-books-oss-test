@@ -121,6 +121,10 @@ export async function listPendingActions(filter: ListPendingActionsFilter) {
 
 // ── Batch Actions ──────────────────────────────────────────────
 
+function coerceConfidence(raw: unknown): 'high' | 'medium' | 'low' {
+  return raw === 'high' || raw === 'medium' || raw === 'low' ? raw : 'medium';
+}
+
 export async function createPendingActionBatch(
   actions: BatchActionItem[],
   common: BatchCommonParams
@@ -138,9 +142,9 @@ export async function createPendingActionBatch(
           batch_id: common.batch_id,
           batch_total: batchTotal,
           title: item.title,
-          description: item.description,
+          description: item.description ?? null,
           payload: item.payload,
-          confidence: item.confidence,
+          confidence: coerceConfidence(item.confidence),
           confidence_score: item.confidence_score,
           on_approve: common.on_approve,
         },
@@ -235,8 +239,11 @@ export async function resolvePendingAction(
       if (session && session.status === 'awaiting_approval') {
         const plan = session.plan as PlanStep[] | null;
 
-        // Check for a deterministic report step first (no LLM needed)
-        const reportStep = plan?.find((s) => s.type === 'report' && s.status !== 'completed');
+        // Only run a deterministic report when it is the next incomplete step.
+        // Plans with later report steps (e.g. categorise → assemble → approve → report)
+        // must resume via LLM, not complete the session here.
+        const nextIncomplete = plan?.find((s) => s.status !== 'completed');
+        const reportStep = nextIncomplete?.type === 'report' ? nextIncomplete : undefined;
         const formatter = reportStep ? ReportFormatterRegistry.get(session.goal_model, reportStep, session) : null;
 
         if (reportStep && formatter) {

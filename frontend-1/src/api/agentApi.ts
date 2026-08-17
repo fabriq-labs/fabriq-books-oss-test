@@ -5,7 +5,13 @@ import { attachmentAPI } from "./metadataApi";
 // ── Agent Session API ─────────────────────────────────────────────────────────
 
 export const sessionAPI = {
-  create: (data: { goal: string; mode?: string; goal_model?: string; template_id?: string }) =>
+  create: (data: {
+    goal: string;
+    mode?: string;
+    goal_model?: string;
+    template_id?: string;
+    intake?: Record<string, unknown>;
+  }) =>
     fetchAPI<any>('/api/agent/sessions', { method: 'POST', body: JSON.stringify(data) })
       .then((r: any) => r.data),
 
@@ -72,6 +78,18 @@ export interface AgentTemplate {
   default_mode: string;
   user_hint: string | null;
   sort_order: number;
+  pinned_plan?: unknown;
+  intake_schema?: {
+    lock_mode?: string;
+    fields?: Array<{
+      key: string;
+      type: 'text' | 'number' | 'single_select';
+      label: string;
+      optional?: boolean;
+      default?: string | number;
+      options?: Array<{ id: string; label: string }>;
+    }>;
+  } | null;
 }
 
 export const agentTemplateAPI = {

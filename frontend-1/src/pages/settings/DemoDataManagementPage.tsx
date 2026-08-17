@@ -20,12 +20,14 @@ import {
   adminAPI,
   type IndianDemoReconStatus,
   type LegalEntitySummary,
+  type NriTaxPackageDemoStatus,
   type RemoveLegalEntityResult,
   type ResetIndianDemoReconciliationResult,
+  type ResetNriTaxPackageDemoResult,
 } from "@/api/superAdminApi";
 import { AlertTriangle, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 
-const INDIAN_DEMO_ORG_ID = "org_indian_demo";
+const OSS_DEMO_ORG_ID = "org_oss_demo";
 
 function StatusRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -42,6 +44,11 @@ export default function DemoDataManagementPage() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [lastResult, setLastResult] = useState<ResetIndianDemoReconciliationResult | null>(null);
+
+  const [nriStatus, setNriStatus] = useState<NriTaxPackageDemoStatus | null>(null);
+  const [nriStatusLoading, setNriStatusLoading] = useState(true);
+  const [nriResetting, setNriResetting] = useState(false);
+  const [nriLastResult, setNriLastResult] = useState<ResetNriTaxPackageDemoResult | null>(null);
 
   const [entities, setEntities] = useState<LegalEntitySummary[]>([]);
   const [entitiesLoading, setEntitiesLoading] = useState(true);
@@ -68,10 +75,27 @@ export default function DemoDataManagementPage() {
     }
   }, [toast]);
 
+  const loadNriStatus = useCallback(async () => {
+    setNriStatusLoading(true);
+    try {
+      const res = await adminAPI.getNriTaxPackageDemoStatus();
+      setNriStatus(res.status);
+    } catch (err) {
+      setNriStatus(null);
+      toast({
+        title: "Could not load NRI T1 demo status",
+        description: err instanceof Error ? err.message : "Request failed",
+        variant: "destructive",
+      });
+    } finally {
+      setNriStatusLoading(false);
+    }
+  }, [toast]);
+
   const loadEntities = useCallback(async () => {
     setEntitiesLoading(true);
     try {
-      const res = await adminAPI.listLegalEntities(INDIAN_DEMO_ORG_ID);
+      const res = await adminAPI.listLegalEntities(OSS_DEMO_ORG_ID);
       setEntities(res.entities);
       setSelectedEntityId((prev) =>
         prev && res.entities.some((e) => e.id === prev) ? prev : ""
@@ -90,8 +114,9 @@ export default function DemoDataManagementPage() {
 
   useEffect(() => {
     void loadStatus();
+    void loadNriStatus();
     void loadEntities();
-  }, [loadStatus, loadEntities]);
+  }, [loadStatus, loadNriStatus, loadEntities]);
 
   const handleResetReconciliation = async () => {
     const confirmed = window.confirm(
@@ -123,6 +148,36 @@ export default function DemoDataManagementPage() {
     }
   };
 
+  const handleResetNriTaxPackage = async () => {
+    const confirmed = window.confirm(
+      "Reset NRI T1 tax-package demo to the pre-agent-run state?\n\n" +
+        "This re-seeds Rajesh Menon books (including unmatched T1 gate lines) and deletes " +
+        "Prepare tax package Workbench sessions for org_rajesh.\n\n" +
+        "Other orgs are not changed."
+    );
+    if (!confirmed) return;
+
+    setNriResetting(true);
+    setNriLastResult(null);
+    try {
+      const res = await adminAPI.resetNriTaxPackageDemo();
+      setNriLastResult(res.result);
+      toast({
+        title: "NRI T1 demo reset",
+        description: res.message,
+      });
+      await loadNriStatus();
+    } catch (err) {
+      toast({
+        title: "Reset failed",
+        description: err instanceof Error ? err.message : "Request failed",
+        variant: "destructive",
+      });
+    } finally {
+      setNriResetting(false);
+    }
+  };
+
   const handlePreviewDrop = async () => {
     if (!selectedEntityId) return;
     setPreviewLoading(true);
@@ -150,9 +205,8 @@ export default function DemoDataManagementPage() {
 
     const confirmed = window.confirm(
       `Drop legal entity ${label}?\n\n` +
-        "This permanently deletes invoices, bills, postings, COA accounts, org-structure " +
-        "(departments, locations, …), linked sales docs, payment receipts, and the entity row.\n\n" +
-        "Tenant org and shared masters (customers, suppliers, items, users) are kept.\n\n" +
+        "This permanently deletes postings, chart-of-accounts rows, and the entity row.\n\n" +
+        "Tenant org and users are kept.\n\n" +
         "Type OK in the next prompt to continue."
     );
     if (!confirmed) return;
@@ -192,6 +246,7 @@ export default function DemoDataManagementPage() {
 
   const canReset =
     Boolean(status?.orgExists) && Boolean(status?.checkingAccountExists) && !resetting;
+  const canResetNri = Boolean(nriStatus?.orgExists) && !nriResetting;
   const selectedEntity = entities.find((e) => e.id === selectedEntityId);
   const previewNonZero = preview
     ? Object.entries(preview.counts).filter(([, n]) => n > 0)
@@ -203,10 +258,82 @@ export default function DemoDataManagementPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Demo Data Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Super Admin tools for demo use-case data. Recon reset is scoped to{" "}
-          <code className="text-xs">org_indian_demo</code>; legal-entity drop works per entity under
-          that tenant.
+          <code className="text-xs">org_indian_demo</code>; NRI T1 reset is scoped to{" "}
+          <code className="text-xs">org_rajesh</code>; legal-entity drop works per entity under
+          the Indian demo tenant.
         </p>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle>NRI Canadian T1 tax package</CardTitle>
+            <CardDescription>
+              Rajesh Menon (<code className="text-xs">org_rajesh</code>) worldwide T1 organizer for
+              Meera Patel CPA. Reset restores unmatched gate lines and deletes tax-package Workbench
+              sessions so you can re-run the demo.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void loadNriStatus()}
+            disabled={nriStatusLoading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${nriStatusLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {nriStatusLoading && !nriStatus ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : !nriStatus?.orgExists ? (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+              <p className="font-medium">NRI demo org not found</p>
+              <p className="mt-1 text-muted-foreground">
+                Seed it via Tenant Administration (demo data = nri) or{" "}
+                <code className="text-xs">
+                  node setup-db.js --demo-data-only --demo-data=nri --skip-tests
+                </code>
+                .
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              <StatusRow label="Org" value={`${nriStatus.orgName} (${nriStatus.orgId})`} />
+              <StatusRow label="Unmatched bank lines" value={nriStatus.unmatchedCount} />
+              <StatusRow label="T1 package sessions" value={nriStatus.taxPackageSessionCount} />
+              <StatusRow label="Pending T1 actions" value={nriStatus.pendingActionCount} />
+            </div>
+          )}
+
+          <div className="flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+            <p className="text-muted-foreground">
+              Restores pre-agent books for <code className="text-xs">org_rajesh</code> only (Home Depot
+              / Interac / Swiggy unmatched lines). Does not wipe other tenants.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            onClick={() => void handleResetNriTaxPackage()}
+            disabled={!canResetNri}
+          >
+            <RotateCcw className={`mr-2 h-4 w-4 ${nriResetting ? "animate-spin" : ""}`} />
+            {nriResetting ? "Resetting…" : "Reset to pre-agent T1 run"}
+          </Button>
+
+          {nriLastResult && (
+            <p className="text-sm text-muted-foreground">
+              Last run: deleted {nriLastResult.deletedSessions} session(s),{" "}
+              {nriLastResult.deletedPendingActions} pending action(s); unmatched lines now{" "}
+              {nriLastResult.unmatchedAfter}.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
@@ -305,9 +432,8 @@ export default function DemoDataManagementPage() {
           <div className="space-y-1.5">
             <CardTitle>Drop legal entity</CardTitle>
             <CardDescription>
-              Deletes one legal entity under <code className="text-xs">{INDIAN_DEMO_ORG_ID}</code>{" "}
-              and all related invoices, bills, postings, accounts, and org-structure. Shared tenant
-              masters are kept.
+              Deletes one legal entity under <code className="text-xs">{OSS_DEMO_ORG_ID}</code>{" "}
+              and related postings and accounts. Tenant users are kept.
             </CardDescription>
           </div>
           <Button
@@ -355,7 +481,7 @@ export default function DemoDataManagementPage() {
                 {entities.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
                     {e.organizationName}
-                    {e.isHeadquarters ? " (HQ)" : ""} — {e.id} · inv {e.invoiceCount} · post{" "}
+                    {e.isHeadquarters ? " (HQ)" : ""} — {e.id} · post{" "}
                     {e.postingCount} · accts {e.accountCount}
                   </SelectItem>
                 ))}
@@ -368,7 +494,6 @@ export default function DemoDataManagementPage() {
               <StatusRow label="Entity" value={selectedEntity.organizationName} />
               <StatusRow label="Id" value={selectedEntity.id} />
               <StatusRow label="Country" value={selectedEntity.country || "—"} />
-              <StatusRow label="Invoices" value={selectedEntity.invoiceCount} />
               <StatusRow label="Postings" value={selectedEntity.postingCount} />
               <StatusRow label="Accounts" value={selectedEntity.accountCount} />
             </div>

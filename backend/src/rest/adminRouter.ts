@@ -15,6 +15,10 @@ import {
   resetIndianDemoReconciliation,
 } from '../utils/setup/resetIndianDemoReconciliation';
 import {
+  getNriTaxPackageDemoStatus,
+  resetNriTaxPackageDemo,
+} from '../utils/setup/resetNriTaxPackageDemo';
+import {
   listLegalEntities,
   removeLegalEntityData,
 } from '../utils/setup/removeLegalEntityData';
@@ -22,6 +26,7 @@ import {
 const adminRouter = Router();
 
 let indianDemoReconResetInProgress = false;
+let nriTaxPackageResetInProgress = false;
 let legalEntityDropInProgress = false;
 
 /** Check if the given user id has the Super Admin role (any of their roles). */
@@ -51,7 +56,7 @@ interface OnboardTenantBody {
 }
 
 
-/** Matches `setup-db.js` parseArgs() --demo-data= values (five demo profiles; no `skip`). */
+/** Matches `setup-db.js` parseArgs() --demo-data= values. */
 const DEMO_DATA_OPTIONS = [
   'indian-demo',
   'us-ca-demo',
@@ -435,11 +440,11 @@ adminRouter.post(
 // ─── Chart of Accounts Setup ──────────────────────────────────────────────────
 
 const COA_TEMPLATE_MAP: Record<string, { relativePath: string; currency: string }> = {
-  'indian':     { relativePath: 'prisma/setup-IN/chart-of-accounts.json',          currency: 'INR' },
-  'us-ca':      { relativePath: 'prisma/setup-US_CA/chart-of-accounts.json',       currency: 'USD' },
-  'perfin':     { relativePath: 'prisma/setup-PERFIN/chart-of-accounts.json',      currency: 'USD' },
-  'nri-india':  { relativePath: 'prisma/setup-NRI/chart-of-accounts-india.json',   currency: 'INR' },
-  'nri-canada': { relativePath: 'prisma/setup-NRI/chart-of-accounts-canada.json',  currency: 'CAD' },
+  indian: { relativePath: 'prisma/setup-IN/chart-of-accounts.json', currency: 'INR' },
+  'us-ca': { relativePath: 'prisma/setup-US_CA/chart-of-accounts.json', currency: 'USD' },
+  perfin: { relativePath: 'prisma/setup-PERFIN/chart-of-accounts.json', currency: 'USD' },
+  'nri-india': { relativePath: 'prisma/setup-NRI/chart-of-accounts-india.json', currency: 'INR' },
+  'nri-canada': { relativePath: 'prisma/setup-NRI/chart-of-accounts-canada.json', currency: 'CAD' },
 };
 
 adminRouter.post(
@@ -638,6 +643,80 @@ adminRouter.post(
       });
       return res.status(500).json({
         error: err?.message || 'Failed to reset indian-demo reconciliation data',
+      });
+    }
+  }
+);
+
+adminRouter.get(
+  '/demo-data/nri-tax-package/status',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+      const status = await getNriTaxPackageDemoStatus();
+      return res.status(200).json({ success: true, status });
+    } catch (err: any) {
+      logger.error('demo-data nri-tax-package status error', {
+        error: err?.message,
+        stack: err?.stack,
+      });
+      return res.status(500).json({
+        error: err?.message || 'Failed to load NRI tax package demo status',
+      });
+    }
+  }
+);
+
+adminRouter.post(
+  '/demo-data/nri-tax-package/reset',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const context = (req as any).context?.auth;
+      if (!context?.user?.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const isSA = await isSuperAdmin(context.user.id);
+      if (!isSA) {
+        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+      }
+      if (nriTaxPackageResetInProgress) {
+        return res.status(409).json({
+          error: 'NRI tax package demo reset is already in progress',
+        });
+      }
+      nriTaxPackageResetInProgress = true;
+      try {
+        const result = await resetNriTaxPackageDemo();
+        logger.info('nri tax package demo reset completed', {
+          userId: context.user.id,
+          ...result,
+        });
+        return res.status(200).json({
+          success: true,
+          message:
+            'NRI books restored and tax-package Workbench sessions deleted. Unmatched T1 demo lines are back.',
+          result,
+        });
+      } finally {
+        nriTaxPackageResetInProgress = false;
+      }
+    } catch (err: any) {
+      nriTaxPackageResetInProgress = false;
+      logger.error('demo-data nri-tax-package reset error', {
+        error: err?.message,
+        stack: err?.stack,
+      });
+      return res.status(500).json({
+        error: err?.message || 'Failed to reset NRI tax package demo',
       });
     }
   }

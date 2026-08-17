@@ -39,7 +39,7 @@ It **still runs**:
 | Indian              | `node setup-db.js --demo-data-only --demo-data=indian-demo --skip-tests` | `org_indian_demo` |
 | US-CA               | `node setup-db.js --demo-data-only --demo-data=us-ca-demo --skip-tests`  | `org_techflow_us` |
 | Personal Finance    | `node setup-db.js --demo-data-only --demo-data=perfin-demo --skip-tests` | `org_perfin_demo` |
-| NRI                 | `node setup-db.js --demo-data-only --demo-data=nri --skip-tests`         | `org_rajesh`      |
+| NRI (Rajesh Menon)  | `node setup-db.js --demo-data-only --demo-data=nri --skip-tests`         | `org_rajesh`      |
 | Both Indian + US-CA | `node setup-db.js --demo-data-only --demo-data=both --skip-tests`        | see above         |
 | Skip demo data      | `node setup-db.js --demo-data-only --demo-data=skip --skip-tests`        | —                 |
 
@@ -115,7 +115,7 @@ Also available in the UI: **Super Admin → Demo Data Management** (`/settings/d
 | Indian (branches) | `org_mumbai_branch`, `org_bangalore_office`, `org_us_office` |
 | US-CA             | `org_techflow_us`                                            |
 | Personal Finance  | `org_perfin_demo`                                            |
-| NRI               | `org_rajesh`                                                 |
+| NRI (Rajesh Menon)  | `org_rajesh` — login `rajesh.menon@gmail.com` / `admin123` |
 
 
 ---

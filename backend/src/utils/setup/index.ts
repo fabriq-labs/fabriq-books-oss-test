@@ -7,6 +7,10 @@ export {
   DEMO_POSTING_IDS,
 } from './resetIndianDemoReconciliation';
 export {
+  getNriTaxPackageDemoStatus,
+  resetNriTaxPackageDemo,
+} from './resetNriTaxPackageDemo';
+export {
   listLegalEntities,
   removeLegalEntityData,
 } from './removeLegalEntityData';

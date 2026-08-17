@@ -47,9 +47,9 @@ const ReconcilePostingExecutor: PendingActionHandler = {
       // confirmReconciliation requires matched_reference on the posting.
       // The agent's queueActionBatch stores match info in the payload but
       // does NOT write it to the posting. We bridge that gap here.
-      const matchType = payload.match_type;   // 'payment_receipt' | 'invoice'
+      const matchType = payload.match_type;   // 'contra_account'
       const matchId = payload.match_id;
-      const matchRef = payload.match_reference; // e.g. "REC-DEMO-001"
+      const matchRef = payload.match_reference;
 
       if (matchType && matchId) {
         const matchedReference = `${matchType}:${matchId}:${matchRef || 'unknown'}`;
@@ -79,7 +79,6 @@ const ReconcilePostingExecutor: PendingActionHandler = {
         data: {
           posting_id: result.posting.id,
           reconciliation_status: result.posting.reconciliation_status,
-          payment_receipt_id: result.posting.payment_receipt_id,
         },
       };
     } catch (error: any) {
@@ -265,13 +264,31 @@ const PlaceholderExecutor: PendingActionHandler = {
 
 // ── Registry ───────────────────────────────────────────────────
 
+const ApproveTaxPackageExecutor: PendingActionHandler = {
+  actionType: 'approve_tax_package',
+  async execute(action, _auth): Promise<ExecutionResult> {
+    logger.info('ApproveTaxPackageExecutor: package approved', {
+      actionId: action.id,
+      taxYear: (action.payload as any)?.tax_year,
+      recipient: (action.payload as any)?.recipient,
+    });
+    return {
+      success: true,
+      data: {
+        approved: true,
+        tax_year: (action.payload as any)?.tax_year,
+        recipient: (action.payload as any)?.recipient,
+        message: 'Package approved. Download the organizer from the completed session.',
+      },
+    };
+  },
+};
+
 const EXECUTORS: Record<string, PendingActionHandler> = {
   reconcile_posting: ReconcilePostingExecutor,
   create_posting: CreatePostingExecutor,
   categorize_transaction: CategorizeTransactionExecutor,
-  invoice_match: PlaceholderExecutor,
-  send_email: PlaceholderExecutor,
-  escalate_collection: PlaceholderExecutor,
+  approve_tax_package: ApproveTaxPackageExecutor,
 };
 
 // ── Public API ─────────────────────────────────────────────────

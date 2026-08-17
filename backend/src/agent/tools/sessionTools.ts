@@ -23,6 +23,8 @@ import {
 import '../builders';
 import { ActionBuilderRegistry } from '../builders/ActionBuilderRegistry';
 import { ReportFormatterRegistry } from '../builders/ReportFormatterRegistry';
+import { assembleTaxPackage } from '../taxPackage/workpapers';
+import { TAX_PACKAGE_KIND, TAX_PACKAGE_TEMPLATE_ID } from '../taxPackage/constants';
 import logger from '../../utils/logger';
 import { sessionEventBus } from '../services/SessionEventBus';
 import { sessionTimeoutService } from '../services/SessionTimeoutService';
@@ -88,26 +90,32 @@ export function completeStepTool(sessionId: string, auth: AuthContext) {
   return tool({
     description: `Signal that the current plan step is complete and advance to the next step. Call this after finishing any step — query, analysis, action, or report. Provide a clear result_summary so future steps and the final report can reference it.`,
     parameters: z.object({
-      step_index: z.number().describe('Index of the step being completed (0-based)'),
-      result_summary: z.string()
+      step_index: z.coerce.number().int().optional()
+        .describe('Index of the step being completed (0-based). Defaults to the current in-progress step.'),
+      result_summary: z.string().optional()
         .describe('What was found or done. Include key numbers.'),
       accumulated_context_update: z.record(z.any()).optional()
         .describe('Key facts to carry forward. E.g. { "unmatched_postings": 23 }'),
     }),
     execute: async ({ step_index, result_summary, accumulated_context_update }) => {
-      logger.info('completeStep called', { sessionId, step_index, result_summary });
-
       const session = await getAgentSession(sessionId);
       const plan = (session.plan as PlanStep[]) || [];
+      const inferred = plan.findIndex((s) => s.status === 'in_progress');
+      const idx = (step_index == null || Number.isNaN(step_index))
+        ? (inferred >= 0 ? inferred : (session.current_step_index ?? 0))
+        : step_index;
+      const summary = result_summary
+        || `Completed step ${idx + 1}: ${plan[idx]?.title || ''}`.trim();
+      logger.info('completeStep called', { sessionId, step_index: idx, result_summary: summary });
 
-      if (step_index < 0 || step_index >= plan.length) {
-        return { success: false, error: `Invalid step_index: ${step_index}` };
+      if (idx < 0 || idx >= plan.length) {
+        return { success: false, error: `Invalid step_index: ${idx}` };
       }
 
       // Auto-complete any skipped prior steps (LLM sometimes merges steps)
-      for (let i = 0; i < step_index; i++) {
+      for (let i = 0; i < idx; i++) {
         if (plan[i].status === 'in_progress' || plan[i].status === 'pending') {
-          logger.info('Auto-completing skipped step', { sessionId, skippedIndex: i, completedBy: step_index });
+          logger.info('Auto-completing skipped step', { sessionId, skippedIndex: i, completedBy: idx });
           plan[i].status = 'completed';
           plan[i].result_summary = plan[i].result_summary || '(merged with subsequent step)';
           plan[i].completed_at = plan[i].completed_at || new Date().toISOString();
@@ -115,15 +123,45 @@ export function completeStepTool(sessionId: string, auth: AuthContext) {
       }
 
       // Update the completed step
-      plan[step_index].status = 'completed';
-      plan[step_index].result_summary = result_summary;
-      plan[step_index].completed_at = new Date().toISOString();
+      plan[idx].status = 'completed';
+      plan[idx].result_summary = summary;
+      plan[idx].completed_at = new Date().toISOString();
 
       // Merge accumulated context
       const existingContext = (session.accumulated_context as Record<string, any>) || {};
       let mergedContext = { ...existingContext, ...accumulated_context_update };
 
-      let cursor = step_index + 1;
+      const isTaxPackage = session.template_id === TAX_PACKAGE_TEMPLATE_ID
+        || existingContext.tax_package_kind === TAX_PACKAGE_KIND
+        || mergedContext.tax_package_kind === TAX_PACKAGE_KIND;
+      const completedTitle = plan[idx]?.title || '';
+      if (
+        isTaxPackage
+        && /assemble/i.test(completedTitle)
+        && !mergedContext.workpapers
+        && auth.user?.org_id
+      ) {
+        try {
+          const assembled = await assembleTaxPackage(auth.user.org_id, {
+            tax_year: Number(mergedContext.tax_year) || 2025,
+            recipient: mergedContext.recipient || 'Meera Patel CPA',
+            include_foreign: mergedContext.include_foreign !== false,
+            basement_rentable_pct: mergedContext.basement_rentable_pct ?? null,
+          });
+          mergedContext = { ...mergedContext, ...assembled };
+          logger.info('completeStep: hydrated tax-package workpapers', {
+            sessionId,
+            unmatched: assembled.unmatched_count,
+          });
+        } catch (hydrateErr: any) {
+          logger.warn('completeStep: tax-package assemble hydrate failed', {
+            sessionId,
+            error: hydrateErr?.message,
+          });
+        }
+      }
+
+      let cursor = idx + 1;
       let newStatus: string = session.status as string;
       let pendingActionsCreated = 0;
 
@@ -225,6 +263,17 @@ export function completeStepTool(sessionId: string, auth: AuthContext) {
         break;
       }
 
+      if (plan[idx]?.type === 'report') {
+        const formatter = ReportFormatterRegistry.get(
+          session.goal_model,
+          plan[idx],
+          { ...session, accumulated_context: mergedContext }
+        );
+        if (formatter) {
+          plan[idx].result_summary = formatter.format(mergedContext, session);
+        }
+      }
+
       // ── Finalize session state ─────────────────────────────────
 
       const allComplete = cursor >= plan.length;
@@ -232,8 +281,7 @@ export function completeStepTool(sessionId: string, auth: AuthContext) {
       if (allComplete && newStatus !== 'awaiting_approval') {
         newStatus = 'completed';
       } else if (newStatus !== 'awaiting_approval') {
-        // Still executing — dispatcher broke because next step needs LLM
-        // Keep status as 'executing'
+        newStatus = 'executing';
       }
 
       const finalIndex = allComplete ? plan.length - 1 : cursor;
@@ -247,12 +295,12 @@ export function completeStepTool(sessionId: string, auth: AuthContext) {
       });
 
       // Build response for the LLM
-      const dispatchedCount = cursor - step_index - 1;
+      const dispatchedCount = cursor - idx - 1;
       const nextStepForLLM = allComplete ? null : cursor;
 
       return {
         success: true,
-        completed_step: step_index,
+        completed_step: idx,
         next_step: nextStepForLLM,
         session_status: newStatus,
         dispatched_steps: dispatchedCount,
@@ -260,8 +308,8 @@ export function completeStepTool(sessionId: string, auth: AuthContext) {
         message: allComplete
           ? 'All steps complete. Session finished.'
           : newStatus === 'awaiting_approval'
-            ? `Step ${step_index + 1} complete. ${pendingActionsCreated} action(s) queued for review. Waiting for human approval.`
-            : `Step ${step_index + 1} complete. Now on step ${cursor + 1}: "${plan[cursor].title}".`,
+            ? `Step ${idx + 1} complete. ${pendingActionsCreated} action(s) queued for review. Waiting for human approval.`
+            : `Step ${idx + 1} complete. Now on step ${cursor + 1}: "${plan[cursor].title}".`,
       };
     },
   });

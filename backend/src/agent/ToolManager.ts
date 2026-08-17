@@ -3,24 +3,13 @@ import {
     createRecordTool,
     updateRecordTool,
     searchRecordsTool,
-    searchItemsTool,
-    searchSuppliersTool,
-    searchDepartmentsTool,
-    searchCostCentersTool,
     searchLocationsTool,
-    searchProjectsTool,
-    searchBudgetPeriodsTool,
-    searchBudgetLinesTool,
     searchCOATool,
     searchEntitiesTool,
-    searchEmployeesTool,
     searchUsersTool,
     createChildItemTool,
     updateChildItemTool,
     advancedSqlQueryTool,
-    processInvoiceFromPdfTool,
-    extractInvoiceFromFileTool,
-    erpConnectorTool
 } from './AgentTools';
 import {
     getAnalyticsContextTool,
@@ -32,7 +21,7 @@ import {
     requestClarificationTool,
     categorizePostingsTool,
     runFinancialReportTool,
-    getOptionChainTool,
+    prepareTaxPackageTool,
 } from './tools';
 import { QueryClassification } from './utils/questionClassifier';
 import logger from '../utils/logger';
@@ -61,7 +50,7 @@ export class ToolManager {
         return ToolManager.instance;
     }
 
-    private static buildToolFactories(auth: AuthContext, toolContext?: any): Record<string, ToolFactory> {
+    private static buildToolFactories(auth: AuthContext, toolContext?: any, sessionId?: string): Record<string, ToolFactory> {
         return {
             searchRecords: () => searchRecordsTool(auth, toolContext),
             createRecord: () => createRecordTool(auth, toolContext),
@@ -69,24 +58,13 @@ export class ToolManager {
             createChildItem: () => createChildItemTool(auth),
             updateChildItem: () => updateChildItemTool(auth),
             advancedSqlQuery: () => advancedSqlQueryTool(auth),
-            extractInvoiceFromFile: () => extractInvoiceFromFileTool(auth, toolContext),
-            processInvoiceFromPdf: () => processInvoiceFromPdfTool(auth),
-            erpConnector: () => erpConnectorTool(auth, toolContext),
             suggestReconciliationMatches: () => suggestReconciliationMatchesTool(auth),
             categorizePostings: () => categorizePostingsTool(auth),
             runFinancialReport: () => runFinancialReportTool(auth, toolContext),
-            getOptionChain: () => getOptionChainTool(auth),
-            searchItems: () => searchItemsTool(auth),
-            searchSuppliers: () => searchSuppliersTool(auth),
-            searchDepartments: () => searchDepartmentsTool(auth),
-            searchCostCenters: () => searchCostCentersTool(auth),
+            prepareTaxPackage: () => prepareTaxPackageTool(auth, sessionId),
             searchLocations: () => searchLocationsTool(auth),
-            searchProjects: () => searchProjectsTool(auth),
-            searchBudgetPeriods: () => searchBudgetPeriodsTool(auth),
-            searchBudgetLines: () => searchBudgetLinesTool(auth),
             searchCOA: () => searchCOATool(auth),
             searchEntities: () => searchEntitiesTool(auth),
-            searchEmployees: () => searchEmployeesTool(auth),
             searchUsers: () => searchUsersTool(auth),
             getAnalyticsContext: () => getAnalyticsContextTool(auth),
             analyticsQuery: () => analyticsQueryTool(auth, toolContext),
@@ -98,9 +76,10 @@ export class ToolManager {
     private static buildToolsFromNames(
         toolNames: string[],
         auth: AuthContext,
-        toolContext?: any
+        toolContext?: any,
+        sessionId?: string
     ): Record<string, unknown> {
-        const factories = ToolManager.buildToolFactories(auth, toolContext);
+        const factories = ToolManager.buildToolFactories(auth, toolContext, sessionId);
         const tools: Record<string, unknown> = {};
         for (const name of toolNames) {
             const factory = factories[name];
@@ -117,7 +96,7 @@ export class ToolManager {
     /**
      * Get tools based on model name — reads model_tools from agent_model_tool_config.
      */
-    public async getToolsForModel(modelName: string, auth: AuthContext, context?: any): Promise<any> {
+    public async getToolsForModel(modelName: string, auth: AuthContext, context?: any, sessionId?: string): Promise<any> {
         logger.debug('Getting tools for model', {
             modelName,
             recordId: context?.recordId,
@@ -133,7 +112,7 @@ export class ToolManager {
         }
 
         logger.debug('Resolved model tools from agent_model_tool_config', { modelName, tools: toolNames });
-        return ToolManager.buildToolsFromNames(toolNames, auth, toolContext);
+        return ToolManager.buildToolsFromNames(toolNames, auth, toolContext, sessionId);
     }
 
     public async getToolsForClassification(
@@ -152,11 +131,12 @@ export class ToolManager {
         auth: AuthContext,
         context?: any,
         sessionId?: string,
-        allowedTools?: string[]
+        allowedTools?: string[],
+        options?: { omitCreatePlan?: boolean }
     ): Promise<any> {
-        logger.debug('Getting unified tools', { modelName, hasSession: !!sessionId, allowedTools });
+        logger.debug('Getting unified tools', { modelName, hasSession: !!sessionId, allowedTools, omitCreatePlan: options?.omitCreatePlan });
 
-        const modelTools = await this.getToolsForModel(modelName, auth, context);
+        const modelTools = await this.getToolsForModel(modelName, auth, context, sessionId);
 
         const tools: any = { ...modelTools };
 
@@ -166,14 +146,28 @@ export class ToolManager {
         }
 
         if (sessionId) {
-            tools.createPlan = createPlanTool(sessionId);
+            if (!options?.omitCreatePlan) {
+                tools.createPlan = createPlanTool(sessionId);
+            }
             tools.completeStep = completeStepTool(sessionId, auth);
             tools.queueActions = queueActionsTool(sessionId, auth);
             tools.requestClarification = requestClarificationTool(sessionId, auth);
+            tools.prepareTaxPackage = prepareTaxPackageTool(auth, sessionId);
         }
 
         if (allowedTools && allowedTools.length > 0) {
-            const permitted = new Set([...ToolManager.CORE_SESSION_TOOLS, ...allowedTools]);
+            const factories = ToolManager.buildToolFactories(auth, context, sessionId);
+            for (const name of allowedTools) {
+                if (tools[name]) continue;
+                const factory = factories[name];
+                if (!factory) continue;
+                const extra = factory();
+                if (extra) tools[name] = extra;
+            }
+            const core = options?.omitCreatePlan
+                ? ['completeStep']
+                : [...ToolManager.CORE_SESSION_TOOLS];
+            const permitted = new Set([...core, ...allowedTools]);
             for (const key of Object.keys(tools)) {
                 if (!permitted.has(key)) {
                     delete tools[key];

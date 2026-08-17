@@ -11,6 +11,7 @@ export interface PlanStep {
   description: string;
   status: string;
   requires_approval: boolean;
+  result_summary?: string;
 }
 
 export interface ClarificationOption {
@@ -19,7 +20,7 @@ export interface ClarificationOption {
 }
 
 export interface ClarificationInputSchema {
-  type?: 'single_select' | 'multi_select' | 'text' | 'date' | 'date_range';
+  type?: 'single_select' | 'multi_select' | 'text' | 'number' | 'date' | 'date_range';
   options?: ClarificationOption[];
 }
 
@@ -101,6 +102,7 @@ interface AgentSessionContextValue {
     mode: string;
     goalModel?: string;
     templateId?: string;
+    intake?: Record<string, unknown>;
   }) => Promise<string>;
 
   // Per-session actions (used by SessionView)
@@ -146,12 +148,14 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     mode: string;
     goalModel?: string;
     templateId?: string;
+    intake?: Record<string, unknown>;
   }): Promise<string> => {
     const session = await sessionAPI.create({
       goal: params.goal,
       mode: params.mode,
       goal_model: params.goalModel,
       template_id: params.templateId,
+      intake: params.intake,
     });
     await refreshSessions();
     return session.id;

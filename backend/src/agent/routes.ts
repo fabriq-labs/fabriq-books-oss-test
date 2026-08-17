@@ -10,7 +10,6 @@ import { categorizeTransactionBatchHandler } from './handlers/erp/categorizeTran
 import { reconcileImportedPostings } from '../services/reconciliation/reconcileImportedPostings';
 import { confirmReconciliation } from '../services/reconciliation/confirmReconciliation';
 import prisma from '../lib/prisma';
-import { processEmail } from '../services/email/ProcessEmailService';
 import { PermissionService } from '../services/permissions/PermissionService';
 import { LegacyDataGraphParser } from '../utils/LegacyDataGraphParser';
 import {
@@ -39,6 +38,9 @@ import {
   buildBillUploadDataUri,
   resolveBillUploadMime,
 } from './utils/billUploadMime';
+import { TAX_PACKAGE_TEMPLATE_ID, buildPinnedPlan } from './taxPackage/constants';
+import { parseTaxPackageGoal, calendarBounds } from './taxPackage/parseGoal';
+import type { PlanStep } from './tools/sessionTools';
 // Removing ai/express import since it appears to be causing issues
 // import { createStreamDataHandler } from 'ai/express';
 
@@ -502,69 +504,6 @@ export function createAgentRouter() {
     }
   });
 
-  /**
-   * POST /api/agent/process-email
-   * Process an email payload: store ingest, run extract per PDF, store items.
-   * Accepts multipart: form fields for email metadata + file(s) for attachments.
-   * Body fields: gmail_message_id (required), gmail_thread_id?, from_email?, to_email?, subject?, received_at? (ISO), body_snippet?, model_name?
-   * Files: one or more PDFs (field name e.g. file, attachment, or attachments).
-   */
-  router.post('/process-email', authMiddleware, upload.any(), async (req: Request, res) => {
-    try {
-      if (!req.context?.auth?.user) {
-        return res.status(401).json({ error: 'Unauthorized: Missing auth context' });
-      }
-
-      const org_id = req.context.auth.user.org_id;
-      if (!org_id) {
-        return res.status(400).json({ error: 'Missing org_id in auth context' });
-      }
-
-      const gmail_message_id = req.body.gmail_message_id ?? req.body.gmailMessageId;
-      if (!gmail_message_id || typeof gmail_message_id !== 'string') {
-        return res.status(400).json({
-          error: 'Missing required field: gmail_message_id',
-          message: 'Provide gmail_message_id as form field or JSON body.',
-        });
-      }
-
-      let files: Express.Multer.File[] = [];
-      if (Array.isArray(req.files)) {
-        files = req.files;
-      } else if (req.files && typeof req.files === 'object') {
-        files = Object.values(req.files).flat();
-      }
-
-      const attachments = files.map((f) => ({ buffer: f.buffer, filename: f.originalname || 'attachment' }));
-
-      const received_at = req.body.received_at ?? req.body.receivedAt;
-      const payload = {
-        org_id,
-        gmail_message_id: gmail_message_id.trim(),
-        gmail_thread_id: req.body.gmail_thread_id ?? req.body.gmailThreadId,
-        from_email: req.body.from_email ?? req.body.fromEmail,
-        to_email: req.body.to_email ?? req.body.toEmail,
-        subject: req.body.subject,
-        received_at: received_at ? new Date(received_at) : undefined,
-        body_snippet: req.body.body_snippet ?? req.body.bodySnippet,
-        model_name: req.body.model_name ?? req.body.modelName ?? 'invoice',
-        attachments,
-      };
-
-      const result = await processEmail(payload, req.context.auth);
-      res.status(200).json(result);
-    } catch (error: any) {
-      logger.error('Error in process-email request', {
-        error: error?.message,
-        stack: error?.stack,
-      });
-      res.status(500).json({
-        error: error?.message || 'Failed to process email',
-        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
-      });
-    }
-  });
-
   // ==========================================
   // AI Categorization Endpoints
   // ==========================================
@@ -669,7 +608,7 @@ export function createAgentRouter() {
   // ==========================================
 
   /**
-   * Reconcile one or more transactions (categorize + match invoices/receipts)
+   * Reconcile one or more transactions (categorize + suggest confirm)
    * POST /api/agent/erp/reconcile-transaction
    *
    * Body: { posting_ids: string[] }
@@ -795,7 +734,7 @@ export function createAgentRouter() {
   });
 
   /**
-   * Confirm reconciliation: create payment receipt (if match is invoice) or link to existing receipt.
+   * Confirm bank-only reconciliation (categorize + CONFIRMED).
    * POST /api/agent/erp/confirm-reconciliation
    * Body: { posting_id: string }
    */
@@ -868,23 +807,87 @@ export function createAgentRouter() {
       if (!req.context?.auth?.user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      const { goal, goal_model, mode, template_id } = req.body;
+      const { goal, goal_model, mode, template_id, intake } = req.body;
       if (!goal) {
         return res.status(400).json({ error: 'goal is required' });
       }
-      // If a template_id is provided, inherit its goal_model if caller didn't specify one
+      const tmpl = template_id
+        ? await prisma.agent_template.findUnique({ where: { id: template_id } })
+        : null;
       let resolvedGoalModel = goal_model;
-      if (template_id && !goal_model) {
-        const tmpl = await prisma.agent_template.findUnique({ where: { id: template_id } });
-        if (tmpl?.goal_model) resolvedGoalModel = tmpl.goal_model;
+      if (template_id && !goal_model && tmpl?.goal_model) {
+        resolvedGoalModel = tmpl.goal_model;
       }
+
+      let plan: PlanStep[] | undefined;
+      let current_step_index: number | undefined;
+      let accumulated_context: Record<string, any> | undefined;
+      const pinned = tmpl?.pinned_plan;
+      if (Array.isArray(pinned) && pinned.length > 0) {
+        plan = (template_id === TAX_PACKAGE_TEMPLATE_ID ? buildPinnedPlan() : pinned).map((s: any, i: number) => ({
+          index: i,
+          type: s.type,
+          title: s.title,
+          description: s.description,
+          status: i === 0 ? 'in_progress' : 'pending',
+          requires_approval: Boolean(s.requires_approval),
+        }));
+        current_step_index = 0;
+      }
+
+      if (template_id === TAX_PACKAGE_TEMPLATE_ID) {
+        const parsed = parseTaxPackageGoal(goal, {
+          tax_year: intake?.tax_year != null ? Number(intake.tax_year) : undefined,
+          recipient: intake?.recipient,
+          include_foreign: intake?.include_foreign,
+          basement_rentable_pct: intake?.basement_pct != null && intake.basement_pct !== ''
+            ? Number(intake.basement_pct)
+            : intake?.basement_rentable_pct ?? null,
+        });
+        const tax_year = parsed.tax_year || 2025;
+        const bounds = calendarBounds(tax_year);
+        accumulated_context = {
+          tax_package_kind: 'ca_t1',
+          tax_year,
+          recipient: parsed.recipient || 'Meera Patel CPA',
+          include_foreign: parsed.include_foreign ?? true,
+          basement_rentable_pct: parsed.basement_rentable_pct ?? null,
+          ...bounds,
+        };
+        if (!plan) {
+          plan = buildPinnedPlan();
+          current_step_index = 0;
+        }
+        // Intake already has year + recipient — skip the lock-year LLM turn.
+        if (plan.length > 1 && accumulated_context.tax_year && accumulated_context.recipient) {
+          const basement = accumulated_context.basement_rentable_pct;
+          plan[0] = {
+            ...plan[0],
+            status: 'completed',
+            result_summary:
+              `TY ${accumulated_context.tax_year} for ${accumulated_context.recipient}. `
+              + (accumulated_context.include_foreign ? 'Include India foreign income. ' : 'Canada-source only. ')
+              + (basement != null ? `Basement rentable share ${basement}%.` : 'Basement rentable share unknown.'),
+            completed_at: new Date().toISOString(),
+          };
+          plan[1] = { ...plan[1], status: 'in_progress' };
+          current_step_index = 1;
+        }
+      }
+
       const session = await createAgentSession({
         org_id: req.context.auth.user.org_id,
         user_id: req.context.auth.user.id,
         goal,
         goal_model: resolvedGoalModel,
         template_id,
-        mode,
+        mode: template_id === TAX_PACKAGE_TEMPLATE_ID ? 'supervised' : mode,
+        name: template_id === TAX_PACKAGE_TEMPLATE_ID
+          ? `T1 package TY ${accumulated_context?.tax_year || ''}`.trim()
+          : undefined,
+        plan,
+        current_step_index,
+        accumulated_context,
       });
       res.status(201).json({ data: session });
     } catch (error: any) {
@@ -1185,7 +1188,7 @@ export function createAgentRouter() {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const {
         name, description, icon, goal_model, system_prompt, user_hint, default_mode,
-        is_active, sort_order, focus_models, allowed_tools,
+        is_active, sort_order, focus_models, allowed_tools, pinned_plan, intake_schema,
       } = req.body;
       if (!name || !description || !system_prompt || !user_hint) {
         return res.status(400).json({ error: 'name, description, system_prompt, and user_hint are required' });
@@ -1203,6 +1206,8 @@ export function createAgentRouter() {
           sort_order: sort_order ?? 0,
           focus_models: Array.isArray(focus_models) ? focus_models : [],
           allowed_tools: Array.isArray(allowed_tools) ? allowed_tools : [],
+          pinned_plan: pinned_plan ?? undefined,
+          intake_schema: intake_schema ?? undefined,
           org_id: null,
         },
       });
@@ -1220,7 +1225,7 @@ export function createAgentRouter() {
       const { id } = req.params;
       const {
         name, description, icon, goal_model, system_prompt, user_hint, default_mode,
-        is_active, sort_order, focus_models, allowed_tools,
+        is_active, sort_order, focus_models, allowed_tools, pinned_plan, intake_schema,
       } = req.body;
       const existing = await prisma.agent_template.findUnique({ where: { id } });
       if (!existing) return res.status(404).json({ error: 'Template not found' });
@@ -1242,6 +1247,8 @@ export function createAgentRouter() {
           ...(allowed_tools !== undefined && {
             allowed_tools: Array.isArray(allowed_tools) ? allowed_tools : [],
           }),
+          ...(pinned_plan !== undefined && { pinned_plan }),
+          ...(intake_schema !== undefined && { intake_schema }),
         },
       });
       res.json({ data: template });

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Clock, FileText } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Clock, FileText, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sessionAPI } from '@/api/api';
 import type { AgentSession } from '@/contexts/AgentSessionContext';
 import { AssistantMessageRenderer } from '@/components/chat/AssistantMessageRenderer';
 import { StepCard } from './StepCard';
 import { TraceViewer, type SessionTrace } from './TraceViewer';
+import { downloadTaxPackageExcel, downloadTaxPackageMarkdown } from '@/lib/taxPackageExport';
 
 interface CompletedViewProps {
   session: AgentSession;
@@ -75,6 +76,12 @@ export const CompletedView: React.FC<CompletedViewProps> = ({ session }) => {
   const duration = session.completed_at && session.started_at
     ? new Date(session.completed_at).getTime() - new Date(session.started_at).getTime()
     : null;
+  const ctx = session.accumulated_context || {};
+  const isTaxPackage = session.template_id === 'atpl_tax_package_ca_t1'
+    || ctx.tax_package_kind === 'ca_t1'
+    || Boolean(ctx.workpapers);
+  const coverMarkdown = reportContent
+    || (isTaxPackage ? String(plan.find((s) => s.type === 'report')?.result_summary || '') : '');
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -92,7 +99,31 @@ export const CompletedView: React.FC<CompletedViewProps> = ({ session }) => {
                 : ''}
             </p>
           </div>
-          {duration && (
+          {isTaxPackage && ctx.workpapers && (
+            <div className="ml-auto flex flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => downloadTaxPackageExcel(ctx, coverMarkdown)}
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Excel organizer
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => downloadTaxPackageMarkdown(coverMarkdown, ctx.tax_year)}
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Cover letter
+              </Button>
+            </div>
+          )}
+          {duration && !isTaxPackage && (
             <div className="ml-auto flex items-center gap-1 text-xs text-gray-400">
               <Clock className="h-3.5 w-3.5" />
               {formatDuration(duration)}

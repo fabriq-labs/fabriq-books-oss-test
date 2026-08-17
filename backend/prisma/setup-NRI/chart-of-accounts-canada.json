@@ -1,309 +1,132 @@
 [
   {
-    "name": "Assets - CAN",
+    "name": "Assets",
     "classification": "Assets",
-    "types": ["header"],
+    "types": ["ASSET"],
     "code": "1000",
     "children": [
       {
-        "name": "Cash & Bank Accounts - CAN",
+        "name": "Bank — Canada",
         "classification": "Assets",
-        "types": ["header"],
+        "types": ["BANK"],
         "code": "1100",
         "children": [
-          { "name": "Checking Account - CAN", "classification": "Assets", "types": ["bank"], "code": "1101" },
-          { "name": "Savings Account - CAN", "classification": "Assets", "types": ["bank"], "code": "1102" },
-          { "name": "Cash on Hand - CAN", "classification": "Assets", "types": ["cash"], "code": "1190" }
+          { "name": "TD Canada Trust Chequing", "classification": "Assets", "types": ["BANK", "CHECKING"], "code": "1110" },
+          { "name": "TD High Interest Savings", "classification": "Assets", "types": ["BANK", "SAVINGS"], "code": "1120" },
+          { "name": "Cash on Hand — CAD", "classification": "Assets", "types": ["ASSET", "CASH"], "code": "1190" }
         ]
       },
       {
-        "name": "Investments - CAN",
+        "name": "Investments — Canada",
         "classification": "Assets",
-        "types": ["header"],
+        "types": ["ASSET"],
         "code": "1200",
         "children": [
-          { "name": "Stocks & ETFs - CAN", "classification": "Assets", "types": ["investment"], "code": "1201" },
-          { "name": "Mutual Funds - CAN", "classification": "Assets", "types": ["investment"], "code": "1211" },
-          { "name": "GICs - CAN", "classification": "Assets", "types": ["investment"], "code": "1221" },
-          { "name": "Bonds - CAN", "classification": "Assets", "types": ["investment"], "code": "1230" },
-          { "name": "Cryptocurrency - CAN", "classification": "Assets", "types": ["investment"], "code": "1240" }
+          { "name": "TFSA — Vanguard VEQT", "classification": "Assets", "types": ["ASSET"], "code": "1210" },
+          { "name": "RRSP — TD Direct Investing", "classification": "Assets", "types": ["ASSET"], "code": "1220" }
         ]
       },
       {
-        "name": "Retirement Accounts - CAN",
+        "name": "Real Estate — Canada",
         "classification": "Assets",
-        "types": ["header"],
-        "code": "1300",
-        "children": [
-          { "name": "RRSP - CAN", "classification": "Assets", "types": ["retirement"], "code": "1301" },
-          { "name": "TFSA - CAN", "classification": "Assets", "types": ["retirement"], "code": "1302" },
-          { "name": "RESP - CAN", "classification": "Assets", "types": ["retirement"], "code": "1303" },
-          { "name": "LIRA - CAN", "classification": "Assets", "types": ["retirement"], "code": "1304" }
-        ]
-      },
-      {
-        "name": "Real Estate - CAN",
-        "classification": "Assets",
-        "types": ["header"],
+        "types": ["ASSET"],
         "code": "1400",
         "children": [
-          { "name": "Primary Residence - CAN", "classification": "Assets", "types": ["fixed_asset"], "code": "1401" },
-          { "name": "Investment Property - CAN", "classification": "Assets", "types": ["fixed_asset"], "code": "1402" }
+          { "name": "Milton townhouse (principal + basement suite)", "classification": "Assets", "types": ["ASSET"], "code": "1410" }
         ]
       },
       {
-        "name": "Vehicles - CAN",
+        "name": "Vehicles — Canada",
         "classification": "Assets",
-        "types": ["header"],
+        "types": ["ASSET"],
         "code": "1500",
         "children": [
-          { "name": "Car - CAN", "classification": "Assets", "types": ["fixed_asset"], "code": "1501" }
-        ]
-      },
-      {
-        "name": "Other Assets - CAN",
-        "classification": "Assets",
-        "types": ["header"],
-        "code": "1600",
-        "children": [
-          { "name": "Gold & Jewelry - CAN", "classification": "Assets", "types": ["other_asset"], "code": "1601" },
-          { "name": "Personal Property - CAN", "classification": "Assets", "types": ["other_asset"], "code": "1602" },
-          { "name": "Loans to Others - CAN", "classification": "Assets", "types": ["receivable"], "code": "1610" },
-          { "name": "Security Deposits - CAN", "classification": "Assets", "types": ["other_asset"], "code": "1620" }
+          { "name": "Honda Civic", "classification": "Assets", "types": ["ASSET"], "code": "1510" }
         ]
       }
     ]
   },
   {
-    "name": "Liabilities - CAN",
+    "name": "Liabilities",
     "classification": "Liabilities",
-    "types": ["header"],
+    "types": ["LIABILITY"],
     "code": "2000",
     "children": [
       {
-        "name": "Credit Cards - CAN",
+        "name": "Credit Cards — Canada",
         "classification": "Liabilities",
-        "types": ["header"],
+        "types": ["CREDIT_CARD"],
         "code": "2100",
         "children": [
-          { "name": "Credit Card - CAN", "classification": "Liabilities", "types": ["credit_card"], "code": "2101" }
+          { "name": "TD Visa Infinite", "classification": "Liabilities", "types": ["CREDIT_CARD"], "code": "2110" }
         ]
       },
       {
-        "name": "Loans - CAN",
+        "name": "Loans — Canada",
         "classification": "Liabilities",
-        "types": ["header"],
+        "types": ["LIABILITY"],
         "code": "2200",
         "children": [
-          { "name": "Mortgage - CAN", "classification": "Liabilities", "types": ["long_term_liability"], "code": "2201" },
-          { "name": "Car Loan - CAN", "classification": "Liabilities", "types": ["long_term_liability"], "code": "2211" },
-          { "name": "Personal Loan - CAN", "classification": "Liabilities", "types": ["long_term_liability"], "code": "2220" },
-          { "name": "Student Loan - CAN", "classification": "Liabilities", "types": ["long_term_liability"], "code": "2230" },
-          { "name": "Line of Credit - CAN", "classification": "Liabilities", "types": ["short_term_liability"], "code": "2240" }
+          { "name": "TD Mortgage — Milton", "classification": "Liabilities", "types": ["LIABILITY"], "code": "2210" }
         ]
       },
       {
-        "name": "Other Liabilities - CAN",
+        "name": "Tax payable — Canada",
         "classification": "Liabilities",
-        "types": ["header"],
+        "types": ["LIABILITY"],
         "code": "2300",
         "children": [
-          { "name": "Taxes Payable - CAN", "classification": "Liabilities", "types": ["other_liability"], "code": "2301" },
-          { "name": "Loans from Others - CAN", "classification": "Liabilities", "types": ["other_liability"], "code": "2310" }
+          { "name": "CRA income tax payable", "classification": "Liabilities", "types": ["LIABILITY"], "code": "2310" },
+          { "name": "HST payable (violin studio)", "classification": "Liabilities", "types": ["LIABILITY"], "code": "2320" }
         ]
       }
     ]
   },
   {
-    "name": "Equity - CAN",
+    "name": "Equity",
     "classification": "Equity",
-    "types": ["header"],
+    "types": ["EQUITY"],
     "code": "3000",
     "children": [
-      { "name": "Opening Balance Equity - CAN", "classification": "Equity", "types": ["equity"], "code": "3001" },
-      { "name": "Retained Earnings - CAN", "classification": "Equity", "types": ["equity"], "code": "3002" },
-      { "name": "Net Worth Adjustment - CAN", "classification": "Equity", "types": ["equity"], "code": "3003" }
+      { "name": "Opening Balance Equity", "classification": "Equity", "types": ["EQUITY"], "code": "3100" },
+      { "name": "Transfers to India (NRE remittance)", "classification": "Equity", "types": ["EQUITY"], "code": "3200" },
+      { "name": "Owner draws", "classification": "Equity", "types": ["EQUITY"], "code": "3300" }
     ]
   },
   {
-    "name": "Income - CAN",
+    "name": "Income",
     "classification": "Income",
-    "types": ["header"],
+    "types": ["INCOME"],
     "code": "4000",
     "children": [
-      {
-        "name": "Employment Income - CAN",
-        "classification": "Income",
-        "types": ["header"],
-        "code": "4100",
-        "children": [
-          { "name": "Salary - CAN", "classification": "Income", "types": ["income"], "code": "4101" },
-          { "name": "Bonus - CAN", "classification": "Income", "types": ["income"], "code": "4110" },
-          { "name": "Commission - CAN", "classification": "Income", "types": ["income"], "code": "4120" }
-        ]
-      },
-      {
-        "name": "Investment Income - CAN",
-        "classification": "Income",
-        "types": ["header"],
-        "code": "4200",
-        "children": [
-          { "name": "Dividends - CAN", "classification": "Income", "types": ["income"], "code": "4201" },
-          { "name": "Interest Income - CAN", "classification": "Income", "types": ["income"], "code": "4211" },
-          { "name": "Capital Gains - CAN", "classification": "Income", "types": ["income"], "code": "4221" }
-        ]
-      },
-      {
-        "name": "Rental Income - CAN",
-        "classification": "Income",
-        "types": ["header"],
-        "code": "4300",
-        "children": [
-          { "name": "Rental Income - CAN", "classification": "Income", "types": ["income"], "code": "4301" }
-        ]
-      },
-      {
-        "name": "Other Income - CAN",
-        "classification": "Income",
-        "types": ["header"],
-        "code": "4400",
-        "children": [
-          { "name": "Freelance Income - CAN", "classification": "Income", "types": ["income"], "code": "4401" },
-          { "name": "Gifts Received - CAN", "classification": "Income", "types": ["income"], "code": "4410" },
-          { "name": "Tax Refunds - CAN", "classification": "Income", "types": ["income"], "code": "4420" },
-          { "name": "Cashback & Rewards - CAN", "classification": "Income", "types": ["income"], "code": "4430" },
-          { "name": "Miscellaneous Income - CAN", "classification": "Income", "types": ["income"], "code": "4490" }
-        ]
-      }
+      { "name": "Shopify salary (T4) — Canadian resident", "classification": "Income", "types": ["INCOME"], "code": "4100" },
+      { "name": "Shopify bonus", "classification": "Income", "types": ["INCOME"], "code": "4110" },
+      { "name": "Basement rental — Milton (T776)", "classification": "Income", "types": ["INCOME"], "code": "4200" },
+      { "name": "Carnatic violin studio (T2125 + HST)", "classification": "Income", "types": ["INCOME"], "code": "4300" },
+      { "name": "Interest — TD savings / GIC", "classification": "Income", "types": ["INCOME"], "code": "4400" }
     ]
   },
   {
-    "name": "Expenses - CAN",
+    "name": "Expenses",
     "classification": "Expense",
-    "types": ["header"],
+    "types": ["EXPENSE"],
     "code": "5000",
     "children": [
-      {
-        "name": "Housing - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5100",
-        "children": [
-          { "name": "Rent - CAN", "classification": "Expense", "types": ["expense"], "code": "5101" },
-          { "name": "Mortgage Interest - CAN", "classification": "Expense", "types": ["expense"], "code": "5102" },
-          { "name": "Property Tax - CAN", "classification": "Expense", "types": ["expense"], "code": "5103" },
-          { "name": "Home Insurance - CAN", "classification": "Expense", "types": ["expense"], "code": "5104" },
-          { "name": "Home Maintenance - CAN", "classification": "Expense", "types": ["expense"], "code": "5105" },
-          { "name": "Utilities - Electricity - CAN", "classification": "Expense", "types": ["expense"], "code": "5111" },
-          { "name": "Utilities - Gas - CAN", "classification": "Expense", "types": ["expense"], "code": "5112" },
-          { "name": "Utilities - Water - CAN", "classification": "Expense", "types": ["expense"], "code": "5113" },
-          { "name": "Internet & Cable - CAN", "classification": "Expense", "types": ["expense"], "code": "5114" },
-          { "name": "Phone - Mobile - CAN", "classification": "Expense", "types": ["expense"], "code": "5115" }
-        ]
-      },
-      {
-        "name": "Transportation - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5200",
-        "children": [
-          { "name": "Fuel - CAN", "classification": "Expense", "types": ["expense"], "code": "5201" },
-          { "name": "Auto Insurance - CAN", "classification": "Expense", "types": ["expense"], "code": "5202" },
-          { "name": "Auto Maintenance - CAN", "classification": "Expense", "types": ["expense"], "code": "5203" },
-          { "name": "Parking - CAN", "classification": "Expense", "types": ["expense"], "code": "5204" },
-          { "name": "Public Transit - CAN", "classification": "Expense", "types": ["expense"], "code": "5205" },
-          { "name": "Ride Share / Taxi - CAN", "classification": "Expense", "types": ["expense"], "code": "5206" },
-          { "name": "Car Lease/Loan Payment - CAN", "classification": "Expense", "types": ["expense"], "code": "5207" }
-        ]
-      },
-      {
-        "name": "Food & Dining - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5300",
-        "children": [
-          { "name": "Groceries - CAN", "classification": "Expense", "types": ["expense"], "code": "5301" },
-          { "name": "Restaurants - CAN", "classification": "Expense", "types": ["expense"], "code": "5302" },
-          { "name": "Coffee & Snacks - CAN", "classification": "Expense", "types": ["expense"], "code": "5303" },
-          { "name": "Food Delivery - CAN", "classification": "Expense", "types": ["expense"], "code": "5304" }
-        ]
-      },
-      {
-        "name": "Healthcare - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5400",
-        "children": [
-          { "name": "Health Insurance - CAN", "classification": "Expense", "types": ["expense"], "code": "5401" },
-          { "name": "Doctor Visits - CAN", "classification": "Expense", "types": ["expense"], "code": "5402" },
-          { "name": "Medications - CAN", "classification": "Expense", "types": ["expense"], "code": "5403" },
-          { "name": "Dental - CAN", "classification": "Expense", "types": ["expense"], "code": "5404" },
-          { "name": "Vision - CAN", "classification": "Expense", "types": ["expense"], "code": "5405" },
-          { "name": "Gym & Fitness - CAN", "classification": "Expense", "types": ["expense"], "code": "5406" }
-        ]
-      },
-      {
-        "name": "Insurance - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5500",
-        "children": [
-          { "name": "Life Insurance - CAN", "classification": "Expense", "types": ["expense"], "code": "5501" },
-          { "name": "Disability Insurance - CAN", "classification": "Expense", "types": ["expense"], "code": "5502" },
-          { "name": "Travel Insurance - CAN", "classification": "Expense", "types": ["expense"], "code": "5503" }
-        ]
-      },
-      {
-        "name": "Personal & Lifestyle - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5600",
-        "children": [
-          { "name": "Clothing - CAN", "classification": "Expense", "types": ["expense"], "code": "5601" },
-          { "name": "Personal Care - CAN", "classification": "Expense", "types": ["expense"], "code": "5602" },
-          { "name": "Entertainment - CAN", "classification": "Expense", "types": ["expense"], "code": "5603" },
-          { "name": "Subscriptions - CAN", "classification": "Expense", "types": ["expense"], "code": "5604" },
-          { "name": "Books & Education - CAN", "classification": "Expense", "types": ["expense"], "code": "5605" },
-          { "name": "Hobbies - CAN", "classification": "Expense", "types": ["expense"], "code": "5606" }
-        ]
-      },
-      {
-        "name": "Travel - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5700",
-        "children": [
-          { "name": "Flights - CAN", "classification": "Expense", "types": ["expense"], "code": "5701" },
-          { "name": "Hotels - CAN", "classification": "Expense", "types": ["expense"], "code": "5702" },
-          { "name": "Vacation Activities - CAN", "classification": "Expense", "types": ["expense"], "code": "5703" },
-          { "name": "Travel - India Trips - CAN", "classification": "Expense", "types": ["expense"], "code": "5710" }
-        ]
-      },
-      {
-        "name": "Family & Gifts - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5800",
-        "children": [
-          { "name": "Family Support - India - CAN", "classification": "Expense", "types": ["expense"], "code": "5801" },
-          { "name": "Gifts Given - CAN", "classification": "Expense", "types": ["expense"], "code": "5802" },
-          { "name": "Charitable Donations - CAN", "classification": "Expense", "types": ["expense"], "code": "5803" }
-        ]
-      },
-      {
-        "name": "Taxes & Fees - CAN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5900",
-        "children": [
-          { "name": "Income Tax - CAN", "classification": "Expense", "types": ["expense"], "code": "5901" },
-          { "name": "Bank Fees - CAN", "classification": "Expense", "types": ["expense"], "code": "5910" },
-          { "name": "Investment Fees - CAN", "classification": "Expense", "types": ["expense"], "code": "5911" },
-          { "name": "Foreign Exchange Loss - CAN", "classification": "Expense", "types": ["expense"], "code": "5920" },
-          { "name": "Professional Fees (Tax/Legal) - CAN", "classification": "Expense", "types": ["expense"], "code": "5930" },
-          { "name": "Miscellaneous Expenses - CAN", "classification": "Expense", "types": ["expense"], "code": "5990" }
-        ]
-      }
+      { "name": "Mortgage interest — TD", "classification": "Expense", "types": ["EXPENSE"], "code": "5100" },
+      { "name": "Property tax — Halton", "classification": "Expense", "types": ["EXPENSE"], "code": "5110" },
+      { "name": "Utilities — Hydro One / Enbridge / Rogers", "classification": "Expense", "types": ["EXPENSE"], "code": "5120" },
+      { "name": "Groceries", "classification": "Expense", "types": ["EXPENSE"], "code": "5200" },
+      { "name": "Dining & coffee", "classification": "Expense", "types": ["EXPENSE"], "code": "5210" },
+      { "name": "Transit, fuel & Presto", "classification": "Expense", "types": ["EXPENSE"], "code": "5300" },
+      { "name": "CRA income tax", "classification": "Expense", "types": ["EXPENSE"], "code": "5400" },
+      { "name": "HST remitted", "classification": "Expense", "types": ["EXPENSE"], "code": "5410" },
+      { "name": "CPA / professional fees", "classification": "Expense", "types": ["EXPENSE"], "code": "5500" },
+      { "name": "Travel — India trips (from Canada)", "classification": "Expense", "types": ["EXPENSE"], "code": "5600" },
+      { "name": "Insurance — home / auto / life", "classification": "Expense", "types": ["EXPENSE"], "code": "5700" },
+      { "name": "Subscriptions & gym", "classification": "Expense", "types": ["EXPENSE"], "code": "5800" },
+      { "name": "Bank fees — TD", "classification": "Expense", "types": ["EXPENSE"], "code": "5900" },
+      { "name": "Basement rental expenses (T776)", "classification": "Expense", "types": ["EXPENSE"], "code": "5220" },
+      { "name": "Miscellaneous — Canada", "classification": "Expense", "types": ["EXPENSE"], "code": "5990" }
     ]
   }
 ]

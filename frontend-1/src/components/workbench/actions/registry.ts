@@ -1,7 +1,7 @@
 import React from 'react';
 import type { PendingAction } from '@/contexts/AgentSessionContext';
 import { CategorizeTransactionDetail } from './CategorizeTransactionDetail';
-import { Tag, BookOpen, RefreshCw, HelpCircle } from 'lucide-react';
+import { Tag, BookOpen, RefreshCw, HelpCircle, FileText } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -25,10 +25,12 @@ export interface ActionTypeEntry {
 
 // ── Helpers ────────────────────────────────────────────────────
 
-function formatAmount(amount: number | string | null | undefined): string {
+function formatAmount(amount: number | string | null | undefined, currency = 'INR'): string {
   if (amount == null) return '';
   const n = Number(amount);
-  return isNaN(n) ? '' : n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+  if (isNaN(n)) return '';
+  const locale = currency === 'CAD' ? 'en-CA' : 'en-IN';
+  return n.toLocaleString(locale, { style: 'currency', currency, maximumFractionDigits: 2 });
 }
 
 // ── Generic fallback ───────────────────────────────────────────
@@ -53,12 +55,26 @@ const REGISTRY: Record<string, ActionTypeEntry> = {
     renderRowSummary: (action) => {
       const p = action.payload as any;
       return {
-        primary: p.description || action.title,
-        secondary: p.predicted_account_name ? `→ ${p.predicted_account_name}` : undefined,
-        amount: formatAmount(p.amount),
+        amount: formatAmount(p.amount, p.currency || 'INR'),
       };
     },
     DetailComponent: CategorizeTransactionDetail,
+  },
+
+  approve_tax_package: {
+    label: 'Tax package',
+    icon: FileText,
+    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
+    renderRowSummary: (action) => {
+      const p = action.payload as any;
+      return {
+        primary: action.title,
+        secondary: p.recipient
+          ? `TY ${p.tax_year || ''} · ${p.recipient}`
+          : action.description ?? undefined,
+      };
+    },
+    DetailComponent: GenericDetail,
   },
 
   create_posting: {

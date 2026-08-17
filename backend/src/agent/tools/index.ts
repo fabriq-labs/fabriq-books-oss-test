@@ -21,4 +21,4 @@ export {
 } from './sessionTools';
 export { categorizePostingsTool } from './categorizePostings';
 export { runFinancialReportTool, runFinancialReportSchema } from './runFinancialReport';
-export { getOptionChainTool, getOptionChainAgentSchema } from './getOptionChain';
+export { prepareTaxPackageTool } from './prepareTaxPackage';

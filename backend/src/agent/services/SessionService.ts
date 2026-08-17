@@ -17,6 +17,7 @@ export type CreateSessionParams = {
   plan?: any;
   current_step_index?: number;
   pending_actions_count?: number;
+  accumulated_context?: any;
 };
 
 export type UpdateSessionParams = {
@@ -49,6 +50,7 @@ export async function createAgentSession(params: CreateSessionParams) {
       plan: params.plan ?? undefined,
       current_step_index: params.current_step_index ?? undefined,
       pending_actions_count: params.pending_actions_count ?? 0,
+      accumulated_context: params.accumulated_context ?? undefined,
     },
   });
 }

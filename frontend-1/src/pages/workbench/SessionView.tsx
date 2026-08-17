@@ -119,7 +119,8 @@ export const SessionView: React.FC = () => {
   // ── Fire initial stream when session is newly created ─────────
   useEffect(() => {
     if (!session || streamStartedRef.current) return;
-    if (session.status === 'planning' && !session.plan) {
+    // Pinned-plan templates start in planning WITH a plan; still need the first LLM turn.
+    if (session.status === 'planning') {
       streamStartedRef.current = true;
       void sessionAPI.startStream(session.id, session.goal, session.goal_model);
     }
@@ -199,7 +200,11 @@ export const SessionView: React.FC = () => {
         {session.status === 'planning' && (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
-            <p className="text-sm text-gray-500">Agent is creating a plan…</p>
+            <p className="text-sm text-gray-500">
+              {session.plan?.length
+                ? 'Agent is running the playbook…'
+                : 'Agent is creating a plan…'}
+            </p>
           </div>
         )}
 

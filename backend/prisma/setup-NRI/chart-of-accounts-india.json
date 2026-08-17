@@ -1,338 +1,130 @@
 [
   {
-    "name": "Assets - IN",
+    "name": "Assets",
     "classification": "Assets",
-    "types": ["header"],
+    "types": ["ASSET"],
     "code": "1000",
     "children": [
       {
-        "name": "Cash & Bank Accounts - IN",
+        "name": "Bank — India",
         "classification": "Assets",
-        "types": ["header"],
+        "types": ["BANK"],
         "code": "1100",
         "children": [
-          { "name": "Savings Account - IN", "classification": "Assets", "types": ["bank"], "code": "1101" },
-          { "name": "Current Account - IN", "classification": "Assets", "types": ["bank"], "code": "1102" },
-          { "name": "NRE Account - IN", "classification": "Assets", "types": ["bank"], "code": "1103" },
-          { "name": "NRO Account - IN", "classification": "Assets", "types": ["bank"], "code": "1104" },
-          { "name": "Cash on Hand - IN", "classification": "Assets", "types": ["cash"], "code": "1190" }
+          { "name": "ICICI Bank NRE Savings", "classification": "Assets", "types": ["BANK", "SAVINGS"], "code": "1110" },
+          { "name": "ICICI Bank NRO Savings", "classification": "Assets", "types": ["BANK", "SAVINGS"], "code": "1120" },
+          { "name": "Cash on Hand — INR", "classification": "Assets", "types": ["ASSET", "CASH"], "code": "1190" }
         ]
       },
       {
-        "name": "Investments - IN",
+        "name": "Investments — India",
         "classification": "Assets",
-        "types": ["header"],
+        "types": ["ASSET"],
         "code": "1200",
         "children": [
-          { "name": "Stocks & ETFs - IN", "classification": "Assets", "types": ["investment"], "code": "1201" },
-          { "name": "Mutual Funds - IN", "classification": "Assets", "types": ["investment"], "code": "1211" },
-          { "name": "Fixed Deposits - IN", "classification": "Assets", "types": ["investment"], "code": "1220" },
-          { "name": "Recurring Deposits - IN", "classification": "Assets", "types": ["investment"], "code": "1221" },
-          { "name": "Bonds & Debentures - IN", "classification": "Assets", "types": ["investment"], "code": "1230" },
-          { "name": "NSC / KVP - IN", "classification": "Assets", "types": ["investment"], "code": "1231" }
+          { "name": "ICICI NRE Fixed Deposit", "classification": "Assets", "types": ["ASSET"], "code": "1210" },
+          { "name": "Zerodha Demat — Indian Equities", "classification": "Assets", "types": ["ASSET"], "code": "1220" },
+          { "name": "Nippon India Mutual Fund (NRO)", "classification": "Assets", "types": ["ASSET"], "code": "1230" }
         ]
       },
       {
-        "name": "Retirement Accounts - IN",
+        "name": "Real Estate — India",
         "classification": "Assets",
-        "types": ["header"],
-        "code": "1300",
-        "children": [
-          { "name": "PPF - IN", "classification": "Assets", "types": ["retirement"], "code": "1301" },
-          { "name": "EPF - IN", "classification": "Assets", "types": ["retirement"], "code": "1302" },
-          { "name": "NPS - IN", "classification": "Assets", "types": ["retirement"], "code": "1303" },
-          { "name": "Superannuation Fund - IN", "classification": "Assets", "types": ["retirement"], "code": "1304" }
-        ]
-      },
-      {
-        "name": "Real Estate - IN",
-        "classification": "Assets",
-        "types": ["header"],
+        "types": ["ASSET"],
         "code": "1400",
         "children": [
-          { "name": "Flat / Apartment - IN", "classification": "Assets", "types": ["fixed_asset"], "code": "1401" },
-          { "name": "Land - IN", "classification": "Assets", "types": ["fixed_asset"], "code": "1402" },
-          { "name": "Investment Property - IN", "classification": "Assets", "types": ["fixed_asset"], "code": "1403" }
+          { "name": "Panampilly Nagar Flat, Kochi", "classification": "Assets", "types": ["ASSET"], "code": "1410" }
         ]
       },
       {
-        "name": "Vehicles - IN",
+        "name": "Other Assets — India",
         "classification": "Assets",
-        "types": ["header"],
-        "code": "1500",
-        "children": [
-          { "name": "Car - IN", "classification": "Assets", "types": ["fixed_asset"], "code": "1501" },
-          { "name": "Two Wheeler - IN", "classification": "Assets", "types": ["fixed_asset"], "code": "1502" }
-        ]
-      },
-      {
-        "name": "Other Assets - IN",
-        "classification": "Assets",
-        "types": ["header"],
+        "types": ["ASSET"],
         "code": "1600",
         "children": [
-          { "name": "Gold & Jewelry - IN", "classification": "Assets", "types": ["other_asset"], "code": "1601" },
-          { "name": "Silver - IN", "classification": "Assets", "types": ["other_asset"], "code": "1602" },
-          { "name": "Personal Property - IN", "classification": "Assets", "types": ["other_asset"], "code": "1603" },
-          { "name": "Loans to Others - IN", "classification": "Assets", "types": ["receivable"], "code": "1610" },
-          { "name": "Security Deposits - IN", "classification": "Assets", "types": ["other_asset"], "code": "1620" },
-          { "name": "LIC Policies - IN", "classification": "Assets", "types": ["other_asset"], "code": "1630" }
+          { "name": "Gold jewellery (family locker)", "classification": "Assets", "types": ["ASSET"], "code": "1610" },
+          { "name": "TDS receivable (NRI)", "classification": "Assets", "types": ["ASSET"], "code": "1620" }
         ]
       }
     ]
   },
   {
-    "name": "Liabilities - IN",
+    "name": "Liabilities",
     "classification": "Liabilities",
-    "types": ["header"],
+    "types": ["LIABILITY"],
     "code": "2000",
     "children": [
       {
-        "name": "Credit Cards - IN",
+        "name": "Credit Cards — India",
         "classification": "Liabilities",
-        "types": ["header"],
+        "types": ["CREDIT_CARD"],
         "code": "2100",
         "children": [
-          { "name": "Credit Card - IN", "classification": "Liabilities", "types": ["credit_card"], "code": "2101" }
+          { "name": "ICICI Sapphiro Credit Card", "classification": "Liabilities", "types": ["CREDIT_CARD"], "code": "2110" }
         ]
       },
       {
-        "name": "Loans - IN",
+        "name": "Loans — India",
         "classification": "Liabilities",
-        "types": ["header"],
+        "types": ["LIABILITY"],
         "code": "2200",
         "children": [
-          { "name": "Home Loan - IN", "classification": "Liabilities", "types": ["long_term_liability"], "code": "2201" },
-          { "name": "Car Loan - IN", "classification": "Liabilities", "types": ["long_term_liability"], "code": "2211" },
-          { "name": "Personal Loan - IN", "classification": "Liabilities", "types": ["long_term_liability"], "code": "2220" },
-          { "name": "Education Loan - IN", "classification": "Liabilities", "types": ["long_term_liability"], "code": "2230" },
-          { "name": "Gold Loan - IN", "classification": "Liabilities", "types": ["short_term_liability"], "code": "2240" },
-          { "name": "Loan Against FD - IN", "classification": "Liabilities", "types": ["short_term_liability"], "code": "2241" }
+          { "name": "ICICI Home Loan — Kochi flat", "classification": "Liabilities", "types": ["LIABILITY"], "code": "2210" }
         ]
       },
       {
-        "name": "Other Liabilities - IN",
+        "name": "Tax payable — India",
         "classification": "Liabilities",
-        "types": ["header"],
+        "types": ["LIABILITY"],
         "code": "2300",
         "children": [
-          { "name": "Taxes Payable - IN", "classification": "Liabilities", "types": ["other_liability"], "code": "2301" },
-          { "name": "Advance Tax Payable - IN", "classification": "Liabilities", "types": ["other_liability"], "code": "2302" },
-          { "name": "Loans from Family - IN", "classification": "Liabilities", "types": ["other_liability"], "code": "2310" }
+          { "name": "Income tax payable (NRI ITR)", "classification": "Liabilities", "types": ["LIABILITY"], "code": "2310" }
         ]
       }
     ]
   },
   {
-    "name": "Equity - IN",
+    "name": "Equity",
     "classification": "Equity",
-    "types": ["header"],
+    "types": ["EQUITY"],
     "code": "3000",
     "children": [
-      { "name": "Opening Balance Equity - IN", "classification": "Equity", "types": ["equity"], "code": "3001" },
-      { "name": "Retained Earnings - IN", "classification": "Equity", "types": ["equity"], "code": "3002" },
-      { "name": "Net Worth Adjustment - IN", "classification": "Equity", "types": ["equity"], "code": "3003" }
+      { "name": "Opening Balance Equity", "classification": "Equity", "types": ["EQUITY"], "code": "3100" },
+      { "name": "Remittances from Canada (NRE)", "classification": "Equity", "types": ["EQUITY"], "code": "3200" },
+      { "name": "Owner draws", "classification": "Equity", "types": ["EQUITY"], "code": "3300" }
     ]
   },
   {
-    "name": "Income - IN",
+    "name": "Income",
     "classification": "Income",
-    "types": ["header"],
+    "types": ["INCOME"],
     "code": "4000",
     "children": [
-      {
-        "name": "Employment Income - IN",
-        "classification": "Income",
-        "types": ["header"],
-        "code": "4100",
-        "children": [
-          { "name": "Salary - IN", "classification": "Income", "types": ["income"], "code": "4101" },
-          { "name": "Bonus - IN", "classification": "Income", "types": ["income"], "code": "4110" },
-          { "name": "Arrears - IN", "classification": "Income", "types": ["income"], "code": "4120" }
-        ]
-      },
-      {
-        "name": "Investment Income - IN",
-        "classification": "Income",
-        "types": ["header"],
-        "code": "4200",
-        "children": [
-          { "name": "Dividends - IN", "classification": "Income", "types": ["income"], "code": "4201" },
-          { "name": "Interest - FD/RD - IN", "classification": "Income", "types": ["income"], "code": "4211" },
-          { "name": "Interest - Savings Account - IN", "classification": "Income", "types": ["income"], "code": "4212" },
-          { "name": "Capital Gains - STCG - IN", "classification": "Income", "types": ["income"], "code": "4221" },
-          { "name": "Capital Gains - LTCG - IN", "classification": "Income", "types": ["income"], "code": "4222" }
-        ]
-      },
-      {
-        "name": "Rental Income - IN",
-        "classification": "Income",
-        "types": ["header"],
-        "code": "4300",
-        "children": [
-          { "name": "Rental Income - IN", "classification": "Income", "types": ["income"], "code": "4301" }
-        ]
-      },
-      {
-        "name": "Other Income - IN",
-        "classification": "Income",
-        "types": ["header"],
-        "code": "4400",
-        "children": [
-          { "name": "Freelance Income - IN", "classification": "Income", "types": ["income"], "code": "4401" },
-          { "name": "Gifts Received - IN", "classification": "Income", "types": ["income"], "code": "4410" },
-          { "name": "Tax Refunds - IN", "classification": "Income", "types": ["income"], "code": "4420" },
-          { "name": "Cashback & Rewards - IN", "classification": "Income", "types": ["income"], "code": "4430" },
-          { "name": "LIC Maturity - IN", "classification": "Income", "types": ["income"], "code": "4440" },
-          { "name": "PPF Interest - IN", "classification": "Income", "types": ["income"], "code": "4450" },
-          { "name": "Miscellaneous Income - IN", "classification": "Income", "types": ["income"], "code": "4490" }
-        ]
-      }
+      { "name": "Rental income — Kochi (India-source, NRI taxable)", "classification": "Income", "types": ["INCOME"], "code": "4100" },
+      { "name": "NRO savings / FD interest (taxable in India)", "classification": "Income", "types": ["INCOME"], "code": "4200" },
+      { "name": "NRE interest (exempt in India)", "classification": "Income", "types": ["INCOME"], "code": "4210" },
+      { "name": "Indian dividends (India-source)", "classification": "Income", "types": ["INCOME"], "code": "4300" },
+      { "name": "Capital gains LTCG — India", "classification": "Income", "types": ["INCOME"], "code": "4400" },
+      { "name": "Capital gains STCG — India", "classification": "Income", "types": ["INCOME"], "code": "4410" }
     ]
   },
   {
-    "name": "Expenses - IN",
+    "name": "Expenses",
     "classification": "Expense",
-    "types": ["header"],
+    "types": ["EXPENSE"],
     "code": "5000",
     "children": [
-      {
-        "name": "Housing - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5100",
-        "children": [
-          { "name": "Rent - IN", "classification": "Expense", "types": ["expense"], "code": "5101" },
-          { "name": "Home Loan EMI - Interest - IN", "classification": "Expense", "types": ["expense"], "code": "5102" },
-          { "name": "Property Tax - IN", "classification": "Expense", "types": ["expense"], "code": "5103" },
-          { "name": "Society Maintenance - IN", "classification": "Expense", "types": ["expense"], "code": "5104" },
-          { "name": "Home Maintenance - IN", "classification": "Expense", "types": ["expense"], "code": "5105" },
-          { "name": "Electricity - IN", "classification": "Expense", "types": ["expense"], "code": "5111" },
-          { "name": "Gas (Piped/Cylinder) - IN", "classification": "Expense", "types": ["expense"], "code": "5112" },
-          { "name": "Water - IN", "classification": "Expense", "types": ["expense"], "code": "5113" },
-          { "name": "Internet & Broadband - IN", "classification": "Expense", "types": ["expense"], "code": "5114" },
-          { "name": "Mobile Phone - IN", "classification": "Expense", "types": ["expense"], "code": "5115" },
-          { "name": "DTH / Cable TV - IN", "classification": "Expense", "types": ["expense"], "code": "5116" }
-        ]
-      },
-      {
-        "name": "Transportation - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5200",
-        "children": [
-          { "name": "Petrol / Diesel - IN", "classification": "Expense", "types": ["expense"], "code": "5201" },
-          { "name": "Vehicle Insurance - IN", "classification": "Expense", "types": ["expense"], "code": "5202" },
-          { "name": "Vehicle Maintenance - IN", "classification": "Expense", "types": ["expense"], "code": "5203" },
-          { "name": "Parking - IN", "classification": "Expense", "types": ["expense"], "code": "5204" },
-          { "name": "Metro / Bus / Train - IN", "classification": "Expense", "types": ["expense"], "code": "5205" },
-          { "name": "Auto / Ola / Uber - IN", "classification": "Expense", "types": ["expense"], "code": "5206" },
-          { "name": "Toll Charges - IN", "classification": "Expense", "types": ["expense"], "code": "5207" },
-          { "name": "Car EMI - IN", "classification": "Expense", "types": ["expense"], "code": "5208" }
-        ]
-      },
-      {
-        "name": "Food & Dining - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5300",
-        "children": [
-          { "name": "Groceries - IN", "classification": "Expense", "types": ["expense"], "code": "5301" },
-          { "name": "Restaurants - IN", "classification": "Expense", "types": ["expense"], "code": "5302" },
-          { "name": "Tea / Coffee / Snacks - IN", "classification": "Expense", "types": ["expense"], "code": "5303" },
-          { "name": "Swiggy / Zomato - IN", "classification": "Expense", "types": ["expense"], "code": "5304" }
-        ]
-      },
-      {
-        "name": "Healthcare - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5400",
-        "children": [
-          { "name": "Health Insurance Premium - IN", "classification": "Expense", "types": ["expense"], "code": "5401" },
-          { "name": "Doctor / Hospital - IN", "classification": "Expense", "types": ["expense"], "code": "5402" },
-          { "name": "Medicines - IN", "classification": "Expense", "types": ["expense"], "code": "5403" },
-          { "name": "Dental - IN", "classification": "Expense", "types": ["expense"], "code": "5404" },
-          { "name": "Eye Care - IN", "classification": "Expense", "types": ["expense"], "code": "5405" },
-          { "name": "Gym & Fitness - IN", "classification": "Expense", "types": ["expense"], "code": "5406" }
-        ]
-      },
-      {
-        "name": "Insurance - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5500",
-        "children": [
-          { "name": "LIC Premium - IN", "classification": "Expense", "types": ["expense"], "code": "5501" },
-          { "name": "Term Insurance Premium - IN", "classification": "Expense", "types": ["expense"], "code": "5502" }
-        ]
-      },
-      {
-        "name": "Personal & Lifestyle - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5600",
-        "children": [
-          { "name": "Clothing - IN", "classification": "Expense", "types": ["expense"], "code": "5601" },
-          { "name": "Personal Care - IN", "classification": "Expense", "types": ["expense"], "code": "5602" },
-          { "name": "Entertainment - IN", "classification": "Expense", "types": ["expense"], "code": "5603" },
-          { "name": "Subscriptions (Netflix, etc.) - IN", "classification": "Expense", "types": ["expense"], "code": "5604" },
-          { "name": "Books & Education - IN", "classification": "Expense", "types": ["expense"], "code": "5605" },
-          { "name": "Hobbies - IN", "classification": "Expense", "types": ["expense"], "code": "5606" }
-        ]
-      },
-      {
-        "name": "Travel - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5700",
-        "children": [
-          { "name": "Flights - IN", "classification": "Expense", "types": ["expense"], "code": "5701" },
-          { "name": "Train Tickets - IN", "classification": "Expense", "types": ["expense"], "code": "5702" },
-          { "name": "Hotels - IN", "classification": "Expense", "types": ["expense"], "code": "5703" },
-          { "name": "Vacation Activities - IN", "classification": "Expense", "types": ["expense"], "code": "5704" },
-          { "name": "Travel - Canada Trips - IN", "classification": "Expense", "types": ["expense"], "code": "5710" }
-        ]
-      },
-      {
-        "name": "Family & Gifts - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5800",
-        "children": [
-          { "name": "Parents Support - IN", "classification": "Expense", "types": ["expense"], "code": "5801" },
-          { "name": "Family Events - IN", "classification": "Expense", "types": ["expense"], "code": "5802" },
-          { "name": "Gifts Given - IN", "classification": "Expense", "types": ["expense"], "code": "5803" },
-          { "name": "Charitable Donations - IN", "classification": "Expense", "types": ["expense"], "code": "5804" },
-          { "name": "Religious Donations - IN", "classification": "Expense", "types": ["expense"], "code": "5805" }
-        ]
-      },
-      {
-        "name": "Domestic Help - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5850",
-        "children": [
-          { "name": "Maid / Cook - IN", "classification": "Expense", "types": ["expense"], "code": "5851" },
-          { "name": "Driver - IN", "classification": "Expense", "types": ["expense"], "code": "5852" },
-          { "name": "Security / Watchman - IN", "classification": "Expense", "types": ["expense"], "code": "5853" }
-        ]
-      },
-      {
-        "name": "Taxes & Fees - IN",
-        "classification": "Expense",
-        "types": ["header"],
-        "code": "5900",
-        "children": [
-          { "name": "Income Tax - IN", "classification": "Expense", "types": ["expense"], "code": "5901" },
-          { "name": "TDS - IN", "classification": "Expense", "types": ["expense"], "code": "5902" },
-          { "name": "Bank Charges - IN", "classification": "Expense", "types": ["expense"], "code": "5910" },
-          { "name": "Demat / Brokerage Fees - IN", "classification": "Expense", "types": ["expense"], "code": "5911" },
-          { "name": "Foreign Exchange Loss - IN", "classification": "Expense", "types": ["expense"], "code": "5920" },
-          { "name": "CA / Professional Fees - IN", "classification": "Expense", "types": ["expense"], "code": "5930" },
-          { "name": "Miscellaneous Expenses - IN", "classification": "Expense", "types": ["expense"], "code": "5990" }
-        ]
-      }
+      { "name": "Society maintenance — Panampilly", "classification": "Expense", "types": ["EXPENSE"], "code": "5100" },
+      { "name": "Property tax — Kochi Corporation", "classification": "Expense", "types": ["EXPENSE"], "code": "5110" },
+      { "name": "Home repairs & KSEB (owner share)", "classification": "Expense", "types": ["EXPENSE"], "code": "5120" },
+      { "name": "Home loan interest — ICICI", "classification": "Expense", "types": ["EXPENSE"], "code": "5130" },
+      { "name": "Parents support — Kochi", "classification": "Expense", "types": ["EXPENSE"], "code": "5200" },
+      { "name": "Bank charges — ICICI", "classification": "Expense", "types": ["EXPENSE"], "code": "5300" },
+      { "name": "Income tax / TDS (NRI India-source)", "classification": "Expense", "types": ["EXPENSE"], "code": "5400" },
+      { "name": "CA fees — ITR-2 NRI", "classification": "Expense", "types": ["EXPENSE"], "code": "5500" },
+      { "name": "India visit expenses", "classification": "Expense", "types": ["EXPENSE"], "code": "5600" },
+      { "name": "Demat / brokerage", "classification": "Expense", "types": ["EXPENSE"], "code": "5700" },
+      { "name": "Miscellaneous — India", "classification": "Expense", "types": ["EXPENSE"], "code": "5900" }
     ]
   }
 ]

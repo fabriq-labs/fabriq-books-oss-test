@@ -576,6 +576,8 @@ model agent_template {
   sort_order    Int      @default(0)
   focus_models  String[] @default([]) // models to include in system prompt; empty = RELATED_MODELS fallback
   allowed_tools String[] @default([]) // tools the LLM may call; empty = model-switch fallback
+  pinned_plan   Json?
+  intake_schema Json?
   created_at    DateTime @default(now())
 
   sessions agent_session[]

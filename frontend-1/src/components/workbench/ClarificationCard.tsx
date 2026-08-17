@@ -182,11 +182,11 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({ clarificat
       ) : (
         <div className="flex gap-2">
           <input
-            type="text"
+            type={clarification.input_schema?.type === 'number' ? 'number' : 'text'}
             value={freeText}
             onChange={(e) => setFreeText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
-            placeholder="Your answer…"
+            placeholder={clarification.input_schema?.type === 'number' ? 'Enter a number…' : 'Your answer…'}
             disabled={isSubmitting}
             className="flex-1 text-sm border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 disabled:opacity-50"
           />

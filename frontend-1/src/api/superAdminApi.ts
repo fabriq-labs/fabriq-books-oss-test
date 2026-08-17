@@ -126,6 +126,33 @@ export interface ResetIndianDemoReconciliationResponse {
   result: ResetIndianDemoReconciliationResult;
 }
 
+export interface NriTaxPackageDemoStatus {
+  orgExists: boolean;
+  orgId: string;
+  orgName: string | null;
+  unmatchedCount: number;
+  taxPackageSessionCount: number;
+  pendingActionCount: number;
+}
+
+export interface NriTaxPackageDemoStatusResponse {
+  success: boolean;
+  status: NriTaxPackageDemoStatus;
+}
+
+export interface ResetNriTaxPackageDemoResult {
+  orgId: string;
+  deletedSessions: number;
+  deletedPendingActions: number;
+  unmatchedAfter: number;
+}
+
+export interface ResetNriTaxPackageDemoResponse {
+  success: boolean;
+  message: string;
+  result: ResetNriTaxPackageDemoResult;
+}
+
 export interface LegalEntitySummary {
   id: string;
   organizationName: string;
@@ -195,6 +222,15 @@ export const adminAPI = {
   resetIndianDemoReconciliation: () =>
     adminFetch<ResetIndianDemoReconciliationResponse>(
       '/api/admin/demo-data/indian-demo/reset-reconciliation',
+      { method: 'POST' }
+    ),
+
+  getNriTaxPackageDemoStatus: () =>
+    adminFetch<NriTaxPackageDemoStatusResponse>('/api/admin/demo-data/nri-tax-package/status'),
+
+  resetNriTaxPackageDemo: () =>
+    adminFetch<ResetNriTaxPackageDemoResponse>(
+      '/api/admin/demo-data/nri-tax-package/reset',
       { method: 'POST' }
     ),
 

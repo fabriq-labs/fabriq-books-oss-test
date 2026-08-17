@@ -8,6 +8,8 @@
  * Views + prompt templates: npm run sync-metadata (or Tenant Admin → Sync metadata).
  */
 import * as path from 'path';
+import { execSync } from 'child_process';
+import * as fs from 'fs';
 import { runSeedCurrenciesSql } from '../src/utils/setup/metadata/seedCurrenciesSql';
 import { runSeedAgentTemplatesSql } from '../src/utils/setup/metadata/seedAgentTemplatesSql';
 
@@ -24,6 +26,24 @@ export function main(): void {
   console.log('🤖 Seeding system agent templates (prisma/seed-agent-templates.sql)...');
   runSeedAgentTemplatesSql(backendRoot);
   console.log('✅ Agent templates seed complete.');
+  const pinnedPlan = path.join(backendRoot, 'prisma', 'migration', 'add_agent_template_pinned_plan.sql');
+  if (fs.existsSync(pinnedPlan)) {
+    execSync(`npx prisma db execute --schema "${path.join(backendRoot, 'prisma', 'schema')}" --file "${pinnedPlan}"`, {
+      cwd: backendRoot,
+      env: process.env,
+      stdio: 'inherit',
+    });
+  }
+  const taxPackage = path.join(backendRoot, 'prisma', 'seed-tax-package-template.sql');
+  if (fs.existsSync(taxPackage)) {
+    console.log('📦 Seeding tax package agent template...');
+    execSync(`npx prisma db execute --schema "${path.join(backendRoot, 'prisma', 'schema')}" --file "${taxPackage}"`, {
+      cwd: backendRoot,
+      env: process.env,
+      stdio: 'inherit',
+    });
+    console.log('✅ Tax package template seed complete.');
+  }
 }
 
 if (require.main === module) {

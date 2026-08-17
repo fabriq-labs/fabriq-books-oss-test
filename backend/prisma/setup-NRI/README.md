@@ -1,119 +1,50 @@
-# NRI Personal Finance Demo Data
+# NRI personal books (`--demo-data=nri`)
 
-This setup script creates a personal finance tenant for Rajesh Kumar (NRI) with assets in two countries (Canada and India).
+Rajesh Menon — **Canadian tax resident**, **NRI in India**, still an **Indian taxpayer on India-source income only**.
 
-## Overview
+Additive on prod: does not replace `org_indian_demo` / `org_techflow_us`. Safe with `--demo-data-only`.
 
-| Component | Count | Details |
-|-----------|-------|---------|
-| **Tenant (org)** | 1 | Rajesh Kumar (NRI) |
-| **Organizations** | 2 | Canada & India legal entities |
-| **Users** | 1 | Super Admin access |
-| **Chart of Accounts** | ~90 | Personal finance accounts |
+## Story
 
-## Data Structure
+Lives in Milton, Ontario (Shopify T4 + Carnatic violin studio + Milton basement suite).  
+Keeps a Kochi flat (Panampilly Nagar) rented to Arjun & Meera Nair. Files **ITR-2 as NRI** (rent, NRO interest, Indian CG/dividends). **NRE interest is exempt in India**. Canada salary is not India-source.
 
-### Tenant
-- **ID**: `org_rajesh`
-- **Name**: Rajesh Kumar
-- **Slug**: `rajesh-personal`
-- **Timezone**: America/Toronto
-- **Base Currency**: CAD
+Canada books: calendar year 2024–2025 (`JAN_DEC`).  
+India books: FY Apr 2024–Mar 2026 (`APR_MAR`).
 
-### Organizations (Legal Entities)
+## IDs
 
-| Organization | Location | Currency | Purpose |
-|--------------|----------|----------|---------|
-| Rajesh (Canada) | Toronto, Ontario | CAD | Canadian assets & income |
-| Rajesh (India) | Chennai, Tamil Nadu | INR | Indian assets & income |
+| Item | Value |
+|------|--------|
+| Org | `org_rajesh` — Maple Leaf NRI Holdings (reporting CAD) |
+| Canada entity | `ent_rajesh_canada` — personal, Milton, CAD |
+| India entity | `ent_rajesh_india` — personal, Kochi, INR |
+| Login | `rajesh.menon@gmail.com` / `admin123` (Super Admin) |
+| Login | `kavya.menon@gmail.com` / `admin123` (Finance Team) |
+| Banks | TD Canada Trust Chequing · ICICI NRE · ICICI NRO |
+| Chequing | `acco_ent_rajesh_canada_1110` |
+| ICICI NRE | `acco_ent_rajesh_india_1110` |
+| ICICI NRO | `acco_ent_rajesh_india_1120` |
 
-### User
-
-| Name | Email | Role |
-|------|-------|------|
-| Rajesh Kumar | rajesh.kumar@metalimits.com | Super Admin |
-
-**Password**: `Metalimits@123`
-
-## Chart of Accounts
-
-Each legal entity has its own country-specific chart of accounts:
-
-### Rajesh (Canada) - `chart-of-accounts-canada.json`
-
-| Category | Key Accounts |
-|----------|--------------|
-| **Assets** | Checking/Savings, Stocks & ETFs, GICs, RRSP, TFSA, RESP, LIRA |
-| **Liabilities** | Credit Card, Mortgage, Car Loan, Line of Credit |
-| **Income** | Salary, Dividends, Interest, Capital Gains, Rental |
-| **Expenses** | Housing, Transportation, Healthcare, Travel to India |
-
-### Rajesh (India) - `chart-of-accounts-india.json`
-
-| Category | Key Accounts |
-|----------|--------------|
-| **Assets** | Savings/NRE/NRO Accounts, Stocks, Mutual Funds, FDs, PPF, EPF, NPS |
-| **Liabilities** | Credit Card, Home Loan, Gold Loan, Loan Against FD |
-| **Income** | Salary, Dividends, FD Interest, STCG/LTCG, LIC Maturity |
-| **Expenses** | Housing, Society Maintenance, Domestic Help, Travel to Canada |
-
-### Account Code Structure (same for both)
-
-| Code Range | Category |
-|------------|----------|
-| 1000-1699 | Assets |
-| 2000-2399 | Liabilities |
-| 3000-3003 | Equity |
-| 4000-4499 | Income |
-| 5000-5999 | Expenses |
-
-## Running the Setup
-
-### Option 1: Full Database Reset + NRI Data
+## Load (existing DB, no schema wipe)
 
 ```bash
 cd backend
-node setup-db.js --demo-data=skip --skip-tests
-cd prisma/setup-NRI
-npx ts-node setup-nri-demo.ts
+node setup-db.js --demo-data-only --demo-data=nri --skip-tests --env=test
 ```
 
-### Option 2: Add to Existing Database (Demo Data Only)
-
-```bash
-cd backend
-node setup-db.js --demo-data-only --demo-data=skip
-cd prisma/setup-NRI
-npx ts-node setup-nri-demo.ts
-```
-
-### Option 3: Run Setup Script Directly
+Or directly:
 
 ```bash
 cd backend/prisma/setup-NRI
 npx ts-node setup-nri-demo.ts
 ```
 
-## Usage
+## Verify reports
 
-After setup, login with:
-- **Email**: rajesh.kumar@metalimits.com
-- **Password**: Metalimits@123
+```bash
+cd backend/prisma/setup-NRI
+npx ts-node verify-nri-reports.ts
+```
 
-You can then:
-1. View/edit chart of accounts
-2. Record transactions
-3. Track assets across Canada and India
-4. Generate financial reports
-
-## Files
-
-| File | Description |
-|------|-------------|
-| `org.csv` | Tenant record |
-| `organization.csv` | Legal entities (Canada & India) |
-| `users.csv` | User account |
-| `role_user.csv` | Role assignments (Super Admin) |
-| `chart-of-accounts-canada.json` | Canada-specific accounts (RRSP, TFSA, GICs, etc.) |
-| `chart-of-accounts-india.json` | India-specific accounts (PPF, EPF, NPS, FDs, etc.) |
-| `setup-nri-demo.ts` | Setup script |
+Filter reports by legal entity. India P&L is India-source (NRI). Canada P&L is T1-style resident income. Org-level CAD reports convert INR via seeded AVERAGE rates.

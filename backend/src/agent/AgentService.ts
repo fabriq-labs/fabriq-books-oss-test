@@ -36,10 +36,8 @@ const DEFAULT_STREAM_TIMEOUT_MS = 120_000;
 // When a session targets a specific goal_model, only include these related models
 // in the system prompt to reduce noise and improve LLM accuracy
 const RELATED_MODELS: Record<string, string[]> = {
-  posting: ['posting', 'account', 'payment_receipt', 'invoice'],
+  posting: ['posting', 'account'],
   account: ['account', 'posting'],
-  invoice: ['invoice', 'supplier', 'purchase_order', 'posting', 'account'],
-  trade: ['trade', 'instrument', 'holding', 'posting', 'account'],
 };
 
 /**
@@ -248,7 +246,13 @@ export class AgentService {
       // Use unified tools (model-specific + analytics + session tools if applicable)
       const toolManager = ToolManager.getInstance();
       const templateAllowedTools: string[] = templateForHandleRequest?.allowed_tools || [];
-      const tools = await toolManager.getUnifiedTools(modelName, auth, enhancedContext, sessionId, templateAllowedTools);
+      const omitCreatePlan = Boolean(
+        templateForHandleRequest?.pinned_plan
+        || sessionForContextHandleRequest?.plan
+      );
+      const tools = await toolManager.getUnifiedTools(
+        modelName, auth, enhancedContext, sessionId, templateAllowedTools, { omitCreatePlan }
+      );
 
       // Build messages: for session requests, include persisted session messages
       let allMessages: any[];
@@ -699,7 +703,14 @@ export class AgentService {
       // Use unified tools (model-specific + analytics + session tools if applicable)
       const toolManager = ToolManager.getInstance();
       const templateAllowedToolsStreaming: string[] = templateForStreaming?.allowed_tools || [];
-      const tools = await toolManager.getUnifiedTools(modelName, auth, enhancedContext, sessionId, templateAllowedToolsStreaming);
+      const omitCreatePlanStreaming = Boolean(
+        templateForStreaming?.pinned_plan
+        || sessionForContextStreaming?.plan
+      );
+      const tools = await toolManager.getUnifiedTools(
+        modelName, auth, enhancedContext, sessionId, templateAllowedToolsStreaming,
+        { omitCreatePlan: omitCreatePlanStreaming }
+      );
 
       // Use streamText with configurable maxSteps
       const llmModelId = getModelId('agent');

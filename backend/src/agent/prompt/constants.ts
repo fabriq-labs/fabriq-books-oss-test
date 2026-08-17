@@ -90,6 +90,8 @@ You are operating inside an active agent session. Follow this decision tree exac
 IF a plan already exists (plan is not null):
   → NEVER call createPlan again. Proceed with executing the existing plan.
     Calling createPlan when a plan already exists will discard all progress.
+    If status is still 'planning' but a plan is present, treat the current step
+    as 'executing' (query / analysis / action / report rules below).
 
 IF status is 'planning' AND no plan exists:
   → Call createPlan IMMEDIATELY. Decompose the goal into 3-5 steps.
@@ -176,7 +178,7 @@ RULES:
  * `SESSION_DIRECTIVE` is appended by the caller BEFORE this block so that the
  * cacheable prefix (base prompt + tool guidelines + SESSION_DIRECTIVE) stays
  * byte-identical across turns while only this trailing state block changes. See
- * [docs/agent/04-PROMPT_SYSTEM.md]. Compact header every turn (~50 tokens); full
+ * Prompt assembly. Compact header every turn (~50 tokens); full
  * plan on first turn and after createPlan.
  */
 export function buildSessionStateBlock(
