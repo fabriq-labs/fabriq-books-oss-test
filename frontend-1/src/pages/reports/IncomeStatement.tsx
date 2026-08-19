@@ -10,8 +10,6 @@ import { Loader2, DollarSign, FileDown, ChevronDown, FileSpreadsheet, Filter, Re
 import { toast } from "@/hooks/use-toast";
 import dayjs from "dayjs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import * as XLSX from "xlsx";
 import { pdf } from "@react-pdf/renderer";
@@ -19,6 +17,7 @@ import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
 import { LegalEntityMultiSelect } from "@/components/Reports/LegalEntityMultiSelect";
 import {
+  ReportActivityFilterField,
   ReportAdvancedField,
   ReportAdvancedFilters,
   ReportAdvancedSummaryChip,
@@ -26,6 +25,7 @@ import {
 import { ReportAccountFilter } from "@/components/Reports/ReportAccountFilter";
 import { ReportCurrencySelect } from "@/components/Reports/ReportCurrencySelect";
 import { ReportIdleState } from "@/components/Reports/ReportIdleState";
+import { ReportViewToggle, type ReportViewMode } from "@/components/Reports/ReportViewToggle";
 import { useReportLegalEntitySelection } from "@/components/Reports/useReportLegalEntitySelection";
 import { isEntityHeadquarters, useEntity, CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import { IncomeStatementPDFDocument, IncomeStatementPdfProps } from "@/components/pdf_generator/IncomePDFGenerator";
@@ -136,7 +136,7 @@ export default function IncomeStatement() {
   const [hasRun, setHasRun] = useState(false);
   const [appliedFilterKey, setAppliedFilterKey] = useState<string | null>(null);
   const [account, setAccount]: any = useState(null);
-  const [view, setView] = useState("Summary");
+  const [view, setView] = useState<ReportViewMode>("Summary");
   const [showOnlyNonZero, setShowOnlyNonZero] = useState(true);
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
   const [selectedCurrencyId, setSelectedCurrencyId] = useState("");
@@ -717,6 +717,9 @@ export default function IncomeStatement() {
               <ReportAdvancedSummaryChip>{legalEntitySummaryLabel}</ReportAdvancedSummaryChip>
               <ReportAdvancedSummaryChip>{reportCurrencyCode}</ReportAdvancedSummaryChip>
               <ReportAdvancedSummaryChip>{accountSummaryLabel}</ReportAdvancedSummaryChip>
+              {!showOnlyNonZero ? (
+                <ReportAdvancedSummaryChip>Including zero rows</ReportAdvancedSummaryChip>
+              ) : null}
             </>
           }
         >
@@ -759,42 +762,20 @@ export default function IncomeStatement() {
               onAccountClear={handleAccountClear}
             />
           </ReportAdvancedField>
-        </ReportAdvancedFilters>
 
-        {/* View tabs + activity filter */}
-        <div className="mt-3 flex flex-wrap items-center gap-4">
-          <div className="flex border-b border-slate-200 w-fit">
-            <button
-              onClick={() => setView("Summary")}
-              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${view === "Summary"
-                ? "text-slate-900 border-b-2 border-blue-600"
-                : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
-                }`}
-            >
-              Summary View
-            </button>
-            <button
-              onClick={() => setView("Details")}
-              className={`px-4 py-1.5 text-sm font-medium transition-all duration-200 relative ${view === "Details"
-                ? "text-slate-900 border-b-2 border-blue-600"
-                : "text-slate-600 hover:text-slate-900 hover:border-b-2 hover:border-slate-300"
-                }`}
-            >
-              Detailed View
-            </button>
-          </div>
-          <div className="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-1.5 bg-white">
-            <Filter className="h-4 w-4 text-slate-500" />
-            <Label htmlFor="show-nonzero" className="text-sm text-slate-700 cursor-pointer whitespace-nowrap">
-              Show only rows with activity
-            </Label>
-            <Switch id="show-nonzero" checked={showOnlyNonZero} onCheckedChange={setShowOnlyNonZero} />
-          </div>
-        </div>
+          <ReportActivityFilterField
+            id="show-nonzero"
+            checked={showOnlyNonZero}
+            onCheckedChange={setShowOnlyNonZero}
+          />
+        </ReportAdvancedFilters>
       </div>
 
       <div className="p-3 space-y-3">
         <div className="space-y-3">
+          {hasRun && !(reportLoading && data.length === 0) && !(error && data.length === 0) ? (
+            <ReportViewToggle value={view} onChange={setView} />
+          ) : null}
           {!hasRun && !reportLoading ? (
             <Card className="shadow-sm border-slate-200">
               <CardContent className="p-6">
@@ -832,7 +813,7 @@ export default function IncomeStatement() {
                       </p>
                       <p className="text-xs text-slate-500 mt-1">
                         {showOnlyNonZero && data.length > 0
-                          ? "Try turning off \"Show only rows with activity\" to see all accounts."
+                          ? "Try turning off \"Show only rows with activity\" under Advanced options to see all accounts."
                           : "No data found for the selected period and filters"}
                       </p>
                     </div>

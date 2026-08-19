@@ -21,14 +21,13 @@ import {
 import { toast } from "@/hooks/use-toast";
 import dayjs from "dayjs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import * as XLSX from "xlsx";
 import "@/styles/reports.css";
 import { ReportControls } from "@/components/Reports/ReportControls";
 import { LegalEntityMultiSelect } from "@/components/Reports/LegalEntityMultiSelect";
 import {
+  ReportActivityFilterField,
   ReportAdvancedField,
   ReportAdvancedFilters,
   ReportAdvancedSummaryChip,
@@ -590,6 +589,9 @@ export default function CashFlow() {
               <ReportAdvancedSummaryChip>{legalEntitySummaryLabel}</ReportAdvancedSummaryChip>
               <ReportAdvancedSummaryChip>{reportCurrencyCode}</ReportAdvancedSummaryChip>
               <ReportAdvancedSummaryChip>{accountSummaryLabel}</ReportAdvancedSummaryChip>
+              {!showOnlyNonZero ? (
+                <ReportAdvancedSummaryChip>Including zero rows</ReportAdvancedSummaryChip>
+              ) : null}
             </>
           }
         >
@@ -632,17 +634,13 @@ export default function CashFlow() {
               onAccountClear={handleAccountClear}
             />
           </ReportAdvancedField>
-        </ReportAdvancedFilters>
 
-        <div className="mt-3 flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-1.5 bg-white">
-            <Filter className="h-4 w-4 text-slate-500" />
-            <Label htmlFor="show-nonzero-cf" className="text-sm text-slate-700 cursor-pointer whitespace-nowrap">
-              Show only rows with activity
-            </Label>
-            <Switch id="show-nonzero-cf" checked={showOnlyNonZero} onCheckedChange={setShowOnlyNonZero} />
-          </div>
-        </div>
+          <ReportActivityFilterField
+            id="show-nonzero-cf"
+            checked={showOnlyNonZero}
+            onCheckedChange={setShowOnlyNonZero}
+          />
+        </ReportAdvancedFilters>
       </div>
 
       <div className="p-3 space-y-3">
