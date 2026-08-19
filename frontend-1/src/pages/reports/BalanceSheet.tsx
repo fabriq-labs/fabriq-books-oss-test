@@ -26,6 +26,7 @@ import {
 } from "@/components/Reports/ReportAdvancedFilters";
 import { ReportAccountFilter } from "@/components/Reports/ReportAccountFilter";
 import { ReportCurrencySelect } from "@/components/Reports/ReportCurrencySelect";
+import { ReportIdleState } from "@/components/Reports/ReportIdleState";
 import { useReportLegalEntitySelection } from "@/components/Reports/useReportLegalEntitySelection";
 import { isEntityHeadquarters, useEntity, CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import { aggregateTrialBalanceSectionRows } from "@/lib/aggregateTrialBalanceSectionRows";
@@ -63,15 +64,11 @@ type CurrencyListRow = {
 
 const useTrialBalance = ({
   dateRange,
-  view,
   currencyId,
-  currencyCode,
   legalEntityIds,
 }: {
   dateRange: [dayjs.Dayjs, dayjs.Dayjs];
-  view: string;
   currencyId: string;
-  currencyCode: string;
   legalEntityIds: string[];
 }) => {
   const [loading, setLoading] = useState(false);
@@ -103,21 +100,7 @@ const useTrialBalance = ({
         const result = (await reportAPI.getReport("trial_balance", filters)) as any;
         if (seq !== fetchSeq.current) return;
         const rawRows = Array.isArray(result?.data) ? result.data : [];
-        const filteredData = rawRows.filter((row: any) => {
-          const lev = Number(row?.level ?? 0);
-          if (view === "Summary") {
-            return lev === 0;
-          }
-          return (
-            lev === 0 ||
-            Number(row.total_debits ?? 0) !== 0 ||
-            Number(row.total_credits ?? 0) !== 0 ||
-            Number(row.opening_balance ?? 0) !== 0 ||
-            Number(row.balance ?? 0) !== 0 ||
-            Number(row.total_balance ?? 0) !== 0
-          );
-        });
-        setData(filteredData);
+        setData(rawRows);
         setError(null);
       } catch (err) {
         if (seq !== fetchSeq.current) return;
@@ -133,7 +116,7 @@ const useTrialBalance = ({
         }
       }
     },
-    [dateRange, view, currencyId, currencyCode, legalEntityIds]
+    [dateRange, currencyId, legalEntityIds]
   );
 
   useEffect(() => {
@@ -158,6 +141,8 @@ export default function BalanceSheet() {
   const { entities, currentEntity, currentEntityId, loading: entityLoading } = useEntity();
 
   const [fetchOnButtonClick, setFetchOnButtonClick] = useState(false);
+  const [hasRun, setHasRun] = useState(false);
+  const [appliedFilterKey, setAppliedFilterKey] = useState<string | null>(null);
   const [account, setAccount]: any = useState(null);
   const [view, setView] = useState("Summary");
   const [showOnlyNonZero, setShowOnlyNonZero] = useState(true);
@@ -223,13 +208,11 @@ export default function BalanceSheet() {
 
   const { data, loading, error, fetchTrialBalance } = useTrialBalance({
     dateRange: effectiveDateRange,
-    view,
     currencyId: effectiveReportCurrencyId,
-    currencyCode: reportCurrencyCode,
     legalEntityIds: selectedLegalEntityIds,
   });
 
-  const reportLoading = loading || entityLoading || !selectionReady;
+  const reportLoading = loading;
 
   const loadCurrencies = useCallback(async () => {
     setCurrenciesLoading(true);
@@ -289,7 +272,13 @@ export default function BalanceSheet() {
     return account?.name ?? account?.account_name ?? "All accounts";
   }, [account]);
 
-  const displayedData = showOnlyNonZero ? data.filter(hasNonZeroAmount) : data;
+  const displayedData = useMemo(() => {
+    const viewFiltered =
+      view === "Summary"
+        ? data.filter((row) => Number(row.level ?? 0) === 0)
+        : data.filter((row) => Number(row.level ?? 0) === 0 || hasNonZeroAmount(row));
+    return showOnlyNonZero ? viewFiltered.filter(hasNonZeroAmount) : viewFiltered;
+  }, [data, view, showOnlyNonZero]);
 
   const groupedData = (data: TrialBalanceRow[]) => {
     const normalizeClassification = (classification: string | null | undefined) => {
@@ -320,17 +309,24 @@ export default function BalanceSheet() {
     }));
   };
 
-  useEffect(() => {
-    if (entityLoading || !selectionReady) return;
-    void fetchTrialBalance(account);
-  }, [entityLoading, selectionReady, fetchTrialBalance, account]);
+  const runDisabled = entityLoading || !selectionReady;
+  const filterKey = JSON.stringify({
+    from: effectiveDateRange[0].format("YYYY-MM-DD"),
+    to: effectiveDateRange[1].format("YYYY-MM-DD"),
+    currencyId: effectiveReportCurrencyId,
+    legalEntityIds: selectedLegalEntityIds,
+    accountId: account?.id ?? null,
+  });
+  const filtersDirty = hasRun && appliedFilterKey !== filterKey;
 
   useEffect(() => {
     if (!fetchOnButtonClick) return;
-    if (entityLoading || !selectionReady) return;
+    if (runDisabled) return;
+    setHasRun(true);
+    setAppliedFilterKey(filterKey);
     void fetchTrialBalance(account);
     setFetchOnButtonClick(false);
-  }, [fetchOnButtonClick, entityLoading, selectionReady, fetchTrialBalance, account]);
+  }, [fetchOnButtonClick, runDisabled, fetchTrialBalance, account, filterKey]);
 
   const getClassificationIcon = (classification: string) => {
     const normalized = classification.toLowerCase();
@@ -619,7 +615,8 @@ export default function BalanceSheet() {
           <div className="flex items-center gap-2 flex-nowrap overflow-x-auto ml-auto">
             <ReportControls
               onRefresh={handleRefresh}
-              loading={reportLoading}
+              loading={reportLoading || runDisabled}
+              filtersDirty={filtersDirty}
               showAccountFilter={false}
               showRefreshButton={true}
               className="!flex-row !items-center !gap-2 shrink-0"
@@ -771,7 +768,13 @@ export default function BalanceSheet() {
       {/* Content */}
       <div className="p-3 space-y-3">
         <div className="space-y-3">
-          {reportLoading && data.length === 0 ? (
+          {!hasRun && !reportLoading ? (
+            <Card className="shadow-sm border-slate-200">
+              <CardContent className="p-6">
+                <ReportIdleState onRun={handleRefresh} disabled={runDisabled} />
+              </CardContent>
+            </Card>
+          ) : reportLoading && data.length === 0 ? (
             <Card className="shadow-sm border-slate-200">
               <CardContent className="p-6">
                 <LoadingContent />

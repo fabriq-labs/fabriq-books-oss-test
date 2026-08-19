@@ -1,32 +1,28 @@
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { SearchDropDown } from "@/components/search_dropdown/dropdown";
-import { RefreshCw } from "lucide-react";
+import { Play, RefreshCw } from "lucide-react";
 
 interface ReportControlsProps {
-    // Account filter props
     selectedAccount?: any;
     onAccountChange?: (account: any) => void;
     onAccountClear?: () => void;
 
-    // Refresh props
     onRefresh?: () => void;
     loading?: boolean;
+    /** When true, highlight the run button — filters changed since last run. */
+    filtersDirty?: boolean;
 
-    // Optional props
     showAccountFilter?: boolean;
     showRefreshButton?: boolean;
     className?: string;
-    /** Extra filters for account search (e.g. legal_entity_id). Passed to SearchDropDown additionalFilters. */
     accountAdditionalFilters?: Record<string, any>;
-    /** Client-side filter for account options after fetch (e.g. bank/credit_card only). */
     accountFilterOptions?: (items: any[]) => any[];
-    /** Rendered before the refresh button (e.g. FY selector, month dropdown, currency). */
     beforeRefresh?: React.ReactNode;
-    /** If true, do not fetch accounts on initial render — wait for user to type. */
     skipInitialAccountSearch?: boolean;
-    /** Key for the account dropdown — change to remount/reset it (e.g. when entity switches). */
     accountKey?: string;
+    /** Button label. Financial reports use "Run report"; transaction lists use "Refresh". */
+    runButtonLabel?: string;
 }
 
 export const ReportControls: React.FC<ReportControlsProps> = ({
@@ -35,6 +31,7 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     onAccountClear,
     onRefresh,
     loading = false,
+    filtersDirty = false,
     showAccountFilter = true,
     showRefreshButton = true,
     className = "",
@@ -43,6 +40,7 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
     beforeRefresh,
     skipInitialAccountSearch = false,
     accountKey,
+    runButtonLabel = "Run report",
 }) => {
     const accountDropdown = useMemo(
         () => (
@@ -75,6 +73,8 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
         [selectedAccount, onAccountChange, onAccountClear, accountAdditionalFilters, accountFilterOptions, skipInitialAccountSearch, accountKey]
     );
 
+    const isRefreshLabel = runButtonLabel.toLowerCase() === "refresh";
+
     return (
         <div className={`flex flex-col sm:flex-row sm:justify-end gap-3 items-stretch sm:items-center ${className}`}>
             {showAccountFilter && accountDropdown}
@@ -85,13 +85,21 @@ export const ReportControls: React.FC<ReportControlsProps> = ({
                 <Button
                     onClick={onRefresh}
                     disabled={loading}
-                    className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+                    className={`flex items-center gap-2 shrink-0 ${
+                        filtersDirty
+                            ? "bg-primary hover:bg-primary/90 ring-2 ring-offset-1 ring-primary/40"
+                            : "bg-primary hover:bg-primary/90"
+                    }`}
+                    title={filtersDirty ? "Filters changed — click to load updated results" : undefined}
                 >
                     {loading ? (
                         <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
+                    ) : isRefreshLabel ? (
                         <RefreshCw className="h-4 w-4" />
+                    ) : (
+                        <Play className="h-4 w-4" />
                     )}
+                    {runButtonLabel}
                 </Button>
             )}
         </div>

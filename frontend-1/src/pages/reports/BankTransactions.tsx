@@ -639,6 +639,7 @@ export default function BankTransactions() {
                             loading={isLoading || ledgerLoading}
                             showAccountFilter={true}
                             showRefreshButton={true}
+                            runButtonLabel="Refresh"
                             accountAdditionalFilters={accountAdditionalFilters}
                             accountFilterOptions={accountFilterOptions}
                             skipInitialAccountSearch={true}

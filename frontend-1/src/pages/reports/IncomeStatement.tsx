@@ -25,6 +25,7 @@ import {
 } from "@/components/Reports/ReportAdvancedFilters";
 import { ReportAccountFilter } from "@/components/Reports/ReportAccountFilter";
 import { ReportCurrencySelect } from "@/components/Reports/ReportCurrencySelect";
+import { ReportIdleState } from "@/components/Reports/ReportIdleState";
 import { useReportLegalEntitySelection } from "@/components/Reports/useReportLegalEntitySelection";
 import { isEntityHeadquarters, useEntity, CURRENT_ENTITY_STORAGE_KEY } from "@/contexts/EntityContext";
 import { IncomeStatementPDFDocument, IncomeStatementPdfProps } from "@/components/pdf_generator/IncomePDFGenerator";
@@ -132,6 +133,8 @@ export default function IncomeStatement() {
   const { entities, currentEntity, currentEntityId, loading: entityLoading } = useEntity();
 
   const [fetchOnButtonClick, setFetchOnButtonClick] = useState(false);
+  const [hasRun, setHasRun] = useState(false);
+  const [appliedFilterKey, setAppliedFilterKey] = useState<string | null>(null);
   const [account, setAccount]: any = useState(null);
   const [view, setView] = useState("Summary");
   const [showOnlyNonZero, setShowOnlyNonZero] = useState(true);
@@ -202,7 +205,7 @@ export default function IncomeStatement() {
     legalEntityIds: selectedLegalEntityIds,
   });
 
-  const reportLoading = loading || entityLoading || !selectionReady;
+  const reportLoading = loading;
 
   const ADD_BACK_TYPES = ["D&A", "Interest & Tax", "EBITDA Adjustments"];
   const hasAddBackType = (row: IncomeStatementRow) =>
@@ -349,17 +352,24 @@ export default function IncomeStatement() {
     return account?.name ?? account?.account_name ?? "All accounts";
   }, [account]);
 
-  useEffect(() => {
-    if (entityLoading || !selectionReady) return;
-    void fetchIncomeStatement(account);
-  }, [entityLoading, selectionReady, fetchIncomeStatement, account]);
+  const runDisabled = entityLoading || !selectionReady;
+  const filterKey = JSON.stringify({
+    from: effectiveDateRange[0].format("YYYY-MM-DD"),
+    to: effectiveDateRange[1].format("YYYY-MM-DD"),
+    currencyId: effectiveReportCurrencyId,
+    legalEntityIds: selectedLegalEntityIds,
+    accountId: account?.id ?? null,
+  });
+  const filtersDirty = hasRun && appliedFilterKey !== filterKey;
 
   useEffect(() => {
     if (!fetchOnButtonClick) return;
-    if (entityLoading || !selectionReady) return;
+    if (runDisabled) return;
+    setHasRun(true);
+    setAppliedFilterKey(filterKey);
     void fetchIncomeStatement(account);
     setFetchOnButtonClick(false);
-  }, [fetchOnButtonClick, entityLoading, selectionReady, fetchIncomeStatement, account]);
+  }, [fetchOnButtonClick, runDisabled, fetchIncomeStatement, account, filterKey]);
 
   const handleAccountChange = (value: any) => setAccount(value);
   const handleAccountClear = () => setAccount(null);
@@ -633,7 +643,8 @@ export default function IncomeStatement() {
           <div className="flex items-center gap-2 flex-nowrap overflow-x-auto ml-auto">
             <ReportControls
               onRefresh={handleRefresh}
-              loading={reportLoading}
+              loading={reportLoading || runDisabled}
+              filtersDirty={filtersDirty}
               showAccountFilter={false}
               showRefreshButton={true}
               className="!flex-row !items-center !gap-2 shrink-0"
@@ -784,7 +795,13 @@ export default function IncomeStatement() {
 
       <div className="p-3 space-y-3">
         <div className="space-y-3">
-          {reportLoading && data.length === 0 ? (
+          {!hasRun && !reportLoading ? (
+            <Card className="shadow-sm border-slate-200">
+              <CardContent className="p-6">
+                <ReportIdleState onRun={handleRefresh} disabled={runDisabled} />
+              </CardContent>
+            </Card>
+          ) : reportLoading && data.length === 0 ? (
             <Card className="shadow-sm border-slate-200">
               <CardContent className="p-6">
                 <LoadingContent />

@@ -72,6 +72,55 @@ interface ClassificationBreakdownItem {
   value: number;
   percentage: number;
 }
+
+/** Org-scoped COA tree. Replaces public.account_hierarchy so the planner
+ *  does not estimate ~100k rows (all tenants) and trigger JIT. */
+function sqlAccountTree(orgId: string): Prisma.Sql {
+  return Prisma.sql`
+    account_tree AS (
+      SELECT
+        a.id,
+        a.code,
+        a.classification,
+        a.name,
+        a.type,
+        NULLIF(BTRIM(a.parent_account_id), '') AS parent_account_id,
+        a.name::varchar(1000) AS path,
+        0 AS level,
+        a.org_id,
+        a.base_currency_id AS currency,
+        a.legal_entity_id
+      FROM account a
+      WHERE a.org_id = ${orgId}
+        AND (a.parent_account_id IS NULL OR BTRIM(a.parent_account_id) = '')
+      UNION ALL
+      SELECT
+        a.id,
+        a.code,
+        a.classification,
+        a.name,
+        a.type,
+        NULLIF(BTRIM(a.parent_account_id), ''),
+        ((t.path::text || ' -> ' || a.name)::varchar(1000)),
+        t.level + 1,
+        a.org_id,
+        a.base_currency_id,
+        a.legal_entity_id
+      FROM account a
+      INNER JOIN account_tree t
+        ON BTRIM(a.parent_account_id) = t.id
+       AND a.org_id = t.org_id
+      WHERE a.org_id = ${orgId}
+    )`;
+}
+
+async function queryRawNoJit<T>(query: Prisma.Sql): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe('SET LOCAL jit = off');
+    return tx.$queryRaw<T>(query);
+  });
+}
+
 export const getIncomeStatement = async (
   startDate: string,
   endDate: string,
@@ -81,10 +130,10 @@ export const getIncomeStatement = async (
   reportCurrency?: string, // `currency.id` or ISO code; if omitted, uses org base currency
   maxLevel?: number // cap hierarchy depth; undefined = no cap
 ): Promise<IncomeStatementRow[]> => {
-  // NULL means "use org default"; a value means "use this currency"
   const currencyParam = reportCurrency || null;
-  const incomeStatement = await prisma.$queryRaw<IncomeStatementRow[]>`
+  return queryRawNoJit<IncomeStatementRow[]>(Prisma.sql`
         WITH RECURSIVE
+  ${sqlAccountTree(orgId)},
   org_base AS (
     SELECT
       COALESCE(c_param.id, c_org.id, c_legacy.id, c_inr.id) AS base_currency_id,
@@ -106,7 +155,6 @@ export const getIncomeStatement = async (
     LEFT JOIN currency c_inr ON c_inr.org_id = o.id AND c_inr.code = 'INR'
     WHERE o.id = ${orgId}
   ),
-  -- Most recent AVERAGE rate on or before period end, per account currency id (from_currency_id)
   period_avg_rates AS (
     SELECT DISTINCT ON (er.from_currency_id)
       er.from_currency_id,
@@ -120,47 +168,46 @@ export const getIncomeStatement = async (
       AND er.effective_date <= ${endDate}::date
     ORDER BY er.from_currency_id, er.effective_date DESC
   ),
-  account_balances AS (
-    SELECT
-      ah.id,
-      ah."path",
-      ah."name",
-      ah.classification,
-      ah.type as account_type,
-      ah."level",
-      ah.parent_account_id,
-      ah.org_id,
-      ah.currency as account_currency,
-      COUNT(p.id)::int AS posting_count,
-      COALESCE(SUM(
-        CASE
-          WHEN ah.classification IN ('Assets', 'Expense') THEN
-            CASE
-              WHEN p.account_id = ah.id THEN p.amount
-              WHEN p.credit_account_id = ah.id THEN -p.amount
-              ELSE 0
-            END
-          WHEN ah.classification IN ('Liabilities', 'Equity', 'Income') THEN
-            CASE
-              WHEN p.credit_account_id = ah.id THEN p.amount
-              WHEN p.account_id = ah.id THEN -p.amount
-              ELSE 0
-            END
-          ELSE
-            CASE
-              WHEN p.account_id = ah.id THEN p.amount
-              WHEN p.credit_account_id = ah.id THEN -p.amount
-              ELSE 0
-            END
-        END
-      ), 0) as balance
-    FROM account_hierarchy ah
-    LEFT JOIN posting p ON 
-      (p.account_id = ah.id OR p.credit_account_id = ah.id)
+  period_legs AS (
+    SELECT p.id AS posting_id, p.account_id AS account_id, p.amount AS debit_amount, 0::numeric AS credit_amount
+    FROM posting p
+    WHERE p.org_id = ${orgId}
+      AND p.account_id IS NOT NULL
       AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
       AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
       AND p.reversal_of_posting_id IS NULL
       AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
+    UNION ALL
+    SELECT p.id, p.credit_account_id, 0::numeric, p.amount
+    FROM posting p
+    WHERE p.org_id = ${orgId}
+      AND p.credit_account_id IS NOT NULL
+      AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+      AND p.reversal_of_posting_id IS NULL
+      AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
+  ),
+  account_balances AS (
+    SELECT
+      ah.id,
+      ah.path,
+      ah.name,
+      ah.classification,
+      ah.type as account_type,
+      ah.level,
+      ah.parent_account_id,
+      ah.org_id,
+      ah.currency as account_currency,
+      COUNT(pl.posting_id)::int AS posting_count,
+      COALESCE(SUM(
+        CASE
+          WHEN ah.classification IN ('Assets', 'Expense') THEN pl.debit_amount - pl.credit_amount
+          WHEN ah.classification IN ('Liabilities', 'Equity', 'Income') THEN pl.credit_amount - pl.debit_amount
+          ELSE pl.debit_amount - pl.credit_amount
+        END
+      ), 0) as balance
+    FROM account_tree ah
+    LEFT JOIN period_legs pl ON pl.account_id = ah.id
     WHERE ah.org_id = ${orgId} ${accountId ? Prisma.sql`AND ah.id = ${accountId}` : Prisma.empty}
       ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
     GROUP BY ah.id, ah.path, ah.name, ah.classification, ah.type, ah.level, ah.parent_account_id, ah.org_id, ah.currency
@@ -188,15 +235,14 @@ export const getIncomeStatement = async (
       ah.id AS root_id,
       ah.id AS descendant_id,
       ah.org_id
-    FROM account_hierarchy ah
-    WHERE ah.org_id = ${orgId}
+    FROM account_tree ah
     UNION ALL
     SELECT
       hd.root_id,
       child.id AS descendant_id,
       hd.org_id
     FROM hierarchy_descendants hd
-    JOIN account_hierarchy child
+    JOIN account_tree child
       ON child.parent_account_id = hd.descendant_id
       AND child.org_id = hd.org_id
   ),
@@ -221,7 +267,7 @@ export const getIncomeStatement = async (
     (SELECT base_currency FROM org_base) as report_currency,
     COALESCE(cb.converted_balance, 0) + COALESCE(pt.rolled_up_balance, 0) as total_amount,
     COALESCE(cb.posting_count, 0)::int AS posting_count
-  FROM account_hierarchy display_ah
+  FROM account_tree display_ah
   LEFT JOIN converted_balances cb ON cb.id = display_ah.id
   LEFT JOIN parent_totals pt ON display_ah.id = pt.id
   WHERE display_ah.org_id = ${orgId}
@@ -245,8 +291,7 @@ export const getIncomeStatement = async (
           AND hd.descendant_id <> hd.root_id
       )
     )` : Prisma.empty}
-  ORDER BY display_ah.path;`;
-  return incomeStatement;
+  ORDER BY display_ah.path`);
 };
 
 export const getTrialBalance = async (
@@ -257,17 +302,11 @@ export const getTrialBalance = async (
   reportCurrency?: string, // `currency.id` or ISO code; if omitted, uses org base currency
   legalEntityIds?: string[] // when provided, only include accounts whose legal_entity_id is in this list (excludes NULL)
 ): Promise<TrialBalanceRow[]> => {
-
-  // Calculate previous year date range for opening balance
-  const currentYear = new Date(startDate).getFullYear();
-  const prevYearStart = `${currentYear - 1}-04-01`;
-  const prevYearEnd = `${currentYear}-03-31`;
-
-  // NULL means "use org default"; a value means "use this currency"
   const currencyParam = reportCurrency || null;
 
-  const trialBalance = await prisma.$queryRaw<TrialBalanceRow[]>`
+  return queryRawNoJit<TrialBalanceRow[]>(Prisma.sql`
       WITH RECURSIVE
+      ${sqlAccountTree(orgId)},
       org_base AS (
         SELECT
           COALESCE(c_param.id, c_org.id, c_legacy.id, c_inr.id) AS base_currency_id,
@@ -290,7 +329,6 @@ export const getTrialBalance = async (
         WHERE o.id = ${orgId}
       ),
 
-      -- Most recent AVERAGE rate on or before period end, keyed by from_currency_id
       period_avg_rates AS (
         SELECT DISTINCT ON (er.from_currency_id)
           er.from_currency_id,
@@ -305,7 +343,6 @@ export const getTrialBalance = async (
         ORDER BY er.from_currency_id, er.effective_date DESC
       ),
 
-      -- Most recent CLOSING rate before the period start (for opening balance)
       opening_close_rates AS (
         SELECT DISTINCT ON (er.from_currency_id)
           er.from_currency_id,
@@ -320,9 +357,6 @@ export const getTrialBalance = async (
         ORDER BY er.from_currency_id, er.effective_date DESC
       ),
 
-      -- Opening balance: most recent OPENING_BALANCE journal before the report period.
-      -- Uses posting_date < startDate so any month selection within a FY works correctly
-      -- (the year-window approach broke for Jan-Mar months of APR_MAR entities).
       previous_year_closing AS (
         SELECT
           closing_legs.account_id,
@@ -337,7 +371,7 @@ export const getTrialBalance = async (
               ELSE p.amount
             END AS opening_balance_orig
           FROM posting p
-          INNER JOIN account_hierarchy ah ON ah.id = p.account_id AND ah.org_id = p.org_id
+          INNER JOIN account_tree ah ON ah.id = p.account_id AND ah.org_id = p.org_id
           WHERE p.posting_type = 'OPENING_BALANCE'
             AND p.posting_date < ${startDate}::date
             AND p.org_id = ${orgId}
@@ -355,7 +389,7 @@ export const getTrialBalance = async (
               ELSE -p.amount
             END AS opening_balance_orig
           FROM posting p
-          INNER JOIN account_hierarchy ah ON ah.id = p.credit_account_id AND ah.org_id = p.org_id
+          INNER JOIN account_tree ah ON ah.id = p.credit_account_id AND ah.org_id = p.org_id
           WHERE p.posting_type = 'OPENING_BALANCE'
             AND p.posting_date < ${startDate}::date
             AND p.org_id = ${orgId}
@@ -368,7 +402,28 @@ export const getTrialBalance = async (
         GROUP BY closing_legs.account_id
       ),
 
-      -- Per-account period activity in original currency (includes currency)
+      period_legs AS (
+        SELECT p.account_id AS account_id, p.amount AS debit_amount, 0::numeric AS credit_amount
+        FROM posting p
+        WHERE p.org_id = ${orgId}
+          AND p.account_id IS NOT NULL
+          AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+          AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+          AND p.reversal_of_posting_id IS NULL
+          AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
+          AND (p.name IS NULL OR p.name NOT LIKE 'Clos%')
+        UNION ALL
+        SELECT p.credit_account_id, 0::numeric, p.amount
+        FROM posting p
+        WHERE p.org_id = ${orgId}
+          AND p.credit_account_id IS NOT NULL
+          AND p.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+          AND COALESCE(p.status, 'ACTIVE') NOT IN ('REVERSED', 'DUPLICATE')
+          AND p.reversal_of_posting_id IS NULL
+          AND COALESCE(p.posting_type, '') <> 'DUPLICATE'
+          AND (p.name IS NULL OR p.name NOT LIKE 'Clos%')
+      ),
+
       rolled_up_balances AS (
         SELECT
           ah.id as account_id,
@@ -380,28 +435,25 @@ export const getTrialBalance = async (
           ah.level,
           ah.parent_account_id,
           ah.currency as account_currency,
-          COALESCE(SUM(ab.debit_amount), 0) as total_debits_orig,
-          COALESCE(SUM(ab.credit_amount), 0) as total_credits_orig,
+          COALESCE(SUM(pl.debit_amount), 0) as total_debits_orig,
+          COALESCE(SUM(pl.credit_amount), 0) as total_credits_orig,
           CASE
             WHEN ah.classification IN ('Assets', 'Expense') THEN
-              COALESCE(SUM(ab.debit_amount - ab.credit_amount), 0)
+              COALESCE(SUM(pl.debit_amount - pl.credit_amount), 0)
             WHEN ah.classification IN ('Liabilities', 'Equity', 'Income')
               OR LOWER(ah.classification::text) LIKE '%revenue%' THEN
-              COALESCE(SUM(ab.credit_amount - ab.debit_amount), 0)
+              COALESCE(SUM(pl.credit_amount - pl.debit_amount), 0)
             ELSE
-              COALESCE(SUM(ab.debit_amount - ab.credit_amount), 0)
+              COALESCE(SUM(pl.debit_amount - pl.credit_amount), 0)
           END AS balance_orig
-        FROM account_hierarchy ah
-        LEFT JOIN account_balances ab ON ah.id = ab.account_id
-          AND ab.org_id = ah.org_id
-          AND ab.value_date BETWEEN ${startDate}::date AND ${endDate}::date
+        FROM account_tree ah
+        LEFT JOIN period_legs pl ON pl.account_id = ah.id
         WHERE ah.org_id = ${orgId} ${accountId ? Prisma.sql`AND ah.id = ${accountId}` : Prisma.empty}
           ${legalEntityIds?.length ? Prisma.sql`AND ah.legal_entity_id = ANY(${legalEntityIds})` : Prisma.empty}
         GROUP BY ah.id, ah.org_id, ah.classification, ah.path, ah.name, ah.type,
                  ah.level, ah.parent_account_id, ah.currency
       ),
 
-      -- Convert each account's amounts to base currency
       converted_balances AS (
         SELECT
           rb.*,
@@ -448,20 +500,18 @@ export const getTrialBalance = async (
           ah.id AS root_id,
           ah.id AS descendant_id,
           ah.org_id
-        FROM account_hierarchy ah
-        WHERE ah.org_id = ${orgId}
+        FROM account_tree ah
         UNION ALL
         SELECT
           hd.root_id,
           child.id AS descendant_id,
           hd.org_id
         FROM hierarchy_descendants hd
-        JOIN account_hierarchy child
+        JOIN account_tree child
           ON child.parent_account_id = hd.descendant_id
           AND child.org_id = hd.org_id
       ),
 
-      -- Roll up CONVERTED amounts to true parent accounts only (not path-prefix siblings)
       parent_totals AS (
         SELECT
           hd.root_id AS id,
@@ -476,7 +526,6 @@ export const getTrialBalance = async (
         GROUP BY hd.root_id
       ),
 
-      -- Roll up CONVERTED opening balances to parent accounts
       parent_opening_totals AS (
         SELECT
           hd.root_id AS id,
@@ -510,7 +559,7 @@ export const getTrialBalance = async (
         COALESCE(cb.total_debits_orig, 0) as total_debits_orig,
         COALESCE(cb.total_credits_orig, 0) as total_credits_orig,
         COALESCE(cb.balance_orig, 0) as balance_orig
-      FROM account_hierarchy display_ah
+      FROM account_tree display_ah
       LEFT JOIN converted_balances cb ON cb.account_id = display_ah.id
       LEFT JOIN currency acc_curr ON acc_curr.id = COALESCE(cb.account_currency, display_ah.currency)
       LEFT JOIN parent_totals pt ON display_ah.id = pt.id
@@ -529,9 +578,7 @@ export const getTrialBalance = async (
               AND hd.descendant_id <> hd.root_id
           )
         )` : Prisma.empty}
-      ORDER BY display_ah.path`;
-
-  return trialBalance;
+      ORDER BY display_ah.path`);
 };
 
 // ── Monthly trial balance ─────────────────────────────────────────────────────

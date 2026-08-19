@@ -7,12 +7,13 @@ import { reportAPI } from "@/api/api";
 import { formatCurrency } from "@/lib/formatters";
 import {
   Loader2, Building2, CreditCard, TrendingUp, DollarSign,
-  Receipt, FileSpreadsheet, RefreshCw,
+  Receipt, FileSpreadsheet, Play,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import dayjs from "dayjs";
 import * as XLSX from "xlsx";
 import "@/styles/reports.css";
+import { ReportIdleState } from "@/components/Reports/ReportIdleState";
 import { isEntityHeadquarters, useEntity } from "@/contexts/EntityContext";
 import {
   FinancialYearSelector,
@@ -140,6 +141,7 @@ export default function MonthlyTrialBalance() {
 
   const [rows, setRows] = useState<MonthlyTrialBalanceRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasRun, setHasRun] = useState(false);
   const fetchSeq = useRef(0);
 
   const monthOptions = useMemo(() => buildMonthOptions(selectedFY), [selectedFY]);
@@ -163,6 +165,7 @@ export default function MonthlyTrialBalance() {
   const fetchData = useCallback(async () => {
     if (entityLoading) return;
     const seq = ++fetchSeq.current;
+    setHasRun(true);
     setLoading(true);
     try {
       const result = (await reportAPI.getReport("monthly_trial_balance", {
@@ -179,8 +182,6 @@ export default function MonthlyTrialBalance() {
       if (seq === fetchSeq.current) setLoading(false);
     }
   }, [fromDate, toDate, legalEntityIds, entityLoading]);
-
-  useEffect(() => { void fetchData(); }, [fetchData]);
 
   // ── Derived state ──────────────────────────────────────────────────────────
 
@@ -310,13 +311,13 @@ export default function MonthlyTrialBalance() {
             </label>
 
             <Button
-              variant="outline"
               size="sm"
-              onClick={fetchData}
+              onClick={() => void fetchData()}
               disabled={loading || entityLoading}
               className="shrink-0"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Play className="h-4 w-4 mr-1.5" />}
+              Run report
             </Button>
 
             <Button
@@ -347,7 +348,13 @@ export default function MonthlyTrialBalance() {
 
       {/* Content */}
       <div className="p-3 space-y-3">
-        {loading && rows.length === 0 ? (
+        {!hasRun && !loading ? (
+          <Card className="shadow-sm border-slate-200">
+            <CardContent className="p-6">
+              <ReportIdleState onRun={() => void fetchData()} disabled={entityLoading} />
+            </CardContent>
+          </Card>
+        ) : loading && rows.length === 0 ? (
           <Card className="shadow-sm border-slate-200">
             <CardContent className="p-8 flex flex-col items-center gap-2">
               <Loader2 className="h-6 w-6 animate-spin text-blue-600" />

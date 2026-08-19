@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { reportAPI } from "@/api/api";
 import { formatCurrency } from "@/lib/formatters";
-import { Loader2, FileDown, ChevronDown, FileSpreadsheet, TrendingUp } from "lucide-react";
+import { Loader2, FileDown, ChevronDown, FileSpreadsheet, TrendingUp, Play } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { pdf } from "@react-pdf/renderer";
@@ -20,6 +20,7 @@ import {
   type FinancialYearType,
 } from "@/components/Reports/FinancialYearSelector";
 import { PersonalIncomePDFDocument } from "@/components/pdf_generator/PersonalIncomePDFDocument";
+import { ReportIdleState } from "@/components/Reports/ReportIdleState";
 import "@/styles/reports.css";
 
 interface IncomeRow {
@@ -58,6 +59,7 @@ export default function PersonalIncomeReport() {
 
   const [rows, setRows] = useState<IncomeRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasRun, setHasRun] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportPdfLoading, setExportPdfLoading] = useState(false);
   const fetchSeq = useRef(0);
@@ -65,6 +67,7 @@ export default function PersonalIncomeReport() {
   const fetchReport = useCallback(async () => {
     if (!selectedFY) return;
     const seq = ++fetchSeq.current;
+    setHasRun(true);
     setLoading(true);
     setError(null);
     try {
@@ -89,10 +92,6 @@ export default function PersonalIncomeReport() {
       if (seq === fetchSeq.current) setLoading(false);
     }
   }, [selectedFY, currentEntityId]);
-
-  useEffect(() => {
-    if (!entityLoading) void fetchReport();
-  }, [entityLoading, fetchReport]);
 
   const incomeTotal = useMemo(
     () => rows.filter((r) => r.level === 0).reduce((s, r) => s + Math.abs(Number(r.total_amount)), 0),
@@ -153,7 +152,7 @@ export default function PersonalIncomeReport() {
     toast({ title: "Excel exported" });
   };
 
-  const reportLoading = loading || entityLoading;
+  const reportLoading = loading;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -175,13 +174,13 @@ export default function PersonalIncomeReport() {
             />
 
             <Button
-              variant="outline"
               size="sm"
               onClick={() => void fetchReport()}
-              disabled={reportLoading}
-              className="h-9 border-slate-300 shrink-0"
+              disabled={reportLoading || entityLoading}
+              className="h-9 shrink-0"
             >
-              {reportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+              {reportLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Play className="h-4 w-4 mr-1.5" />}
+              Run report
             </Button>
 
             <DropdownMenu>
@@ -216,7 +215,13 @@ export default function PersonalIncomeReport() {
 
       {/* Body */}
       <div className="p-3">
-        {reportLoading && rows.length === 0 ? (
+        {!hasRun && !reportLoading ? (
+          <Card className="shadow-sm border-slate-200">
+            <CardContent className="p-6">
+              <ReportIdleState onRun={() => void fetchReport()} disabled={entityLoading} />
+            </CardContent>
+          </Card>
+        ) : reportLoading && rows.length === 0 ? (
           <Card className="shadow-sm border-slate-200">
             <CardContent className="p-8 flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-6 w-6 animate-spin text-blue-600" />

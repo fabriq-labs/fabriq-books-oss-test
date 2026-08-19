@@ -187,6 +187,7 @@ export default function PostingList() {
                             loading={false}
                             showAccountFilter={true}
                             showRefreshButton={true}
+                            runButtonLabel="Refresh"
                             beforeRefresh={
                                 <>
                                     <FinancialYearSelector
