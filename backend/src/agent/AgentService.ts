@@ -810,6 +810,8 @@ export class AgentService {
           if (streamError) return;
 
           const durationMs = Date.now() - startTime;
+          const promptTokens = usage?.promptTokens ?? 0;
+          const emptyStream = !String(text ?? '').trim() && promptTokens === 0;
           llmTraceLogger.logTrace({
             orgId: auth.user?.org_id || 'default',
             userId: auth.user?.id,
@@ -827,7 +829,8 @@ export class AgentService {
               providerMetadata: providerMetadata as any,
             },
             durationMs,
-            status: 'success',
+            status: emptyStream ? 'error' : 'success',
+            errorMessage: emptyStream ? 'Empty stream response (no tokens or text)' : undefined,
           }).catch(() => { });
 
           // ── Persist session messages and auto-continue ──

@@ -1,11 +1,17 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useChat } from "@ai-sdk/react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useChat, type Message } from "@ai-sdk/react";
 import Cookies from "js-cookie";
-import { X, RefreshCw, Loader2, ArrowUp, TrendingUp, AlertTriangle } from "lucide-react";
+import { X, RefreshCw, Loader2, ArrowUp, TrendingUp, AlertTriangle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchAPI } from "@/api/api";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import {
+  clearOptionsPositionChatThread,
+  loadChatThread,
+  optionsPositionChatThreadId,
+  saveChatThread,
+} from "@/lib/chatThreadApi";
 
 /* ── Types ──────────────────────────────────────────────── */
 
@@ -346,11 +352,31 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
   // Start true so the first LLM turn waits for the Questrade fetch to settle.
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [clearingChat, setClearingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const analysisInitiated = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
   const modelContextRef = useRef<Record<string, string | number | boolean>>(
     buildModelContext(row, null)
+  );
+
+  const chatThreadId = useMemo(
+    () => (row.holding_id ? optionsPositionChatThreadId(row.holding_id) : undefined),
+    [row.holding_id]
+  );
+
+  const buildThreadMetadata = useCallback(
+    () => ({
+      kind: "options_position",
+      holdingId: row.holding_id ?? null,
+      symbol: row.symbol,
+      recordId: row.holding_id ?? null,
+      modelName: "holding",
+      viewName: "holding_view",
+    }),
+    [row.holding_id, row.symbol]
   );
 
   const dte = daysToExpiry(row.symbol);
@@ -408,13 +434,32 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
    * options_income row. getOptionChain is available for roll questions.
    */
   const authToken = Cookies.get("__session");
-  const { messages, append, isLoading, input, setInput } = useChat({
+  const {
+    messages,
+    setMessages,
+    append,
+    isLoading,
+    input,
+    setInput,
+  } = useChat({
+    id: chatThreadId,
     api: `${import.meta.env.VITE_API_BASE_URL || ""}/api/agent/chat/stream`,
+    sendExtraMessageFields: true,
     headers: authToken
       ? { Accept: "text/event-stream", Authorization: `Bearer ${authToken}` }
       : { Accept: "text/event-stream" },
     onError: (err) => {
       console.error("Option analysis stream error:", err);
+    },
+    onFinish: (message) => {
+      if (!chatThreadId) return;
+      const snapshot = messagesRef.current;
+      const threadMessages = snapshot.some((m) => m.id === message.id)
+        ? snapshot
+        : [...snapshot, message];
+      void saveChatThread(chatThreadId, threadMessages, buildThreadMetadata()).catch((err) => {
+        console.error("Failed to persist option position chat", err);
+      });
     },
     experimental_prepareRequestBody: ({ messages: msgs }) => ({
       messages: msgs,
@@ -428,8 +473,45 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
     }),
   });
 
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  /* Load persisted conversation for this holding (survives modal close/reopen). */
+  useEffect(() => {
+    if (!chatThreadId) {
+      setHistoryLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+    setHistoryLoaded(false);
+    setMessages([]);
+
+    async function loadHistory() {
+      try {
+        const thread = await loadChatThread(chatThreadId);
+        if (cancelled) return;
+        if (thread?.messages?.length) {
+          setMessages(thread.messages);
+          analysisInitiated.current = true;
+        }
+      } catch (err) {
+        console.error("Failed to load option position chat history", err);
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    }
+
+    void loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [chatThreadId, setMessages]);
+
   /* Kick off first analysis turn once quote fetch has settled (success or failure). */
   useEffect(() => {
+    if (!historyLoaded) return;
     if (analysisInitiated.current) return;
     if (quoteLoading) return;
     analysisInitiated.current = true;
@@ -437,7 +519,7 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
       role: "user",
       content: initialAnalysisPrompt(row),
     });
-  }, [quoteLoading, append, row]);
+  }, [historyLoaded, quoteLoading, append, row]);
 
   /* Auto-scroll chat to bottom */
   useEffect(() => {
@@ -462,9 +544,25 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
     }
   };
 
+  const handleClearConversation = async () => {
+    if (!row.holding_id || isLoading || clearingChat) return;
+    setClearingChat(true);
+    try {
+      await clearOptionsPositionChatThread(row.holding_id);
+      setMessages([]);
+      analysisInitiated.current = true;
+    } catch (err) {
+      console.error("Failed to clear option position chat", err);
+    } finally {
+      setClearingChat(false);
+    }
+  };
+
   const statusPills = computeStatusPills(row, quote, dte);
   const showAnalysisSkeleton =
-    quoteLoading || (isLoading && messages.filter((m) => m.role === "assistant").length === 0);
+    !historyLoaded ||
+    quoteLoading ||
+    (isLoading && messages.filter((m) => m.role === "assistant").length === 0);
 
   /* Backdrop close */
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -509,6 +607,21 @@ export function OptionPositionDetailModal({ row, currency, onClose }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {row.holding_id && messages.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void handleClearConversation()}
+                disabled={isLoading || clearingChat}
+                className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 p-1 rounded transition-colors disabled:opacity-40"
+                title="Clear conversation (audit log preserved)"
+              >
+                {clearingChat ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </button>
+            )}
             <button
               onClick={() => void fetchQuote()}
               disabled={quoteLoading}

@@ -8,6 +8,11 @@ const VIEW = 'chat_thread_view';
 const DEFAULT_TITLE = 'New Financial Inquiry';
 const TITLE_MAX_LENGTH = 60;
 
+/** Stable chat_thread id for Options Income position modal (scoped by org + user in DAL). */
+export function optionsPositionChatThreadId(holdingId: string): string {
+  return `opt_${holdingId}`;
+}
+
 async function resolveCurrentUserId(): Promise<string> {
   const cached = userStorage.getUserData()?.id;
   if (cached) {
@@ -281,4 +286,9 @@ export async function deleteChatThread(chatId: string): Promise<void> {
     return;
   }
   throw new Error(await readErrorMessage(response));
+}
+
+/** Clear UI conversation for an options position; llm_trace audit rows are untouched. */
+export async function clearOptionsPositionChatThread(holdingId: string): Promise<void> {
+  await deleteChatThread(optionsPositionChatThreadId(holdingId));
 }

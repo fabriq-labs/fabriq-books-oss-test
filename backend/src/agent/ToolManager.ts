@@ -22,6 +22,7 @@ import {
     categorizePostingsTool,
     runFinancialReportTool,
     prepareTaxPackageTool,
+    getOptionChainTool,
 } from './tools';
 import { QueryClassification } from './utils/questionClassifier';
 import logger from '../utils/logger';
@@ -70,6 +71,7 @@ export class ToolManager {
             analyticsQuery: () => analyticsQueryTool(auth, toolContext),
             queueActions: () => null, // session-only — wired in getUnifiedTools
             requestClarification: () => null,
+            getOptionChain: () => getOptionChainTool(auth),
         };
     }
 

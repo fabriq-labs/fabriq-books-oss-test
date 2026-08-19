@@ -22,3 +22,4 @@ export {
 export { categorizePostingsTool } from './categorizePostings';
 export { runFinancialReportTool, runFinancialReportSchema } from './runFinancialReport';
 export { prepareTaxPackageTool } from './prepareTaxPackage';
+export { getOptionChainTool, getOptionChainAgentSchema } from './getOptionChain';
