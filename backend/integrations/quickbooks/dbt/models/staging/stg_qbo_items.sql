@@ -22,7 +22,6 @@ select
     -- Core fields (direct columns)
     "Name" as name,
     "Type" as item_type,  -- Service, Inventory, NonInventory
-    null as sku,  -- SKU not available in QuickBooks items table
     "Description" as description,
     "Active" as active,
     "FullyQualifiedName" as fully_qualified_name,

@@ -5,23 +5,17 @@
   config(
     materialized='incremental',
     incremental_strategy='merge',
-    unique_key='source_record_id',
-    on_schema_change='append_new_columns'
+    unique_key=['source_record_id', 'source_system_id', 'org_id'],
+    on_schema_change='ignore',
+    full_refresh=false
   )
 }}
 
 select
-    -- Generate ID
-    md5(concat(stg.item_id, '_', sb.id)) as id,
-
-    -- Core item fields - mapped from QuickBooks to Prisma
-    -- item_code is unique but nullable - use SKU if available, otherwise null
-    -- If SKU is empty/null, leave item_code as null to avoid unique constraint violations
-    case 
-        when stg.sku is not null and stg.sku != '' and trim(stg.sku) != ''
-        then stg.sku
-        else null
-    end as item_code,  -- SKU maps to item_code (unique constraint, nullable)
+    -- Core item fields - mapped from QuickBooks to Prisma.
+    -- Prisma generates id on insert; merge matches lineage keys.
+    -- Do not select item_code: QBO has no item code, and Airbyte qb_items has no Sku.
+    -- Prisma item_code is optional (String?); leave it unset on insert.
     coalesce(stg.name, '') as item_name,  -- Required field
     coalesce(stg.name, '') as name,  -- Optional name field
     null as item_shortname,  -- Not in QuickBooks items stream
@@ -67,8 +61,7 @@ select
     null as product_id,
     null as item_category_id,
     null as tax_master_id,
-    null as tax_rate_intra_id,
-    null as currency_master_id
+    null as tax_rate_intra_id
 
 from {{ ref('stg_qbo_items') }} stg
 -- Join to sync_batch (with DISTINCT ON to prevent duplicates)

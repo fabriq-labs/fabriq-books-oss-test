@@ -5,16 +5,14 @@
   config(
     materialized='incremental',
     incremental_strategy='merge',
-    unique_key='source_record_id',
-    on_schema_change='append_new_columns'
+    unique_key=['source_record_id', 'source_system_id', 'org_id'],
+    on_schema_change='ignore',
+    full_refresh=false
   )
 }}
 
 select
-    -- Generate ID
-    md5(concat(stg.account_id, '_', sb.id)) as id,
-
-    -- Core account fields
+    -- Core account fields. Prisma generates id on insert; merge matches lineage keys.
     stg.account_name as name,
     ARRAY[stg.account_type]::text[] as type,  -- Convert to text array as required by Prisma schema
     stg.account_sub_type as sub_type,
@@ -27,10 +25,10 @@ select
         when stg.classification = 'Equity' then 'Equity'::account_classification
         else null
     end as classification,
-    stg.current_balance::numeric as balance,
-    stg.currency_code as currency,
+    stg.current_balance::numeric(19, 4) as balance,
     case when coalesce(stg.active, true) then true else false end as is_active,
-    stg.parent_account_id as parent_account_id,
+    -- QBO parent ids are source ids, not Prisma account.id; writing them violates the FK.
+    null as parent_account_id,
     
     -- Timestamps
     {{ parse_qbo_date('stg.create_time') }} as created_at,

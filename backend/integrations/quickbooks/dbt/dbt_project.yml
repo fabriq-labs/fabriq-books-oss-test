@@ -34,24 +34,19 @@ models:
       +custom_schema: datalake
       # Note: source_system table is managed by Prisma, not DBT
 
-    # Normalized models in public schema
+    # Normalized models merge into Prisma-owned public tables.
+    # ignore: dest has extra Prisma columns; do not ADD/DROP/ALTER.
+    # prisma_guard still refuses DDL if dbt tries it. Never --full-refresh.
     normalized:
       +materialized: incremental
       +custom_schema: public
-      customers:
-        +incremental_strategy: merge
-        +unique_key: source_record_id
-        +on_schema_change: append_new_columns
-      supplier:
-        +incremental_strategy: merge
-        +unique_key: source_record_id
-        +on_schema_change: append_new_columns
-      item_master:
-        +incremental_strategy: merge
-        +unique_key: source_record_id
-        +on_schema_change: append_new_columns
-      account:
-        +incremental_strategy: merge
-        +unique_key: source_record_id
-        +on_schema_change: append_new_columns
+      +incremental_strategy: merge
+      +unique_key:
+        - source_record_id
+        - source_system_id
+        - org_id
+      +on_schema_change: ignore
+      +full_refresh: false
+      +pre_hook:
+        - "{{ assert_prisma_relation_exists() }}"
 

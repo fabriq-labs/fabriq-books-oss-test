@@ -5,16 +5,14 @@
   config(
     materialized='incremental',
     incremental_strategy='merge',
-    unique_key='source_record_id',
-    on_schema_change='append_new_columns'
+    unique_key=['source_record_id', 'source_system_id', 'org_id'],
+    on_schema_change='ignore',
+    full_refresh=false
   )
 }}
 
 select
-    -- Generate ID
-    md5(concat(stg.vendor_id, '_', sb.id)) as id,
-
-    -- Core supplier fields
+    -- Core supplier fields. Prisma generates id on insert; merge matches lineage keys.
     coalesce(stg.display_name, stg.company_name, 'Unknown') as supplier_name,
     coalesce(stg.billing_address_line1, '') as supplier_address,
     coalesce(stg.billing_city, '') as city,
