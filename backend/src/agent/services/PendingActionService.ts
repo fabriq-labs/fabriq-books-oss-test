@@ -66,7 +66,7 @@ export type ListPendingActionsFilter = {
 
 // ── Single Action ──────────────────────────────────────────────
 
-export async function m (params: CreatePendingActionParams) {
+export async function createPendingAction(params: CreatePendingActionParams) {
   const action = await prisma.pending_action.create({
     data: {
       org_id: params.org_id,
