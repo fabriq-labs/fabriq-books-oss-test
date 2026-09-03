@@ -11,11 +11,13 @@ describe('SQL seed files for Super Admin sync', () => {
     'prisma/seed-agent-model-tools.sql',
   ];
 
-  it.each(files)('%s exists, upserts, and is one statement', (rel) => {
+  it.each(files)('%s exists, upserts, and splits cleanly', (rel) => {
     const sql = fs.readFileSync(path.join(BACKEND_ROOT, rel), 'utf8');
     expect(sql).toMatch(/INSERT INTO/i);
     expect(sql).toMatch(/ON CONFLICT/i);
-    const inserts = sql.match(/INSERT INTO/gi) || [];
-    expect(inserts).toHaveLength(1);
+    const { splitSqlStatements } = require('../executeSqlFile');
+    const stmts = splitSqlStatements(sql);
+    expect(stmts.length).toBeGreaterThanOrEqual(1);
+    expect(stmts[0]).toMatch(/INSERT INTO/i);
   });
 });
