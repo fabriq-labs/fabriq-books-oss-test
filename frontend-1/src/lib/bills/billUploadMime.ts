@@ -44,22 +44,26 @@ export function extensionFromFileName(fileName?: string | null): string | null {
   return base.slice(dot + 1).toLowerCase();
 }
 
+export type BillUploadMimeResolveResult =
+  | { readonly ok: true; mime: BillUploadMime }
+  | { readonly ok: false; error: string };
+
 export function resolveBillUploadMime(input: {
   originalName?: string | null;
   mimetype?: string | null;
-}): { ok: true; mime: BillUploadMime } | { ok: false; error: string } {
+}): BillUploadMimeResolveResult {
   const rawMime = String(input.mimetype || '').trim().toLowerCase();
   const aliased = rawMime ? ALIAS_TO_CANONICAL[rawMime] : undefined;
-  if (aliased) return { ok: true, mime: aliased };
+  if (aliased) return { ok: true as const, mime: aliased };
 
   const ext = extensionFromFileName(input.originalName);
   if (ext && EXT_TO_MIME[ext]) {
-    return { ok: true, mime: EXT_TO_MIME[ext] };
+    return { ok: true as const, mime: EXT_TO_MIME[ext] };
   }
 
   const hint = rawMime || (ext ? `.${ext}` : 'unknown');
   return {
-    ok: false,
+    ok: false as const,
     error: `Unsupported file type (${hint}). Use PDF or a photo (JPEG, PNG, HEIC, WebP).`,
   };
 }

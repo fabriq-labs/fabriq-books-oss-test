@@ -12,6 +12,8 @@ interface StepCardProps {
   clarification: ClarificationRequest | null;
   events: SessionEvent[]; // filtered to this step's step_index
   onClarify: (answer: string) => Promise<void>;
+  /** When false, keep step title as primary and put result_summary on a secondary line (completed view). */
+  preferSummary?: boolean;
 }
 
 function StatusIcon({ step, isCurrent, isAwaiting }: { step: PlanStep; isCurrent: boolean; isAwaiting: boolean }) {
@@ -29,6 +31,7 @@ function StepCardInner({
   clarification,
   events,
   onClarify,
+  preferSummary = true,
 }: StepCardProps) {
   const isDone = step.status === 'completed';
   const isFailed = step.status === 'failed';
@@ -40,6 +43,11 @@ function StepCardInner({
   const toolEvents = events.filter(
     (e) => e.type === 'tool_called' && !SKIP_TOOLS.has(e.data?.tool_name)
   );
+
+  const primaryText =
+    preferSummary && isDone && step.result_summary
+      ? step.result_summary
+      : step.title;
 
   return (
     <div
@@ -61,9 +69,7 @@ function StepCardInner({
             'text-sm leading-snug',
             isDone ? 'text-gray-800' : isFailed ? 'text-red-700' : 'text-gray-700',
           )}>
-            {isDone && step.result_summary
-              ? step.result_summary
-              : step.title}
+            {primaryText}
             {hasClarified && (
               <span className="ml-2 text-[10px] text-amber-600 border border-amber-200 bg-amber-50 rounded px-1 py-0.5">
                 ↩ clarified

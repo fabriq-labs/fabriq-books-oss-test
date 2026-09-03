@@ -48,10 +48,10 @@ export const sync_purchase_order = async (
       throw new Error('Organization ID is required but not provided');
     }
 
-    // Fetch org to get ERP system type
+    // Fetch org to get ERP system type (purchase_order has org_id, not an organization relation)
     const org = await tx.org.findUnique({
       where: { id: authContext.user.org_id },
-      select: { erp_system_type: true },
+      select: { id: true, erp_system_type: true, basecurrency_id: true },
     });
 
     if (!org) {
@@ -75,7 +75,7 @@ export const sync_purchase_order = async (
     });
 
     // Fetch purchase order with all related data
-    const purchaseOrder = await tx.purchase_order.findUnique({
+    const purchaseOrderRecord = await tx.purchase_order.findUnique({
       where: { id: modelId },
       include: {
         supplier_details: {
@@ -96,13 +96,18 @@ export const sync_purchase_order = async (
           },
         },
         location: true,
-        organization: true,
       },
     });
 
-    if (!purchaseOrder) {
+    if (!purchaseOrderRecord) {
       throw new Error(`Purchase order not found: ${modelId}`);
     }
+
+    // Attach org for connectors/mappers that expect `organization` (not a Prisma relation)
+    const purchaseOrder = {
+      ...purchaseOrderRecord,
+      organization: org,
+    };
 
     // Check if already synced
     if (purchaseOrder.source_record_id && purchaseOrder.sync_status === 'synced') {

@@ -28,6 +28,8 @@ export type ExtractedLineItem = {
   quantity?: number | null;
   line_total?: number | null;
   invoiced_amount?: number | null;
+  discount_rate?: number | null;
+  discount_amount?: number | null;
   tax_type?: string | null;
   tax_rate?: number | null;
   tax_rate_intra?: number | null;
@@ -179,6 +181,10 @@ export type ExtractedInvoice = {
   invoice_net_total?: number | null;
   invoice_total?: number | null;
   terms_and_conditions?: string | null;
+  /** Footer discount only (extract blob; allocated onto lines by applyHeaderDiscountToLines) */
+  discount_rate?: number | null;
+  discount_amount?: number | null;
+  discount_allocated?: boolean | null;
   [key: string]: unknown;
 };
 
@@ -837,6 +843,8 @@ export function buildBillCreatePayloads(opts: {
       ordered_amount: line.ordered_amount ?? line.line_total ?? line.invoiced_amount ?? 0,
       invoice_qty: qty,
       line_total: line.line_total ?? line.invoiced_amount ?? line.ordered_amount ?? undefined,
+      discount_rate: line.discount_rate ?? 0,
+      discount_amount: line.discount_amount ?? 0,
       tax_rate: lr.tax_rate ?? line.tax_rate ?? 0,
       line_tax_amount: lr.line_tax_amount ?? line.line_tax_amount ?? undefined,
       tax_group_id: lr.tax_group_id || undefined,

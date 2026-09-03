@@ -22,7 +22,7 @@ select
     '' as state,  -- Address not in contacts stream, use empty string
     '' as country,  -- Address not in contacts stream, use empty string
     '' as zip_code,  -- Address not in contacts stream, use empty string
-    coalesce(stg.phone, stg.mobile) as primary_phone,
+    coalesce(stg.phone, stg.mobile, '') as primary_phone,  -- NOT NULL in Prisma; Zoho contacts often omit phone
     coalesce(stg.email, '') as primary_email,
     'Not Specified' as industry,  -- Industry not in contacts stream, use default
     stg.website,

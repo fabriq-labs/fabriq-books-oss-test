@@ -32,6 +32,7 @@ import {
   buildBillCreatePayloads,
   sanitizeChargeTaxFields,
 } from './invoiceExtractResolve';
+import { applyHeaderDiscountToLines } from './invoiceDiscount';
 import { preparePostingCreatePayload, attachLegalEntityScopeToToolResult } from './postingCreateHelpers';
 import {
   normalizeSearchParam,
@@ -1372,7 +1373,7 @@ export function processInvoiceFromPdfTool(auth: AuthContext) {
           supplier_remarks: extractedData.data.invoice.supplier_remarks,
           shipping_terms: extractedData.data.invoice.shipping_terms || poData?.supplier_details?.shipping_terms?.shipping_terms,
           shipping_method: extractedData.data.invoice.shipping_method || poData?.supplier_details?.shipping_method?.shipping_method,
-          payment_terms: extractedData.data.invoice.payment_terms || poData?.supplier_details?.payment_terms?.payment_terms,
+          // payment_terms: extractedData.data.invoice.payment_terms || poData?.supplier_details?.payment_terms?.payment_terms,
           remit_to: extractedData.data.invoice.remit_to,
           bill_to: extractedData.data.invoice.bill_to,
           deliver_to: extractedData.data.invoice.deliver_to,
@@ -1509,12 +1510,16 @@ export function extractInvoiceFromFileTool(
       _options,
     ) => {
       try {
+        // Allocate header discounts onto product lines before resolve/create/FE preview.
+        params = applyHeaderDiscountToLines(params);
+
         logger.debug('Received extracted invoice data', {
           hasInvoice: !!params.invoice,
           lineItemsCount: params.line_items?.length || 0,
           chargesCount: params.charges?.length || 0,
           hasContext: !!params.context,
-          poNumber: params.invoice?.po_number
+          poNumber: params.invoice?.po_number,
+          discountAllocated: params.invoice?.discount_allocated === true,
         });
 
         // Lookup purchase order if PO number is present in the invoice

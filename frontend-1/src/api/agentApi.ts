@@ -164,11 +164,15 @@ export const agentAPI = {
     formData.append('file', file);
     if (prompt) formData.append('prompt', prompt);
     if (context) formData.append('context', JSON.stringify(context));
-    // Client-side safety net: backend also enforces AGENT_STREAM_TIMEOUT_MS.
-    // Keep FE slightly above backend default (120s) so server can return a clean error first.
+    // Client-side safety net: backend enforces AGENT_STREAM_TIMEOUT_MS (default 120s,
+    // often raised to 300s locally). Keep FE above that so the server can return a
+    // clean 504 instead of the browser aborting first with "signal is aborted without reason".
     const controller = new AbortController();
-    const timeoutMs = 150_000;
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutMs = 330_000;
+    const timer = setTimeout(
+      () => controller.abort(new DOMException('Extract request timed out', 'TimeoutError')),
+      timeoutMs,
+    );
     return uploadAPI('/api/agent/extract', {
       method: 'POST',
       body: formData,

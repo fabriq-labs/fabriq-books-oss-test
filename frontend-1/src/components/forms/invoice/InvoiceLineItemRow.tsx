@@ -666,6 +666,11 @@ const InvoiceLineItemRow: React.FC<InvoiceLineItemRowProps> = ({
           )}
         </TableCell>
         <TableCell>
+          {item?.discount_amount
+            ? formatCurrency(item?.discount_amount, currencyCode)
+            : "-"}
+        </TableCell>
+        <TableCell>
           {item?.line_tax_amount
             ? formatCurrency(item?.line_tax_amount, currencyCode)
             : "-"}

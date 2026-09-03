@@ -286,7 +286,14 @@ export const extractInvoiceFromFileSchema = z.object({
     shipping_handling_misc_total: z.number().nullish(),
     invoice_total: z.number().nullish(),
     balance_amount: z.number().nullish(),
-    terms_and_conditions: z.string().nullish()
+    terms_and_conditions: z.string().nullish(),
+    /**
+     * Footer / header discount only (e.g. "Less: Discount $40" or "10% off").
+     * Do NOT copy onto line_items — code allocates onto product lines.
+     * Cash / prompt-payment terms ("2/10 net 30") stay in payment_terms, not here.
+     */
+    discount_rate: z.number().nullish(),
+    discount_amount: z.number().nullish(),
   }).passthrough(),
   line_items: z.array(z.object({
     item_name: z.string().nullish(),
@@ -299,6 +306,9 @@ export const extractInvoiceFromFileSchema = z.object({
     invoice_qty: z.number().nullish(),
     line_total: z.number().nullish(),
     invoiced_amount: z.number().nullish(),
+    /** Line discount as printed on that row only — never copy footer discount here */
+    discount_rate: z.number().nullish(),
+    discount_amount: z.number().nullish(),
     tax_type: z.string().nullish(),
     tax_rate: z.number().nullish(),
     tax_rate_intra: z.number().nullish(),

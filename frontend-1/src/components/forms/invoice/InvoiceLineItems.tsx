@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState, KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, KeyboardEvent } from 'react';
 import { parse, isAfter, startOfDay } from "date-fns";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,26 @@ const InvoiceLineItems = ({
         details?.currency?.code ||
         details?.currency?.item?.code ||
         'INR';
+
+    const totalDiscountAmount = useMemo(() => {
+        return (itemDetails || []).reduce((sum: number, item: any) => {
+            const qty = Number(item.invoice_qty ?? 0) || 0;
+            const rate = Number(item.rate ?? 0) || 0;
+            const gross = qty * rate;
+            const explicit = Number(item.discount_amount ?? 0);
+            if (explicit > 0) {
+                return sum + explicit;
+            }
+            const discountRate = Number(item.discount_rate ?? 0);
+            if (discountRate > 0 && gross > 0) {
+                return sum + Math.round(((gross * discountRate) / 100) * 100) / 100;
+            }
+            return sum;
+        }, 0);
+    }, [itemDetails]);
+
+    const showDiscount = totalDiscountAmount > 0;
+
     useEffect(() => {
         console.log("details", details);
         if (details?.invoice_line_item && Array.isArray(details.invoice_line_item)) {
@@ -86,6 +106,8 @@ const InvoiceLineItems = ({
                     created_at: item?.created_at,
                     item_number: item?.item_number,
                     line_tax_amount: item?.line_tax_amount,
+                    discount_rate: item?.discount_rate,
+                    discount_amount: item?.discount_amount,
                     ordered_quantity: item?.ordered_quantity,
                     po_quantity: item?.purchase_order_line_item?.quantity || 0,
                     purchase_order_line_item: item?.purchase_order_line_item,
@@ -659,6 +681,7 @@ const InvoiceLineItems = ({
                                         ? taxPack?.taxGroupLabel || 'Tax'
                                         : 'Tax Rate'}
                                 </TableHead>
+                                <TableHead className="w-[120px]">Discount Amount</TableHead>
                                 <TableHead className="w-[120px]">Line Tax Amount</TableHead>
                                 <TableHead className="w-[120px]">Line Total</TableHead>
                                 <TableHead className="w-[80px]">Actions</TableHead>
@@ -670,7 +693,8 @@ const InvoiceLineItems = ({
                                     <TableCell
                                         colSpan={
                                             (allowPoMapping ? 10 : 7) +
-                                            (showStructuredTax ? 1 : 0)
+                                            (showStructuredTax ? 1 : 0) +
+                                            1
                                         }
                                         className="text-center h-24 text-muted-foreground"
                                     >
@@ -713,7 +737,8 @@ const InvoiceLineItems = ({
                                 <TableCell
                                     colSpan={
                                         (allowPoMapping ? 10 : 7) +
-                                        (showStructuredTax ? 1 : 0)
+                                        (showStructuredTax ? 1 : 0) +
+                                        1
                                     }
                                     className="p-0"
                                 >
@@ -725,6 +750,14 @@ const InvoiceLineItems = ({
                                                     {formatCurrency(details?.invoice_net_total || 0, currencyCode)}
                                                 </span>
                                             </div>
+                                            {showDiscount ? (
+                                                <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                                                    <span className="text-sm font-medium text-gray-600">Discount Amount:</span>
+                                                    <span className="text-sm font-semibold text-gray-800">
+                                                        {formatCurrency(totalDiscountAmount, currencyCode)}
+                                                    </span>
+                                                </div>
+                                            ) : null}
                                             <div className="flex justify-between items-center py-2 border-b border-gray-200">
                                                 <span className="text-sm font-medium text-gray-600">Tax Total:</span>
                                                 <span className="text-sm font-semibold text-gray-800">

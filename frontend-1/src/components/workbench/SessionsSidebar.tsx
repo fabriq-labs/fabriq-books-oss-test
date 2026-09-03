@@ -78,7 +78,10 @@ export const SessionsSidebar: React.FC = () => {
           )}
           {sessions.map((s) => {
             const isActive = sessionId === s.id;
-            const pendingCount = s.pending_actions_count;
+            const pendingCount = Math.max(
+              0,
+              (s.pending_actions_count || 0) - (s.completed_actions_count || 0)
+            );
             return (
               <button
                 key={s.id}

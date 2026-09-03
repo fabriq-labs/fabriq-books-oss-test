@@ -9,6 +9,9 @@ backups/
 node_modules/
 *.tsbuildinfo
 
+# MkDocs / docs site build output
+/site/
+
 # Root-only directories (leading / = repo root only; don't exclude e.g. frontend-1/config/scripts/)
 /dist/
 /build/

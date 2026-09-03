@@ -19,6 +19,11 @@ import {
     BILL_UPLOAD_HELPER_TEXT,
     resolveBillUploadMime,
 } from '@/lib/bills/billUploadMime';
+import {
+    getExtractedLineDiscountAmount,
+    getExtractedLineTaxAmount,
+    getExtractedLineTotal,
+} from '@/lib/invoices/extractedLineTotal';
 import { useEntity } from '@/contexts/EntityContext';
 
 /** Tool result may include created_invoice_id when backend auto-created an invoice from PO match */
@@ -105,6 +110,8 @@ interface ParsedData {
             tax_rate?: number;
             tax_rate_intra?: number;
             line_tax_amount?: number;
+            discount_rate?: number;
+            discount_amount?: number;
             classification_code?: string;
             classification_scheme?: string;
             hsn_sac?: string;
@@ -267,7 +274,7 @@ export const InvoiceUpload: React.FC = () => {
                 originalName: file.name,
                 mimetype: file.type,
             });
-            if (!resolved.ok) {
+            if (resolved.ok === false) {
                 setError(resolved.error);
                 return false;
             }
@@ -605,7 +612,7 @@ export const InvoiceUpload: React.FC = () => {
                             tax_rate: lr?.tax_rate ?? lineItem?.tax_rate ?? 0,
                             line_tax_amount:
                                 lr?.line_tax_amount ?? lineItem?.line_tax_amount ?? undefined,
-                            line_total: lineItem?.line_total ?? lineItem?.invoiced_amount ?? undefined,
+                            line_total: getExtractedLineTotal(lineItem, lr),
                             tax_group_id: lr?.tax_group_id || undefined,
                             classification_code:
                                 lr?.classification_code ||
@@ -618,6 +625,8 @@ export const InvoiceUpload: React.FC = () => {
                                 undefined,
                             ordered_quantity: lineItem?.ordered_quantity || 0,
                             ordered_amount: lineItem?.ordered_amount || 0,
+                            discount_rate: lineItem?.discount_rate ?? 0,
+                            discount_amount: lineItem?.discount_amount ?? 0,
                             invoice_qty:
                                 lineItem?.quantity ||
                                 lineItem?.invoice_qty ||
@@ -648,7 +657,7 @@ export const InvoiceUpload: React.FC = () => {
                             ordered_quantity: 1,
                             ordered_amount: amount,
                             invoice_qty: 1,
-                            line_total: amount,
+                            line_total: getExtractedLineTotal(charge, cr, true),
                             tax_rate: cr ? (cr.tax_rate ?? 0) : (charge?.tax_rate ?? 0),
                             line_tax_amount:
                                 cr?.line_tax_amount ?? charge?.line_tax_amount ?? undefined,
@@ -1024,9 +1033,10 @@ export const InvoiceUpload: React.FC = () => {
                                                             <th className="text-left p-3 text-sm font-semibold text-gray-700">HSN</th>
                                                             <th className="text-right p-3 text-sm font-semibold text-gray-700">Quantity</th>
                                                             <th className="text-right p-3 text-sm font-semibold text-gray-700">Rate</th>
+                                                            <th className="text-right p-3 text-sm font-semibold text-gray-700">Discount</th>
                                                             <th className="text-right p-3 text-sm font-semibold text-gray-700">Tax %</th>
                                                             <th className="text-right p-3 text-sm font-semibold text-gray-700">Tax amt</th>
-                                                            <th className="text-right p-3 text-sm font-semibold text-gray-700">Total</th>
+                                                            <th className="text-right p-3 text-sm font-semibold text-gray-700">Line Total</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -1043,6 +1053,9 @@ export const InvoiceUpload: React.FC = () => {
                                                                 '-';
                                                             const taxRate = lr?.tax_rate ?? item.tax_rate;
                                                             const taxGroup = lr?.tax_group_code;
+                                                            const discountAmount = getExtractedLineDiscountAmount(item);
+                                                            const lineTaxAmount = getExtractedLineTaxAmount(item, lr);
+                                                            const lineTotal = getExtractedLineTotal(item, lr);
                                                             return (
                                                             <tr key={`line-${index}`} className="border-b hover:bg-gray-50">
                                                                 <td className="p-3 text-sm text-gray-900">{item.item_name || '-'}</td>
@@ -1053,6 +1066,11 @@ export const InvoiceUpload: React.FC = () => {
                                                                     {currencyLabel}{(item.rate || 0).toLocaleString()}
                                                                 </td>
                                                                 <td className="p-3 text-sm text-gray-900 text-right">
+                                                                    {discountAmount > 0
+                                                                        ? `${currencyLabel}${discountAmount.toLocaleString()}`
+                                                                        : '-'}
+                                                                </td>
+                                                                <td className="p-3 text-sm text-gray-900 text-right">
                                                                     {taxGroup
                                                                         ? taxGroup
                                                                         : taxRate != null
@@ -1060,10 +1078,10 @@ export const InvoiceUpload: React.FC = () => {
                                                                           : '-'}
                                                                 </td>
                                                                 <td className="p-3 text-sm text-gray-900 text-right">
-                                                                    {currencyLabel}{(lr?.line_tax_amount ?? item.line_tax_amount ?? 0).toLocaleString()}
+                                                                    {currencyLabel}{lineTaxAmount.toLocaleString()}
                                                                 </td>
                                                                 <td className="p-3 text-sm font-semibold text-gray-900 text-right">
-                                                                    {currencyLabel}{(item.line_total || item.invoiced_amount || 0).toLocaleString()}
+                                                                    {currencyLabel}{lineTotal.toLocaleString()}
                                                                 </td>
                                                             </tr>
                                                             );
@@ -1082,6 +1100,8 @@ export const InvoiceUpload: React.FC = () => {
                                                                     'Service charge');
                                                             const taxRate = cr ? cr.tax_rate : charge.tax_rate;
                                                             const taxGroup = cr?.tax_group_code;
+                                                            const lineTaxAmount = getExtractedLineTaxAmount(charge, cr, true);
+                                                            const lineTotal = getExtractedLineTotal(charge, cr, true);
                                                             return (
                                                                 <tr key={`charge-${index}`} className="border-b hover:bg-gray-50">
                                                                     <td className="p-3 text-sm text-gray-900">{name}</td>
@@ -1091,6 +1111,7 @@ export const InvoiceUpload: React.FC = () => {
                                                                     <td className="p-3 text-sm text-gray-900 text-right">
                                                                         {currencyLabel}{(charge.amount || 0).toLocaleString()}
                                                                     </td>
+                                                                    <td className="p-3 text-sm text-gray-900 text-right">-</td>
                                                                     <td className="p-3 text-sm text-gray-900 text-right">
                                                                         {taxGroup
                                                                             ? taxGroup
@@ -1099,15 +1120,10 @@ export const InvoiceUpload: React.FC = () => {
                                                                               : '-'}
                                                                     </td>
                                                                     <td className="p-3 text-sm text-gray-900 text-right">
-                                                                        {currencyLabel}
-                                                                        {(
-                                                                            cr?.line_tax_amount ??
-                                                                            charge.line_tax_amount ??
-                                                                            0
-                                                                        ).toLocaleString()}
+                                                                        {currencyLabel}{lineTaxAmount.toLocaleString()}
                                                                     </td>
                                                                     <td className="p-3 text-sm font-semibold text-gray-900 text-right">
-                                                                        {currencyLabel}{(charge.amount || 0).toLocaleString()}
+                                                                        {currencyLabel}{lineTotal.toLocaleString()}
                                                                     </td>
                                                                 </tr>
                                                             );

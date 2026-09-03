@@ -9,7 +9,7 @@ VALUES
 $$You are a bookkeeping agent. Your job is to find bank transactions that have not yet been posted to the general ledger and propose the correct journal entry for each one.
 
 Follow these steps exactly:
-1. Use analyticsQuery to find postings where status = 'unbooked' (or equivalent) for the accounts specified by the user. Use a broad ILIKE keyword search on the account name — the user's description may be approximate. If no account is specified, or if the named account is not found, find all unbooked transactions across all accounts for the org. Never stop to ask for clarification — if multiple accounts match, process all of them.
+1. Use analyticsQuery or searchRecords to find postings where status = 'unbooked' (or equivalent) for the accounts specified by the user. Use a broad ILIKE keyword search on the account name — the user's description may be approximate. If no account is specified, or if the named account is not found, find all unbooked transactions across all accounts for the org. Never stop to ask for clarification — if multiple accounts match, process all of them.
 2. For each unbooked transaction, determine the appropriate expense or income account from the chart of accounts based on the description, vendor name, and amount.
 3. Use queueActions with action_type = 'create_posting' for all transactions in a single call. Set confidence based on how clear the categorisation is:
    - 'high': vendor or description clearly maps to a single account (e.g. "Staples" → Office Supplies)
@@ -21,7 +21,7 @@ $$,
 'Which account or date range? e.g. "HDFC account", "all accounts for March 2024"',
 'supervised', true, 1,
 ARRAY['posting', 'account', 'category_group'],
-ARRAY['getAnalyticsContext', 'analyticsQuery', 'queueActions'],
+ARRAY['getAnalyticsContext', 'analyticsQuery', 'searchRecords', 'queueActions'],
 NOW()),
 
 -- 2. Reconcile Transactions
@@ -115,7 +115,7 @@ $$,
 'Which account or date range? e.g. "HDFC account", "March 2024"',
 'supervised', true, 2,
 ARRAY['posting', 'account', 'payment_receipt', 'invoice'],
-ARRAY['searchRecords', 'getAnalyticsContext', 'analyticsQuery', 'suggestReconciliationMatches', 'queueActions', 'requestClarification'],
+ARRAY['searchRecords', 'getAnalyticsContext', 'analyticsQuery', 'searchRecords', 'suggestReconciliationMatches', 'queueActions', 'requestClarification'],
 NOW()),
 
 -- 3. Analyse Spending
@@ -134,7 +134,7 @@ $$,
 'What period or scope? e.g. "Q1 2024", "last 3 months by vendor", "compare March vs February"',
 'autonomous', true, 3,
 ARRAY['posting', 'account', 'category', 'category_group'],
-ARRAY['getAnalyticsContext', 'analyticsQuery'],
+ARRAY['getAnalyticsContext', 'analyticsQuery', 'searchRecords'],
 NOW()),
 
 -- 4. Categorise Expenses
@@ -209,7 +209,7 @@ $$,
 'Which bank account to process? e.g. "HDFC Checking account", "all accounts for March 2024"',
 'supervised', true, 4,
 ARRAY['posting', 'account', 'category', 'category_group'],
-ARRAY['getAnalyticsContext', 'analyticsQuery', 'categorizePostings', 'queueActions', 'requestClarification'],
+ARRAY['getAnalyticsContext', 'analyticsQuery', 'searchRecords', 'categorizePostings', 'queueActions', 'requestClarification'],
 NOW()),
 
 -- 5. Custom (free-form)

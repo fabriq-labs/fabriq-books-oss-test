@@ -2014,6 +2014,9 @@ export const InvoiceForm: React.FC = () => {
                 <PaymentReceiptTable
                   paymentReceipts={initialValues?.payment_receipt || []}
                   currency={invoiceCurrencyCode}
+                  remainingBalance={
+                    initialValues?.balance_amount ?? initialValues?.invoice_total
+                  }
                   showActions
                   onDelete={(pr) => deletePaymentReceiptApi(pr.id)}
                   updatingPaymentId={updatingPaymentReceiptId}

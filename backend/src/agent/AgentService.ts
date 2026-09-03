@@ -17,7 +17,8 @@ import {
   createAgentMessage,
   listAgentMessages,
 } from './services/SessionService';
-import { buildSessionStateBlock, SESSION_DIRECTIVE, shouldAutoContinue } from './prompt/constants';
+import { buildAvailableToolsDirective, buildSessionStateBlock, SESSION_DIRECTIVE, shouldAutoContinue } from './prompt/constants';
+import { STEP_STALL_FAIL_REASON, toSessionHistoryMessages } from './sessionHistory';
 import { sessionEventBus } from './services/SessionEventBus';
 import { sessionTimeoutService } from './services/SessionTimeoutService';
 import {
@@ -253,15 +254,15 @@ export class AgentService {
       const tools = await toolManager.getUnifiedTools(
         modelName, auth, enhancedContext, sessionId, templateAllowedTools, { omitCreatePlan }
       );
+      if (sessionId) {
+        finalSystemPrompt += buildAvailableToolsDirective(Object.keys(tools));
+      }
 
       // Build messages: for session requests, include persisted session messages
       let allMessages: any[];
       if (sessionId && sessionMessages.length > 0) {
         // Use session message history + current message
-        const historyMessages = sessionMessages.map((m: any) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        }));
+        const historyMessages = toSessionHistoryMessages(sessionMessages);
         allMessages = [
           { role: 'system', content: finalSystemPrompt },
           ...historyMessages,
@@ -347,12 +348,16 @@ export class AgentService {
         const toolCalls = result.steps
           ?.flatMap((s: any) => s.toolCalls ?? [])
           .map((tc: any) => ({ toolName: tc.toolName, args: tc.args }));
+        const toolResults = result.steps
+          ?.flatMap((s: any) => s.toolResults ?? [])
+          .map((tr: any) => ({ toolName: tr.toolName, result: tr.result }));
 
         await createAgentMessage({
           session_id: sessionId,
           role: 'assistant',
           content: result.text || '',
           tool_calls: toolCalls?.length ? toolCalls : undefined,
+          tool_results: toolResults?.length ? toolResults : undefined,
           step_index: (await getAgentSession(sessionId)).current_step_index ?? undefined,
         });
 
@@ -369,7 +374,8 @@ export class AgentService {
           const nextStep = plan?.[updatedSession.current_step_index ?? 0];
           if (nextStep) {
             const continuationMessage =
-              `Continue with step ${nextStep.index + 1}: "${nextStep.title}". ${nextStep.description}`;
+              `Continue with step ${nextStep.index + 1}: "${nextStep.title}". ${nextStep.description} ` +
+              'Call tools now. You MUST call completeStep or requestClarification before ending this turn.';
             logger.info('Auto-continuing session', {
               sessionId,
               nextStep: nextStep.index,
@@ -386,6 +392,7 @@ export class AgentService {
             sessionId,
             stepIndex: stepIndexBeforeLLM,
           });
+          await this.failStuckExecutingSession(sessionId, STEP_STALL_FAIL_REASON);
         }
       }
 
@@ -467,6 +474,34 @@ export class AgentService {
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * When auto-continuation is skipped because the step did not advance, mark the
+   * session failed immediately instead of leaving it in `executing` until the
+   * 5-minute watchdog.
+   */
+  private async failStuckExecutingSession(sessionId: string, reason: string): Promise<void> {
+    try {
+      const session = await prisma.agent_session.findUnique({
+        where: { id: sessionId },
+        select: { status: true, org_id: true },
+      });
+      if (session && (session.status === 'planning' || session.status === 'executing')) {
+        await prisma.agent_session.update({
+          where: { id: sessionId },
+          data: { status: 'failed', completed_at: new Date() },
+        });
+        sessionTimeoutService.cancel(sessionId);
+        sessionEventBus.emitSessionEvent(sessionId, session.org_id, 'session_status_changed', {
+          status: 'failed',
+          reason,
+        });
+        logger.warn('Marked stuck session as failed', { sessionId, reason });
+      }
+    } catch (updateErr) {
+      logger.error('Failed to mark stuck session as failed', { sessionId, updateErr });
     }
   }
 
@@ -711,6 +746,9 @@ export class AgentService {
         modelName, auth, enhancedContext, sessionId, templateAllowedToolsStreaming,
         { omitCreatePlan: omitCreatePlanStreaming }
       );
+      if (sessionId) {
+        finalSystemPrompt += buildAvailableToolsDirective(Object.keys(tools));
+      }
 
       // Use streamText with configurable maxSteps
       const llmModelId = getModelId('agent');
@@ -719,10 +757,7 @@ export class AgentService {
       // Build messages: for session requests, include persisted session messages
       let allMessages: any[];
       if (sessionId && sessionMessages.length > 0) {
-        const historyMessages = sessionMessages.map((m: any) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        }));
+        const historyMessages = toSessionHistoryMessages(sessionMessages);
         allMessages = [
           { role: 'system', content: finalSystemPrompt },
           ...historyMessages,
@@ -848,11 +883,15 @@ export class AgentService {
               const toolCalls = steps
                 ?.flatMap((s: any) => s.toolCalls ?? [])
                 .map((tc: any) => ({ toolName: tc.toolName, args: tc.args }));
+              const toolResults = steps
+                ?.flatMap((s: any) => s.toolResults ?? [])
+                .map((tr: any) => ({ toolName: tr.toolName, result: tr.result }));
               await createAgentMessage({
                 session_id: sessionId,
                 role: 'assistant',
                 content: text || '',
                 tool_calls: toolCalls?.length ? toolCalls : undefined,
+                tool_results: toolResults?.length ? toolResults : undefined,
                 step_index: (await getAgentSession(sessionId)).current_step_index ?? undefined,
               });
 
@@ -873,7 +912,8 @@ export class AgentService {
                   setImmediate(async () => {
                     try {
                       await this.handleRequest(
-                        `Continue with step ${(latestSession.current_step_index ?? 0) + 1}: "${nextStep.title}".`,
+                        `Continue with step ${(latestSession.current_step_index ?? 0) + 1}: "${nextStep.title}". ` +
+                          `${nextStep.description ?? ''} Call tools now. You MUST call completeStep or requestClarification before ending this turn.`,
                         auth,
                         [],
                         { modelName: latestSession.goal_model || context?.modelName || 'posting' },
@@ -892,6 +932,7 @@ export class AgentService {
                   sessionId,
                   stepIndex: stepIndexBeforeLLM,
                 });
+                await this.failStuckExecutingSession(sessionId, STEP_STALL_FAIL_REASON);
               }
             } catch (err: any) {
               logger.error('Session persistence failed (streaming)', {
@@ -1001,7 +1042,9 @@ export class AgentService {
       DEFAULT_STREAM_TIMEOUT_MS;
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(() => {
-      abortController.abort();
+      abortController.abort(
+        new DOMException(`LLM stream timed out after ${timeoutMs}ms`, 'TimeoutError'),
+      );
     }, timeoutMs);
 
     try {

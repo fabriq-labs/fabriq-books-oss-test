@@ -60,7 +60,6 @@ model account {
   project_masters       project_master[]
   invoices              invoice[]
 
-  @@unique([source_record_id, source_system_id, org_id])
   @@index([source_system_id, source_record_id])
   @@index([source_updated_at])
   @@index([plaid_item_id])
@@ -113,10 +112,10 @@ model posting {
   matched_reference     String? // e.g. "payment_receipt:payr_demo_001" or "invoice:inv_demo_001"
   payment_receipt_id    String? @unique // FK to payment_receipt when matched (one-to-one)
 
-  account              account?              @relation("debit_account", fields: [account_id], references: [id])
-  credit_account       account?              @relation("credit_account", fields: [credit_account_id], references: [id])
-  payment_receipt      payment_receipt?      @relation("PostingToPaymentReceipt", fields: [payment_receipt_id], references: [id])
-  plaid_transaction    plaid_transaction?
+  account         account?         @relation("debit_account", fields: [account_id], references: [id])
+  credit_account  account?         @relation("credit_account", fields: [credit_account_id], references: [id])
+  payment_receipt payment_receipt? @relation("PostingToPaymentReceipt", fields: [payment_receipt_id], references: [id])
+  plaid_transaction plaid_transaction?
 
   @@map("posting")
 }
@@ -135,20 +134,9 @@ model instrument {
   isin        String?         @unique
   details     Json?
 
-  current_price            Decimal?  @db.Decimal(19, 4)
-  price_updated_at         DateTime?
-  price_currency_id        String?   @db.VarChar(50)
-  external_symbol_id       Int?
-  underlying_instrument_id String?   @db.VarChar(50)
-
-  price_currency currency?    @relation("InstrumentPriceCurrency", fields: [price_currency_id], references: [id])
-  underlying     instrument?  @relation("InstrumentUnderlying", fields: [underlying_instrument_id], references: [id])
-  derivatives    instrument[] @relation("InstrumentUnderlying")
-
   trades   trade[]
   holdings holding[]
 
-  @@index([underlying_instrument_id])
   @@map("instrument")
 }
 
@@ -182,11 +170,11 @@ model trade {
   posting_id String?  @unique
   posting    posting? @relation("PostingToTrade")
 
-  instrument      instrument? @relation(fields: [instrument_id], references: [id])
-  account         account?    @relation(fields: [account_id], references: [id])
-  target_account  account?    @relation("target_account", fields: [target_account_id], references: [id])
-  reference_trade trade?      @relation("transfer_pair", fields: [reference_trade_id], references: [id])
-  related_trades  trade[]     @relation("transfer_pair")
+  instrument      instrument?    @relation(fields: [instrument_id], references: [id])
+  account         account?       @relation(fields: [account_id], references: [id])
+  target_account  account?       @relation("target_account", fields: [target_account_id], references: [id])
+  reference_trade trade?         @relation("transfer_pair", fields: [reference_trade_id], references: [id])
+  related_trades  trade[]        @relation("transfer_pair")
   source_system   source_system? @relation("TradeSourceSystem", fields: [source_system_id], references: [id])
 
   @@map("trade")
@@ -262,8 +250,6 @@ enum instrument_type {
   MUTUAL_FUND
   ETF
   FOREX
-  CASH
-  OPTION
 }
 
 enum trade_type {
@@ -304,7 +290,6 @@ model currency {
   orgs              org[]
   accounts          account[]
   holdings          holding[]
-  instrumentPrices  instrument[]      @relation("InstrumentPriceCurrency")
   exchangeFromRates exchange_rate[]   @relation("ExchangeRateFromCurrency")
   exchangeToRates   exchange_rate[]   @relation("ExchangeRateToCurrency")
   created_by        String?
@@ -698,7 +683,6 @@ model pending_action {
 /// Persisted Vercel AI SDK useChat threads (UIMessage[] + audit metadata)
 model chat_thread {
   id                String   @id @db.VarChar(255) // Maps to useChat / streamText chatId
-  org_id            String   @db.VarChar(255)
   user_id           String   @db.VarChar(255)
   title             String   @default("New Financial Inquiry") @db.VarChar(255)
   messages          Json     @default("[]") @db.JsonB
@@ -712,6 +696,5 @@ model chat_thread {
   updated_at        DateTime @updatedAt
 
   @@index([user_id])
-  @@index([org_id, user_id])
   @@map("chat_thread")
 }

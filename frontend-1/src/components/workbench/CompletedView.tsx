@@ -149,7 +149,7 @@ export const CompletedView: React.FC<CompletedViewProps> = ({ session }) => {
         </div>
       )}
 
-      {/* Step cards — same V2 philosophy as executing view */}
+      {/* Step cards — titles only; full narrative is in Report above */}
       {plan.length > 0 && (
         <div className="px-5 py-4 space-y-2 border-b shrink-0">
           {plan.map((step) => (
@@ -161,6 +161,7 @@ export const CompletedView: React.FC<CompletedViewProps> = ({ session }) => {
               clarification={null}
               events={[]}
               onClarify={async () => {}}
+              preferSummary={false}
             />
           ))}
         </div>

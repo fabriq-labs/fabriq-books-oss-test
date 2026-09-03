@@ -129,8 +129,11 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, []);
 
-  // Inbox count = total unresolved pending actions across all sessions
-  const inboxCount = sessions.reduce((sum, s) => sum + (s.pending_actions_count || 0), 0);
+  // Inbox count = unresolved actions (queued minus already resolved)
+  const inboxCount = sessions.reduce((sum, s) => {
+    const unresolved = (s.pending_actions_count || 0) - (s.completed_actions_count || 0);
+    return sum + Math.max(0, unresolved);
+  }, 0);
 
   // Load sessions on mount + 60-second fallback poll (SSE handles real-time per session)
   useEffect(() => {

@@ -1,6 +1,7 @@
 /** Purchase bill classification vs PO linkage (BP-3). */
 
 export const BILL_INVOICE_TYPE = 'PURCHASE' as const;
+export const SALES_INVOICE_TYPE = 'SALES' as const;
 
 export type BillPoMode = 'With PO' | 'Without PO';
 
@@ -32,4 +33,18 @@ export function billTypeAndPoMode(poMode: BillPoMode = DEFAULT_BILL_PO_MODE): {
     invoice_type: BILL_INVOICE_TYPE,
     po_mode: poMode,
   };
+}
+
+/** Invoice type from a workflow list row (`invoices[0].invoice_type`). */
+export function workflowItemInvoiceType(item: {
+  invoices?: Array<{ invoice_type?: string | null }>;
+} | null | undefined): string | null {
+  return item?.invoices?.[0]?.invoice_type ?? null;
+}
+
+/** Purchase bills list — includes PURCHASE, legacy PO modes, and unset type. */
+export function isPurchaseBillWorkflowItem(item: {
+  invoices?: Array<{ invoice_type?: string | null }>;
+}): boolean {
+  return workflowItemInvoiceType(item) !== SALES_INVOICE_TYPE;
 }

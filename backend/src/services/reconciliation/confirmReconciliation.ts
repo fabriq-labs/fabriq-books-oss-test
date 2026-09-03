@@ -6,6 +6,7 @@
 import prisma from '../../lib/prisma';
 import { AuthContext } from '../../auth/types';
 import logger from '../../utils/logger';
+import { calculate_payment_total } from '../../lib/actions/zeiv';
 export interface ConfirmReconciliationResult {
   posting: {
     id: string;
@@ -122,33 +123,49 @@ export async function confirmReconciliation(
       throw new Error(`Invoice ${parsed.id} not found`);
     }
 
+    const outstanding = Number(invoice.balance_amount ?? invoice.invoice_total ?? 0);
+    const paymentType = amount >= outstanding ? 'FULL' : 'PARTIAL';
     const receiptNumber = generateReceiptNumber();
-    const newReceipt = await prisma.payment_receipt.create({
-      data: {
-        invoice_id: invoice.id,
-        customer_id: invoice.customer_id,
-        amount,
-        receipt_date: valueDate,
-        account_id: bankAccountId,
-        org_id: orgId,
-        receipt_number: receiptNumber,
-        payment_type: 'FULL',
-        status: 'COMPLETED',
-      },
-    });
 
-    await prisma.posting.update({
-      where: { id: postingId },
-      data: {
-        payment_receipt_id: newReceipt.id,
-        reconciliation_status: 'MATCHED',
-      },
-    });
+    // Create receipt + link posting + refresh invoice.balance_amount in one transaction
+    // (raw payment_receipt.create bypasses invoice.payment_receipt ADD → calculate_payment_total)
+    await prisma.$transaction(async (tx) => {
+      const newReceipt = await tx.payment_receipt.create({
+        data: {
+          invoice_id: invoice.id,
+          customer_id: invoice.customer_id,
+          amount,
+          receipt_date: valueDate,
+          account_id: bankAccountId,
+          org_id: orgId,
+          receipt_number: receiptNumber,
+          payment_type: paymentType,
+          status: 'COMPLETED',
+        },
+      });
 
-    logger.info('[confirmReconciliation] Created payment receipt and linked posting', {
-      postingId,
-      receiptId: newReceipt.id,
-      invoiceId: invoice.id,
+      await tx.posting.update({
+        where: { id: postingId },
+        data: {
+          payment_receipt_id: newReceipt.id,
+          reconciliation_status: 'MATCHED',
+        },
+      });
+
+      await calculate_payment_total(
+        auth,
+        'invoice.payment_receipt',
+        invoice.id,
+        [newReceipt.id],
+        null,
+        tx
+      );
+
+      logger.info('[confirmReconciliation] Created payment receipt and linked posting', {
+        postingId,
+        receiptId: newReceipt.id,
+        invoiceId: invoice.id,
+      });
     });
 
     const updated = await prisma.posting.findUnique({

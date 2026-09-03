@@ -31,6 +31,9 @@ export const AGENT_TOOL_CATALOG: ToolCatalogEntry[] = [
   { name: 'queueActions', label: 'Queue Actions', description: 'Queue pending actions for human review (sessions)', category: 'session' },
   { name: 'requestClarification', label: 'Request Clarification', description: 'Ask the user a structured question (sessions)', category: 'session' },
   { name: 'prepareTaxPackage', label: 'Prepare Tax Package', description: 'Scan unmatched lines and assemble a Canadian T1 organizer', category: 'finance' },
+  { name: 'processInvoiceFromPdf', label: 'Process Invoice PDF', description: 'Extract invoice data from a PDF for form review', category: 'other' },
+  { name: 'extractInvoiceFromFile', label: 'Extract Invoice From File', description: 'Accept AI-extracted invoice data and optionally create the invoice', category: 'other' },
+  { name: 'erpConnector', label: 'ERP Connector', description: 'Query external ERP data (e.g. purchase order status)', category: 'erp' },
 ];
 
 /** model_name in agent_model_tool_config for unlisted page models (see seed SQL). */

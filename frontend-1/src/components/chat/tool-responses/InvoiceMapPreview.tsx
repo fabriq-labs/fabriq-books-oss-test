@@ -1,4 +1,4 @@
-import React from 'react';
+import { getExtractedLineTotal } from '@/lib/invoices/extractedLineTotal';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,12 @@ interface InvoiceMapPreviewProps {
             item_description?: string;
             rate?: number;
             ordered_quantity?: number;
+            quantity?: number;
+            invoice_qty?: number;
+            discount_rate?: number;
+            discount_amount?: number;
+            tax_rate?: number;
+            line_tax_amount?: number;
             line_total?: number;
         }>;
     };
@@ -129,11 +135,14 @@ export const InvoiceMapPreview: React.FC<InvoiceMapPreviewProps> = ({ data, mess
                                         <span className="text-gray-600">
                                             Qty: {item.ordered_quantity || 0}
                                         </span>
-                                        {item.line_total && (
-                                            <span className={`${sidebarMode ? 'ml-2' : 'ml-3'} font-medium text-gray-900`}>
-                                                ${item.line_total.toLocaleString()}
-                                            </span>
-                                        )}
+                                        {(() => {
+                                            const lineTotal = getExtractedLineTotal(item);
+                                            return lineTotal > 0 ? (
+                                                <span className={`${sidebarMode ? 'ml-2' : 'ml-3'} font-medium text-gray-900`}>
+                                                    ${lineTotal.toLocaleString()}
+                                                </span>
+                                            ) : null;
+                                        })()}
                                     </div>
                                 </div>
                             ))}

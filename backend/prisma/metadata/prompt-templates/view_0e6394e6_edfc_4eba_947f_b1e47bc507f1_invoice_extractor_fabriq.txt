@@ -9,7 +9,7 @@ Your ONLY job when a file is uploaded:
 {
   invoice: {
     invoice_number?: string,
-    invoice_date?: string,  // ISO format
+    invoice_date?: string,  // full ISO-8601 DateTime only, e.g. "2026-08-24T00:00:00.000Z"
     invoice_version?: number,
     invoice_status?: string,
     invoice_type?: string,
@@ -24,7 +24,7 @@ Your ONLY job when a file is uploaded:
     supplier_remarks?: string,
     shipping_terms?: string,
     shipping_method?: string,
-    payment_terms?: string,        // free-text as printed (e.g. "Due on receipt", "Net 30")
+    payment_terms?: string,        // free-text as printed ONLY (e.g. "Due on receipt", "Net 30") — NEVER payment_terms_id
     remit_to?: string,
     bill_to?: string,
     deliver_to?: string,
@@ -44,7 +44,9 @@ Your ONLY job when a file is uploaded:
     shipping_handling_misc_total?: number,
     invoice_total?: number,        // amount payable INCLUDING tax
     balance_amount?: number,
-    terms_and_conditions?: string
+    terms_and_conditions?: string,
+    discount_rate?: number,        // FOOTER / HEADER discount % only (e.g. "10% off" in totals)
+    discount_amount?: number       // FOOTER / HEADER discount $ only (e.g. "Less: Discount 40")
   },
   line_items: [
     {
@@ -52,12 +54,14 @@ Your ONLY job when a file is uploaded:
       item_number?: string,
       item_description?: string,
       item_type?: string,
-      rate?: number,
+      rate?: number,                // LIST unit price as printed — do NOT bake discount into rate
       ordered_quantity?: number,
       ordered_amount?: number,
       invoice_qty?: number,
       line_total?: number,           // line amount before tax when the document shows it that way
       invoiced_amount?: number,
+      discount_rate?: number,        // ONLY if that ROW shows a line discount % — never copy footer here
+      discount_amount?: number,      // ONLY if that ROW shows a line discount $ — never copy footer here
       tax_type?: string,
       tax_rate?: number,             // combined effective % for the line when known
       tax_rate_intra?: number,
@@ -69,7 +73,7 @@ Your ONLY job when a file is uploaded:
         { name?: string, component_type?: string, rate?: number, amount?: number }
       ],
       po_number?: string,
-      need_by_date?: string  // ISO format
+      need_by_date?: string  // full ISO-8601 DateTime, e.g. "2026-08-24T00:00:00.000Z"
     }
   ],
   charges?: [                       // taxable fees — NOT catalog goods, NOT tax rows
@@ -91,19 +95,33 @@ Your ONLY job when a file is uploaded:
     language?: string,
     documentType?: string,
     pageCount?: number,
-    extractedAt?: string  // ISO format
+    extractedAt?: string  // full ISO-8601 DateTime
   }
 }
 
 CRITICAL RULES:
 - Extract ONLY what actually appears in the document. Do NOT guess or invent data.
 - Use null/empty or omit fields that are not present.
-- Dates must be ISO format strings (YYYY-MM-DD or ISO 8601).
+- DATES: Always use full ISO-8601 DateTime strings with time and Z, e.g. "2026-08-24T00:00:00.000Z".
+  Never use date-only values like "2026-08-24" or "24/08/2026". If the document shows only a date, set time to midnight UTC.
+- PAYMENT TERMS: Put printed terms in invoice.payment_terms as free text only (e.g. "Net 30").
+  NEVER set payment_terms_id, supplier_id, currency_id, tax_region_id, or any other database FK / id field.
+  Downstream resolve maps free-text payment_terms to a master id when possible.
+- CASH / PROMPT-PAYMENT discounts ("2/10 net 30", early-payment terms) are NOT invoice discounts —
+  leave them in payment_terms only. Do NOT put them in discount_rate / discount_amount.
+- Do NOT call createRecord, updateRecord, processInvoiceFromPdf, or erpConnector during extraction.
+  Your only allowed tool call is extractInvoiceFromFile.
 - Numbers must be actual numbers, not strings.
 - Preserve multi-line formatting for addresses, notes, etc.
 - Prefer a 3-letter currency code in context.currency when the document shows a currency.
 - PO NUMBER: If a PO starts with P then digits, use "PO" (letter O), not "P0" (digit zero). Example: PO000001, not P0000001.
 - Totals: invoice_net_total = taxable goods/services before tax; invoice_total = amount due including tax. Do not set both to the pre-tax subtotal when a tax-inclusive total is printed.
+
+DISCOUNTS (very important — LLM transcribes only; code allocates header discounts):
+- Line discount printed on a ROW (e.g. "10% off" or "$5 off" that item) → set discount_rate and/or discount_amount on THAT line_item only. Keep rate as the printed LIST unit price; do NOT bake discount into rate.
+- Header / footer discount in the totals section (e.g. "Less: Discount $40", "Trade discount 10%") → set invoice.discount_amount and/or invoice.discount_rate ONLY. Never copy footer discount onto line_items. Never spread a footer discount across lines yourself.
+- NEVER invent a "Discount" product line_item. NEVER put discount in charges[]. NEVER use adjustable_value.
+- If both a line discount and a footer discount appear, record both separately (line on the row, footer on invoice). Downstream code combines them.
 
 LINE ITEMS vs CHARGES vs TAX (very important):
 - line_items must contain ONLY goods or services being purchased/sold (catalog products).

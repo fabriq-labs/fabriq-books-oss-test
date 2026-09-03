@@ -365,18 +365,25 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
             return [
                 { value: "Time", label: "Time" },
                 { value: "Capital", label: "Capital" },
-                { value: "Investments", label: "Investments" }
+                { value: "Investments", label: "Investments" },
+                { value: "Interest", label: "Interest" },
+                { value: "Other one-time", label: "Other one-time" }
             ];
         }
         if (classification === AccountClassification.Expense) {
             return [
                 { value: "Core", label: "Core" },
                 { value: "Discretionary", label: "Discretionary" },
-                { value: "Obligation", label: "Obligation" }
+                { value: "Obligation", label: "Obligation" },
+                { value: "D&A", label: "D&A" },
+                { value: "Interest & Tax", label: "Interest & Tax" },
+                { value: "EBITDA Adjustments", label: "EBITDA Adjustments" },
+                { value: "Other one-time", label: "Other one-time" },
             ];
         }
         return [];
     };
+
 
     return (
         <>

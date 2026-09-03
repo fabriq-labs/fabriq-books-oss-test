@@ -148,8 +148,21 @@ export const PaymentReceiptTable: React.FC<PaymentReceiptTableProps> = ({
         );
     }
 
-    const totalPayments = paymentReceipts.reduce((sum, receipt) => sum + receipt.amount, 0);
-    const displayBalance = Number(paymentReceipts[0]?.invoice?.balance_amount ?? remainingBalance ?? 0) || 0;
+    const totalPayments = paymentReceipts.reduce(
+        (sum, receipt) => sum + (Number(receipt.amount) || 0),
+        0
+    );
+    // Prefer invoice_total − payments so Remaining Balance stays correct even when
+    // balance_amount was not refreshed (e.g. receipts created outside addChild).
+    const nestedInvoice = paymentReceipts[0]?.invoice;
+    const invoiceTotal =
+        nestedInvoice?.invoice_total != null
+            ? Number(nestedInvoice.invoice_total) || 0
+            : null;
+    const displayBalance =
+        invoiceTotal != null
+            ? Math.max(0, Math.round((invoiceTotal - totalPayments) * 100) / 100)
+            : Number(remainingBalance ?? nestedInvoice?.balance_amount ?? 0) || 0;
     const currencyCode = paymentReceipts[0]?.currency?.code || currency;
 
     return (

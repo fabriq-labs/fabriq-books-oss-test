@@ -79,7 +79,8 @@ export const InboxPage: React.FC = () => {
         pageSize: PAGE_SIZE,
         action_type: f.action_type || undefined,
         confidence: f.confidence || undefined,
-        status: f.status || undefined,
+        // Empty string means "all" — must send explicitly; omitting status defaults API to pending
+        status: f.status === '' ? 'all' : (f.status || undefined),
       });
       setItems(result.items);
       setTotal(result.total);

@@ -213,4 +213,31 @@ describe('invoiceExtractResolve charges', () => {
     expect(linePayloads[1].tax_group_id).toBe('txgrp_demo_gst18');
     expect(linePayloads[1].purchase_order_item_id).toBeUndefined();
   });
+
+  test('buildBillCreatePayloads copies line discount_rate and discount_amount', () => {
+    const { linePayloads } = buildBillCreatePayloads({
+      extracted: {
+        invoice: { invoice_number: 'INV-D1' },
+        line_items: [
+          {
+            item_name: 'Widget',
+            rate: 100,
+            invoice_qty: 1,
+            discount_rate: 10,
+            discount_amount: 10,
+            line_total: 90,
+          },
+        ],
+      },
+      resolved: {
+        lines: [{ tax_group_id: 'txgrp_demo_gst18', tax_rate: 18, match: 'tax_group' }],
+        charges: [],
+      },
+      withPO: false,
+    });
+    expect(linePayloads).toHaveLength(1);
+    expect(linePayloads[0].discount_rate).toBe(10);
+    expect(linePayloads[0].discount_amount).toBe(10);
+    expect(linePayloads[0].rate).toBe(100);
+  });
 });

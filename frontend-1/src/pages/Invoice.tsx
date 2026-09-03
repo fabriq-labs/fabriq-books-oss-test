@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { log } from 'console';
 import { viewAPI, workflowAPI } from '@/api/api';
 import { buildNewBillCreatePayload } from '@/lib/bills/createBillDefaults';
+import { isPurchaseBillWorkflowItem } from '@/lib/bills/poMode';
 import { useEntity } from '@/contexts/EntityContext';
 
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -81,15 +82,15 @@ export const Invoice: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'toDos') {
-      const assigned = details['assignedToList'] || [];
-      const roleBased = details['roleBasedList'] || [];
-      const createdBy = details['createdByList'] || [];
+      const assigned = (details['assignedToList'] || []).filter(isPurchaseBillWorkflowItem);
+      const roleBased = (details['roleBasedList'] || []).filter(isPurchaseBillWorkflowItem);
+      const createdBy = (details['createdByList'] || []).filter(isPurchaseBillWorkflowItem);
       const draftFromCreatedBy = createdBy.filter((item: any) => item.current_state === 'Draft');
       const combinedList = [...assigned, ...roleBased, ...draftFromCreatedBy];
       const uniqueList = Array.from(new Map(combinedList.map(item => [item.id, item])).values());
       setActiveList(uniqueList);
     } else {
-      const createdBy = details['createdByList'] || [];
+      const createdBy = (details['createdByList'] || []).filter(isPurchaseBillWorkflowItem);
       const nonDraftFromCreatedBy = createdBy.filter((item: any) => item.current_state !== 'Draft');
       setActiveList(nonDraftFromCreatedBy);
     }

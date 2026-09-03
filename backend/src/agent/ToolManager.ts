@@ -10,6 +10,9 @@ import {
     createChildItemTool,
     updateChildItemTool,
     advancedSqlQueryTool,
+    processInvoiceFromPdfTool,
+    extractInvoiceFromFileTool,
+    erpConnectorTool,
 } from './AgentTools';
 import {
     getAnalyticsContextTool,
@@ -31,6 +34,7 @@ import {
     resolveIncludeAnalyticsTools,
     resolveModelToolNames,
 } from './agentModelToolConfigCache';
+import { CORE_SESSION_TOOLS } from './templateToolFilter';
 
 type ToolFactory = () => unknown;
 
@@ -69,6 +73,9 @@ export class ToolManager {
             searchUsers: () => searchUsersTool(auth),
             getAnalyticsContext: () => getAnalyticsContextTool(auth),
             analyticsQuery: () => analyticsQueryTool(auth, toolContext),
+            processInvoiceFromPdf: () => processInvoiceFromPdfTool(auth),
+            extractInvoiceFromFile: () => extractInvoiceFromFileTool(auth, toolContext),
+            erpConnector: () => erpConnectorTool(auth, toolContext),
             queueActions: () => null, // session-only — wired in getUnifiedTools
             requestClarification: () => null,
             getOptionChain: () => getOptionChainTool(auth),
@@ -126,8 +133,6 @@ export class ToolManager {
         return await this.getToolsForModel(modelName, auth, context);
     }
 
-    private static readonly CORE_SESSION_TOOLS = new Set(['createPlan', 'completeStep']);
-
     public async getUnifiedTools(
         modelName: string,
         auth: AuthContext,
@@ -168,7 +173,7 @@ export class ToolManager {
             }
             const core = options?.omitCreatePlan
                 ? ['completeStep']
-                : [...ToolManager.CORE_SESSION_TOOLS];
+                : [...CORE_SESSION_TOOLS];
             const permitted = new Set([...core, ...allowedTools]);
             for (const key of Object.keys(tools)) {
                 if (!permitted.has(key)) {

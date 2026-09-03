@@ -86,29 +86,31 @@ function InvoiceTable({ data, handleAction, onDuplicate, sortOption = {}, setSor
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {data && data?.map((item) => (
-                        <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item?.invoices[0]?.invoice_number}</TableCell>
-                            <TableCell>{new Date(item?.invoices[0]?.invoice_date).toLocaleDateString('en-GB')}</TableCell>
-                            <TableCell>₹{item?.invoices[0]?.invoice_total?.toLocaleString()}</TableCell>
-                            <TableCell>
-                                <span className={cn("px-2 py-1 rounded-full text-xs font-medium", getListStatusColor(item.current_state))}>
-                                    {getStatusText(item.current_state)}
-                                </span>
-                            </TableCell>
-                            <TableCell>
-                                <ActionButtons
-                                    id={item.id}
-                                    onView={(id) => handleAction(item?.invoices[0]?.id, item.current_state)}
-                                    onDuplicate={
-                                        onDuplicate
-                                            ? () => onDuplicate(item?.invoices[0]?.id)
-                                            : undefined
-                                    }
-                                />
-                            </TableCell>
-                        </TableRow>
-                    ))}          {!data || data.length === 0 && (
+                    {data && data.length > 0 ? (
+                        data.map((item) => (
+                            <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item?.invoices[0]?.invoice_number}</TableCell>
+                                <TableCell>{new Date(item?.invoices[0]?.invoice_date).toLocaleDateString('en-GB')}</TableCell>
+                                <TableCell>₹{item?.invoices[0]?.invoice_total?.toLocaleString()}</TableCell>
+                                <TableCell>
+                                    <span className={cn("px-2 py-1 rounded-full text-xs font-medium", getListStatusColor(item.current_state))}>
+                                        {getStatusText(item.current_state)}
+                                    </span>
+                                </TableCell>
+                                <TableCell>
+                                    <ActionButtons
+                                        id={item.id}
+                                        onView={(id) => handleAction(item?.invoices[0]?.id, item.current_state)}
+                                        onDuplicate={
+                                            onDuplicate
+                                                ? () => onDuplicate(item?.invoices[0]?.id)
+                                                : undefined
+                                        }
+                                    />
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
                         <TableRow>
                             <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                                 No orders found matching the criteria.

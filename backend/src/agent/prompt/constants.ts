@@ -216,6 +216,21 @@ Accumulated: ${JSON.stringify(session.accumulated_context ?? {})}
 }
 
 /**
+ * Appended after tools are resolved so the LLM does not call names from the
+ * posting chat prompt that this template's `allowed_tools` actually stripped.
+ */
+export function buildAvailableToolsDirective(toolNames: string[]): string {
+  const names = [...toolNames].sort().join(', ');
+  return `
+
+#### TOOLS AVAILABLE IN THIS SESSION
+You may ONLY call these tools: ${names}.
+Do not call any other tool name. The posting chat prompt may mention searchRecords, createRecord, or other tools — ignore those names unless they appear in this list.
+If you need to look up accounts or postings and searchRecords is listed, use it. Otherwise use analyticsQuery.
+`;
+}
+
+/**
  * Determine whether the agent should auto-continue to the next step.
  * Returns true for any step type while status is 'executing'.
  *
