@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { runSeedAgentModelToolsSql } from './seedAgentModelToolsSql';
+import { runSeedAgentTemplatesSql } from './seedAgentTemplatesSql';
+import { runSeedCurrenciesSql } from './seedCurrenciesSql';
+import { resolveSyncTargets, type SyncMetadataTarget } from './syncMetadataTargets';
 
 const prisma = new PrismaClient();
 
@@ -15,30 +19,47 @@ export interface SyncMetadataCounts {
   errors: number;
 }
 
-/** Views + prompt templates only (safe for Tenant Admin / container — no `npx`). */
+export interface SqlSeedCounts {
+  rowsAffected: number;
+  errors: number;
+}
+
 export interface SyncMetadataResult {
   views: SyncMetadataCounts;
   promptTemplates: SyncMetadataCounts;
+  agentTemplates: SqlSeedCounts;
+  currencies: SqlSeedCounts;
+  agentModelTools: SqlSeedCounts;
 }
 
+export type { SyncMetadataTarget };
+
 export async function main(
-  filterType?: 'view' | 'prompttemplate'
+  filterType?: 'view' | 'prompttemplate' | { targets?: unknown }
 ): Promise<SyncMetadataResult> {
   const emptyCounts = (): SyncMetadataCounts => ({
     created: 0,
     updated: 0,
     errors: 0,
   });
+  const emptySql = (): SqlSeedCounts => ({
+    rowsAffected: 0,
+    errors: 0,
+  });
 
   const result: SyncMetadataResult = {
     views: emptyCounts(),
     promptTemplates: emptyCounts(),
+    agentTemplates: emptySql(),
+    currencies: emptySql(),
+    agentModelTools: emptySql(),
   };
 
   try {
     const backendRoot = getBackendRootDir();
-    const shouldSyncViews = !filterType || filterType === 'view';
-    const shouldSyncTemplates = !filterType || filterType === 'prompttemplate';
+    const targets = resolveSyncTargets(filterType);
+    const shouldSyncViews = targets.includes('views');
+    const shouldSyncTemplates = targets.includes('promptTemplates');
 
     let viewsCreatedCount = 0;
     let viewsUpdatedCount = 0;
@@ -246,6 +267,45 @@ export async function main(
       console.log('');
     }
 
+    if (targets.includes('agentTemplates')) {
+      console.log('🤖 Seeding agent templates...');
+      try {
+        result.agentTemplates.rowsAffected = await runSeedAgentTemplatesSql(backendRoot, prisma);
+        console.log(`  ✓ Agent templates upserted (${result.agentTemplates.rowsAffected} rows)`);
+      } catch (error) {
+        console.error('  ❌ Error seeding agent templates:', error);
+        result.agentTemplates.errors = 1;
+        throw error;
+      }
+      console.log('');
+    }
+
+    if (targets.includes('currencies')) {
+      console.log('💱 Seeding currencies...');
+      try {
+        result.currencies.rowsAffected = await runSeedCurrenciesSql(backendRoot, prisma);
+        console.log(`  ✓ Currencies upserted (${result.currencies.rowsAffected} rows)`);
+      } catch (error) {
+        console.error('  ❌ Error seeding currencies:', error);
+        result.currencies.errors = 1;
+        throw error;
+      }
+      console.log('');
+    }
+
+    if (targets.includes('agentModelTools')) {
+      console.log('🧰 Seeding agent model tools...');
+      try {
+        result.agentModelTools.rowsAffected = await runSeedAgentModelToolsSql(backendRoot, prisma);
+        console.log(`  ✓ Agent model tools upserted (${result.agentModelTools.rowsAffected} rows)`);
+      } catch (error) {
+        console.error('  ❌ Error seeding agent model tools:', error);
+        result.agentModelTools.errors = 1;
+        throw error;
+      }
+      console.log('');
+    }
+
     result.views = {
       created: shouldSyncViews ? viewsCreatedCount : 0,
       updated: shouldSyncViews ? viewsUpdatedCount : 0,
@@ -264,15 +324,24 @@ export async function main(
     if (shouldSyncTemplates) {
       console.log(`   Prompt Templates: ${templatesCreatedCount} created, ${templatesUpdatedCount} updated`);
     }
-    const totalViewsErrors = shouldSyncViews ? viewsErrorCount : 0;
-    const totalTemplatesErrors = shouldSyncTemplates ? templatesErrorCount : 0;
-    if (totalViewsErrors > 0 || totalTemplatesErrors > 0) {
-      console.log(`   Total Errors: ${totalViewsErrors + totalTemplatesErrors}`);
+    if (targets.includes('agentTemplates')) {
+      console.log(`   Agent templates: ${result.agentTemplates.rowsAffected} rows upserted`);
     }
-    console.log('');
-    console.log(
-      'Note: currencies + agent templates are not part of this sync. From backend/ run: npm run seed-sql-metadata'
-    );
+    if (targets.includes('currencies')) {
+      console.log(`   Currencies: ${result.currencies.rowsAffected} rows upserted`);
+    }
+    if (targets.includes('agentModelTools')) {
+      console.log(`   Agent model tools: ${result.agentModelTools.rowsAffected} rows upserted`);
+    }
+    const totalErrors =
+      result.views.errors +
+      result.promptTemplates.errors +
+      result.agentTemplates.errors +
+      result.currencies.errors +
+      result.agentModelTools.errors;
+    if (totalErrors > 0) {
+      console.log(`   Total Errors: ${totalErrors}`);
+    }
     console.log('');
 
     return result;

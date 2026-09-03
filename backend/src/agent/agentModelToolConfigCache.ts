@@ -196,7 +196,7 @@ export async function upsertModelToolConfig(
 /** Apply prisma/seed-agent-model-tools.sql (idempotent upsert). Returns row count after seed. */
 export async function seedDefaultModelToolConfigs(): Promise<number> {
   const backendRoot = path.resolve(__dirname, '../../..');
-  runSeedAgentModelToolsSql(backendRoot);
+  await runSeedAgentModelToolsSql(backendRoot, prisma);
   invalidateModelToolCache();
   await warmAgentModelToolCache();
   return cacheByModel?.size ?? 0;

@@ -1,6 +1,7 @@
 /**
  * Sync views and prompt templates from JSON (+ matching .txt for prompts).
- * Currencies / agent templates: `npm run seed-sql-metadata` (terminal only).
+ * Optional SQL seeds (agent templates, currencies, model tools): pass `{ targets }`
+ * or use Super Admin → Sync metadata. CLI default remains views + prompt templates.
  * Usage: npm run sync-metadata
  */
 export { main, type SyncMetadataResult, type SyncMetadataCounts } from '../src/utils/setup/metadata/syncMetadataFromJson';

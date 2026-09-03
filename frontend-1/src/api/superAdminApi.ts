@@ -53,12 +53,27 @@ export interface SyncMetadataCounts {
   errors: number;
 }
 
+export interface SqlSeedCounts {
+  rowsAffected: number;
+  errors: number;
+}
+
+export type SyncMetadataTarget =
+  | 'views'
+  | 'promptTemplates'
+  | 'agentTemplates'
+  | 'currencies'
+  | 'agentModelTools';
+
 export interface DevOptionsSyncMetadataResponse {
   success: boolean;
   message: string;
   stats: {
     views: SyncMetadataCounts;
     promptTemplates: SyncMetadataCounts;
+    agentTemplates: SqlSeedCounts;
+    currencies: SqlSeedCounts;
+    agentModelTools: SqlSeedCounts;
   };
 }
 
@@ -187,9 +202,10 @@ export interface RemoveLegalEntityResponse {
 // ── Admin API ─────────────────────────────────────────────────────────────────
 
 export const adminAPI = {
-  devOptionsSyncMetadata: () =>
+  devOptionsSyncMetadata: (targets: SyncMetadataTarget[]) =>
     adminFetch<DevOptionsSyncMetadataResponse>('/api/admin/dev-options/sync-metadata', {
       method: 'POST',
+      body: JSON.stringify({ targets }),
     }),
 
   demoDatabaseReset: (payload: DemoDatabaseResetPayload) =>

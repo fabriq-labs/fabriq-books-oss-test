@@ -29,10 +29,15 @@ import {
   type OnboardTenantPayload,
   type SeedModelName,
   type SeedProfile,
+  type SyncMetadataTarget,
 } from "@/api/superAdminApi";
 import { viewAPI } from "@/api/metadataApi";
 import { v4 as uuidv4 } from "uuid";
 import { DemoDatabaseResetSection } from "./DemoDatabaseResetSection";
+import {
+  formatSyncMetadataStats,
+  SyncMetadataModal,
+} from "./SyncMetadataModal";
 import {
   ArrowLeft,
   ArrowRight,
@@ -271,6 +276,7 @@ export default function TenantAdministrationPage() {
 
   // Section 3 — Metadata sync
   const [syncing, setSyncing] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [lastSyncStats, setLastSyncStats] = useState<string | null>(null);
 
   // Section 4 — Targeted model seed
@@ -342,16 +348,14 @@ export default function TenantAdministrationPage() {
     }
   };
 
-  const handleSyncMetadata = async () => {
+  const handleSyncMetadata = async (targets: SyncMetadataTarget[]) => {
     setSyncing(true);
     setLastSyncStats(null);
     try {
-      const res = await adminAPI.devOptionsSyncMetadata();
-      const v = res.stats.views;
-      const p = res.stats.promptTemplates;
-      const summary = `Views: ${v.created} created, ${v.updated} updated, ${v.errors} errors. Prompts: ${p.created} created, ${p.updated} updated, ${p.errors} errors.`;
-      setLastSyncStats(summary);
+      const res = await adminAPI.devOptionsSyncMetadata(targets);
+      setLastSyncStats(formatSyncMetadataStats(res.stats, targets));
       toast({ title: "Metadata synced", description: res.message });
+      setSyncModalOpen(false);
     } catch (err) {
       toast({
         title: "Sync failed",
@@ -502,13 +506,20 @@ export default function TenantAdministrationPage() {
         <CardHeader>
           <CardTitle>Sync metadata &amp; templates</CardTitle>
           <CardDescription>
-            Syncs views and prompt templates from the backend repo into this database (upserts). Currencies and agent templates are terminal-only: <code className="text-xs">npm run seed-sql-metadata</code> from <code className="text-xs">backend/</code>.
+            Choose which metadata to upsert from the backend repo into this database: views, prompt
+            templates, agent templates, currencies, and agent model tools.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button onClick={handleSyncMetadata} disabled={syncing}>
-            {syncing ? "Syncing…" : "Sync views & prompt templates"}
+          <Button onClick={() => setSyncModalOpen(true)} disabled={syncing}>
+            {syncing ? "Syncing…" : "Choose what to sync…"}
           </Button>
+          <SyncMetadataModal
+            open={syncModalOpen}
+            syncing={syncing}
+            onOpenChange={setSyncModalOpen}
+            onConfirm={handleSyncMetadata}
+          />
           {lastSyncStats && (
             <p className="text-sm rounded-md border bg-muted/30 p-3 font-mono text-xs">
               {lastSyncStats}

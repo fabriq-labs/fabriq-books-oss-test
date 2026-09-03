@@ -8,6 +8,7 @@ import prisma from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 import { main as syncMetadataFromJson } from '../utils/setup/metadata/syncMetadataFromJson';
+import { parseSyncTargets } from '../utils/setup/metadata/syncMetadataTargets';
 import { setupChartOfAccounts } from '../utils/setup/setupChartOfAccounts';
 import { seedPaymentTermsFromCsv } from '../utils/setup/seedPaymentTermsFromCsv';
 import {
@@ -405,15 +406,23 @@ adminRouter.post(
         });
       }
 
+      let targets;
+      try {
+        targets = parseSyncTargets((req.body as { targets?: unknown } | undefined)?.targets);
+      } catch (parseErr: any) {
+        return res.status(400).json({
+          error: parseErr?.message || 'Select at least one metadata type to sync.',
+        });
+      }
+
       devOptionsSyncInProgress = true;
 
       try {
-        const stats = await syncMetadataFromJson();
-        logger.info('dev-options sync-metadata finished', { stats });
+        const stats = await syncMetadataFromJson({ targets });
+        logger.info('dev-options sync-metadata finished', { stats, targets });
         return res.status(200).json({
           success: true,
-          message:
-            'Views and prompt templates were synced from the repo into this database. Currencies and agent templates: run `npm run seed-sql-metadata` from backend/ (terminal).',
+          message: `Synced: ${targets.join(', ')}.`,
           stats,
         });
       } catch (err: any) {

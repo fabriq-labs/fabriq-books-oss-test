@@ -1,18 +1,15 @@
-import { execSync } from 'child_process';
-import * as fs from 'fs';
 import * as path from 'path';
+import type { PrismaClient } from '@prisma/client';
+import { executeSqlFile } from './executeSqlFile';
 
 /**
- * Applies `prisma/seed-currencies.sql` via `prisma db execute` (same as setup-db Step 1.7).
- * Uses ON CONFLICT (code) DO UPDATE; safe to repeat.
- * Terminal only (`npm run seed-sql-metadata`) — not used by Tenant Admin sync.
+ * Applies `prisma/seed-currencies.sql`.
+ * Uses ON CONFLICT (code) DO UPDATE; safe to repeat. No `npx` / Prisma CLI.
  */
-export function runSeedCurrenciesSql(backendRoot: string): void {
+export async function runSeedCurrenciesSql(
+  backendRoot: string,
+  prisma: PrismaClient
+): Promise<number> {
   const sqlPath = path.join(backendRoot, 'prisma', 'seed-currencies.sql');
-  const schemaPath = path.join(backendRoot, 'prisma', 'schema');
-  if (!fs.existsSync(sqlPath)) {
-    throw new Error(`seed-currencies.sql not found at ${sqlPath}`);
-  }
-  const cmd = `npx prisma db execute --schema "${schemaPath}" --file "${sqlPath}"`;
-  execSync(cmd, { cwd: backendRoot, env: process.env, stdio: 'inherit' });
+  return executeSqlFile(prisma, sqlPath);
 }

@@ -3,29 +3,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { adminAPI } from "@/api/api";
+import { adminAPI, type SyncMetadataTarget } from "@/api/api";
 import { ChevronDown } from "lucide-react";
 import { DemoDatabaseResetSection } from "./DemoDatabaseResetSection";
+import { formatSyncMetadataStats, SyncMetadataModal } from "./SyncMetadataModal";
 
 export default function DeveloperOptionsPage() {
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
   const [lastStats, setLastStats] = useState<string | null>(null);
 
-  const handleSyncMetadata = async () => {
+  const handleSyncMetadata = async (targets: SyncMetadataTarget[]) => {
     setSyncing(true);
     setLastStats(null);
     try {
-      const res = await adminAPI.devOptionsSyncMetadata();
-      const v = res.stats.views;
-      const p = res.stats.promptTemplates;
-      const summary = `Views: ${v.created} created, ${v.updated} updated, ${v.errors} errors. Prompt templates: ${p.created} created, ${p.updated} updated, ${p.errors} errors.`;
-      setLastStats(summary);
+      const res = await adminAPI.devOptionsSyncMetadata(targets);
+      setLastStats(formatSyncMetadataStats(res.stats, targets));
       toast({
         title: "Metadata synced",
         description: res.message,
       });
+      setSyncModalOpen(false);
     } catch (err) {
       toast({
         title: "Sync failed",
@@ -51,15 +51,20 @@ export default function DeveloperOptionsPage() {
         <CardHeader>
           <CardTitle>Sync metadata from repo</CardTitle>
           <CardDescription>
-            Runs the same steps as <code className="text-xs">npm run sync-metadata</code> (views and prompt
-            templates from <code className="text-xs">backend/prisma/metadata/</code>). Currencies and agent
-            templates: terminal only — <code className="text-xs">npm run seed-sql-metadata</code>.
+            Choose which metadata to upsert from <code className="text-xs">backend/prisma/</code> into this
+            database: views, prompt templates, agent templates, currencies, and agent model tools.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button onClick={handleSyncMetadata} disabled={syncing}>
-            {syncing ? "Syncing…" : "Sync views & prompt templates"}
+          <Button onClick={() => setSyncModalOpen(true)} disabled={syncing}>
+            {syncing ? "Syncing…" : "Choose what to sync…"}
           </Button>
+          <SyncMetadataModal
+            open={syncModalOpen}
+            syncing={syncing}
+            onOpenChange={setSyncModalOpen}
+            onConfirm={handleSyncMetadata}
+          />
           {lastStats && (
             <p className="text-sm text-muted-foreground rounded-md border bg-muted/30 p-3 font-mono text-xs">
               {lastStats}
