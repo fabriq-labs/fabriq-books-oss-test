@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DynamicTable from "@/components/masters/DynamicTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Modal } from "antd";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Modal, Pagination } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { createBankTransactionRowRenderer } from "@/components/masters/posting/BankTransactionRow";
@@ -30,7 +31,7 @@ import {
     CartesianGrid,
     Legend,
 } from "recharts";
-import { GitMerge, TrendingUp, TrendingDown, DollarSign, Edit, Trash2 } from "lucide-react";
+import { GitMerge, TrendingUp, TrendingDown, DollarSign, Edit, Trash2, AlertTriangle } from "lucide-react";
 import { useChat as useChatContext } from "@/contexts/ChatContext";
 import { getModelDisplayName, getViewName } from "@/utils/modelDisplayNames";
 import { BulkAction } from "@/types/bulkActions";
@@ -70,8 +71,8 @@ const postingTypeExcludeFilters = [
 const EXPENSE_COLORS = ['#E74A3B', '#F6C23E', '#36B9CC', '#4E73DF', '#858796', '#1CC88A', '#6f42c1', '#fd7e14'];
 const INCOME_COLORS = ['#1CC88A', '#36B9CC', '#4E73DF', '#F6C23E', '#858796', '#6f42c1'];
 
-/** Single search page size for full FY register + insights aggregates. */
-const BANK_TX_FULL_PAGE = 25_000;
+/** Max rows loaded per search (backend MAX_PAGE_SIZE). Table is client-paginated. */
+const BANK_TX_FULL_PAGE = 1000;
 
 function comparePostingLedgerAsc(a: any, b: any): number {
     const ta = dayjs(a.value_date ?? a.posting_date).valueOf();
@@ -183,6 +184,10 @@ export default function BankTransactions() {
     const [selectedLedgerRows, setSelectedLedgerRows] = useState<any[]>([]);
     const [ledgerSearchInput, setLedgerSearchInput] = useState("");
     const [ledgerSearchTerm, setLedgerSearchTerm] = useState<string | undefined>(undefined);
+    const [ledgerPage, setLedgerPage] = useState(1);
+    const [ledgerPageSize, setLedgerPageSize] = useState(10);
+    const [ledgerMatchTotal, setLedgerMatchTotal] = useState(0);
+    const [insightsMatchTotal, setInsightsMatchTotal] = useState(0);
 
     const masterDefaultFilters = useMemo(() => {
         const base: Record<string, any> = {
@@ -402,6 +407,7 @@ export default function BankTransactions() {
         if (!account?.id) {
             rawLedgerRef.current = [];
             setLedgerList({});
+            setLedgerMatchTotal(0);
             return;
         }
         setLedgerLoading(true);
@@ -419,10 +425,12 @@ export default function BankTransactions() {
             const raw = Array.isArray(res?.data) ? res.data : [];
             rawLedgerRef.current = raw;
             const data = applyRunningBalance(raw);
+            setLedgerMatchTotal(Number(res?.total) || raw.length);
             setLedgerList({ ...res, data });
         } catch (e) {
             console.error("Error loading bank ledger:", e);
             rawLedgerRef.current = [];
+            setLedgerMatchTotal(0);
             setLedgerList({});
         } finally {
             setLedgerLoading(false);
@@ -433,10 +441,15 @@ export default function BankTransactions() {
         if (!account?.id) {
             rawLedgerRef.current = [];
             setLedgerList({});
+            setLedgerMatchTotal(0);
             return;
         }
         void fetchLedger();
     }, [account?.id, fetchLedger]);
+
+    useEffect(() => {
+        setLedgerPage(1);
+    }, [account?.id, selectedFY.value, ledgerSearchTerm]);
 
     useEffect(() => {
         if (rawLedgerRef.current.length === 0) return;
@@ -462,6 +475,7 @@ export default function BankTransactions() {
     const fetchTransactions = useCallback(async () => {
         if (!account) {
             setTransactions([]);
+            setInsightsMatchTotal(0);
             return;
         }
         setIsLoading(true);
@@ -480,9 +494,14 @@ export default function BankTransactions() {
             if (response?.data) {
                 const transformed = transformPostingData(response.data, account.id);
                 setTransactions(transformed);
+                setInsightsMatchTotal(Number(response?.total) || transformed.length);
+            } else {
+                setTransactions([]);
+                setInsightsMatchTotal(0);
             }
         } catch (error) {
             console.error("Error fetching transactions:", error);
+            setInsightsMatchTotal(0);
         } finally {
             setIsLoading(false);
         }
@@ -614,6 +633,37 @@ export default function BankTransactions() {
         return items.filter((item: any) => isBankOrCreditCard(item));
     }, []);
 
+    const pagedLedgerList = useMemo(() => {
+        const all = Array.isArray(ledgerList.data) ? ledgerList.data : [];
+        const start = (ledgerPage - 1) * ledgerPageSize;
+        return {
+            ...ledgerList,
+            data: all.slice(start, start + ledgerPageSize),
+        };
+    }, [ledgerList, ledgerPage, ledgerPageSize]);
+
+    const loadedLedgerCount = Array.isArray(ledgerList.data) ? ledgerList.data.length : 0;
+
+    const handleLedgerPageChange = (page: number) => {
+        setLedgerPage(page);
+    };
+
+    const handleLedgerPageSizeChange = (_current: number, size: number) => {
+        setLedgerPageSize(size);
+        setLedgerPage(1);
+    };
+
+    const truncatedYearWarning = (matchTotal: number) =>
+        matchTotal > BANK_TX_FULL_PAGE ? (
+            <Alert className="mb-3 border-amber-300 bg-amber-50 text-amber-950">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                    This financial year has {matchTotal.toLocaleString()} matching rows.
+                    Only the first {BANK_TX_FULL_PAGE.toLocaleString()} are loaded.
+                </AlertDescription>
+            </Alert>
+        ) : null;
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
             <div className="w-full p-4">
@@ -673,9 +723,11 @@ export default function BankTransactions() {
                                         <span className="text-xs text-muted-foreground">(trial balance)</span>
                                     </div>
                                     <p className="mb-3 text-xs text-muted-foreground">
-                                        Transactions are sorted oldest first with a running balance. Up to{" "}
-                                        {BANK_TX_FULL_PAGE.toLocaleString()} rows for this financial year.
+                                        Transactions are sorted oldest first with a running balance.
+                                        Paging is in the browser; Refresh loads up to{" "}
+                                        {BANK_TX_FULL_PAGE.toLocaleString()} rows.
                                     </p>
+                                    {truncatedYearWarning(ledgerMatchTotal)}
                                     <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex max-w-md flex-1 items-center gap-2">
                                             <Input
@@ -739,13 +791,32 @@ export default function BankTransactions() {
                                     )}
                                     <DynamicTable
                                         ref={ledgerTableRef}
-                                        data={ledgerList}
+                                        data={pagedLedgerList}
                                         isLoading={ledgerLoading}
                                         renderActions={renderLedgerActions}
                                         enableMultiSelect
                                         onSelectionChange={setSelectedLedgerRows}
                                         customRowRenderer={simpleRowRenderer}
                                     />
+                                    {loadedLedgerCount > 0 && (
+                                        <div
+                                            style={{ marginBottom: "10px" }}
+                                            className="mt-4 mb-10 flex float-right"
+                                        >
+                                            <Pagination
+                                                current={ledgerPage}
+                                                pageSize={ledgerPageSize}
+                                                total={loadedLedgerCount}
+                                                onChange={handleLedgerPageChange}
+                                                onShowSizeChange={handleLedgerPageSizeChange}
+                                                showSizeChanger={true}
+                                                pageSizeOptions={["10", "20", "50", "100"]}
+                                                showTotal={(total, range) =>
+                                                    `${range[0]}-${range[1]} of ${total} items`
+                                                }
+                                            />
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </TabsContent>
@@ -765,6 +836,7 @@ export default function BankTransactions() {
                                 </div>
                             ) : (
                                 <div className="space-y-6">
+                                    {truncatedYearWarning(insightsMatchTotal)}
                                     {/* Summary Cards */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <Card className="bg-green-50 border-green-200">
