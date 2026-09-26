@@ -59,6 +59,7 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
     if (legacyContraColumn && legacyContraColumn !== "credit_account_id") {
       delete mappingValue[legacyContraColumn];
     }
+    const aiNotesColumn: any = getKeyByValue(mappingValue, "notes");
 
     const csvData = data?.map((record: any) => {
       const debitAmount = toNumber(record[debitAmountColumn]);
@@ -68,20 +69,30 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
       const counterValue = counterAccountColumn ? record[counterAccountColumn] : null;
       const legacyValue = legacyContraColumn ? record[legacyContraColumn] : null;
       const contra = counterValue || legacyValue || null;
+      const aiNotes =
+        record.__ai_notes != null && String(record.__ai_notes).trim() !== ""
+          ? String(record.__ai_notes).trim()
+          : null;
+      const mappedNotes = aiNotesColumn ? record[aiNotesColumn] : null;
       const finalRecord = {
         ...record,
         amount: hasDebitAmount ? debitAmount : creditAmount,
         account_id: hasCreditAmount ? relationId : contra,
         credit_account_id: hasDebitAmount ? relationId : contra,
+        notes: aiNotes || mappedNotes || record.notes || null,
       };
       delete finalRecord[debitAmountColumn];
       delete finalRecord[creditAmountColumn];
+      delete finalRecord.__ai_notes;
       if (counterAccountColumn) delete finalRecord[counterAccountColumn];
       if (legacyContraColumn && legacyContraColumn !== "credit_account_id") {
         delete finalRecord[legacyContraColumn];
       }
+      if (aiNotesColumn && aiNotesColumn !== "notes") delete finalRecord[aiNotesColumn];
       return finalRecord;
     });
+    mappingValue.notes = "notes";
+    if (aiNotesColumn && aiNotesColumn !== "notes") delete mappingValue[aiNotesColumn];
     return {
       mapping: mappingValue,
       isJSON: true,
@@ -98,9 +109,16 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
 
     const csvData = data?.map((record: any) => ({
       ...record,
+      notes:
+        record.__ai_notes != null && String(record.__ai_notes).trim() !== ""
+          ? String(record.__ai_notes).trim()
+          : record.notes ?? null,
       account_id: Object.values(mappingValue).includes("credit_account_id") ? relationId : null,
       credit_account_id: Object.values(mappingValue).includes("account_id") ? relationId : null,
     }));
+    if (!Object.values(mappingValue).includes("notes")) {
+      mappingValue.notes = "notes";
+    }
     return {
       mapping: mappingValue,
       isJSON: true,

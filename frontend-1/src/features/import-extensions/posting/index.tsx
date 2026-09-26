@@ -168,14 +168,11 @@ export const postingImportExtension: ImportExtension = {
 
     const tableHeaders = Object.keys(csvData[0] || {});
     const counterColIndex = selectedValues.findIndex((val: string) => val === 'counter_account_id');
-    const notesColIndex = selectedValues.findIndex((val: string) => val === 'notes');
     const counterColKey = counterColIndex >= 0 ? tableHeaders[counterColIndex] : null;
-    const notesColKey = notesColIndex >= 0 ? tableHeaders[notesColIndex] : null;
 
     const AI_COUNTER = '__ai_counter_account';
     const AI_NOTES = '__ai_notes';
     const needCounterCol = !counterColKey;
-    const needNotesCol = !notesColKey;
 
     const finalCSVData = csvData.map((item: any, index: number) => {
       const record: any = {};
@@ -183,7 +180,7 @@ export const postingImportExtension: ImportExtension = {
         record[key] = item[key]?.isNotAvailable ? null : item[key];
       });
       if (needCounterCol) record[AI_COUNTER] = null;
-      if (needNotesCol) record[AI_NOTES] = null;
+      record[AI_NOTES] = null;
 
       const cat = categorizations[index];
       if (cat && cat.confidence_score >= 0.5 && cat.account_id) {
@@ -193,22 +190,17 @@ export const postingImportExtension: ImportExtension = {
         const reasoning =
           typeof cat.reasoning === 'string' ? cat.reasoning.trim() : '';
         if (reasoning) {
-          const existingRaw = notesColKey ? record[notesColKey] : record[AI_NOTES];
+          const existingRaw = record.notes;
           const existing =
             existingRaw == null || existingRaw === ''
               ? ''
               : String(existingRaw).trim();
-          const merged =
-            !existing
+          record[AI_NOTES] =
+            !existing || existing === reasoning
               ? reasoning
               : existing.includes(reasoning)
                 ? existing
                 : `${existing}\n\nAI: ${reasoning}`;
-          if (notesColKey) {
-            record[notesColKey] = merged;
-          } else {
-            record[AI_NOTES] = merged;
-          }
         }
       }
 
@@ -217,7 +209,8 @@ export const postingImportExtension: ImportExtension = {
 
     const finalSelectedValues = [...selectedValues];
     if (needCounterCol) finalSelectedValues.push('counter_account_id');
-    if (needNotesCol) finalSelectedValues.push('notes');
+    // Always map this column. Putting it last means it wins over an empty extracted notes column.
+    finalSelectedValues.push('notes');
 
     return { csvData: finalCSVData, selectedValues: finalSelectedValues };
   },
