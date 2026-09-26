@@ -152,9 +152,8 @@ export const postingImportExtension: ImportExtension = {
   /**
    * Transform data for upload, injecting AI categorizations.
    *
-   * Double-entry convention (matches PostingImportService):
-   *   debit_amount  (money OUT) → contra expense on account_id
-   *   credit_amount (money IN)  → contra income on credit_account_id
+   * Predictions go in counter_account_id, not account_id / credit_account_id.
+   * Transactions.tsx then places the bank on one side and this counter on the other.
    */
   transformDataForUpload(
     csvData: any[],
@@ -168,22 +167,14 @@ export const postingImportExtension: ImportExtension = {
     }
 
     const tableHeaders = Object.keys(csvData[0] || {});
-    const accountIdColIndex = selectedValues.findIndex((val: string) => val === 'account_id');
-    const creditAccountColIndex = selectedValues.findIndex(
-      (val: string) => val === 'credit_account_id'
-    );
+    const counterColIndex = selectedValues.findIndex((val: string) => val === 'counter_account_id');
     const notesColIndex = selectedValues.findIndex((val: string) => val === 'notes');
-    const accountIdColKey =
-      accountIdColIndex >= 0 ? tableHeaders[accountIdColIndex] : null;
-    const creditAccountColKey =
-      creditAccountColIndex >= 0 ? tableHeaders[creditAccountColIndex] : null;
+    const counterColKey = counterColIndex >= 0 ? tableHeaders[counterColIndex] : null;
     const notesColKey = notesColIndex >= 0 ? tableHeaders[notesColIndex] : null;
 
-    const AI_OUT = '__ai_contra_out'; // → account_id (expense)
-    const AI_IN = '__ai_contra_in'; // → credit_account_id (income)
+    const AI_COUNTER = '__ai_counter_account';
     const AI_NOTES = '__ai_notes';
-    const needOutCol = !accountIdColKey;
-    const needInCol = !creditAccountColKey;
+    const needCounterCol = !counterColKey;
     const needNotesCol = !notesColKey;
 
     const finalCSVData = csvData.map((item: any, index: number) => {
@@ -191,26 +182,13 @@ export const postingImportExtension: ImportExtension = {
       Object.keys(item).forEach((key) => {
         record[key] = item[key]?.isNotAvailable ? null : item[key];
       });
-      if (needOutCol) record[AI_OUT] = null;
-      if (needInCol) record[AI_IN] = null;
+      if (needCounterCol) record[AI_COUNTER] = null;
       if (needNotesCol) record[AI_NOTES] = null;
 
       const cat = categorizations[index];
       if (cat && cat.confidence_score >= 0.5 && cat.account_id) {
-        const isDebit = Number(item.debit_amount ?? 0) !== 0;
-        if (isDebit) {
-          if (accountIdColKey) {
-            if (!record[accountIdColKey]) record[accountIdColKey] = cat.account_id;
-          } else {
-            record[AI_OUT] = cat.account_id;
-          }
-        } else {
-          if (creditAccountColKey) {
-            if (!record[creditAccountColKey]) record[creditAccountColKey] = cat.account_id;
-          } else {
-            record[AI_IN] = cat.account_id;
-          }
-        }
+        const targetKey = counterColKey || AI_COUNTER;
+        if (!record[targetKey]) record[targetKey] = cat.account_id;
 
         const reasoning =
           typeof cat.reasoning === 'string' ? cat.reasoning.trim() : '';
@@ -238,8 +216,7 @@ export const postingImportExtension: ImportExtension = {
     });
 
     const finalSelectedValues = [...selectedValues];
-    if (needOutCol) finalSelectedValues.push('account_id');
-    if (needInCol) finalSelectedValues.push('credit_account_id');
+    if (needCounterCol) finalSelectedValues.push('counter_account_id');
     if (needNotesCol) finalSelectedValues.push('notes');
 
     return { csvData: finalCSVData, selectedValues: finalSelectedValues };

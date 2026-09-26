@@ -41,7 +41,10 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
     const getKeyByValue = (obj: any, value: any) => Object.keys(obj).find(k => obj[k] === value) ?? null;
     const debitAmountColumn: any = getKeyByValue(mappingValue, "debit_amount");
     const creditAmountColumn: any = getKeyByValue(mappingValue, "credit_amount");
-    const contraAccountColumn: any = getKeyByValue(mappingValue, "credit_account_id");
+    // AI import writes the predicted other account as counter_account_id.
+    // A CSV that maps its contra column to credit_account_id still uses that column.
+    const counterAccountColumn: any = getKeyByValue(mappingValue, "counter_account_id");
+    const legacyContraColumn: any = getKeyByValue(mappingValue, "credit_account_id");
 
     mappingValue = {
       ...mappingValue,
@@ -51,22 +54,32 @@ function transformPostingCSVData(formattedData: any, relationId: any): any {
     };
     delete mappingValue[debitAmountColumn];
     delete mappingValue[creditAmountColumn];
-    delete mappingValue[contraAccountColumn];
+    if (counterAccountColumn) delete mappingValue[counterAccountColumn];
+    // Do not delete the output key when the CSV header is already "credit_account_id".
+    if (legacyContraColumn && legacyContraColumn !== "credit_account_id") {
+      delete mappingValue[legacyContraColumn];
+    }
 
     const csvData = data?.map((record: any) => {
       const debitAmount = toNumber(record[debitAmountColumn]);
       const creditAmount = toNumber(record[creditAmountColumn]);
       const hasDebitAmount = debitAmount !== 0;
       const hasCreditAmount = creditAmount !== 0;
+      const counterValue = counterAccountColumn ? record[counterAccountColumn] : null;
+      const legacyValue = legacyContraColumn ? record[legacyContraColumn] : null;
+      const contra = counterValue || legacyValue || null;
       const finalRecord = {
         ...record,
         amount: hasDebitAmount ? debitAmount : creditAmount,
-        account_id: hasCreditAmount ? relationId : (record[contraAccountColumn] ? record[contraAccountColumn] : null),
-        credit_account_id: hasDebitAmount ? relationId : (record[contraAccountColumn] ? record[contraAccountColumn] : null),
+        account_id: hasCreditAmount ? relationId : contra,
+        credit_account_id: hasDebitAmount ? relationId : contra,
       };
       delete finalRecord[debitAmountColumn];
       delete finalRecord[creditAmountColumn];
-      delete finalRecord[contraAccountColumn];
+      if (counterAccountColumn) delete finalRecord[counterAccountColumn];
+      if (legacyContraColumn && legacyContraColumn !== "credit_account_id") {
+        delete finalRecord[legacyContraColumn];
+      }
       return finalRecord;
     });
     return {
