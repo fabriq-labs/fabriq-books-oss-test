@@ -1,0 +1,11 @@
+Customer ID,Customer Name,No. of Invoices,Sales Subtotal,Sales Tax,Invoice Total
+C001,Lone Star Electrical Services,5,2704.05,$223.09,"$2,927.14"
+C002,Metro Home Supply,5,4305.85,$355.24,"$4,661.09"
+C003,Bright Homes LLC,5,1461.05,$120.53,"$1,581.58"
+C004,Sunrise Property Services,5,4036.8,$347.15,"$4,383.95"
+C005,Evergreen Builders Inc.,5,2357.3,$183.87,"$2,541.17"
+C006,Northside Maintenance Co.,4,1523.25,$156.14,"$1,679.39"
+C007,Premier Home Solutions,4,2683.25,$214.66,"$2,897.91"
+C008,West Coast Renovations,4,1507.25,$143.19,"$1,650.44"
+C009,Liberty Facilities LLC,4,2355.2,$170.74,"$2,525.94"
+C010,Oak Ridge Contractors,4,3316.5,$323.35,"$3,639.85"

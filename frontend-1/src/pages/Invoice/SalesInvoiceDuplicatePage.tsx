@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { viewAPI, workflowAPI } from '@/api/api';
+import { SALES_INVOICE_TYPE } from '@/lib/bills/poMode';
 
 interface ApiRecordResponse {
     data?: Record<string, any>;
@@ -35,6 +36,7 @@ const buildDuplicateHeaderPayload = (source: Record<string, any>) => ({
     adjustable_value: source.adjustable_value,
     transaction_type: source.transaction_type,
     supplier_name: source.supplier_name,
+    invoice_type: SALES_INVOICE_TYPE,
 });
 
 const buildDuplicateLineItemPayload = (lineItem: Record<string, any>) => ({
@@ -79,6 +81,7 @@ const SalesInvoiceDuplicatePage: React.FC = () => {
 
                 const createRes = (await workflowAPI.create('invoice', '3', {
                     status: '3',
+                    invoice_type: SALES_INVOICE_TYPE,
                 })) as WorkflowCreateResponse;
 
                 const newId = createRes.data?.id;

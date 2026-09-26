@@ -36,7 +36,7 @@ import sys
 import subprocess
 import logging
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 try:
     import psycopg2
@@ -116,9 +116,9 @@ def ensure_db_env_from_database_url() -> None:
         else:
             os.environ.setdefault('DB_PORT', '5432')
         if p.username:
-            os.environ['DB_USER'] = p.username
+            os.environ['DB_USER'] = unquote(p.username)
         if p.password:
-            os.environ['DB_PASSWORD'] = p.password
+            os.environ['DB_PASSWORD'] = unquote(p.password)
         path = (p.path or '').lstrip('/')
         if path:
             dbname = path.split('?')[0]

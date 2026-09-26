@@ -11,7 +11,7 @@ import { SearchDropDown } from "./search_dropdown/dropdown";
 import { constructObject } from "./utils/helper";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDFDocument } from "./pdf_generator/InvoicePdf";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { viewAPI } from "@/api/api";
 import dayjs from "dayjs";
@@ -36,6 +36,9 @@ import {
   ZeroRatedTaxGroup,
 } from "@/lib/tax/taxLookups";
 import { fetchLatestExchangeRate } from "@/lib/currency/exchangeRateLookups";
+import { isExternalSource } from "@/utils/sourceSystem";
+import { cn } from "@/lib/utils";
+import { SALES_INVOICE_TYPE } from "@/lib/bills/poMode";
 
 interface InvoiceItem {
   id: number | string;
@@ -47,6 +50,7 @@ interface InvoiceItem {
   discount_amount?: number;
   tax: number | string;
   total: number;
+  line_tax_amount: number | string;
   item_name: string;
   item_description: string;
   item_number?: string;
@@ -127,7 +131,9 @@ interface InvoiceFormData {
 export const InvoiceForm: React.FC = () => {
   const { id, viewId } = useParams<{ id: string; viewId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  const isSalesPath = location.pathname.includes("/sales/");
   const [products, setProducts] = useState<any>({});
   const [legalEntity, setLegalEntity] = useState<any>({});
   const [customer, setCustomer] = useState<any>({});
@@ -172,6 +178,10 @@ export const InvoiceForm: React.FC = () => {
   const [nextItemId, setNextItemId] = useState(1);
   const [initialValues, setInitialValues] = useState<any>(null);
   const didPersistHQLegalEntityRef = useRef(false);
+  /** Locked when editing an existing invoice that was synced from an external ERP. */
+  const readOnly =
+    Boolean(id) &&
+    (initialValues == null || isExternalSource(initialValues?.source_system_id));
   const [invoiceCurrencyCode, setInvoiceCurrencyCode] = useState<string>("INR");
   const didUserChangeLegalEntityRef = useRef(false);
   /** When true, auto rate lookup will not overwrite the exchange rate field. */
@@ -200,43 +210,8 @@ export const InvoiceForm: React.FC = () => {
     },
   });
 
-  // Calculate totals whenever items change
-  useEffect(() => {
-    const subTotal = formData.items.reduce((sum, item) => {
-      const quantity = Number(item.quantity) || 0;
-      const price = Number(item.price) || 0;
-      return sum + quantity * price;
-    }, 0);
-
-    const totalDiscount = formData.items.reduce((sum, item) => {
-      const quantity = Number(item.quantity) || 0;
-      const price = Number(item.price) || 0;
-      const discountRate = Number(item.discount_rate) || 0;
-      const itemSubtotal = quantity * price;
-      return sum + (itemSubtotal * discountRate) / 100;
-    }, 0);
-
-    const totalTax = formData.items.reduce((sum, item) => {
-      const quantity = Number(item.quantity) || 0;
-      const price = Number(item.price) || 0;
-      const discountRate = Number(item.discount_rate) || 0;
-      const tax = Number(item.tax) || 0;
-      const itemSubtotal = quantity * price;
-      const lineAfterDiscount = itemSubtotal - (itemSubtotal * discountRate) / 100;
-      return sum + (lineAfterDiscount * tax) / 100;
-    }, 0);
-
-    const adjustableValue = Number(formData.adjustable_value) || 0;
-    const grandTotal = subTotal - totalDiscount + totalTax + adjustableValue;
-
-    setFormData((prev) => ({
-      ...prev,
-      subTotal,
-      totalDiscount,
-      totalTax,
-      grandTotal,
-    }));
-  }, [formData.items, formData.adjustable_value]);
+  // Totals come from the API / database (invoice_net_total, tax_total, invoice_total) —
+  // do not recalculate on the client after items load.
   useEffect(() => {
     if (id) {
       // Clear fields immediately to avoid showing stale values
@@ -361,7 +336,10 @@ export const InvoiceForm: React.FC = () => {
         paymentTermsDays,
         invoice_number: res.data.invoice_number || prev.invoice_number,
         invoice_date: res.data.invoice_date || prev.invoice_date,
-        grandTotal: res.data.invoice_total,
+        subTotal: Number(res.data.invoice_net_total) || 0,
+        totalDiscount: 0,
+        totalTax: Number(res.data.tax_total) || 0,
+        grandTotal: Number(res.data.invoice_total) || 0,
         adjustable_label:
           res.data.adjustable_label ??
           prev.adjustable_label ??
@@ -423,6 +401,7 @@ export const InvoiceForm: React.FC = () => {
   const handleFieldUpdate = useCallback(
     (field: string, overrideValue?: any) => {
       if (!id) return;
+      if (initialValues && isExternalSource(initialValues.source_system_id)) return;
       const currentValue =
         overrideValue !== undefined
           ? overrideValue
@@ -453,8 +432,14 @@ export const InvoiceForm: React.FC = () => {
               ...(res.data?.invoice_date !== undefined && {
                 invoice_date: res.data.invoice_date,
               }),
+              ...(res.data?.invoice_net_total !== undefined && {
+                subTotal: Number(res.data.invoice_net_total) || 0,
+              }),
+              ...(res.data?.tax_total !== undefined && {
+                totalTax: Number(res.data.tax_total) || 0,
+              }),
               ...(res.data?.invoice_total !== undefined && {
-                grandTotal: res.data.invoice_total,
+                grandTotal: Number(res.data.invoice_total) || 0,
               }),
             }));
           }
@@ -469,7 +454,7 @@ export const InvoiceForm: React.FC = () => {
         });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id],
+    [id, initialValues?.source_system_id],
   );
 
   const resolveBaseCurrencyId = (le?: any): string | null =>
@@ -620,6 +605,7 @@ export const InvoiceForm: React.FC = () => {
         discount_rate: item.discount_rate ?? "",
         discount_amount: item.discount_amount ?? 0,
         total: item.line_total ?? item.total ?? 0,
+        line_tax_amount: item.line_tax_amount ?? 0,
         item_name: item.item_name || item.item_master?.item_name || "",
         item_description:
           item.item_description || item.item_master?.item_description || "",
@@ -653,38 +639,18 @@ export const InvoiceForm: React.FC = () => {
       if (!invoiceData?.invoice_line_item) return false;
       const mappedItems = mapLineItemsToForm(invoiceData.invoice_line_item);
       setInitialValues(invoiceData);
-      setFormData((prev) => {
-        const subTotal = mappedItems.reduce((sum, item) => {
-          const qty = Number(item.quantity) || 0;
-          const price = Number(item.price) || 0;
-          return sum + qty * price;
-        }, 0);
-        const totalDiscount = mappedItems.reduce((sum, item) => {
-          const qty = Number(item.quantity) || 0;
-          const price = Number(item.price) || 0;
-          const discountRate = Number(item.discount_rate) || 0;
-          return sum + (qty * price * discountRate) / 100;
-        }, 0);
-        const totalTax = mappedItems.reduce((sum, item) => {
-          const qty = Number(item.quantity) || 0;
-          const price = Number(item.price) || 0;
-          const discountRate = Number(item.discount_rate) || 0;
-          const tax = Number(item.tax) || 0;
-          const lineAfterDiscount =
-            qty * price - (qty * price * discountRate) / 100;
-          return sum + (lineAfterDiscount * tax) / 100;
-        }, 0);
-        const grandTotal =
-          invoiceData?.invoice_total ?? subTotal - totalDiscount + totalTax;
-        return {
-          ...prev,
-          items: mappedItems,
-          subTotal,
-          totalDiscount,
-          totalTax,
-          grandTotal,
-        };
-      });
+      setFormData((prev) => ({
+        ...prev,
+        items: mappedItems,
+        subTotal: Number(invoiceData.invoice_net_total) || 0,
+        totalDiscount: 0,
+        totalTax: Number(invoiceData.tax_total) || 0,
+        grandTotal: Number(invoiceData.invoice_total) || 0,
+        adjustable_value:
+          invoiceData.adjustable_value != null
+            ? Number(invoiceData.adjustable_value)
+            : prev.adjustable_value,
+      }));
       return true;
     },
     [mapLineItemsToForm],
@@ -779,6 +745,7 @@ export const InvoiceForm: React.FC = () => {
   };
 
   const addItem = async () => {
+    if (readOnly) return;
     // Check if there's already an empty line item
 
     const hasEmptyItem = formData.items.some(
@@ -857,6 +824,7 @@ export const InvoiceForm: React.FC = () => {
         discount_rate: "",
         discount_amount: 0,
         total: 0,
+        line_tax_amount: 0,
         item_name: "",
         item_description: "",
       };
@@ -1499,6 +1467,7 @@ export const InvoiceForm: React.FC = () => {
   };
 
   const removeItem = async (itemId: number | string) => {
+    if (readOnly) return;
     // If editing existing invoice, delete via API
     if (id && typeof itemId === "string") {
       try {
@@ -1687,12 +1656,14 @@ export const InvoiceForm: React.FC = () => {
   );
 
   const handleConfirmSubmit = async () => {
+    if (readOnly) return;
     try {
       setIsSubmitting(true);
 
       const submissionData = {
         ...formData,
         invoice_total: formData.grandTotal ?? initialValues?.invoice_total,
+        ...(isSalesPath ? { invoice_type: SALES_INVOICE_TYPE } : {}),
       };
 
       if (!id) {
@@ -1955,7 +1926,7 @@ export const InvoiceForm: React.FC = () => {
   const showStructuredTax = taxPack.id !== "GENERIC";
 
   const getFormTitle = () =>
-    id ? "Edit Invoice" : "New Invoice";
+    readOnly ? "View Invoice" : id ? "Edit Invoice" : "New Invoice";
 
 
   return (
@@ -1984,16 +1955,18 @@ export const InvoiceForm: React.FC = () => {
                 pdfUrl={pdfPreviewUrl}
                 title={`Invoice ${formData.invoice_number || ""} – Preview`}
               />
-              <Button
-                type="button"
-                onClick={() => setShowPaymentReceiptModal(true)}
-                // size="sm"
-                className="bg-primary hover:bg-primary/90"
-                disabled={!id}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Payment Receipt
-              </Button>
+              {!readOnly && (
+                <Button
+                  type="button"
+                  onClick={() => setShowPaymentReceiptModal(true)}
+                  // size="sm"
+                  className="bg-primary hover:bg-primary/90"
+                  disabled={!id}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Payment Receipt
+                </Button>
+              )}
               <Button
 
                 variant="outline" onClick={handleCancel}>
@@ -2005,7 +1978,7 @@ export const InvoiceForm: React.FC = () => {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handlePreviewAndExport();
+              if (!readOnly) handlePreviewAndExport();
             }}
           >
             {/* Payment Receipts Table - shown below invoice grand totals */}
@@ -2017,7 +1990,7 @@ export const InvoiceForm: React.FC = () => {
                   remainingBalance={
                     initialValues?.balance_amount ?? initialValues?.invoice_total
                   }
-                  showActions
+                  showActions={!readOnly}
                   onDelete={(pr) => deletePaymentReceiptApi(pr.id)}
                   updatingPaymentId={updatingPaymentReceiptId}
                 />
@@ -2025,7 +1998,7 @@ export const InvoiceForm: React.FC = () => {
             )}
             <div className="mt-4">
               <Card className="border border-border/70 shadow-sm overflow-hidden rounded-lg">
-                <CardContent className="p-5 md:p-6 space-y-7 bg-background">
+                <CardContent className={cn("p-5 md:p-6 space-y-7 bg-background", readOnly && "pointer-events-none opacity-90")}>
                   {/* Basic Information Section */}
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
@@ -2464,6 +2437,7 @@ export const InvoiceForm: React.FC = () => {
                     onProductSelectChange={handleProductSelectChange}
                     onProductSelectClear={handleProductSelectClear}
                     onTaxGroupSelect={handleTaxGroupSelect}
+                    readOnly={readOnly}
                   />
 
                   {/* Zoho-style Notes, Terms and Attachments */}
@@ -2523,7 +2497,7 @@ export const InvoiceForm: React.FC = () => {
                             Attach File(s) to Invoice
                           </p>
                           {id ? (
-                            <Attachment model="invoice" id={id} />
+                            <Attachment model="invoice" id={id} disabled={readOnly} />
                           ) : (
                             <p className="text-xs text-muted-foreground">
                               Save invoice to enable attachments.

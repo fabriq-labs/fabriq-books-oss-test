@@ -118,6 +118,12 @@
       },
       "displayName": "Recoverable",
       "isColumnShow": false
+    },
+    "source_system_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Source System",
+      "isColumnShow": false
     }
   },
   "org_id": "52",

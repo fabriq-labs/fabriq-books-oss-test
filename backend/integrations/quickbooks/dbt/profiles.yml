@@ -11,4 +11,5 @@ quickbooks_integrations:
       schema: "{{ env_var('DB_SCHEMA', 'public') }}"
       threads: 4
       keepalives_idle: 0
-      connect_timeout: 10
+      connect_timeout: 30
+      retries: 3

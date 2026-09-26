@@ -232,6 +232,12 @@
         "name": "read",
         "country_code": "read"
       }
+    },
+    "source_system_id": {
+      "dataType": "string",
+      "permission": "read",
+      "displayName": "Source System",
+      "isColumnShow": false
     }
   },
   "org_id": "52",

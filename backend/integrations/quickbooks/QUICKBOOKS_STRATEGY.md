@@ -131,21 +131,40 @@ data->'MetaData'->>'LastUpdatedTime' as last_updated_time
 | QBO Field | Staging Field | Normalized Field | Notes |
 |-----------|---------------|------------------|-------|
 | `Id` | `vendor_id` | `source_record_id` | |
-| `DisplayName` | `display_name` | `supplier_name` | Primary name field |
-| `CompanyName` | `company_name` | `legal_name` | Legal entity name |
-| `PrimaryEmailAddr.Address` | `primary_email` | `primary_email` | JSONB extraction |
-| `BillAddr.Line1` | `billing_address_line1` | `supplier_address` | JSONB extraction |
+| `DisplayName` | `display_name` | `supplier_name` | Primary name |
+| `CompanyName` | `company_name` | `legal_name` | |
+| `PrintOnCheckName` | `print_on_check_name` | `name` | |
+| `PrimaryEmailAddr.Address` | `primary_email` | `primary_email` | |
+| `PrimaryPhone.FreeFormNumber` | `primary_phone` | `primary_phone` | |
+| `Mobile.FreeFormNumber` | `mobile_phone` | `alternative_phone` | |
+| `WebAddr.URI` | `website` | `website` | |
+| `BillAddr.Line1` (+ Line2) | `billing_address_*` | `supplier_address` | Combined |
+| `BillAddr.City` | `billing_city` | `city` | |
+| `BillAddr.CountrySubDivisionCode` | `billing_state` | `state` | |
+| `BillAddr.PostalCode` | `billing_postal_code` | `zip_code` | |
+| `BillAddr.Country` | `billing_country` | `country` | |
+| `TaxIdentifier` | `tax_identifier` | `legal_registration_number` | |
+| `TermRef.name` | `payment_term_name` | `payment_term_id` | Match Fabriq payment terms |
+| `CurrencyRef.value` | `currency_code` | `preferred_currency_id` | |
+| `Active` | `active` | `status` | Active / Inactive |
 
 #### Items
 
 | QBO Field | Staging Field | Normalized Field | Notes |
 |-----------|---------------|------------------|-------|
 | `Id` | `item_id` | `source_record_id` | |
-| `Name` | `name` | `item_name` | |
+| `Name` | `name` | `item_name` / `name` | |
 | `Type` | `item_type` | `item_type` | Service, Inventory, NonInventory |
-| `Sku` | `sku` | `item_code` | |
+| `Sku` | `sku` | `item_code` | Truncated to 20 chars; empty → null |
+| `Description` | `description` | `item_description` | Sales description |
 | `UnitPrice` | `unit_price` | `unit_price` | |
-| `TrackQtyOnHand` | `track_qty_on_hand` | `stockable` | Converted to Yes/No |
+| `PurchaseCost` | `purchase_cost` | — | Not stored (no Fabriq column) |
+| `PurchaseDesc` | `purchase_description` | — | Not stored (no Fabriq column) |
+| `IncomeAccountRef` | `income_account_id` | `sales_account_id` | Join synced `account` |
+| `ExpenseAccountRef` | `expense_account_id` | `purchase_account_id` | Join synced `account` |
+| `PrefVendorRef` | `preferred_vendor_id` / `name` | `supplier_id` / `preferred_supplier` | Join synced `supplier` |
+| `SalesTaxCodeRef.name` | `sales_tax_code_name` | `item_tax_category` | Label only |
+| `TrackQtyOnHand` | `track_qty_on_hand` | `stockable` | Y/N for Inventory |
 
 #### Accounts
 

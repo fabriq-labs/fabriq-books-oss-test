@@ -25,6 +25,8 @@ import { useDataGraphAndSchema } from '@/hooks/useDataGraphAndSchema';
 import { resolveTaxPack, type TaxPackCatalog } from '@/lib/tax/taxPack';
 import { fetchEntityTaxPack } from '@/lib/tax/taxLookups';
 import { getUserDetails } from '@/utils/auth';
+import { isExternalSource } from '@/utils/sourceSystem';
+import { cn } from '@/lib/utils';
 
 interface ItemMasterFormProps {
     initialValues?: any;
@@ -56,6 +58,7 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
     const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
     const [supplierSearchTerm, setSupplierSearchTerm] = useState<string>('');
     const [taxPack, setTaxPack] = useState<TaxPackCatalog>(resolveTaxPack('GENERIC'));
+    const readOnly = Boolean(id) && isExternalSource(initialValues?.source_system_id);
 
     type ItemMasterValues = z.infer<typeof dynamicSchema>;
 
@@ -170,6 +173,7 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
     };
 
     const handleSubmit = async (data: ItemMasterValues) => {
+        if (readOnly) return;
         try {
             setIsSubmitting(true);
 
@@ -423,7 +427,7 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Item</h1>
                     <p className="text-sm text-gray-600 mt-1">
-                        {initialValues ? 'Edit Item' : 'Create New Item'}
+                        {readOnly ? 'View Item' : initialValues ? 'Edit Item' : 'Create New Item'}
                     </p>
                 </div>
                 <Button
@@ -466,8 +470,22 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                     </div>
                                 ) : (
                                     <Form {...form}>
-                                        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                                        <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", readOnly && "pointer-events-none opacity-90")}>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="item_code"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <RequiredFormLabel fieldName="item_code" dataGraph={dataGraph}>Item Code (SKU)</RequiredFormLabel>
+                                                            <FormControl>
+                                                                <Input placeholder="SKU / item code" {...field} value={field.value ?? ""} />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+
                                                 <FormField
                                                     control={form.control}
                                                     name="item_name"
@@ -587,6 +605,9 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                                 <SelectContent>
                                                                     <SelectItem value="Goods">Goods</SelectItem>
                                                                     <SelectItem value="Services">Services</SelectItem>
+                                                                    <SelectItem value="Inventory">Inventory</SelectItem>
+                                                                    <SelectItem value="NonInventory">NonInventory</SelectItem>
+                                                                    <SelectItem value="Service">Service</SelectItem>
                                                                 </SelectContent>
                                                             </Select>
                                                             <FormMessage />
@@ -838,21 +859,23 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                 />
                                             </div>
 
-                                            <div className="flex justify-end space-x-2">
+                                            <div className={cn("flex justify-end space-x-2", readOnly && "pointer-events-auto opacity-100")}>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
                                                     onClick={handleCancel}
                                                 >
-                                                    Cancel
+                                                    {readOnly ? "Close" : "Cancel"}
                                                 </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={isSubmitting}
-                                                    className="bg-primary hover:bg-primary/90"
-                                                >
-                                                    Save
-                                                </Button>
+                                                {!readOnly && (
+                                                    <Button
+                                                        type="submit"
+                                                        disabled={isSubmitting}
+                                                        className="bg-primary hover:bg-primary/90"
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                )}
                                             </div>
                                         </form>
                                     </Form>)}
@@ -864,10 +887,12 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <CardTitle>Suppliers</CardTitle>
-                                    <Button onClick={() => setIsAddSupplierModalOpen(true)}>
-                                        <Plus size={16} className="mr-2" />
-                                        Add Supplier
-                                    </Button>
+                                    {!readOnly && (
+                                        <Button onClick={() => setIsAddSupplierModalOpen(true)}>
+                                            <Plus size={16} className="mr-2" />
+                                            Add Supplier
+                                        </Button>
+                                    )}
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -883,7 +908,7 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                 <TableHead>Primary Email</TableHead>
                                                 <TableHead>Primary Phone</TableHead>
                                                 <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
+                                                {!readOnly && <TableHead className="text-right">Actions</TableHead>}
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -896,16 +921,18 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                         <TableCell>{supplier.primary_email || '-'}</TableCell>
                                                         <TableCell>{supplier.primary_phone || '-'}</TableCell>
                                                         <TableCell>{supplier.status || '-'}</TableCell>
-                                                        <TableCell className="text-right">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="text-red-500 hover:text-red-600"
-                                                                onClick={() => handleDeleteSupplier(supplierItem.id)}
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </Button>
-                                                        </TableCell>
+                                                        {!readOnly && (
+                                                            <TableCell className="text-right">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="text-red-500 hover:text-red-600"
+                                                                    onClick={() => handleDeleteSupplier(supplierItem.id)}
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </Button>
+                                                            </TableCell>
+                                                        )}
                                                     </TableRow>
                                                 );
                                             })}
@@ -941,8 +968,22 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                             </div>
                         ) : (
                             <Form {...form}>
-                                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                                <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", readOnly && "pointer-events-none opacity-90")}>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <FormField
+                                            control={form.control}
+                                            name="item_code"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <RequiredFormLabel fieldName="item_code" dataGraph={dataGraph}>Item Code (SKU)</RequiredFormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="SKU / item code" {...field} value={field.value ?? ""} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
                                         <FormField
                                             control={form.control}
                                             name="item_name"
@@ -1062,6 +1103,9 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                                         <SelectContent>
                                                             <SelectItem value="Goods">Goods</SelectItem>
                                                             <SelectItem value="Services">Services</SelectItem>
+                                                            <SelectItem value="Inventory">Inventory</SelectItem>
+                                                            <SelectItem value="NonInventory">NonInventory</SelectItem>
+                                                            <SelectItem value="Service">Service</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                     <FormMessage />
@@ -1292,21 +1336,23 @@ export const ItemMasterForm: React.FC<ItemMasterFormProps> = (
                                         />
                                     </div>
 
-                                    <div className="flex justify-end space-x-2">
+                                    <div className={cn("flex justify-end space-x-2", readOnly && "pointer-events-auto opacity-100")}>
                                         <Button
                                             type="button"
                                             variant="outline"
                                             onClick={handleCancel}
                                         >
-                                            Cancel
+                                            {readOnly ? "Close" : "Cancel"}
                                         </Button>
-                                        <Button
-                                            type="submit"
-                                            disabled={isSubmitting}
-                                            className="bg-primary hover:bg-primary/90"
-                                        >
-                                            Save
-                                        </Button>
+                                        {!readOnly && (
+                                            <Button
+                                                type="submit"
+                                                disabled={isSubmitting}
+                                                className="bg-primary hover:bg-primary/90"
+                                            >
+                                                Save
+                                            </Button>
+                                        )}
                                     </div>
                                 </form>
                             </Form>)}

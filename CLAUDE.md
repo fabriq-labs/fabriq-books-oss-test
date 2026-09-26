@@ -70,6 +70,8 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | Tax architecture (country-agnostic GST/HST, P0/P1) | [docs/tax/README.md](./docs/tax/README.md) · [TAX_ARCHITECTURE.md](./docs/tax/TAX_ARCHITECTURE.md) · [IMPLEMENTATION_PLAN.md](./docs/tax/IMPLEMENTATION_PLAN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
+| QuickBooks → Fabriq (fields + concepts, app users) | [docs/QUICKBOOKS_TO_FABRIQ_USER_GUIDE.md](./docs/QUICKBOOKS_TO_FABRIQ_USER_GUIDE.md) |
+| QuickBooks + Airbyte setup (OAuth, connection, extract/transform) | [docs/QUICKBOOKS_INTEGRATION_TO_FABRIQ.md](./docs/QUICKBOOKS_INTEGRATION_TO_FABRIQ.md) |
 | Plaid bank feed integration | [docs/PLAID_README.md](./docs/PLAID_README.md) (implementation guide) · [docs/PLAID_INTEGRATION.md](./docs/PLAID_INTEGRATION.md) (design notes) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |
 | Frontend filter system (defaultFilters, presetFilters, virtual OR keys, badge chips) | [docs/FILTER_SYSTEM.md](./docs/FILTER_SYSTEM.md) |

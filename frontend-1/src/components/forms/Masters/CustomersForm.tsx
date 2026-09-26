@@ -17,6 +17,8 @@ import { constructObject } from '../../utils/helper';
 import { useTool } from '@/contexts/ToolContext';
 import { SearchDropDown } from '../../search_dropdown/dropdown';
 import { TaxRegistrationsTab } from './TaxRegistrationsTab';
+import { isExternalSource } from '@/utils/sourceSystem';
+import { cn } from '@/lib/utils';
 
 const TAX_TREATMENT_OPTIONS = [
     { value: 'registered', label: 'Registered' },
@@ -71,6 +73,8 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [packLegalEntityId, setPackLegalEntityId] = useState<string | null>(null);
     const { latestFormToolResponse } = useTool();
+
+    const readOnly = Boolean(id) && isExternalSource(initialValues?.source_system_id);
 
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
@@ -187,6 +191,7 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
     };
 
     const handleSubmit = async (data: ItemMasterValues) => {
+        if (readOnly) return;
         try {
             setIsSubmitting(true);
             const submissionData = {
@@ -284,7 +289,7 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
     ) : (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6", readOnly && "pointer-events-none opacity-90")}>
                     <FormField
                         control={form.control}
                         name="customer_name"
@@ -522,15 +527,17 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
 
                 <div className="flex justify-end space-x-2">
                     <Button type="button" variant="outline" onClick={handleCancel}>
-                        Cancel
+                        {readOnly ? "Close" : "Cancel"}
                     </Button>
-                    <Button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="bg-primary hover:bg-primary/90"
-                    >
-                        Save
-                    </Button>
+                    {!readOnly && (
+                        <Button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="bg-primary hover:bg-primary/90"
+                        >
+                            Save
+                        </Button>
+                    )}
                 </div>
             </form>
         </Form>
@@ -542,7 +549,7 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Customer</h1>
                     <p className="text-sm text-gray-600 mt-1">
-                        {initialValues ? 'Edit Customer' : 'Create Customer'}
+                        {readOnly ? "View Customer" : initialValues ? "Edit Customer" : "Create Customer"}
                     </p>
                 </div>
                 <Button
@@ -575,6 +582,7 @@ export const CustomersForm: React.FC<InstrumentFormProps> = ({
                             partyId={id}
                             orgId={initialValues?.org_id || ''}
                             packLegalEntityId={packLegalEntityId}
+                            readOnly={readOnly}
                         />
                     </TabsContent>
                 </Tabs>

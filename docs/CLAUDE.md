@@ -56,6 +56,9 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | In-app conversational chat | [docs/agent/15-CONVERSATIONAL_CHAT.md](./agent/15-CONVERSATIONAL_CHAT.md) |
 | Business rules / modules | [docs/BUSINESS_DOMAIN.md](./docs/BUSINESS_DOMAIN.md) |
 | ERP integrations (forward/reverse sync) | [docs/INTEGRATIONS.md](./docs/INTEGRATIONS.md) |
+| QuickBooks → Fabriq: fields + concepts (business users) | [docs/QUICKBOOKS_TO_FABRIQ_USER_GUIDE.md](./QUICKBOOKS_TO_FABRIQ_USER_GUIDE.md) |
+| QuickBooks + Airbyte setup (OAuth, connection, extract/transform) | [docs/QUICKBOOKS_INTEGRATION_TO_FABRIQ.md](./QUICKBOOKS_INTEGRATION_TO_FABRIQ.md) |
+| QuickBooks forward sync setup (engineers) | [docs/QUICKBOOKS_FORWARD_SYNC.md](./QUICKBOOKS_FORWARD_SYNC.md) |
 | Railway sync button implementation (backend + frontend) | [docs/RAILWAY_SYNC_SERVICE_IMPLEMENTATION.md](./docs/RAILWAY_SYNC_SERVICE_IMPLEMENTATION.md) |
 | Agentic FinOps positioning, demo roadmap, GTM | [docs/positioning/](./docs/positioning/) |
 | Import functionality (CSV/PDF upload) | [docs/IMPORT_FUNCTIONALITY.md](./docs/IMPORT_FUNCTIONALITY.md) |

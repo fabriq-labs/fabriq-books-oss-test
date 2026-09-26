@@ -1,0 +1,37 @@
+*InvoiceNo,*Customer,*InvoiceDate,*DueDate,Terms,Location,Memo,Item(Product/Service),ItemDescription,ItemQuantity,ItemRate,*ItemAmount,Taxable,TaxRate,Service Date
+INV-260801,Lone Star Electrical Services,08/01/2026,08/31/2026,Net 30,"Austin, TX","Received $5,000.00; Balance due $9,500.00",9W LED Bulb,9W LED Bulb,1000,5.61,5610.00,Y,Texas,08/01/2026
+INV-260801,,,,,,,1200mm Ceiling Fan,1200mm Ceiling Fan,50,97.20,4860.00,Y,,
+INV-260801,,,,,,,20A GFCI Receptacle,20A GFCI Receptacle,204.9847,19.66,4030.00,Y,,
+INV-260824,Lone Star Electrical Services,08/24/2026,09/23/2026,Net 30,"Austin, TX","Balance due $8,500.00",12W LED Bulb,12W LED Bulb,416.6662,6.80,2833.33,Y,Texas,08/24/2026
+INV-260824,,,,,,,6A Single-Pole Switch,6A Single-Pole Switch,649.8463,4.36,2833.33,Y,,
+INV-260824,,,,,,,20A Circuit Breaker,20A Circuit Breaker,215.2994,13.16,2833.34,Y,,
+INV-260803,Metro Home Supply,08/03/2026,09/02/2026,Net 30,"Dallas, TX","Received $4,000.00; Balance due $8,000.00",15W LED Bulb,15W LED Bulb,500,8.44,4220.00,Y,Texas,08/03/2026
+INV-260803,,,,,,,6A Single-Pole Switch,6A Single-Pole Switch,900,4.36,3924.00,Y,,
+INV-260803,,,,,,,20A Circuit Breaker,20A Circuit Breaker,293.0091,13.16,3856.00,Y,,
+INV-260827,Metro Home Supply,08/27/2026,09/26/2026,Net 30,"Dallas, TX","Balance due $6,500.00",9W LED Bulb,9W LED Bulb,386.2157,5.61,2166.67,Y,Texas,08/27/2026
+INV-260827,,,,,,,15A Duplex Receptacle,15A Duplex Receptacle,351.7321,6.16,2166.67,Y,,
+INV-260827,,,,,,,1.5mm Copper Wire 100ft,1.5mm Copper Wire 100ft,57.9166,37.41,2166.66,Y,,
+INV-260806,Bright Homes LLC,08/06/2026,09/05/2026,Net 30,"Houston, TX","Received $6,000.00; Balance due $5,000.00",12W LED Bulb,12W LED Bulb,539.2162,6.80,3666.67,Y,Texas,08/06/2026
+INV-260806,,,,,,,1200mm Ceiling Fan,1200mm Ceiling Fan,37.7229,97.20,3666.67,Y,,
+INV-260806,,,,,,,2.5mm Copper Wire 100ft,2.5mm Copper Wire 100ft,66.3889,55.23,3666.66,Y,,
+INV-260809,Sunrise Property Services,08/09/2026,09/08/2026,Net 30,"Phoenix, AZ","Received $2,500.00; Balance due $7,000.00",15W LED Bulb,15W LED Bulb,375.1979,8.44,3166.67,Y,Arizona,08/09/2026
+INV-260809,,,,,,,15A Duplex Receptacle,15A Duplex Receptacle,514.0698,6.16,3166.67,Y,,
+INV-260809,,,,,,,20A GFCI Receptacle,20A GFCI Receptacle,161.0712,19.66,3166.66,Y,,
+INV-260812,Evergreen Builders Inc.,08/12/2026,09/11/2026,Net 30,"Denver, CO","Received $3,000.00; Balance due $5,000.00",9W LED Bulb,9W LED Bulb,475.3422,5.61,2666.67,Y,Colorado,08/12/2026
+INV-260812,,,,,,,1.5mm Copper Wire 100ft,1.5mm Copper Wire 100ft,71.2823,37.41,2666.67,Y,,
+INV-260812,,,,,,,20A Circuit Breaker,20A Circuit Breaker,202.6337,13.16,2666.66,Y,,
+INV-260816,Northside Maintenance Co.,08/16/2026,09/15/2026,Net 30,"Chicago, IL","Balance due $7,500.00",12W LED Bulb,12W LED Bulb,367.6471,6.80,2500.00,Y,Illinois,08/16/2026
+INV-260816,,,,,,,20A GFCI Receptacle,20A GFCI Receptacle,127.1617,19.66,2500.00,Y,,
+INV-260816,,,,,,,2.5mm Copper Wire 100ft,2.5mm Copper Wire 100ft,45.2653,55.23,2500.00,Y,,
+INV-260819,Premier Home Solutions,08/19/2026,09/18/2026,Net 30,"Atlanta, GA","Received $2,500.00; Balance due $4,500.00",15W LED Bulb,15W LED Bulb,276.4609,8.44,2333.33,Y,Georgia,08/19/2026
+INV-260819,,,,,,,1200mm Ceiling Fan,1200mm Ceiling Fan,24.0055,97.20,2333.33,Y,,
+INV-260819,,,,,,,15A Duplex Receptacle,15A Duplex Receptacle,378.789,6.16,2333.34,Y,,
+INV-260821,West Coast Renovations,08/21/2026,09/20/2026,Net 30,"Los Angeles, CA","Received $1,500.00; Balance due $5,000.00",6A Single-Pole Switch,6A Single-Pole Switch,496.9427,4.36,2166.67,Y,California,08/21/2026
+INV-260821,,,,,,,20A Circuit Breaker,20A Circuit Breaker,164.6406,13.16,2166.67,Y,,
+INV-260821,,,,,,,1.5mm Copper Wire 100ft,1.5mm Copper Wire 100ft,57.9166,37.41,2166.66,Y,,
+INV-260826,Liberty Facilities LLC,08/26/2026,09/25/2026,Net 30,"Charlotte, NC","Received $1,500.00; Balance due $4,000.00",9W LED Bulb,9W LED Bulb,326.7968,5.61,1833.33,Y,North Carolina,08/26/2026
+INV-260826,,,,,,,15A Duplex Receptacle,15A Duplex Receptacle,297.6185,6.16,1833.33,Y,,
+INV-260826,,,,,,,2.5mm Copper Wire 100ft,2.5mm Copper Wire 100ft,33.1946,55.23,1833.34,Y,,
+INV-260830,Oak Ridge Contractors,08/30/2026,09/29/2026,Net 30,"Nashville, TN","Balance due $14,500.00",12W LED Bulb,12W LED Bulb,710.7838,6.80,4833.33,Y,Tennessee,08/30/2026
+INV-260830,,,,,,,1200mm Ceiling Fan,1200mm Ceiling Fan,49.7256,97.20,4833.33,Y,,
+INV-260830,,,,,,,20A GFCI Receptacle,20A GFCI Receptacle,245.8464,19.66,4833.34,Y,,

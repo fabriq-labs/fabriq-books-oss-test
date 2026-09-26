@@ -21,6 +21,7 @@ const InvoiceList: React.FC = () => {
             view="invoice_view"
             displayName="Invoices"
             supportPath="sales"
+            createDefaults={{ invoice_type: SALES_INVOICE_TYPE }}
             duplicateActionConfig={{
                 enabled: true,
                 queryParam: "duplicateOf",

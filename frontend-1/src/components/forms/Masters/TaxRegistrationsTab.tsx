@@ -39,6 +39,8 @@ interface TaxRegistrationsTabProps {
    * For entity forms pass the same id as partyId; for customers pass seller/HQ LE id.
    */
   packLegalEntityId?: string | null;
+  /** When true, hide add/save/delete and disable row edits (external source records). */
+  readOnly?: boolean;
 }
 
 function newRow(defaultScheme: string, makePrimary: boolean): RegRow {
@@ -58,6 +60,7 @@ export const TaxRegistrationsTab: React.FC<TaxRegistrationsTabProps> = ({
   partyId,
   orgId,
   packLegalEntityId,
+  readOnly = false,
 }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<RegRow[]>([]);
@@ -229,25 +232,31 @@ export const TaxRegistrationsTab: React.FC<TaxRegistrationsTabProps> = ({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={handleAdd}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="bg-primary hover:bg-primary/90"
-            disabled={isSaving}
-            onClick={handleSave}
-          >
-            {isSaving ? 'Saving…' : 'Save registrations'}
-          </Button>
+          {!readOnly && (
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={handleAdd}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-primary hover:bg-primary/90"
+                disabled={isSaving}
+                onClick={handleSave}
+              >
+                {isSaving ? 'Saving…' : 'Save registrations'}
+              </Button>
+            </>
+          )}
         </div>
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground text-sm">
-            No tax registrations yet. Click Add to enter a {taxPack.registrationLabel}.
+            {readOnly
+              ? 'No tax registrations.'
+              : `No tax registrations yet. Click Add to enter a ${taxPack.registrationLabel}.`}
           </div>
         ) : (
           <Table>
@@ -257,7 +266,7 @@ export const TaxRegistrationsTab: React.FC<TaxRegistrationsTabProps> = ({
                 <TableHead>{taxPack.registrationLabel} / Number</TableHead>
                 <TableHead className="w-[220px]">Tax region</TableHead>
                 <TableHead className="w-[90px]">Primary</TableHead>
-                <TableHead className="w-[60px]" />
+                {!readOnly && <TableHead className="w-[60px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -267,6 +276,7 @@ export const TaxRegistrationsTab: React.FC<TaxRegistrationsTabProps> = ({
                     <Select
                       value={row.scheme}
                       onValueChange={(v) => updateRow(row.key, { scheme: v })}
+                      disabled={readOnly}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Scheme" />
@@ -295,6 +305,8 @@ export const TaxRegistrationsTab: React.FC<TaxRegistrationsTabProps> = ({
                       onChange={(e) =>
                         updateRow(row.key, { registration_number: e.target.value })
                       }
+                      disabled={readOnly}
+                      readOnly={readOnly}
                     />
                   </TableCell>
                   <TableCell>
@@ -316,24 +328,28 @@ export const TaxRegistrationsTab: React.FC<TaxRegistrationsTabProps> = ({
                       limit="20"
                       searchParams="name"
                       type={MODEL}
+                      disabled={readOnly}
                     />
                   </TableCell>
                   <TableCell>
                     <Checkbox
                       checked={row.is_primary}
                       onCheckedChange={(c) => handlePrimary(row.key, c === true)}
+                      disabled={readOnly}
                     />
                   </TableCell>
-                  <TableCell>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(row)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
+                  {!readOnly && (
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(row)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

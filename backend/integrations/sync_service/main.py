@@ -15,7 +15,7 @@ from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 from psycopg2.extras import Json
@@ -53,9 +53,9 @@ def _ensure_db_env_from_database_url() -> None:
         else:
             os.environ.setdefault("DB_PORT", "5432")
         if p.username:
-            os.environ["DB_USER"] = p.username
+            os.environ["DB_USER"] = unquote(p.username)
         if p.password:
-            os.environ["DB_PASSWORD"] = p.password
+            os.environ["DB_PASSWORD"] = unquote(p.password)
         path = (p.path or "").lstrip("/")
         if path:
             dbname = path.split("?")[0]

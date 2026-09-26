@@ -1,5 +1,5 @@
 -- Staging model for QuickBooks Online vendors
--- Extract from direct columns and JSONB columns, convert QuickBooks fields to snake_case
+-- Columns absent from current Airbyte qb_vendors schema are null
 
 {{
   config(
@@ -14,54 +14,57 @@ select
     _airbyte_extracted_at,
     _airbyte_generation_id,
     _airbyte_meta,
-    
-    -- Primary identifier (direct column)
+
+    -- Primary identifier
     "Id" as vendor_id,
-    
-    -- Core fields (direct columns)
+
+    -- Name and contact
     "DisplayName" as display_name,
     "CompanyName" as company_name,
+    "PrintOnCheckName" as print_on_check_name,
     "Title" as title,
     "GivenName" as given_name,
     "MiddleName" as middle_name,
     "FamilyName" as family_name,
     "Suffix" as suffix,
     "Active" as active,
-    
-    -- Contact information (JSONB columns)
+
+    -- Contact (JSONB)
     "PrimaryEmailAddr"->>'Address' as primary_email,
     "PrimaryPhone"->>'FreeFormNumber' as primary_phone,
     "Mobile"->>'FreeFormNumber' as mobile_phone,
     "Fax"->>'FreeFormNumber' as fax,
     "WebAddr"->>'URI' as website,
-    
-    -- Addresses (JSONB columns)
+    null::text as other_phone,  -- AlternatePhone not in Airbyte schema
+
+    -- Address / BillAddr
     "BillAddr"->>'Line1' as billing_address_line1,
     "BillAddr"->>'Line2' as billing_address_line2,
     "BillAddr"->>'City' as billing_city,
     "BillAddr"->>'CountrySubDivisionCode' as billing_state,
     "BillAddr"->>'PostalCode' as billing_postal_code,
     "BillAddr"->>'Country' as billing_country,
-    
-    -- Balance information (direct columns)
+
+    null::text as notes,  -- Notes not in Airbyte schema
+
     "Balance" as balance,
-    null as credit_limit,  -- CreditLimit not available in vendors table
-    
-    -- Payment terms (JSONB columns)
-    null as payment_method_id,  -- PaymentMethodRef not available in vendors table
-    "TermRef"->>'value' as payment_term_id,
-    
-    -- Tax information (direct columns and JSONB)
-    null as taxable,  -- Taxable not available in vendors table
-    null as tax_exemption_reason_id,  -- TaxExemptionReasonId not available
-    null as default_tax_code_id,  -- DefaultTaxCodeRef not available in vendors table
-    
-    -- 1099 information (direct columns)
+
+    -- Payment terms / currency
+    "TermRef"->>'value' as payment_term_ref_id,
+    "TermRef"->>'name' as payment_term_name,
+    "CurrencyRef"->>'value' as currency_code,
+    "CurrencyRef"->>'name' as currency_name,
+
+    -- Tax / 1099 / account number
+    "TaxIdentifier" as tax_identifier,
     "Vendor1099" as vendor_1099,
     "AcctNum" as account_number,
-    
-    -- Timestamps (QuickBooks uses MetaData.LastUpdatedTime - JSONB column)
+
+    -- ExpenseAccountRef not in Airbyte schema
+    null::text as expense_account_id,
+    null::text as expense_account_name,
+
     "MetaData"->>'LastUpdatedTime' as last_updated_time,
     "MetaData"->>'CreateTime' as create_time
-    
+
 from {{ source('datalake', 'qb_vendors') }}

@@ -16,6 +16,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker } from 'antd';
 import dayjs from 'dayjs';
+import { isExternalSource } from '@/utils/sourceSystem';
+import { cn } from '@/lib/utils';
 const itemMasterSchema = z.object({
     tax_name: z.string().min(1, { message: 'Tax Name is required' }),
     tax_code: z.string().min(1, { message: 'Tax Code is required' }),
@@ -59,6 +61,7 @@ export const TaxMasterForm: React.FC<ItemMasterFormProps> = (
     const navigate = useNavigate();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
+    const readOnly = Boolean(id) && isExternalSource(initialValues?.source_system_id);
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
         defaultValues: initialValues || {
@@ -101,6 +104,7 @@ export const TaxMasterForm: React.FC<ItemMasterFormProps> = (
     };
 
     const handleSubmit = async (data: ItemMasterValues) => {
+        if (readOnly) return;
         try {
             setIsSubmitting(true);
 
@@ -183,7 +187,7 @@ export const TaxMasterForm: React.FC<ItemMasterFormProps> = (
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Tax</h1>
                     <p className="text-sm text-gray-600 mt-1">
-                        {initialValues ? 'Edit Tax Master' : 'Create New Tax Master'}
+                        {readOnly ? 'View Tax Master' : initialValues ? 'Edit Tax Master' : 'Create New Tax Master'}
                     </p>
                 </div>
                 <Button
@@ -219,7 +223,7 @@ export const TaxMasterForm: React.FC<ItemMasterFormProps> = (
                         </div>
                     ) : (
                         <Form {...form}>
-                            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                            <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", readOnly && "pointer-events-none opacity-90")}>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <FormField
                                         control={form.control}
@@ -374,21 +378,23 @@ export const TaxMasterForm: React.FC<ItemMasterFormProps> = (
                                         )}
                                     />
                                 </div>
-                                <div className="flex justify-end space-x-2">
+                                <div className={cn("flex justify-end space-x-2", readOnly && "pointer-events-auto opacity-100")}>
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={handleCancel}
                                     >
-                                        Cancel
+                                        {readOnly ? "Close" : "Cancel"}
                                     </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={isSubmitting}
-                                        className="bg-primary hover:bg-primary/90"
-                                    >
-                                        Save
-                                    </Button>
+                                    {!readOnly && (
+                                        <Button
+                                            type="submit"
+                                            disabled={isSubmitting}
+                                            className="bg-primary hover:bg-primary/90"
+                                        >
+                                            Save
+                                        </Button>
+                                    )}
                                 </div>
                             </form>
                         </Form>)}

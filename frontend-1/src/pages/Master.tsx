@@ -3,7 +3,8 @@ import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle, us
 import { viewAPI, bulkEditAPI, workflowAPI } from "@/api/api";
 import DynamicTable from "@/components/masters/DynamicTable";
 import { Button } from "@/components/ui/button";
-import { Building, Import, Plus, Search, Edit, Trash2, Copy, Download, Columns3 } from "lucide-react";
+import { Building, Import, Plus, Search, Edit, Trash2, Copy, Download, Columns3, Eye } from "lucide-react";
+import { isFabriqSource } from "@/utils/sourceSystem";
 import { Pagination, Modal } from "antd";
 import { ActionButtons } from "@/components/ui/action-buttons";
 import { useToast } from "@/hooks/use-toast";
@@ -132,6 +133,11 @@ interface MasterProps {
     queryParam?: string;
     openInNewTab?: boolean;
   };
+  /**
+   * Extra fields merged into workflowAPI.create when this Master creates a draft
+   * (e.g. `{ invoice_type: 'SALES' }` for the sales invoices list).
+   */
+  createDefaults?: Record<string, any>;
 }
 
 type DateRangeType = {
@@ -160,6 +166,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   customRowRenderer,
   filterEnhancements,
   duplicateActionConfig,
+  createDefaults,
 }, masterRef) => {
   // Extract import-related config from listConfig.importConfig
   const {
@@ -505,6 +512,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
       workflowAPI
         .create(type, workflowConfig.stateId, {
           status: workflowConfig.stateId,
+          ...(createDefaults || {}),
         })
         .then((res: any) => {
           if (res?.data?.id) {
@@ -535,7 +543,8 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   };
 
   const handleView = (id: string) => {
-    navigate(`/${type}/${id}/view`);
+    const basePath = supportPath ? `/${supportPath}` : "";
+    navigate(`${basePath}/${type}/${id}/view/${view}`);
   };
 
   const handleEdit = (id: string) => {
@@ -711,26 +720,38 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   };
 
   const renderActions = (record: any) => {
-    const canDuplicate = !!duplicateActionConfig?.enabled;
+    // Fabriq-sourced → edit actions; external ERP → view-only (Eye).
+    const isEditMode = isFabriqSource(record.source_system_id);
+    const showDuplicate = isEditMode && !!duplicateActionConfig?.enabled;
+
     return (
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={() => handleEdit(record.id)}>
-          <Edit size={16} />
-        </Button>
-        {canDuplicate && (
-          <Button variant="ghost" size="sm" onClick={() => handleDuplicate(record.id)}>
+        {isEditMode ? (
+          <Button variant="ghost" size="sm" onClick={() => handleEdit(record.id)} title="Edit">
+            <Edit size={16} />
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => handleView(record.id)} title="View">
+            <Eye size={16} />
+          </Button>
+        )}
+        {showDuplicate && (
+          <Button variant="ghost" size="sm" onClick={() => handleDuplicate(record.id)} title="Duplicate">
             <Copy size={16} />
           </Button>
         )}
         {injectRowActions?.(record)}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-red-500 hover:text-red-600"
-          onClick={() => handleDelete(record.id)}
-        >
-          <Trash2 size={16} />
-        </Button>
+        {isEditMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-500 hover:text-red-600"
+            onClick={() => handleDelete(record.id)}
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </Button>
+        )}
       </div>
     );
   };

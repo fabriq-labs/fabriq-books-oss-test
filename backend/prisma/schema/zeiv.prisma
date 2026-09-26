@@ -173,10 +173,17 @@ model tax_master {
   org_id           String
   assigned_to      String?
   name             String?
+  // Lineage fields for data integration tracking
+  source_system_id String?                @default("srcsys_fabriq") // FK to datalake.source_system (default: fabriq for internal records)
+  source_record_id String? // Source system record ID
+  source_updated_at DateTime?             @default(now())
+  ingest_batch_id  String?
   item_master      item_master[]          @relation("ItemMaster_TaxMaster")
   tax_rate_intra   item_master[]          @relation("ItemMaster_TaxRateIntra")
   tax_group_component tax_group_component[]
   invoice_line_tax invoice_line_tax[]
+
+  @@index([source_system_id, source_record_id])
 }
 
 model payment_terms {

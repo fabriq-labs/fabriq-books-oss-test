@@ -21,6 +21,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Master from '@/pages/Master';
 import { TaxRegistrationsTab } from './TaxRegistrationsTab';
+import { isExternalSource } from '@/utils/sourceSystem';
+import { cn } from '@/lib/utils';
 
 const TAX_TREATMENT_OPTIONS = [
     { value: 'registered', label: 'Registered' },
@@ -87,6 +89,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
     const [isLoadingItems, setIsLoadingItems] = useState(false);
     const [itemSearchTerm, setItemSearchTerm] = useState<string>('');
     const [packLegalEntityId, setPackLegalEntityId] = useState<string | null>(null);
+    const readOnly = Boolean(id) && isExternalSource(initialValues?.source_system_id);
     const form = useForm<ItemMasterValues>({
         resolver: zodResolver(itemMasterSchema),
         defaultValues: initialValues || {
@@ -187,6 +190,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
     };
 
     const handleSubmit = async (data: ItemMasterValues) => {
+        if (readOnly) return;
         try {
             setIsSubmitting(true);
 
@@ -357,7 +361,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Supplier Master</h1>
                     <p className="text-sm text-gray-600 mt-1">
-                        {initialValues ? 'Edit Supplier' : 'Create New Supplier'}
+                        {readOnly ? 'View Supplier' : initialValues ? 'Edit Supplier' : 'Create New Supplier'}
                     </p>
                 </div>
                 <Button
@@ -399,7 +403,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                     </div>
                                 ) : (
                                     <Form {...form}>
-                                        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                                        <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", readOnly && "pointer-events-none opacity-90")}>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <FormField
                                                     control={form.control}
@@ -801,21 +805,23 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                                 />
                                             </div>
 
-                                            <div className="flex justify-end space-x-2">
+                                            <div className={cn("flex justify-end space-x-2", readOnly && "pointer-events-auto opacity-100")}>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
                                                     onClick={handleCancel}
                                                 >
-                                                    Cancel
+                                                    {readOnly ? "Close" : "Cancel"}
                                                 </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={isSubmitting}
-                                                    className="bg-primary hover:bg-primary/90"
-                                                >
-                                                    Save
-                                                </Button>
+                                                {!readOnly && (
+                                                    <Button
+                                                        type="submit"
+                                                        disabled={isSubmitting}
+                                                        className="bg-primary hover:bg-primary/90"
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                )}
                                             </div>
                                         </form>
                                     </Form>)}
@@ -829,6 +835,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                 partyId={id}
                                 orgId={initialValues?.org_id || ''}
                                 packLegalEntityId={packLegalEntityId}
+                                readOnly={readOnly}
                             />
                         ) : null}
                     </TabsContent>
@@ -837,10 +844,12 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <CardTitle>Items Supplied</CardTitle>
-                                    <Button onClick={() => setIsAddItemModalOpen(true)}>
-                                        <Plus size={16} className="mr-2" />
-                                        Add Item
-                                    </Button>
+                                    {!readOnly && (
+                                        <Button onClick={() => setIsAddItemModalOpen(true)}>
+                                            <Plus size={16} className="mr-2" />
+                                            Add Item
+                                        </Button>
+                                    )}
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -857,7 +866,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                                 <TableHead>Description</TableHead>
                                                 <TableHead>Unit Price</TableHead>
                                                 <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
+                                                {!readOnly && <TableHead className="text-right">Actions</TableHead>}
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -871,16 +880,18 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                                         <TableCell>{item.item_description || '-'}</TableCell>
                                                         <TableCell>{item.unit_price ? `$${item.unit_price}` : '-'}</TableCell>
                                                         <TableCell>{item.item_status || '-'}</TableCell>
-                                                        <TableCell className="text-right">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="text-red-500 hover:text-red-600"
-                                                                onClick={() => handleDeleteItem(supplierItem.id)}
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </Button>
-                                                        </TableCell>
+                                                        {!readOnly && (
+                                                            <TableCell className="text-right">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="text-red-500 hover:text-red-600"
+                                                                    onClick={() => handleDeleteItem(supplierItem.id)}
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </Button>
+                                                            </TableCell>
+                                                        )}
                                                     </TableRow>
                                                 );
                                             })}
@@ -916,7 +927,7 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                             </div>
                         ) : (
                             <Form {...form}>
-                                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                                <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", readOnly && "pointer-events-none opacity-90")}>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <FormField
                                             control={form.control}
@@ -1317,21 +1328,23 @@ export const SupplierForm: React.FC<ItemMasterFormProps> = (
                                         />
                                     </div>
 
-                                    <div className="flex justify-end space-x-2">
+                                    <div className={cn("flex justify-end space-x-2", readOnly && "pointer-events-auto opacity-100")}>
                                         <Button
                                             type="button"
                                             variant="outline"
                                             onClick={handleCancel}
                                         >
-                                            Cancel
+                                            {readOnly ? "Close" : "Cancel"}
                                         </Button>
-                                        <Button
-                                            type="submit"
-                                            disabled={isSubmitting}
-                                            className="bg-primary hover:bg-primary/90"
-                                        >
-                                            Save
-                                        </Button>
+                                        {!readOnly && (
+                                            <Button
+                                                type="submit"
+                                                disabled={isSubmitting}
+                                                className="bg-primary hover:bg-primary/90"
+                                            >
+                                                Save
+                                            </Button>
+                                        )}
                                     </div>
                                 </form>
                             </Form>)}

@@ -13,7 +13,7 @@ const INSTANCE_EMAIL_INGEST_ITEM_VIEW = 'instance_email_ingest_item_view';
 const INSTANCE_EMAIL_INGEST_VIEW = 'instance_email_ingest_view';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { billTypeAndPoMode } from '@/lib/bills/poMode';
+import { billTypeAndPoMode, SALES_INVOICE_TYPE } from '@/lib/bills/poMode';
 import {
     BILL_UPLOAD_ACCEPT_ATTR,
     BILL_UPLOAD_HELPER_TEXT,
@@ -527,9 +527,12 @@ export const InvoiceUpload: React.FC = () => {
             const charges = parsedData.data.charges || [];
             const resolved = parsedData.data.resolved;
 
-            // Persist tax / party / currency from extract resolve; default Without PO.
+            // Persist tax / party / currency from extract resolve.
+            // Sales upload → invoice_type SALES; purchase bill upload → PURCHASE + po_mode.
             const invoicePayload: Record<string, unknown> = {
-                ...billTypeAndPoMode(withPO ? 'With PO' : 'Without PO'),
+                ...(isPurchaseUpload
+                    ? billTypeAndPoMode(withPO ? 'With PO' : 'Without PO')
+                    : { invoice_type: SALES_INVOICE_TYPE }),
                 invoice_number: invoice?.invoice_number,
                 invoice_date: formatDateToISO(invoice?.invoice_date),
                 invoice_total: invoice?.invoice_total || invoice?.invoice_net_total || 0,

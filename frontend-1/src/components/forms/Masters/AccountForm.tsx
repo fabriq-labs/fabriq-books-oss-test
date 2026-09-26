@@ -20,6 +20,8 @@ import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
 import { SearchDropDown } from '../../search_dropdown/dropdown';
 import { formatCurrency } from '@/lib/formatters';
 import dayjs from 'dayjs';
+import { isExternalSource } from '@/utils/sourceSystem';
+import { cn } from '@/lib/utils';
 
 enum AccountClassification {
     Assets = "Assets",
@@ -77,6 +79,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const { latestFormToolResponse } = useTool();
     const { setPageContext } = useChatContext();
+    const readOnly = Boolean(id) && !isDuplicateMode && isExternalSource(initialValues?.source_system_id);
 
     // Opening balance from OPENING_BALANCE posting (read-only display)
     const [openingPosting, setOpeningPosting] = useState<{ amount: number; posting_date: string; account_id: string; credit_account_id: string } | null>(null);
@@ -248,6 +251,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
     }, [latestFormToolResponse, form]);
 
     const handleSubmit = async (data: ItemMasterValues) => {
+        if (readOnly) return;
         try {
             setIsSubmitting(true);
 
@@ -401,7 +405,13 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                 <Card>
                     <CardHeader>
                         <CardTitle>
-                            {isDuplicateMode ? 'Duplicate Account' : initialValues ? 'Edit Account' : 'Create Account'}
+                            {readOnly
+                                ? 'View Account'
+                                : isDuplicateMode
+                                    ? 'Duplicate Account'
+                                    : initialValues
+                                        ? 'Edit Account'
+                                        : 'Create Account'}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -447,7 +457,7 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                             </div>
                         ) : (
                             <Form {...form}>
-                                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                                <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", readOnly && "pointer-events-none opacity-90")}>
                                     <FormField
                                         control={form.control}
                                         name="name"
@@ -672,8 +682,8 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                                         )}
                                     />
 
-                                    <div className="flex justify-end space-x-2">
-                                        {!!id && (
+                                    <div className={cn("flex justify-end space-x-2", readOnly && "pointer-events-auto opacity-100")}>
+                                        {!!id && !readOnly && (
                                             <Button
                                                 type="button"
                                                 variant="outline"
@@ -689,15 +699,17 @@ export const AccountForm: React.FC<ItemMasterFormProps> = ({
                                             variant="outline"
                                             onClick={handleCancel}
                                         >
-                                            Cancel
+                                            {readOnly ? "Close" : "Cancel"}
                                         </Button>
-                                        <Button
-                                            type="submit"
-                                            disabled={isSubmitting}
-                                            className="bg-primary hover:bg-primary/90"
-                                        >
-                                            Save
-                                        </Button>
+                                        {!readOnly && (
+                                            <Button
+                                                type="submit"
+                                                disabled={isSubmitting}
+                                                className="bg-primary hover:bg-primary/90"
+                                            >
+                                                Save
+                                            </Button>
+                                        )}
                                     </div>
                                 </form>
                             </Form>

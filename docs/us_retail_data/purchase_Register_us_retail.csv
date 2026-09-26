@@ -1,0 +1,26 @@
+Invoice No.,Invoice Date,Vendor ID,Vendor Name,Item Code,Item Description,Qty,Unit Cost,Purchase Subtotal,Sales Tax,Invoice Total
+PINV-2603-1001,08/03/2026,V001,ABC Electrical Supply LLC,EL-002,12W LED Bulb,100,$5.26,$526.00,$0.00,$526.00
+PINV-2603-1002,08/12/2026,V002,BrightLine Wholesale Inc.,EL-005,6A Single-Pole Switch,150,$3.10,$465.00,$0.00,$465.00
+PINV-2603-1003,08/21/2026,V003,PowerMax Distributors LLC,EL-008,20A Circuit Breaker,200,$9.56,"$1,912.00",$0.00,"$1,912.00"
+PINV-2603-1004,08/30/2026,V004,United Electrical Wholesale Corp.,EL-001,9W LED Bulb,250,$4.28,"$1,070.00",$0.00,"$1,070.00"
+PINV-2604-1005,08/08/2026,V005,National Wire & Lighting Supply,EL-004,1200mm Ceiling Fan,300,$70.07,"$21,021.00",$0.00,"$21,021.00"
+PINV-2604-1006,08/17/2026,V001,ABC Electrical Supply LLC,EL-007,20A GFCI Receptacle,400,$13.98,"$5,592.00",$0.00,"$5,592.00"
+PINV-2604-1007,08/26/2026,V002,BrightLine Wholesale Inc.,EL-010,2.5mm Copper Wire 100ft,500,$43.68,"$21,840.00",$0.00,"$21,840.00"
+PINV-2605-1008,08/05/2026,V003,PowerMax Distributors LLC,EL-003,15W LED Bulb,100,$6.43,$643.00,$0.00,$643.00
+PINV-2605-1009,08/14/2026,V004,United Electrical Wholesale Corp.,EL-006,15A Duplex Receptacle,150,$4.26,$639.00,$0.00,$639.00
+PINV-2605-1010,08/23/2026,V005,National Wire & Lighting Supply,EL-009,1.5mm Copper Wire 100ft,200,$27.46,"$5,492.00",$0.00,"$5,492.00"
+PINV-2606-1011,08/01/2026,V001,ABC Electrical Supply LLC,EL-002,12W LED Bulb,250,$5.33,"$1,332.50",$0.00,"$1,332.50"
+PINV-2606-1012,08/10/2026,V002,BrightLine Wholesale Inc.,EL-005,6A Single-Pole Switch,300,$3.03,$909.00,$0.00,$909.00
+PINV-2606-1013,08/19/2026,V003,PowerMax Distributors LLC,EL-008,20A Circuit Breaker,400,$10.07,"$4,028.00",$0.00,"$4,028.00"
+PINV-2606-1014,08/28/2026,V004,United Electrical Wholesale Corp.,EL-001,9W LED Bulb,500,$4.21,"$2,105.00",$0.00,"$2,105.00"
+PINV-2607-1015,08/07/2026,V005,National Wire & Lighting Supply,EL-004,1200mm Ceiling Fan,100,$74.03,"$7,403.00",$0.00,"$7,403.00"
+PINV-2607-1016,08/16/2026,V001,ABC Electrical Supply LLC,EL-007,20A GFCI Receptacle,150,$14.19,"$2,128.50",$0.00,"$2,128.50"
+PINV-2607-1017,08/25/2026,V002,BrightLine Wholesale Inc.,EL-010,2.5mm Copper Wire 100ft,200,$43.92,"$8,784.00",$0.00,"$8,784.00"
+PINV-2608-1018,08/03/2026,V003,PowerMax Distributors LLC,EL-003,15W LED Bulb,250,$6.16,"$1,540.00",$0.00,"$1,540.00"
+PINV-2608-1019,08/12/2026,V004,United Electrical Wholesale Corp.,EL-006,15A Duplex Receptacle,300,$4.31,"$1,293.00",$0.00,"$1,293.00"
+PINV-2608-1020,08/21/2026,V005,National Wire & Lighting Supply,EL-009,1.5mm Copper Wire 100ft,400,$28.30,"$11,320.00",$0.00,"$11,320.00"
+PINV-2603-1021,08/03/2026,V001,ABC Electrical Supply LLC,EL-002,12W LED Bulb,500,$5.08,"$2,540.00",$0.00,"$2,540.00"
+PINV-2603-1022,08/12/2026,V002,BrightLine Wholesale Inc.,EL-005,6A Single-Pole Switch,100,$3.20,$320.00,$0.00,$320.00
+PINV-2603-1023,08/21/2026,V003,PowerMax Distributors LLC,EL-008,20A Circuit Breaker,150,$10.22,"$1,533.00",$0.00,"$1,533.00"
+PINV-2603-1024,08/30/2026,V004,United Electrical Wholesale Corp.,EL-001,9W LED Bulb,200,$4.44,$888.00,$0.00,$888.00
+PINV-2604-1025,08/08/2026,V005,National Wire & Lighting Supply,EL-004,1200mm Ceiling Fan,250,$71.04,"$17,760.00",$0.00,"$17,760.00"

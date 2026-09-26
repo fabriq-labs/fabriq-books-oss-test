@@ -23,12 +23,14 @@ export interface SalesInvoiceItem {
   product: string;
   period: string;
   quantity: number | string;
+  
   price: number | string;
   discount_rate?: number | string;
   tax: number | string;
   total: number;
   item_name: string;
   item_description: string;
+  line_tax_amount?: number | string;
   tax_group_id?: string | null;
   tax_group_name?: string | null;
   classification_code?: string | null;
@@ -77,6 +79,8 @@ interface SalesInvoiceItemTableProps {
     taxGroupId: string | null,
     taxGroup?: any,
   ) => void;
+  /** When true, line items and adjustable fields are not editable. */
+  readOnly?: boolean;
 }
 
 export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
@@ -102,9 +106,10 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
   onProductSelectChange,
   onProductSelectClear,
   onTaxGroupSelect,
+  readOnly = false,
 }) => {
   const showDiscount = Number(totalDiscount) !== 0;
-  const colSpan = showStructuredTax ? 9 : 7;
+  const colSpan = (showStructuredTax ? 9 : 7) - (readOnly ? 1 : 0);
 
   const componentSummary = items.reduce(
     (acc: Record<string, number>, item) => {
@@ -123,30 +128,38 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold text-foreground">Line Items</h2>
           <p className="text-sm text-muted-foreground">
-            Add line items to your invoice.
+            {readOnly
+              ? "Line items for this invoice."
+              : "Add line items to your invoice."}
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={onAddItem}
-          className="bg-primary hover:bg-primary/90"
-          disabled={isAddingItem}
-        >
-          {isAddingItem ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              Adding...
-            </>
-          ) : (
-            <>
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Add New Row
-            </>
-          )}
-        </Button>
+        {!readOnly && (
+          <Button
+            type="button"
+            onClick={onAddItem}
+            className="bg-primary hover:bg-primary/90"
+            disabled={isAddingItem}
+          >
+            {isAddingItem ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add New Row
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
-      <div className="overflow-x-auto border border-border/60 rounded-md">
+      <div
+        className={`overflow-x-auto border border-border/60 rounded-md${
+          readOnly ? " pointer-events-none opacity-90" : ""
+        }`}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -182,9 +195,11 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
               <TableHead className="w-[160px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">
                 Amount
               </TableHead>
-              <TableHead className="w-[50px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">
-                Actions
-              </TableHead>
+              {!readOnly && (
+                <TableHead className="w-[50px] text-right text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Actions
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -204,13 +219,8 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                 const discountRate = Number(item.discount_rate) || 0;
                 const taxRate = Number(item.tax) || 0;
                 const taxable = qty * price * (1 - discountRate / 100);
-                const taxAmt =
-                  item.tax_components && item.tax_components.length > 0
-                    ? item.tax_components.reduce(
-                        (s, c) => s + Number(c.amount || 0),
-                        0,
-                      )
-                    : (taxable * taxRate) / 100;
+                const lineTaxAmount = Number(item.line_tax_amount) || 0;
+                const taxAmt = lineTaxAmount || (taxable * taxRate) / 100;
 
                 return (
                   <TableRow key={item.id}>
@@ -416,21 +426,23 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                       </TableCell>
                     )}
                     <TableCell className="align-top py-3 text-right text-sm">
-                      {formatCurrency(taxAmt, currencyCode)}
+                      {formatCurrency(lineTaxAmount, currencyCode)}
                     </TableCell>
                     <TableCell className="align-top py-3 text-right font-medium">
                       {formatCurrency(Number(item.total) || 0, currencyCode)}
                     </TableCell>
-                    <TableCell className="align-top py-3 text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onRemoveItem(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+                    {!readOnly && (
+                      <TableCell className="align-top py-3 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onRemoveItem(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })
@@ -484,6 +496,8 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                     onChange={(e) => onAdjustableLabelChange(e.target.value)}
                     onBlur={onAdjustableBlur}
                     className="h-8 w-28 text-right"
+                    disabled={readOnly}
+                    readOnly={readOnly}
                   />
                   <Input
                     type="number"
@@ -495,6 +509,8 @@ export const SalesInvoiceItemTable: React.FC<SalesInvoiceItemTableProps> = ({
                     }
                     onBlur={onAdjustableBlur}
                     className={`h-8 w-28 text-right ${noSpinnerNumberClass}`}
+                    disabled={readOnly}
+                    readOnly={readOnly}
                   />
                 </div>
               </TableCell>
