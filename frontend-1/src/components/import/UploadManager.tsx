@@ -7,6 +7,7 @@ import {
   Result,
   Modal,
   notification,
+  Progress,
   Upload,
 } from "antd";
 import React, { useState } from "react";
@@ -34,6 +35,7 @@ export const UploadManager = ({
   onEnableChunkingChange,
   relationAdditionalFilters,
   relationFormLabel,
+  pdfProgress,
 }: any) => {
   const [form] = Form.useForm();
   const { readString } = usePapaParse();
@@ -242,6 +244,19 @@ export const UploadManager = ({
                   </Form.Item>
                 </Form>
               )}
+            </div>
+          )}
+          {isUploading && pdfProgress?.message && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-700 mb-2">{pdfProgress.message}</p>
+              {pdfProgress.total ? (
+                <Progress
+                  percent={Math.round(
+                    ((pdfProgress.completed ?? 0) / pdfProgress.total) * 100
+                  )}
+                  status="active"
+                />
+              ) : null}
             </div>
           )}
         </>

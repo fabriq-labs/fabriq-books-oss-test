@@ -15,7 +15,7 @@
  */
 
 import { BaseDocumentExtractor } from '../base-extractor';
-import { CategorizationExtractionOptions, DocumentExtractionRequest, DocumentExtractionResult } from '../types';
+import { CategorizationExtractionOptions, DocumentExtractionRequest, DocumentExtractionResult, ExtractionProgress } from '../types';
 import { ExtractionContext } from '../types';
 import {
   fetchAccountsForCategorization,
@@ -209,7 +209,19 @@ Return the data in the exact JSON structure specified.`);
     }
 
     logger.debug('[chunking] routing to single-call extract (chunking off or not a buffer)');
+    emitProgress(request.options, {
+      phase: 'extracting',
+      message: 'Reading the statement',
+      completed: 0,
+      total: 1,
+    });
     const result = await super.extract(context, request);
+    emitProgress(request.options, {
+      phase: 'combining',
+      message: 'Combining results',
+      completed: 1,
+      total: 1,
+    });
     return this.applyTargetAccountFilter(result);
   }
 
@@ -275,13 +287,35 @@ Return the data in the exact JSON structure specified.`);
 
     if (chunks.length === 1) {
       logger.debug('[chunking] document fits in one chunk, falling back to single-call path');
+      emitProgress(options, {
+        phase: 'extracting',
+        message: `Reading ${pageCount} page${pageCount === 1 ? '' : 's'}`,
+        completed: 0,
+        total: 1,
+        pageCount,
+      });
       const single = await super.extract(context, {
         documentType: documentType || 'posting_with_categorization',
         documentContent: buffer,
         options,
       });
+      emitProgress(options, {
+        phase: 'combining',
+        message: 'Combining results',
+        completed: 1,
+        total: 1,
+        pageCount,
+      });
       return this.applyTargetAccountFilter(single);
     }
+
+    emitProgress(options, {
+      phase: 'extracting',
+      message: `Reading ${pageCount} pages in ${chunks.length} chunks`,
+      completed: 0,
+      total: chunks.length,
+      pageCount,
+    });
 
     const chunkResults: DocumentExtractionResult[] = [];
     const perChunkLatencyMs: number[] = [];
@@ -329,6 +363,14 @@ Return the data in the exact JSON structure specified.`);
       );
 
       chunkResults.push(...batchResults);
+      const completed = batchStart + batch.length;
+      emitProgress(options, {
+        phase: 'extracting',
+        message: `Read ${completed} of ${chunks.length} chunks`,
+        completed,
+        total: chunks.length,
+        pageCount,
+      });
     }
 
     const failures = chunkResults.filter(r => !r.success);
@@ -356,6 +398,14 @@ Return the data in the exact JSON structure specified.`);
         },
       };
     }
+
+    emitProgress(options, {
+      phase: 'combining',
+      message: 'Combining results',
+      completed: chunks.length,
+      total: chunks.length,
+      pageCount,
+    });
 
     const merged = mergeChunkResults(chunkResults, {
       preferredAccountNumber: this.cachedTargetAccount?.account_number ?? null,
@@ -496,5 +546,15 @@ Return the data in the exact JSON structure specified.`);
 
   hasCategorizationContext(): boolean {
     return this.cachedAccounts !== null;
+  }
+}
+
+function emitProgress(options: { onProgress?: (progress: ExtractionProgress) => void } | undefined, progress: ExtractionProgress) {
+  const cb = options?.onProgress;
+  if (typeof cb !== 'function') return;
+  try {
+    cb(progress);
+  } catch {
+    // Client disconnect must not fail the extract.
   }
 }

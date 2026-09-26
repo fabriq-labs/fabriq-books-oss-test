@@ -63,7 +63,8 @@ export const postingImportExtension: ImportExtension = {
           file,
           options.legalEntityId,
           options.accountId,
-          options.enableChunking === true
+          options.enableChunking === true,
+          options.onProgress
         )
       : await importAPI.parseDocument('posting', file);
 

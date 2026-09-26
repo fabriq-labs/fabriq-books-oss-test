@@ -17,6 +17,7 @@ import {
 } from '../types';
 import prisma from '../../../lib/prisma';
 import { BankStatementWithCategorizationExtractor } from '../../extractors/bank-statement/bank-statement-with-categorization-extractor';
+import { ExtractionProgress } from '../../extractors/types';
 import logger from '../../../utils/logger';
 
 export class PostingImportExtension implements ImportExtension {
@@ -63,6 +64,11 @@ export class PostingImportExtension implements ImportExtension {
         enableChunking: options.enableChunking === true || options.enableChunking === 'true',
       });
 
+      emitExtensionProgress(options, {
+        phase: 'preparing',
+        message: 'Loading accounts',
+      });
+
       // Fetch destination account details for prompt scoping + extraction notes
       const targetAccount = options.accountId
         ? await fetchTargetAccount(options.accountId)
@@ -104,6 +110,7 @@ export class PostingImportExtension implements ImportExtension {
           options: {
             enableChunking,
             extractionNotes: extractionNotes ?? undefined,
+            onProgress: options.onProgress,
             targetAccount: targetAccount
               ? {
                   id: targetAccount.id,
@@ -173,6 +180,19 @@ export class PostingImportExtension implements ImportExtension {
       success: true,
       data,
     };
+  }
+}
+
+function emitExtensionProgress(
+  options: ImportExtensionOptions,
+  progress: ExtractionProgress
+) {
+  const cb = options.onProgress;
+  if (typeof cb !== 'function') return;
+  try {
+    cb(progress);
+  } catch {
+    // Client disconnect must not fail the extract.
   }
 }
 

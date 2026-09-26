@@ -84,11 +84,20 @@ export interface PdfUploadResult {
 /**
  * Options for PDF upload
  */
+export interface PdfParseProgress {
+  phase: 'preparing' | 'extracting' | 'combining';
+  message: string;
+  completed?: number;
+  total?: number;
+  pageCount?: number;
+}
+
 export interface PdfUploadOptions {
   legalEntityId?: string;
   accountId?: string;
   categorizeInExtraction?: boolean;
   enableChunking?: boolean;
+  onProgress?: (progress: PdfParseProgress) => void;
 }
 
 /**

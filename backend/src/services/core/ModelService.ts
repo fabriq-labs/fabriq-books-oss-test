@@ -604,6 +604,9 @@ export class ModelService {
           }
         }
       }
+      if (typeof options?.onProgress === 'function') {
+        extractorOptions.onProgress = options.onProgress;
+      }
 
       // 1. Check if an import extension handles this document type
       if (extension && extension.customExtract) {

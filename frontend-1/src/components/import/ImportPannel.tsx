@@ -12,6 +12,7 @@ import { ChevronLeft, FileText, Upload, Download } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { importExtensionRegistry } from "@/features/import-extensions";
+import { PdfParseProgress } from "@/features/import-extensions/types";
 import { useEntity } from "@/contexts/EntityContext";
 
 export const ImportPannel = ({
@@ -58,6 +59,7 @@ export const ImportPannel = ({
   const [pdfCategorizations, setPdfCategorizations] = useState<any[]>([]);
   const [pdfCategorizationMode, setPdfCategorizationMode] = useState<"extract_only" | "extract_and_categorize">("extract_and_categorize");
   const [enableChunking, setEnableChunking] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<PdfParseProgress | null>(null);
   const [currentImportId, setCurrentImportId] = useState<string | null>(null);
 
   // Get import extension for this model type (if any)
@@ -119,6 +121,9 @@ export const ImportPannel = ({
     try {
       let csvContent: string;
       let categorizations: any[] = [];
+      if (uploadOptions?.categorizeInExtraction) {
+        setPdfProgress({ phase: "preparing", message: "Uploading statement…" });
+      }
 
       // Check if extension handles PDF upload
       if (extension?.handlePdfUpload) {
@@ -134,6 +139,7 @@ export const ImportPannel = ({
           ...pdfOptions,
           categorizeInExtraction: uploadOptions?.categorizeInExtraction === true,
           enableChunking: uploadOptions?.enableChunking === true,
+          onProgress: (progress) => setPdfProgress(progress),
         });
 
         setCurrentImportId(result?.import_id || null);
@@ -230,6 +236,8 @@ export const ImportPannel = ({
         message: error?.message || "Failed to process PDF",
         placement: "topRight",
       });
+    } finally {
+      setPdfProgress(null);
     }
   };
 
@@ -599,6 +607,7 @@ export const ImportPannel = ({
           onEnableChunkingChange={setEnableChunking}
           relationAdditionalFilters={relationAdditionalFilters}
           relationFormLabel={relationFormLabel}
+          pdfProgress={pdfProgress}
         />
       )}
       {csvContent && csvContent.length > 0 && (

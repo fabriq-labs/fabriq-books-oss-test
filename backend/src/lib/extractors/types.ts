@@ -13,6 +13,15 @@ export interface DocumentExtractionResult {
   };
 }
 
+/** Live status for a long PDF extract. Counts are chunk progress, not filtered rows. */
+export interface ExtractionProgress {
+  phase: 'preparing' | 'extracting' | 'combining';
+  message: string;
+  completed?: number;
+  total?: number;
+  pageCount?: number;
+}
+
 export interface DocumentExtractionRequest {
   documentType: string;
   documentContent: string | Buffer;
@@ -22,6 +31,7 @@ export interface DocumentExtractionRequest {
     customFields?: string[];
     language?: string;
     enableChunking?: boolean;
+    onProgress?: (progress: ExtractionProgress) => void;
     [key: string]: any;
   };
 }

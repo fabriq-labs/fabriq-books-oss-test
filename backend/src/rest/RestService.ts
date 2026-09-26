@@ -21,6 +21,7 @@ import { SearchQueryBuilder } from '../services/query/SearchQueryBuilder';
 import { run_report } from '../lib/reports';
 import { ModelService } from '../services/core/ModelService';
 import { ImportAuditService } from '../services/import/ImportAuditService';
+import { ExtractionProgress } from '../lib/extractors/types';
 
 export interface AuthRequest extends Request {
   context?: any;
@@ -582,6 +583,19 @@ export class RestService {
    */
   public async parseDocument(req: AuthRequest, res: Response) {
     let importId: string | undefined;
+    const wantsStream =
+      req.params.modelName === 'posting_with_categorization' &&
+      String(req.headers.accept || '').includes('text/event-stream');
+    let streaming = false;
+    const sendEvent = (data: object) => {
+      if (!streaming) return;
+      try {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        (res as Response & { flush?: () => void }).flush?.();
+      } catch {
+        // Client disconnect must not fail the extract.
+      }
+    };
     try {
       const context = this.getAuthContext(req);
       const modelName = req.params.modelName;
@@ -612,6 +626,15 @@ export class RestService {
       }
       await auditService.markProcessing(importId);
 
+      if (wantsStream) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders();
+        streaming = true;
+      }
+
       // Validation, extension option extraction, and metaData shaping are
       // handled inside ModelService.parseDocument
       const result = await this.modelService.parseDocument(
@@ -624,11 +647,22 @@ export class RestService {
           fileName: req.file.originalname,
           documentType: req.query.documentType as string | undefined,
           ...req.body,
+          ...(streaming
+            ? {
+                onProgress: (progress: ExtractionProgress) =>
+                  sendEvent({ type: 'progress', ...progress }),
+              }
+            : {}),
         }
       );
 
       if (!result.success) {
         await auditService.markFailure(importId, result.error ?? 'Failed to parse PDF document');
+        if (streaming) {
+          sendEvent({ type: 'error', message: result.error ?? 'Failed to parse PDF document' });
+          res.end();
+          return;
+        }
         throw mapServiceMessageToApiError(result.error);
       }
 
@@ -639,17 +673,29 @@ export class RestService {
         user: context.user?.id,
       });
 
-      res.json({
+      const payload = {
         ...result,
         metaData: {
           ...(result.metaData || {}),
           import_id: importId,
         },
-      });
+      };
+      if (streaming) {
+        sendEvent({ type: 'result', ...payload });
+        res.end();
+        return;
+      }
+      res.json(payload);
 
     } catch (error: unknown) {
       if (importId) {
         await ImportAuditService.getInstance().markFailure(importId, error);
+      }
+      if (streaming) {
+        const message = error instanceof Error ? error.message : 'Failed to parse PDF document';
+        sendEvent({ type: 'error', message });
+        try { res.end(); } catch { /* already closed */ }
+        return;
       }
       handleRestControllerError(error, req, res, 'parseDocument', 'Failed to parse PDF document', {
         logExtras: {
