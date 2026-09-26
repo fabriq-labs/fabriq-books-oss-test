@@ -115,6 +115,12 @@
       "displayName": "Account Number",
       "isColumnShow": false
     },
+    "extraction_notes": {
+      "dataType": "string",
+      "permission": "update",
+      "displayName": "Bank Statement Extraction Notes",
+      "isColumnShow": false
+    },
     "child_accounts": {
       "type": "table",
       "select": {

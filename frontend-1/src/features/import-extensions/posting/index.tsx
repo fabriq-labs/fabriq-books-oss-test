@@ -73,9 +73,21 @@ export const postingImportExtension: ImportExtension = {
 
     const transactions = res.data?.transactions || [];
     const categorizations = res.data?.categorizations || [];
+    const importId = res?.metaData?.import_id ?? res?.import_id ?? res?.data?.import_id;
+    const accountContext = res.data?.accountContext;
 
     if (transactions.length === 0) {
-      throw new Error('No transactions found in the PDF');
+      const acctLabel =
+        accountContext?.accountNumber != null
+          ? `account ${accountContext.accountNumber}`
+          : 'the selected account';
+      return {
+        csvContent: '',
+        import_id: importId,
+        categorizations: [],
+        empty: true,
+        emptyMessage: `No transactions found for ${acctLabel} in this statement. The PDF may list other accounts, or this account had no activity in the period.`,
+      };
     }
 
     // Transform AI-extracted data to CSV format
@@ -108,7 +120,7 @@ export const postingImportExtension: ImportExtension = {
 
     return {
       csvContent,
-      import_id: res?.metaData?.import_id ?? res?.import_id ?? res?.data?.import_id,
+      import_id: importId,
       categorizations,
     };
   },
@@ -138,7 +150,11 @@ export const postingImportExtension: ImportExtension = {
   },
 
   /**
-   * Transform data for upload, injecting AI categorizations
+   * Transform data for upload, injecting AI categorizations.
+   *
+   * Double-entry convention (matches PostingImportService):
+   *   debit_amount  (money OUT) → contra expense on account_id
+   *   credit_amount (money IN)  → contra income on credit_account_id
    */
   transformDataForUpload(
     csvData: any[],
@@ -151,43 +167,80 @@ export const postingImportExtension: ImportExtension = {
       return { csvData, selectedValues };
     }
 
-    // Find which column is mapped to credit_account_id (the contra-account)
     const tableHeaders = Object.keys(csvData[0] || {});
-    const creditAccountColIndex = selectedValues.findIndex((val: string) => val === 'credit_account_id');
-    const creditAccountColKey = creditAccountColIndex >= 0 ? tableHeaders[creditAccountColIndex] : null;
+    const accountIdColIndex = selectedValues.findIndex((val: string) => val === 'account_id');
+    const creditAccountColIndex = selectedValues.findIndex(
+      (val: string) => val === 'credit_account_id'
+    );
+    const notesColIndex = selectedValues.findIndex((val: string) => val === 'notes');
+    const accountIdColKey =
+      accountIdColIndex >= 0 ? tableHeaders[accountIdColIndex] : null;
+    const creditAccountColKey =
+      creditAccountColIndex >= 0 ? tableHeaders[creditAccountColIndex] : null;
+    const notesColKey = notesColIndex >= 0 ? tableHeaders[notesColIndex] : null;
 
-    // Create a synthetic column key for AI predictions if no column is mapped to credit_account_id
-    const aiCounterAccountKey = '__ai_counter_account';
-    const useAiColumn = !creditAccountColKey;
-
-    // Build final selectedValues with AI column mapping if needed
-    const finalSelectedValues = useAiColumn
-      ? [...selectedValues, 'credit_account_id']
-      : selectedValues;
+    const AI_OUT = '__ai_contra_out'; // → account_id (expense)
+    const AI_IN = '__ai_contra_in'; // → credit_account_id (income)
+    const AI_NOTES = '__ai_notes';
+    const needOutCol = !accountIdColKey;
+    const needInCol = !creditAccountColKey;
+    const needNotesCol = !notesColKey;
 
     const finalCSVData = csvData.map((item: any, index: number) => {
       const record: any = {};
-      Object.keys(item).map((key) => {
+      Object.keys(item).forEach((key) => {
         record[key] = item[key]?.isNotAvailable ? null : item[key];
       });
+      if (needOutCol) record[AI_OUT] = null;
+      if (needInCol) record[AI_IN] = null;
+      if (needNotesCol) record[AI_NOTES] = null;
 
-      // Inject AI categorization into the data
       const cat = categorizations[index];
-      if (cat && cat.confidence_score >= 0.5) {
-        if (creditAccountColKey) {
-          // If a column is already mapped to credit_account_id, inject into that column
-          // Only if the cell is currently empty
-          if (!record[creditAccountColKey]) {
-            record[creditAccountColKey] = cat.account_id;
+      if (cat && cat.confidence_score >= 0.5 && cat.account_id) {
+        const isDebit = Number(item.debit_amount ?? 0) !== 0;
+        if (isDebit) {
+          if (accountIdColKey) {
+            if (!record[accountIdColKey]) record[accountIdColKey] = cat.account_id;
+          } else {
+            record[AI_OUT] = cat.account_id;
           }
         } else {
-          // Add a synthetic column with the AI prediction
-          record[aiCounterAccountKey] = cat.account_id;
+          if (creditAccountColKey) {
+            if (!record[creditAccountColKey]) record[creditAccountColKey] = cat.account_id;
+          } else {
+            record[AI_IN] = cat.account_id;
+          }
+        }
+
+        const reasoning =
+          typeof cat.reasoning === 'string' ? cat.reasoning.trim() : '';
+        if (reasoning) {
+          const existingRaw = notesColKey ? record[notesColKey] : record[AI_NOTES];
+          const existing =
+            existingRaw == null || existingRaw === ''
+              ? ''
+              : String(existingRaw).trim();
+          const merged =
+            !existing
+              ? reasoning
+              : existing.includes(reasoning)
+                ? existing
+                : `${existing}\n\nAI: ${reasoning}`;
+          if (notesColKey) {
+            record[notesColKey] = merged;
+          } else {
+            record[AI_NOTES] = merged;
+          }
         }
       }
 
       return record;
     });
+
+    const finalSelectedValues = [...selectedValues];
+    if (needOutCol) finalSelectedValues.push('account_id');
+    if (needInCol) finalSelectedValues.push('credit_account_id');
+    if (needNotesCol) finalSelectedValues.push('notes');
 
     return { csvData: finalCSVData, selectedValues: finalSelectedValues };
   },

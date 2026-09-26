@@ -27,6 +27,7 @@ import {
 import logger from '../../../utils/logger';
 import { splitPdfIntoPageChunks, PAGE_CHUNK_SIZE } from './page-chunker';
 import { mergeChunkResults } from './bank-statement-merger';
+import { filterTransactionsToTargetAccount } from './target-account-filter';
 
 // Process this many chunks concurrently. Set to 1 for sequential (safest); increase to tune.
 const CHUNK_PARALLEL_FACTOR = 2;
@@ -36,6 +37,7 @@ export class BankStatementWithCategorizationExtractor extends BaseDocumentExtrac
   private cachedOrgId: string | null = null;
   private cachedLegalEntityId: string | null = null;
   private cachedExtractionNotes: string | null = null;
+  private cachedTargetAccount: CategorizationExtractionOptions['targetAccount'] = null;
 
   getSupportedTypes(): string[] {
     return ['posting_with_categorization', 'bank_statement_categorized'];
@@ -60,19 +62,23 @@ Schema fields (posting model) — use these strictly:
 Also extract:
 - Value date (when transaction occurred)
 - Posting date (when transaction was recorded)
-- Debit amount (from Withdrawal/Debit column - money going OUT of the account, 0 if empty)
-- Credit amount (from Deposit/Credit column - money coming IN to the account, 0 if empty)
+- debit_amount: money leaving the account (0 if none)
+- credit_amount: money entering the account (0 if none)
+- source_account_number: the bank account number this row belongs to (full number as printed). Required on consolidated multi-account statements.
 
-IMPORTANT - Column mapping for Indian bank statements:
-- "Withdrawal Amount" or "Debit" column → debit_amount (money leaving the account)
-- "Deposit Amount" or "Credit" column → credit_amount (money entering the account)
-- Keep debit and credit amounts as SEPARATE fields. Do not merge them.
-- Set the unused amount field to 0 (not null or empty)
+=== DIRECTION (pick whichever mechanism the statement uses) ===
+1. Separate Debit/Withdrawal and Credit/Deposit columns → map each to debit_amount / credit_amount; set the unused field to 0.
+2. Separate sections (e.g. "Checks", "Other withdrawals / debits", "Deposits / credits"), each with a single amount column → section heading decides direction; carry that direction across page breaks until a new section heading appears.
+3. A single signed or marked amount column (negatives, or CR/DR markers) → map to debit_amount or credit_amount accordingly.
 
-Continuation rows and dates (common on bank/PDF statements, e.g. RBC):
-- Tables often leave value_date and/or posting_date blank on continuation rows; the statement implies you reuse the last date shown above in the same transaction section.
-- For each row, if value_date or posting_date is empty in the document, set it from the nearest preceding row that had a non-empty value in that column (top to bottom). Any number of consecutive blank-date rows share the same carried dates until a row shows a new explicit date.
-- Carry value_date and posting_date independently from each column's last non-empty cell. If only one date column exists, use it for both fields unless two distinct dates are clearly labeled.
+Keep debit_amount and credit_amount as SEPARATE fields. Do not merge them into one amount.
+
+Continuation rows and dates:
+- Tables often leave value_date and/or posting_date blank on continuation rows; reuse the last non-empty date above in the same section (top to bottom).
+- Carry value_date and posting_date independently. If only one date column exists, use it for both unless two dates are clearly labeled.
+- Derive the year from the statement period when rows print only month/day.
+- One printed line may contain several transactions when date/reference/amount groups repeat horizontally (e.g. a Checks grid) — emit one transaction per group.
+- Strip footnote markers from reference numbers (e.g. *121324 → 121324).
 
 === ACCOUNT CONTEXT ===
 Also extract basic account context from the statement header:
@@ -83,9 +89,10 @@ Also extract basic account context from the statement header:
 - Starting balance (opening balance)
 - Closing balance (ending balance)
 
-IMPORTANT:
-- Do NOT treat Opening/Starting Balance or Closing/Ending Balance lines as transactions.
-- Never include balance-only rows in the transactions array (they are not postings).`;
+IMPORTANT — do NOT treat as transactions:
+- Opening/Starting/Closing/Ending balance lines
+- Account-summary rollups and "Total … = $…" lines (capture totals only in accountContext if useful)
+- Fee-change / legal / boilerplate pages with no transaction table`;
   }
 
   getExpectedSchema(): Record<string, any> {
@@ -99,6 +106,7 @@ IMPORTANT:
         credit_amount: 'number',
         notes: 'string',
         reference: 'string',
+        source_account_number: 'string',
       }],
       accountContext: {
         accountNumber: 'string',
@@ -112,34 +120,57 @@ IMPORTANT:
   }
 
   /**
-   * Augment the base prompt with categorization instructions and Chart of Accounts.
-   * If options.extractionNotes (or cachedExtractionNotes) is non-empty, injects an
-   * account-specific notes block before the Chart of Accounts (Feature B).
+   * Augment the base prompt with target-account scoping, notes, categorization, CoA.
    */
   protected augmentPromptWithContext(basePrompt: string, options?: any): string {
-    if (!this.cachedAccounts) {
-      return basePrompt;
-    }
-
     const notes: string | null | undefined =
       options?.extractionNotes ?? this.cachedExtractionNotes;
+    const target =
+      options?.targetAccount ?? this.cachedTargetAccount;
 
-    const categorizationInstructions = buildCategorizationInstructions();
-    const accountsList = formatAllAccountsForPrompt(this.cachedAccounts);
+    const parts: string[] = [basePrompt];
 
-    const notesBlock =
-      notes && notes.trim()
-        ? `\n=== ACCOUNT-SPECIFIC NOTES ===\nThe following notes were provided by the account owner about this particular bank account.\nApply these when interpreting transaction descriptions:\n\n${notes}\n`
-        : '';
+    if (target && (target.account_number != null || target.name)) {
+      const num =
+        target.account_number != null ? String(target.account_number) : null;
+      const name = target.name?.trim() || null;
+      parts.push(`
+=== MULTI-ACCOUNT STATEMENT — LABEL ACCURATELY ===
+This PDF may cover several bank accounts. The upload destination is:
+${name ? `- Account name: ${name}` : ''}
+${num ? `- Account number (stored / trailing digits): ${num}` : ''}
 
-    return `${basePrompt}
+CRITICAL — do NOT re-label other accounts' rows as this destination:
+- Extract EVERY transaction table on the statement (all accounts), not only the destination.
+- Set source_account_number on EVERY row to the account that owns that section/table (full printed number when shown).
+- Never copy the destination account number onto rows that belong under a different account heading.
+- Software will filter to the destination after extraction; wrong labels cause incorrect imports.
+- Consolidated layouts often show a multi-account summary first, then per-account detail (Checks / withdrawals / deposits). Carry the current account number across page breaks until a new account heading appears.
+- Set accountContext.accountNumber to the destination's full printed number when available (summary balances for that account).`);
+    }
 
+    if (notes && notes.trim()) {
+      parts.push(`
+=== ACCOUNT-SPECIFIC NOTES ===
+The following notes were provided by the account owner about this particular bank account.
+Apply these when interpreting layout and transaction descriptions:
+
+${notes}`);
+    }
+
+    if (this.cachedAccounts) {
+      const categorizationInstructions = buildCategorizationInstructions();
+      const accountsList = formatAllAccountsForPrompt(this.cachedAccounts);
+      parts.push(`
 ${categorizationInstructions}
-${notesBlock}
+
 === CHART OF ACCOUNTS ===
 ${accountsList}
 
-Return the data in the exact JSON structure specified.`;
+Return the data in the exact JSON structure specified.`);
+    }
+
+    return parts.join('\n');
   }
 
   /**
@@ -178,7 +209,45 @@ Return the data in the exact JSON structure specified.`;
     }
 
     logger.debug('[chunking] routing to single-call extract (chunking off or not a buffer)');
-    return super.extract(context, request);
+    const result = await super.extract(context, request);
+    return this.applyTargetAccountFilter(result);
+  }
+
+  private applyTargetAccountFilter(
+    result: DocumentExtractionResult
+  ): DocumentExtractionResult {
+    if (!result.success || !result.data) return result;
+    const preferred = this.cachedTargetAccount?.account_number ?? null;
+    if (preferred == null) return result;
+
+    const before = result.data.transactions || [];
+    const filtered = filterTransactionsToTargetAccount(
+      before,
+      result.data.categorizations,
+      preferred
+    );
+
+    logger.info('Filtered transactions to target account', {
+      preferredAccountNumber: preferred,
+      before: before.length,
+      after: filtered.transactions.length,
+      removedCount: filtered.removedCount,
+      unnumberedDropped: filtered.unnumberedDropped,
+      sampleSourceNumbers: before.slice(0, 8).map(
+        (t: any) => t.source_account_number ?? t.account_number ?? null
+      ),
+    });
+
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        transactions: filtered.transactions,
+        ...(filtered.categorizations
+          ? { categorizations: filtered.categorizations }
+          : { categorizations: undefined }),
+      },
+    };
   }
 
   private async extractChunked(
@@ -206,11 +275,12 @@ Return the data in the exact JSON structure specified.`;
 
     if (chunks.length === 1) {
       logger.debug('[chunking] document fits in one chunk, falling back to single-call path');
-      return super.extract(context, {
+      const single = await super.extract(context, {
         documentType: documentType || 'posting_with_categorization',
         documentContent: buffer,
         options,
       });
+      return this.applyTargetAccountFilter(single);
     }
 
     const chunkResults: DocumentExtractionResult[] = [];
@@ -287,7 +357,28 @@ Return the data in the exact JSON structure specified.`;
       };
     }
 
-    const merged = mergeChunkResults(chunkResults);
+    const merged = mergeChunkResults(chunkResults, {
+      preferredAccountNumber: this.cachedTargetAccount?.account_number ?? null,
+    });
+
+    const preferred = this.cachedTargetAccount?.account_number ?? null;
+    const filtered = filterTransactionsToTargetAccount(
+      merged.transactions,
+      merged.categorizations,
+      preferred
+    );
+
+    logger.info('[chunking] filtered transactions to target account', {
+      preferredAccountNumber: preferred,
+      before: merged.transactions.length,
+      after: filtered.transactions.length,
+      removedCount: filtered.removedCount,
+      unnumberedDropped: filtered.unnumberedDropped,
+      sampleSourceNumbers: merged.transactions.slice(0, 8).map(
+        (t: any) => t.source_account_number ?? t.account_number ?? null
+      ),
+    });
+
     const processingTime = Date.now() - startTime;
 
     logger.debug('[chunking] per-chunk transaction counts', {
@@ -303,9 +394,9 @@ Return the data in the exact JSON structure specified.`;
       pageCount,
       chunkSize: PAGE_CHUNK_SIZE,
       originalTransactions: merged.originalCount,
-      finalTransactions: merged.transactions.length,
+      finalTransactions: filtered.transactions.length,
       deduplicatedCount: merged.deduplicatedCount,
-      categorizationCount: merged.categorizations?.length || 0,
+      categorizationCount: filtered.categorizations?.length || 0,
       processingTimeMs: processingTime,
       perChunkLatencyMs,
       warnings: merged.warnings,
@@ -315,9 +406,9 @@ Return the data in the exact JSON structure specified.`;
     return {
       success: true,
       data: {
-        transactions: merged.transactions,
+        transactions: filtered.transactions,
         accountContext: merged.accountContext,
-        ...(merged.categorizations ? { categorizations: merged.categorizations } : {}),
+        ...(filtered.categorizations ? { categorizations: filtered.categorizations } : {}),
         ...(merged.warnings.length > 0 ? { warnings: merged.warnings } : {}),
       },
       confidence: this.averageConfidence(chunkResults),
@@ -338,11 +429,12 @@ Return the data in the exact JSON structure specified.`;
   /**
    * Prepare categorization context by fetching accounts.
    * Must be called before extract() for categorization to work.
-   * Pass options.extractionNotes to inject account-specific hints into the prompt (Feature B).
+   * Pass options.extractionNotes / targetAccount for account-specific prompt blocks.
    */
   async prepareCategorizationContext(options: CategorizationExtractionOptions): Promise<void> {
-    // Always update extraction notes even when accounts are cached
+    // Always refresh notes + target account even when CoA is cached
     this.cachedExtractionNotes = options.extractionNotes ?? null;
+    this.cachedTargetAccount = options.targetAccount ?? null;
 
     // Return cached accounts if same org/entity
     if (
@@ -353,6 +445,7 @@ Return the data in the exact JSON structure specified.`;
       logger.debug('Using cached accounts for categorization', {
         orgId: options.orgId,
         legalEntityId: options.legalEntityId,
+        targetAccountId: this.cachedTargetAccount?.id,
       });
       return;
     }
@@ -398,6 +491,7 @@ Return the data in the exact JSON structure specified.`;
     this.cachedOrgId = null;
     this.cachedLegalEntityId = null;
     this.cachedExtractionNotes = null;
+    this.cachedTargetAccount = null;
   }
 
   hasCategorizationContext(): boolean {

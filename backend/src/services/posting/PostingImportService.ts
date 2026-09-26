@@ -95,6 +95,12 @@ export interface ImportBankStatementOptions {
    * If a name string is passed the service resolves it to an ID via a DB lookup.
    */
   legalEntityId?: string;
+  /**
+   * When true (PDF + categorize path), split the PDF into page-range chunks
+   * before extraction to avoid LLM output truncation on long statements.
+   * Forwarded to PostingImportExtension / BankStatementWithCategorizationExtractor.
+   */
+  enableChunking?: boolean;
   onProgress?: ProgressCallback;
 }
 
@@ -153,6 +159,7 @@ export class PostingImportService {
       fileBuffer, mimeType, fileSize, fileName,
       accountId, viewId = 'posting_view', dryRun = false,
       categorize = false, legalEntityId,
+      enableChunking = false,
       onProgress,
     } = options;
 
@@ -197,6 +204,9 @@ export class PostingImportService {
       const parseOptions: Record<string, any> = { mimeType, fileSize, fileName };
       if (resolvedLegalEntityId) parseOptions.legalEntityId = resolvedLegalEntityId;
       if (extractionNotes) parseOptions.extractionNotes = extractionNotes;
+      // Extension only reads enableChunking on the categorize path today
+      if (categorize && enableChunking) parseOptions.enableChunking = true;
+      if (categorize && accountId) parseOptions.accountId = accountId;
 
       const parseResult = await ModelService.getInstance().parseDocument(
         modelName, context, fileBuffer, parseOptions
@@ -521,12 +531,14 @@ export function mapCsvRow(row: Record<string, any>, accountId: string): Record<s
 /**
  * Merge AI categorisation predictions into raw transaction rows.
  *
- * Each categorisation entry: { transaction_index, account_id, confidence_score }
+ * Each categorisation entry: { transaction_index, account_id, confidence_score, reasoning? }
  * Only entries with confidence >= 0.5 are applied.
  *
  * The predicted account is stored in `_predicted_account_id` (internal field).
  * mapPdfRow() then routes it to account_id (for debit rows) or
  * credit_account_id (for credit rows) per the double-entry convention.
+ *
+ * When present, `reasoning` is written into `notes` (appended if notes already exist).
  */
 export function applyCategorizations(
   transactions: Record<string, any>[],
@@ -551,7 +563,27 @@ export function applyCategorizations(
     } else {
       transactions[idx].credit_account_id = predictedId; // revenue on credit side
     }
+
+    const reasoning =
+      typeof cat.reasoning === 'string' ? cat.reasoning.trim() : '';
+    if (reasoning) {
+      transactions[idx].notes = mergeAiReasoningIntoNotes(
+        transactions[idx].notes,
+        reasoning
+      );
+    }
   }
+}
+
+/** Append AI categorization reasoning to existing statement notes. */
+export function mergeAiReasoningIntoNotes(
+  existingNotes: string | null | undefined,
+  reasoning: string
+): string {
+  const existing = (existingNotes ?? '').trim();
+  if (!existing) return reasoning;
+  if (existing.includes(reasoning)) return existing;
+  return `${existing}\n\nAI: ${reasoning}`;
 }
 
 // ── Private module helpers ─────────────────────────────────────────────────────

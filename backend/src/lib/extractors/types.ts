@@ -60,4 +60,10 @@ export interface CategorizationExtractionOptions {
   legalEntityId?: string;
   /** Free-form hints about this account's statement format, injected into the extraction prompt (Feature B). */
   extractionNotes?: string | null;
+  /** Destination bank account for this upload — used to scope multi-account PDFs. */
+  targetAccount?: {
+    id: string;
+    name?: string | null;
+    account_number?: number | string | null;
+  } | null;
 }

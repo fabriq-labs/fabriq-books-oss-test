@@ -9,7 +9,7 @@ import { WorkflowEngine } from '../../workflow-engine/core/WorkflowEngine';
 import { is_workflow_model } from '../../workflow-engine/types/workflow.types';
 import { executeCustomAction } from '../../lib/actions';
 import { ExtractorRegistry } from '../../lib/extractors/extractor-registry';
-import { ImportExtensionRegistry } from '../../lib/import-extensions';
+import { ImportExtensionRegistry, initializeImportExtensions } from '../../lib/import-extensions';
 import { ValidationError } from '../../rest/errors/ApiError';
 import { Prisma } from '@prisma/client';
 
@@ -55,6 +55,7 @@ export class ModelService {
     this.dal = DataAccessLayer.getInstance(prisma);
     this.prisma = prisma;
     this.extractorRegistry = ExtractorRegistry.getInstance();
+    initializeImportExtensions();
     this.importExtensionRegistry = ImportExtensionRegistry.getInstance();
   }
 

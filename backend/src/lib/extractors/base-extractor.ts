@@ -238,7 +238,10 @@ ${documentContent}`;
           question: `Extract ${documentType || 'document'}: ${Buffer.isBuffer(documentContent) ? 'binary' : String(documentContent).substring(0, 200)}`,
           llmModel,
           result: {
-            text: response.substring(0, 500),
+            text: response.substring(
+              0,
+              parseInt(process.env.LLM_TRACE_MAX_CHARS || '200000', 10)
+            ),
             steps: [],
             usage: { promptTokens: promptTokens ?? 0, completionTokens: completionTokens ?? 0 },
           },

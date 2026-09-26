@@ -37,24 +37,29 @@ ${notes}`;
     - description: FULL text from the statement's Description / Details / Transaction remarks / Memo column. That column must map to the JSON field \`description\`, not \`name\`.
     - name: Short display label only (e.g. merchant or payee), or null if the statement only provides one long description line.
     - account_name: Account name or number as shown for the transaction row if present.
-    - notes: Extra lines or running balance text that are NOT the main Description column.
+    - notes: Extra lines that are NOT the main Description column.
 
     Also extract:
     - Value date (when transaction occurred)
     - Posting date (when transaction was recorded)
-    - Debit amount (if present, keep as separate field)
-    - Credit amount (if present, keep as separate field)
+    - debit_amount: money leaving the account (0 if none)
+    - credit_amount: money entering the account (0 if none)
     - Transaction reference number (if shown)
-    - Running balance after transaction (if shown; put in notes if not a separate column)
 
-    Important: Keep debit and credit amounts as separate fields. Do not merge them into a single amount field.
-    If a transaction shows both debit and credit, include both fields with their respective values.
+    Direction — use whichever mechanism the statement uses:
+    1. Separate Debit/Withdrawal and Credit/Deposit columns → map to debit_amount / credit_amount; unused field = 0.
+    2. Separate sections with a single amount column (checks / withdrawals / deposits) → section heading decides direction and carries across page breaks.
+    3. Signed or CR/DR-marked amounts → map to the correct field.
+
+    Keep debit and credit amounts as separate fields. Do not merge them into a single amount field.
     Ignore posting_type field - focus on the actual debit/credit amounts as they appear in the document.
 
     Continuation rows and dates (many bank/PDF statements):
     - Transaction tables often leave value_date and/or posting_date blank on rows that continue the same logical day or the same multi-line transaction: the statement implies you reuse the last date shown above in the same table/section.
     - For each transaction row, if value_date or posting_date is empty in the document, set it to the same value as the nearest preceding row in that statement's transaction list that had a non-empty value in that column (read top to bottom). Multiple consecutive blank-date rows all use the same carried-forward dates until a new row shows an explicit date.
     - Carry forward value_date and posting_date independently (each column inherits from its own last non-empty cell). If the statement only prints one date column, use that date for both value_date and posting_date unless the document clearly labels two different dates.
+    - Derive the year from the statement period when rows print only month/day.
+    - One printed line may contain several transactions when amount groups repeat horizontally — emit one transaction per group.
 
     Also extract basic account context:
     - Account number
@@ -66,7 +71,7 @@ ${notes}`;
 
     IMPORTANT:
     - Do NOT treat Opening/Starting Balance or Closing/Ending Balance lines as transactions.
-    - Never include balance-only rows in the transactions array (they are not postings).
+    - Never include balance-only rows, account-summary rollups, or "Total … = $…" lines in the transactions array.
 
     Return an array of posting records that can be directly inserted into the posting model.`;
   }

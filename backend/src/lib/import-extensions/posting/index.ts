@@ -63,16 +63,25 @@ export class PostingImportExtension implements ImportExtension {
         enableChunking: options.enableChunking === true || options.enableChunking === 'true',
       });
 
-      // Fetch extraction_notes from the bank account if accountId was provided
-      const extractionNotes = options.accountId
-        ? await fetchAccountExtractionNotes(options.accountId)
-        : (options.extractionNotes ?? null);
+      // Fetch destination account details for prompt scoping + extraction notes
+      const targetAccount = options.accountId
+        ? await fetchTargetAccount(options.accountId)
+        : null;
+      const extractionNotes =
+        targetAccount?.extraction_notes ?? options.extractionNotes ?? null;
 
       // Prepare categorization context (fetches Chart of Accounts + account-specific notes)
       await this.extractor.prepareCategorizationContext({
         orgId: context.user.org_id,
         legalEntityId: options.legalEntityId,
         extractionNotes: extractionNotes ?? undefined,
+        targetAccount: targetAccount
+          ? {
+              id: targetAccount.id,
+              name: targetAccount.name,
+              account_number: targetAccount.account_number,
+            }
+          : null,
       });
 
       const enableChunking =
@@ -83,6 +92,7 @@ export class PostingImportExtension implements ImportExtension {
         resolvedEnableChunking: enableChunking,
         legalEntityId: options.legalEntityId,
         accountId: options.accountId,
+        targetAccountNumber: targetAccount?.account_number ?? null,
       });
 
       // Use extractor framework for combined extraction + categorization
@@ -91,7 +101,17 @@ export class PostingImportExtension implements ImportExtension {
         {
           documentType: 'posting_with_categorization',
           documentContent: buffer,
-          options: { enableChunking },
+          options: {
+            enableChunking,
+            extractionNotes: extractionNotes ?? undefined,
+            targetAccount: targetAccount
+              ? {
+                  id: targetAccount.id,
+                  name: targetAccount.name,
+                  account_number: targetAccount.account_number,
+                }
+              : undefined,
+          },
         }
       );
 
@@ -156,13 +176,23 @@ export class PostingImportExtension implements ImportExtension {
   }
 }
 
-async function fetchAccountExtractionNotes(accountId: string): Promise<string | null> {
+async function fetchTargetAccount(accountId: string): Promise<{
+  id: string;
+  name: string | null;
+  account_number: number | null;
+  extraction_notes: string | null;
+} | null> {
   try {
     const account = await (prisma as any).account.findUnique({
       where: { id: accountId },
-      select: { extraction_notes: true },
+      select: {
+        id: true,
+        name: true,
+        account_number: true,
+        extraction_notes: true,
+      },
     });
-    return account?.extraction_notes ?? null;
+    return account ?? null;
   } catch {
     return null;
   }

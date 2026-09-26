@@ -76,6 +76,9 @@ export interface PdfUploadResult {
     confidence_score: number;
     reasoning: string;
   }>;
+  /** True when parse succeeded but the statement had no rows for the selected account */
+  empty?: boolean;
+  emptyMessage?: string;
 }
 
 /**

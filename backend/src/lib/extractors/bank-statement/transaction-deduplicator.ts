@@ -10,19 +10,34 @@ function isDuplicate(a: Record<string, any>, b: Record<string, any>): boolean {
   return sameDate && sameDebit && sameCredit && sameDesc;
 }
 
+export interface DedupeResult {
+  transactions: Record<string, any>[];
+  /** Maps pre-dedupe index → post-dedupe index. Omitted keys were removed. */
+  indexMap: Map<number, number>;
+}
+
 /**
  * Removes consecutive duplicates that arise at chunk boundaries.
- * Only compares adjacent pairs — does not do a full O(n²) deduplcation.
+ * Only compares adjacent pairs — does not do a full O(n²) deduplication.
  */
 export function deduplicateBoundaryTransactions(
   transactions: Record<string, any>[]
-): Record<string, any>[] {
-  if (transactions.length === 0) return [];
+): DedupeResult {
+  const indexMap = new Map<number, number>();
+  if (transactions.length === 0) {
+    return { transactions: [], indexMap };
+  }
+
   const result: Record<string, any>[] = [transactions[0]];
+  indexMap.set(0, 0);
+
   for (let i = 1; i < transactions.length; i++) {
     if (!isDuplicate(result[result.length - 1], transactions[i])) {
+      indexMap.set(i, result.length);
       result.push(transactions[i]);
     }
+    // else: drop i — no entry in indexMap
   }
-  return result;
+
+  return { transactions: result, indexMap };
 }

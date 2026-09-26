@@ -26,11 +26,15 @@ import { ImportExtensionRegistry } from './registry';
 import { PostingImportExtension } from './posting';
 
 /**
- * Initialize and register all import extensions
- * Called once at application startup
+ * Initialize and register all import extensions.
+ * Idempotent — safe to call from server boot and from ModelService in tests.
  */
 export function initializeImportExtensions(): void {
   const registry = ImportExtensionRegistry.getInstance();
+
+  if (registry.hasExtension('posting')) {
+    return;
+  }
 
   // Register posting extension (bank statement categorization)
   registry.register(new PostingImportExtension());

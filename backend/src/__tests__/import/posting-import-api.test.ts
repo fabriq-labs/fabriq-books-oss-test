@@ -240,6 +240,32 @@ describe('Tier 1 — mapping logic and validation (pure, no DB)', () => {
     expect(txns[0].account_id).toBeUndefined();
   });
 
+  it('applyCategorizations writes reasoning into notes', () => {
+    const txns: Record<string, any>[] = [
+      { debit_amount: 100, description: 'Office supplies', notes: 'From statement' },
+    ];
+    applyCategorizations(txns, [{
+      transaction_index: 0,
+      account_id: 'acco_expense_5201',
+      confidence_score: 0.87,
+      reasoning: 'Matches office supply vendor pattern',
+    }]);
+    expect(txns[0].notes).toBe(
+      'From statement\n\nAI: Matches office supply vendor pattern'
+    );
+  });
+
+  it('applyCategorizations sets notes from reasoning when notes empty', () => {
+    const txns: Record<string, any>[] = [{ credit_amount: 50, description: 'Fee refund' }];
+    applyCategorizations(txns, [{
+      transaction_index: 0,
+      account_id: 'acco_revenue_4001',
+      confidence_score: 0.9,
+      reasoning: 'Bank fee reversal',
+    }]);
+    expect(txns[0].notes).toBe('Bank fee reversal');
+  });
+
   // ── applyColumnMapping ─────────────────────────────────────────────────────
 
   it('applyColumnMapping renames columns and converts numeric fields', () => {

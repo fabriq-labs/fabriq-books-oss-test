@@ -136,9 +136,22 @@ export const ImportPannel = ({
           enableChunking: uploadOptions?.enableChunking === true,
         });
 
+        setCurrentImportId(result?.import_id || null);
+
+        if (result.empty) {
+          setUploading(false);
+          setIsModalOpen(false);
+          toast({
+            title: "No transactions to import",
+            description:
+              result.emptyMessage ||
+              "The statement had no transactions for the selected account.",
+          });
+          return;
+        }
+
         csvContent = result.csvContent;
         categorizations = result.categorizations || [];
-        setCurrentImportId(result?.import_id || null);
       } else {
         // Generic PDF parsing for models without extensions
         const res: any = await importAPI.parseDocument(modelType, file);
@@ -152,7 +165,13 @@ export const ImportPannel = ({
           res?.metaData?.import_id || res?.import_id || res?.data?.import_id || null
         );
         if (transactions.length === 0) {
-          throw new Error('No transactions found in the PDF');
+          setUploading(false);
+          setIsModalOpen(false);
+          toast({
+            title: "No transactions to import",
+            description: "No transactions found in the PDF for this import.",
+          });
+          return;
         }
 
         // Transform to CSV format
