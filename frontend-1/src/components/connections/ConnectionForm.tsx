@@ -167,9 +167,9 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
       ) as { success: boolean; message?: string; data?: { new_refresh_token?: string } };
 
       if (result.success) {
-        // Questrade rotates the refresh token on every use. If the backend returns a new token
-        // (new connection flow — no connectionId to persist to), update the form field directly
-        // without going through handleFieldChange, which would reset testPassed.
+        // Questrade rotates the refresh token on every use. Put the new token in the form
+        // before Save; otherwise Save writes the consumed PAT and the next sync fails.
+        // Do not go through handleFieldChange — that resets testPassed.
         const newToken = result.data?.new_refresh_token;
         if (newToken) {
           setFormData((prev: any) => ({

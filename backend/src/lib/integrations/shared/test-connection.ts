@@ -285,9 +285,9 @@ async function testQuickBooksConnection(
 /**
  * Test Questrade connection.
  * Exchanges the Personal Access Token (PAT) for an access token, then calls
- * GET v1/accounts — a read-only, non-mutating endpoint. If connectionId is
- * supplied (editing an existing connection) the rotated refresh token is
- * persisted back so the connection stays live.
+ * GET v1/accounts — a read-only, non-mutating endpoint. The rotated refresh
+ * token is always returned so the form can save it. If connectionId is
+ * supplied, it is also persisted immediately.
  */
 async function testQuestradeConnection(
   credentials: ConnectionConfig['oauth'],
@@ -325,29 +325,26 @@ async function testQuestradeConnection(
 
     const accounts = accountsResp.data.accounts ?? [];
     const accountSummary = accounts.map(a => `${a.type} (${a.number})`).join(', ');
+    const accountData = accounts.map(a => ({ number: a.number, type: a.type, status: a.status }));
 
+    // Questrade rotates the refresh token on every exchange. The pasted PAT is now
+    // invalid. Always return the new token so Save writes that value. If the form
+    // still holds the original PAT, Save overwrites the live token and the next
+    // sync fails with 400.
     if (connectionId) {
-      // Editing existing connection: persist the rotated token immediately
       await persistBrokerOAuth(connectionId, {
         refresh_token: newRefreshToken,
         api_server: apiBase,
         token_endpoint: tokenEndpoint,
         ...buildQuestradeAccessTokenCache(access_token, apiBase, expires_in ?? 1800),
       });
-      return {
-        success: true,
-        message: `Connected to Questrade. Found ${accounts.length} account${accounts.length !== 1 ? 's' : ''}: ${accountSummary}. Token refreshed and saved.`,
-        data: { accounts: accounts.map(a => ({ number: a.number, type: a.type, status: a.status })) },
-      };
     }
 
-    // New connection: return the rotated token so the UI can update the form field before saving.
-    // The original PAT is now consumed — if the UI saves the original, the first sync will fail.
     return {
       success: true,
       message: `Connected to Questrade. Found ${accounts.length} account${accounts.length !== 1 ? 's' : ''}: ${accountSummary}.`,
       data: {
-        accounts: accounts.map(a => ({ number: a.number, type: a.type, status: a.status })),
+        accounts: accountData,
         new_refresh_token: newRefreshToken,
       },
     };
