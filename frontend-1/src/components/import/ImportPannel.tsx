@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Card, notification } from "antd";
+import { Card, Modal, notification } from "antd";
 import { importAPI, viewAPI } from "@/api/api";
 import { buildDataWithLookupFields, fetchColumns } from "./utils/upload";
 import {
@@ -105,6 +105,16 @@ export const ImportPannel = ({
       });
   };
 
+  const showNoTransactionsDialog = (description: string) => {
+    setUploading(false);
+    setIsModalOpen(false);
+    Modal.info({
+      title: "No transactions to import",
+      content: description,
+      okText: "OK",
+    });
+  };
+
   /**
    * PDF Upload Handler
    *
@@ -145,14 +155,10 @@ export const ImportPannel = ({
         setCurrentImportId(result?.import_id || null);
 
         if (result.empty) {
-          setUploading(false);
-          setIsModalOpen(false);
-          toast({
-            title: "No transactions to import",
-            description:
-              result.emptyMessage ||
-              "The statement had no transactions for the selected account.",
-          });
+          showNoTransactionsDialog(
+            result.emptyMessage ||
+              "The statement had no transactions for the selected account."
+          );
           return;
         }
 
@@ -171,12 +177,7 @@ export const ImportPannel = ({
           res?.metaData?.import_id || res?.import_id || res?.data?.import_id || null
         );
         if (transactions.length === 0) {
-          setUploading(false);
-          setIsModalOpen(false);
-          toast({
-            title: "No transactions to import",
-            description: "No transactions found in the PDF for this import.",
-          });
+          showNoTransactionsDialog("No transactions found in the PDF for this import.");
           return;
         }
 
