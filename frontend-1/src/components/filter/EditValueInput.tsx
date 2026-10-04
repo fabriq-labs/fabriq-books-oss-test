@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 
 interface EditValueInputProps {
     value: string;
-    onChange: (value: string) => void;
+    /** `null` means the user explicitly cleared the value (set to null on save). */
+    onChange: (value: string | null) => void;
     col: Record<string, any>;
     className?: string;
     /** Known label for the current value (avoids a fetch on first render) */
@@ -24,7 +25,7 @@ function SelectCombobox({
     additionalFilters,
 }: {
     value: string;
-    onChange: (value: string) => void;
+    onChange: (value: string | null) => void;
     tableProps: any;
     initialLabel?: string;
     className?: string;
@@ -113,7 +114,7 @@ function SelectCombobox({
 
     const clear = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onChange('');
+        onChange(null);
         setSelectedLabel('');
     };
     return (
@@ -218,12 +219,28 @@ export function EditValueInput({ value, onChange, col, className, label, additio
     }
 
     return (
-        <Input
-            className={`bg-[#F5EDFB] border-[#E5DEFF] focus:border-[#7028a0] focus:ring-1 focus:ring-[#7028a0] text-sm ${className ?? ''}`}
-            placeholder="Value"
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            onClick={e => e.stopPropagation()}
-        />
+        <div className={`relative w-full min-w-0 ${className ?? ''}`}>
+            <Input
+                className="bg-[#F5EDFB] border-[#E5DEFF] focus:border-[#7028a0] focus:ring-1 focus:ring-[#7028a0] text-sm pr-9"
+                placeholder="Value"
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                onClick={e => e.stopPropagation()}
+            />
+            {value ? (
+                <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-[#9ca3af] hover:text-[#5b21b6]"
+                    onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onChange(null);
+                    }}
+                    aria-label="Clear value"
+                >
+                    <X className="h-3.5 w-3.5" />
+                </button>
+            ) : null}
+        </div>
     );
 }

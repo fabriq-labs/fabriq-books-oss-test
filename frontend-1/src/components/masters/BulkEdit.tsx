@@ -89,6 +89,28 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
     setEditFields(newFields);
   };
 
+  const updateFieldValue = (index: number, value: string | null) => {
+    const newFields = [...editFields];
+    if (value === null) {
+      // Explicit clear from value input (select X / text X) → null on save
+      newFields[index] = { ...newFields[index], value: null, clearField: true };
+    } else {
+      newFields[index] = { ...newFields[index], value, clearField: false };
+    }
+    setEditFields(newFields);
+  };
+
+  const toggleClearField = (index: number) => {
+    const newFields = [...editFields];
+    const clearing = !newFields[index].clearField;
+    newFields[index] = {
+      ...newFields[index],
+      clearField: clearing,
+      value: clearing ? null : "",
+    };
+    setEditFields(newFields);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -96,8 +118,8 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
     const editData: Record<string, any> = {};
     editFields.forEach((field) => {
       if (field.field) {
-        // If clearField is checked, set to null
-        if (field.clearField) {
+        // Clear button / value-input clear → null (same as single-record forms)
+        if (field.clearField || field.value === null) {
           editData[field.field] = null;
         } else if (field.value !== undefined && field.value !== "") {
           editData[field.field] = field.value;
@@ -177,7 +199,11 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
                 </div>
                 <Select
                   value={field.field}
-                  onValueChange={(value) => updateField(index, "field", value)}
+                  onValueChange={(value) => {
+                    const next = [...editFields];
+                    next[index] = { field: value, value: "", clearField: false };
+                    setEditFields(next);
+                  }}
                 >
                   <SelectTrigger className="w-[170px] bg-[#F1F0FB] border-[#E5DEFF]">
                     <SelectValue placeholder="Select field" />
@@ -219,8 +245,8 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
                         return (
                           <EditValueInput
                             className={field.clearField ? 'opacity-50 pointer-events-none' : ''}
-                            value={field.value ? String(field.value) : ''}
-                            onChange={(val) => updateField(index, "value", val)}
+                            value={field.value != null && field.value !== '' ? String(field.value) : ''}
+                            onChange={(val) => updateFieldValue(index, val)}
                             col={bulkEditCol}
                             additionalFilters={filterEnhancements?.[field.field]?.additionalFilters}
                           />
@@ -239,7 +265,7 @@ export const BulkEdit: React.FC<BulkEditProps> = ({
                   type="button"
                   variant={field.clearField ? "destructive" : "outline"}
                   size="sm"
-                  onClick={() => updateField(index, "clearField", !field.clearField)}
+                  onClick={() => toggleClearField(index)}
                   disabled={!field.field}
                   className="flex items-center gap-1 min-w-[80px] mt-px"
                 >
