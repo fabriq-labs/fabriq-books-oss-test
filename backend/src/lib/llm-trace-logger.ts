@@ -1,6 +1,11 @@
 import prisma from './prisma';
 import logger from '../utils/logger';
-import { extractCacheUsage, resolveCacheUsage, type CacheUsage } from './ai/usage';
+import {
+  extractCacheUsage,
+  resolveCacheUsage,
+  resolveCostUsd,
+  type CacheUsage,
+} from './ai/usage';
 
 interface TraceStep {
   toolCalls?: Array<{
@@ -18,6 +23,8 @@ interface TraceStep {
   };
   /** Provider-specific metadata (carries prompt-cache token counts). */
   providerMetadata?: Record<string, any>;
+  /** Raw HTTP response (OpenRouter cost lives on body.usage.cost). */
+  response?: { body?: unknown };
 }
 
 interface LogTraceParams {
@@ -39,9 +46,15 @@ interface LogTraceParams {
       /** Optional pre-computed cache usage (e.g. paths that don't expose steps). */
       cachedPromptTokens?: number | null;
       cacheCreationTokens?: number | null;
+      /** Optional pre-computed USD cost (e.g. batch categorization). */
+      costUsd?: number | null;
+      /** OpenRouter-style cost if present on mapped usage. */
+      cost?: number | null;
     };
     /** Top-level provider metadata (fallback when steps carry no metadata). */
     providerMetadata?: Record<string, any>;
+    /** Top-level raw response (generateObject / generateText). */
+    response?: { body?: unknown };
   };
   durationMs: number;
   status: 'success' | 'error';
@@ -78,6 +91,13 @@ class LLMTraceLogger {
             }
           : resolveCacheUsage({ steps: result.steps, providerMetadata: result.providerMetadata });
 
+      const costUsd = resolveCostUsd({
+        usage: result.usage,
+        providerMetadata: result.providerMetadata,
+        response: result.response,
+        steps: result.steps,
+      });
+
       // Collect all unique tool names called across steps
       const toolsCalled = this.extractToolsCalled(result.steps);
 
@@ -99,6 +119,7 @@ class LLMTraceLogger {
             total_tokens: totalTokens,
             cached_prompt_tokens: cacheUsage.cachedPromptTokens,
             cache_creation_tokens: cacheUsage.cacheCreationTokens,
+            cost_usd: costUsd,
             duration_ms: durationMs,
             steps_count: result.steps.length,
             tools_called: toolsCalled,

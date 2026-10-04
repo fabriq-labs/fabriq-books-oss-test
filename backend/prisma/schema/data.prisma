@@ -492,6 +492,10 @@ model llm_trace {
   cached_prompt_tokens  Int?
   cache_creation_tokens Int?
 
+  // Provider-reported call cost in USD (e.g. OpenRouter usage.cost). Null when the
+  // provider does not return a cost (Vertex/OpenAI direct, etc.).
+  cost_usd Decimal? @db.Decimal(18, 8)
+
   steps_count  Int?
   tools_called String[]
 

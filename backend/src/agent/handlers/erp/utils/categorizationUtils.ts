@@ -535,18 +535,31 @@ export interface BulkCategorizationItem {
 
 const BANK_TYPE_SET = new Set(['BANK', 'CREDIT_CARD', 'CHECKING', 'SAVINGS']);
 
+/** US state/DC codes — only stripped for US debit-card narratives (not globally; preserves e.g. "amazon in"). */
+const US_STATE_CODES =
+  'al|ak|az|ar|ca|co|ct|de|fl|ga|hi|id|il|in|ia|ks|ky|la|me|md|ma|mi|mn|ms|mo|mt|ne|nv|nh|nj|nm|ny|nc|nd|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy|dc';
+
 /**
  * Normalize a transaction description for fuzzy matching.
  *
  * Two-pass pipeline (A2):
  *   Pass 1 — strip noise tokens (payment rails, reference numbers, dates, bank prefixes, card masks)
  *   Pass 2 — take first 6 tokens to cap length
+ *
+ * US debit-card lines (`DEBIT CARD PURCHASE[-PIN] …`) get extra stripping so the
+ * merchant remains inside the 6-token window instead of the shared rail prefix.
  */
 export function normalizeDescription(description: string | null): string {
   if (!description) return '';
 
   // Step 0: lowercase + replace common separators with spaces
-  let s = description.toLowerCase().replace(/[\/\-_]/g, ' ');
+  let s = description.toLowerCase().replace(/[\/\-_*]/g, ' ');
+
+  // US debit-card rail (Truist etc.): detect before stripping so location/card rules stay scoped
+  const isUsDebitCard = /\bdebit\s+card\s+purchase(?:\s+pin)?\b/.test(s);
+  if (isUsDebitCard) {
+    s = s.replace(/\bdebit\s+card\s+purchase(?:\s+pin)?\b/g, '');
+  }
 
   // Pass 1 — strip noise tokens (applied in order)
 
@@ -581,10 +594,28 @@ export function normalizeDescription(description: string | null): string {
   // 8. Masked card number fragments: digits + X/asterisk run + optional digits (e.g. 441234XXXXXX1234)
   s = s.replace(/\d*[x*]{3,}\d*/g, '');
 
+  // 8b. US debit-card location / card-suffix noise (only when rail phrase was present)
+  if (isUsDebitCard) {
+    // mm dd yy (from 12-27-24) and mm dd (from 11-03)
+    s = s.replace(/\b\d{1,2}\s+\d{1,2}\s+\d{2,4}\b/g, '');
+    s = s.replace(/\b\d{1,2}\s+\d{1,2}\b/g, '');
+    // phone numbers (866-712-7753 → 866 712 7753)
+    s = s.replace(/\b\d{3}\s+\d{3}\s+\d{4}\b/g, '');
+    // state / DC codes
+    s = s.replace(new RegExp(`\\b(${US_STATE_CODES})\\b`, 'g'), '');
+    // Normalize whitespace so ^-anchored city/card strip can match
+    s = s.replace(/\s{2,}/g, ' ').trim();
+    // PIN layout: "CITY [CITY…] CARDLAST4 MERCHANT…" — drop location + card before merchant
+    s = s.replace(/^(?:[a-z]+\s+){1,3}\d{4}\s+/, '');
+    // non-PIN layout: trailing card last-4
+    s = s.replace(/\s+\d{4}$/, '');
+  }
+
   // 9. Collapse multiple spaces
   s = s.replace(/\s{2,}/g, ' ').trim();
 
   // Pass 2 — take first 6 tokens to prevent long descriptions from diluting similarity scores
+  if (!s) return '';
   return s.split(/\s+/).slice(0, 6).join(' ');
 }
 

@@ -208,6 +208,11 @@ export async function reconcileImportedPostings(
     const catEntry = catMap.get(posting.id);
 
     if (posting.account == null || posting.credit_account == null) {
+      // Prefer the upstream categorization/LLM error when present — otherwise a bad
+      // model/config surfaces here as a misleading "missing account" failure.
+      if (catEntry?.error) {
+        throw new Error(`Categorization failed for ${posting.id}: ${catEntry.error}`);
+      }
       throw new Error(
         `Posting ${posting.id} has missing account or credit_account; cannot determine transaction direction.`
       );

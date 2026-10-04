@@ -328,6 +328,7 @@ LLM call. Full diagnostic workflow: [11-OBSERVABILITY.md](./11-OBSERVABILITY.md)
 | `total_tokens` | Total |
 | `cached_prompt_tokens` | Input tokens served from the provider prompt cache at a discount (OpenAI `cachedPromptTokens` / Anthropic `cacheReadInputTokens` / Google `cachedContentTokenCount`); `null` when the provider reports no caching. Summed across steps. See [11-OBSERVABILITY.md](./11-OBSERVABILITY.md#prompt-cache-accounting) |
 | `cache_creation_tokens` | Input tokens written to the cache at a premium (Anthropic `cacheCreationInputTokens`); `null` for providers with no distinct write metric |
+| `cost_usd` | Provider-reported call cost in USD (e.g. OpenRouter `usage.cost` from the raw response body); `null` when the provider does not return a cost |
 | `duration_ms` | Total execution time |
 | `steps_count` | Number of tool-call rounds |
 | `tools_called` | String[] of tool names used |

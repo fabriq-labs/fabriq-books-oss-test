@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatUsd } from "@/lib/llmTokenCost";
 
 const MODEL = "llm_trace";
 const VIEW = "llm_trace_view";
@@ -39,6 +40,7 @@ interface TraceRow {
   total_tokens?: number;
   cached_prompt_tokens?: number | null;
   cache_creation_tokens?: number | null;
+  cost_usd?: number | string | null;
   tools_called?: string[];
   steps_count?: number;
   model_name?: string;
@@ -92,6 +94,13 @@ function formatDuration(ms?: number): string {
 function formatTokens(count?: number): string {
   if (count == null) return "—";
   return count.toLocaleString();
+}
+
+function formatCostUsd(value?: number | string | null): string {
+  if (value == null || value === "") return "—";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return "—";
+  return formatUsd(n);
 }
 
 function formatShortId(id: string): string {
@@ -533,6 +542,7 @@ export const LLMTracesPage: React.FC = () => {
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 w-36">LLM Model</th>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 w-20">Latency</th>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 w-24">Tokens</th>
+                  <th className="px-4 py-2.5 text-left font-medium text-gray-500 w-20">Cost</th>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 w-24">Actions</th>
                 </tr>
               </thead>
@@ -650,6 +660,10 @@ export const LLMTracesPage: React.FC = () => {
                             / {formatTokens(trace.completion_tokens)} completion
                           </TooltipContent>
                         </Tooltip>
+                      </td>
+
+                      <td className="px-4 py-3 text-gray-700 text-xs tabular-nums whitespace-nowrap">
+                        {formatCostUsd(trace.cost_usd)}
                       </td>
 
                       <td className="px-4 py-3">

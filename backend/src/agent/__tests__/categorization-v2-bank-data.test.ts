@@ -77,6 +77,51 @@ describe('Kotak Savings — normalizeDescription', () => {
   });
 });
 
+// ─── US debit card (Truist-style) ─────────────────────────────────────────────
+
+describe('US debit card — normalizeDescription', () => {
+  it('PIN layout: Office Depot keeps merchant, not rail prefix', () => {
+    const result = normalizeDescription(
+      'DEBIT CARD PURCHASE-PIN 12-27-24 GERMANTOWN TN 2356 OFFICE DEPOT 00 1275 S GE'
+    );
+    expect(result).toContain('office depot');
+    expect(result).not.toContain('debit card');
+    expect(result).not.toContain('germantown');
+  });
+
+  it('PIN layout: Marathon gas does not fuzzy-match Office Depot', () => {
+    const officeDesc =
+      'DEBIT CARD PURCHASE-PIN 12-27-24 GERMANTOWN TN 2356 OFFICE DEPOT 00 1275 S GE';
+    const gasNorm = normalizeDescription(
+      'DEBIT CARD PURCHASE-PIN 12-12-24 MEMPHIS 2356 SUMMER AVE MARAT'
+    );
+    const match = findFuzzyMatch(officeDesc, [
+      {
+        descriptionNormalized: gasNorm,
+        counterAccountId: 'exp_operating',
+        counterAccountName: 'Operating Expenses',
+        classification: 'Expense',
+      },
+      {
+        descriptionNormalized: 'office depot',
+        counterAccountId: 'exp_office',
+        counterAccountName: 'Office Supplies',
+        classification: 'Expense',
+      },
+    ]);
+    expect(match).not.toBeNull();
+    expect(match!.counterAccountId).toBe('exp_office');
+  });
+
+  it('non-PIN layout: Uber keeps merchant tokens', () => {
+    const result = normalizeDescription(
+      'DEBIT CARD PURCHASE UBER *TRIP 11-01 HELP.UBER.COM CA 2356'
+    );
+    expect(result).toContain('uber');
+    expect(result).not.toContain('debit');
+  });
+});
+
 // ─── Credit Card Descriptions (clean merchant names) ─────────────────────────
 
 describe('Credit card — normalizeDescription', () => {

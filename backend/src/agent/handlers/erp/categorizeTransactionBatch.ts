@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import { generateObject } from 'ai';
 import { getModel, getModelId } from '../../../lib/ai/modelProvider';
-import { extractCacheUsage } from '../../../lib/ai/usage';
+import { extractCacheUsage, extractCostUsd } from '../../../lib/ai/usage';
 import { ERPMethodHandler } from './types';
 import { ERPConnector } from '../../../lib/integrations/connectors/types';
 import { AuthContext } from '../../../auth/types';
@@ -153,16 +153,38 @@ function isAlreadyCategorized(posting: PostingForCategorization): boolean {
 /**
  * Bulk categorize postings using a single LLM call
  */
+function formatLlmProviderError(error: unknown): string {
+  const err = error as { message?: string; data?: unknown; responseBody?: unknown; cause?: { message?: string } };
+  const raw =
+    (typeof err?.message === 'string' && err.message.trim()) ||
+    (typeof err?.cause?.message === 'string' && err.cause.message.trim()) ||
+    'LLM categorization request failed';
+  // OpenRouter / AI SDK sometimes prefixes messages with whitespace or tabs
+  return raw.replace(/^\s+/, '');
+}
+
 async function bulkCategorizeWithLLM(
   postings: PostingForCategorization[],
   accounts: AccountsGrouped,
   orgId: string
-): Promise<{ results: Map<number, BulkCategorizationItem>; usage: { promptTokens?: number; completionTokens?: number; cachedPromptTokens?: number; cacheCreationTokens?: number } }> {
+): Promise<{
+  results: Map<number, BulkCategorizationItem>;
+  usage: {
+    promptTokens?: number;
+    completionTokens?: number;
+    cachedPromptTokens?: number;
+    cacheCreationTokens?: number;
+    costUsd?: number;
+  };
+  errors: string[];
+}> {
   const results = new Map<number, BulkCategorizationItem>();
+  const errors: string[] = [];
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
   let totalCachedPromptTokens = 0;
   let totalCacheCreationTokens = 0;
+  let totalCostUsd: number | null = null;
 
   // Process in chunks of BULK_LLM_BATCH_SIZE
   const batchSize = CATEGORIZATION_CONFIG.BULK_LLM_BATCH_SIZE;
@@ -188,6 +210,14 @@ async function bulkCategorizeWithLLM(
       const chunkCache = extractCacheUsage((llmResult as any).providerMetadata);
       totalCachedPromptTokens += chunkCache.cachedPromptTokens ?? 0;
       totalCacheCreationTokens += chunkCache.cacheCreationTokens ?? 0;
+      const chunkCost = extractCostUsd({
+        usage: llmResult.usage as any,
+        providerMetadata: (llmResult as any).providerMetadata,
+        responseBody: (llmResult as any).response?.body,
+      });
+      if (chunkCost != null) {
+        totalCostUsd = (totalCostUsd ?? 0) + chunkCost;
+      }
 
       // Map results back to original indices
       for (const cat of llmResult.object.categorizations) {
@@ -206,12 +236,14 @@ async function bulkCategorizeWithLLM(
         resultsCount: llmResult.object.categorizations.length,
       });
     } catch (error: any) {
+      const providerError = formatLlmProviderError(error);
+      errors.push(providerError);
       logger.error('Bulk LLM categorization chunk failed', {
         chunkStart: i,
         chunkSize: chunk.length,
-        error: error.message,
+        error: providerError,
       });
-      // Continue with other chunks, failed ones will be marked as errors
+      // Continue with other chunks; caller fails hard if nothing was returned
     }
   }
 
@@ -222,7 +254,9 @@ async function bulkCategorizeWithLLM(
       completionTokens: totalCompletionTokens || undefined,
       cachedPromptTokens: totalCachedPromptTokens || undefined,
       cacheCreationTokens: totalCacheCreationTokens || undefined,
+      costUsd: totalCostUsd ?? undefined,
     },
+    errors,
   };
 }
 
@@ -501,7 +535,13 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
       // Step 5: Bulk LLM categorization — split by direction so each sub-batch gets
       // only the relevant account subset (A5): money_out → expense+liability,
       // money_in → income+asset.
-      let llmTokenUsage: { promptTokens?: number; completionTokens?: number; cachedPromptTokens?: number; cacheCreationTokens?: number } = {};
+      let llmTokenUsage: {
+        promptTokens?: number;
+        completionTokens?: number;
+        cachedPromptTokens?: number;
+        cacheCreationTokens?: number;
+        costUsd?: number;
+      } = {};
       let llmCategorizedCount = 0;
 
       if (postingsNeedingLLM.length > 0) {
@@ -547,12 +587,25 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
         const applyLLMResults = async (
           queue: { posting: PostingForCategorization; originalIndex: number }[],
           llmResults: Map<number, BulkCategorizationItem>,
-          usage: { promptTokens?: number; completionTokens?: number; cachedPromptTokens?: number; cacheCreationTokens?: number }
+          usage: {
+            promptTokens?: number;
+            completionTokens?: number;
+            cachedPromptTokens?: number;
+            cacheCreationTokens?: number;
+            costUsd?: number;
+          },
+          providerErrors: string[] = []
         ) => {
           llmTokenUsage.promptTokens = (llmTokenUsage.promptTokens ?? 0) + (usage.promptTokens ?? 0);
           llmTokenUsage.completionTokens = (llmTokenUsage.completionTokens ?? 0) + (usage.completionTokens ?? 0);
           llmTokenUsage.cachedPromptTokens = (llmTokenUsage.cachedPromptTokens ?? 0) + (usage.cachedPromptTokens ?? 0);
           llmTokenUsage.cacheCreationTokens = (llmTokenUsage.cacheCreationTokens ?? 0) + (usage.cacheCreationTokens ?? 0);
+          if (usage.costUsd != null) {
+            llmTokenUsage.costUsd = (llmTokenUsage.costUsd ?? 0) + usage.costUsd;
+          }
+
+          const missingPredictionError =
+            providerErrors[0] || 'LLM did not return a prediction for this posting';
 
           for (let llmIndex = 0; llmIndex < queue.length; llmIndex++) {
             const { posting, originalIndex } = queue[llmIndex];
@@ -619,7 +672,7 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
                 confidence_score: null,
                 reasoning: null,
                 applied: false,
-                error: 'LLM did not return a prediction for this posting',
+                error: missingPredictionError,
               };
             }
           }
@@ -628,21 +681,29 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
         toolTracker.track('bulkCategorizeWithLLM', true);
 
         if (outQueue.length > 0) {
-          const { results: outResults, usage } = await bulkCategorizeWithLLM(
+          const { results: outResults, usage, errors: outErrors } = await bulkCategorizeWithLLM(
             outQueue.map((p) => p.posting),
             moneyOutAccounts,
             orgId
           );
-          await applyLLMResults(outQueue, outResults, usage);
+          // Provider/config failures (bad model id, auth, etc.) should fail the batch —
+          // do not continue into reconciliation with uncategorized postings.
+          if (outErrors.length > 0 && outResults.size === 0) {
+            throw new Error(outErrors[0]);
+          }
+          await applyLLMResults(outQueue, outResults, usage, outErrors);
         }
 
         if (inQueue.length > 0) {
-          const { results: inResults, usage } = await bulkCategorizeWithLLM(
+          const { results: inResults, usage, errors: inErrors } = await bulkCategorizeWithLLM(
             inQueue.map((p) => p.posting),
             moneyInAccounts,
             orgId
           );
-          await applyLLMResults(inQueue, inResults, usage);
+          if (inErrors.length > 0 && inResults.size === 0) {
+            throw new Error(inErrors[0]);
+          }
+          await applyLLMResults(inQueue, inResults, usage, inErrors);
         }
       }
 
@@ -708,6 +769,7 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
             completionTokens: llmTokenUsage.completionTokens ?? 0,
             cachedPromptTokens: llmTokenUsage.cachedPromptTokens ?? null,
             cacheCreationTokens: llmTokenUsage.cacheCreationTokens ?? null,
+            costUsd: llmTokenUsage.costUsd ?? null,
           },
         },
         durationMs,

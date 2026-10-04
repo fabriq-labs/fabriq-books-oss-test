@@ -257,6 +257,37 @@ describe('normalizeDescription', () => {
   it('T8 null input returns empty string', () => {
     expect(normalizeDescription(null)).toBe('');
   });
+
+  // T8b: US debit-card PIN layout — keep merchant, drop rail/date/city/card
+  it('T8b strips US debit-card PIN boilerplate and keeps merchant', () => {
+    const office = normalizeDescription(
+      'DEBIT CARD PURCHASE-PIN 12-27-24 GERMANTOWN TN 2356 OFFICE DEPOT 00 1275 S GE'
+    );
+    const gas = normalizeDescription(
+      'DEBIT CARD PURCHASE-PIN 12-12-24 MEMPHIS 2356 SUMMER AVE MARAT'
+    );
+    expect(office).toContain('office depot');
+    expect(office).not.toContain('debit');
+    expect(office).not.toContain('germantown');
+    expect(gas).toContain('summer');
+    expect(office).not.toBe(gas);
+  });
+
+  // T8c: US debit-card non-PIN layout — merchant stays first
+  it('T8c strips US debit-card trailing date/location/card and keeps merchant', () => {
+    const result = normalizeDescription(
+      'DEBIT CARD PURCHASE COURTYARD BY MARRI 11-03 SOUTH BEND IN 2356'
+    );
+    expect(result).toContain('courtyard');
+    expect(result).not.toContain('debit');
+    expect(result).not.toMatch(/\b2356\b/);
+  });
+
+  // T8d: do not strip US state codes outside debit-card narratives
+  it('T8d preserves "amazon in" for non-debit-card descriptions', () => {
+    const result = normalizeDescription('POS 441234XXXXXX1234 AMAZON IN');
+    expect(result).toContain('amazon in');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

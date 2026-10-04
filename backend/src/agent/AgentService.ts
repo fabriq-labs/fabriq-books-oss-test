@@ -412,6 +412,7 @@ export class AgentService {
           steps: result.steps as any,
           usage: result.usage,
           providerMetadata: result.providerMetadata as any,
+          response: (result as any).response,
         },
         durationMs,
         status: 'success',

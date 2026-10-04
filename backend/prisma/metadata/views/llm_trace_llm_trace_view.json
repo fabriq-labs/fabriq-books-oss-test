@@ -210,6 +210,19 @@
       "displayName": "Tokens",
       "isColumnShow": true
     },
+    "cost_usd": {
+      "orderNo": 7,
+      "dataType": "decimal",
+      "required": false,
+      "permission": "read",
+      "tableProps": {
+        "width": "100",
+        "columnType": "number",
+        "defaultValue": ""
+      },
+      "displayName": "Cost (USD)",
+      "isColumnShow": true
+    },
     "error_message": {
       "dataType": "string",
       "required": false,

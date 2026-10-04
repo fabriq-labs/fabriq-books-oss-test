@@ -1,7 +1,9 @@
 import {
   extractCacheUsage,
+  extractCostUsd,
   sumCacheUsageFromSteps,
   resolveCacheUsage,
+  resolveCostUsd,
 } from '../../lib/ai/usage';
 
 describe('prompt-cache usage extraction (lib/ai/usage)', () => {
@@ -85,6 +87,36 @@ describe('prompt-cache usage extraction (lib/ai/usage)', () => {
         providerMetadata: { openai: { cachedPromptTokens: 777 } },
       };
       expect(resolveCacheUsage(result).cachedPromptTokens).toBe(777);
+    });
+  });
+
+  describe('extractCostUsd / resolveCostUsd', () => {
+    it('reads OpenRouter cost from response body usage', () => {
+      expect(
+        extractCostUsd({
+          responseBody: { usage: { prompt_tokens: 10, completion_tokens: 2, cost: 0.00042 } },
+        })
+      ).toBe(0.00042);
+    });
+
+    it('honours explicit costUsd override', () => {
+      expect(extractCostUsd({ usage: { costUsd: 0.01 }, responseBody: { usage: { cost: 9 } } })).toBe(0.01);
+    });
+
+    it('sums per-step response body costs', () => {
+      expect(
+        resolveCostUsd({
+          steps: [
+            { response: { body: { usage: { cost: 0.001 } } } },
+            { response: { body: { usage: { cost: 0.002 } } } },
+          ],
+        })
+      ).toBeCloseTo(0.003);
+    });
+
+    it('returns null when no cost is present', () => {
+      expect(extractCostUsd({})).toBeNull();
+      expect(resolveCostUsd({ usage: { promptTokens: 1 } as any, steps: [] })).toBeNull();
     });
   });
 });

@@ -104,4 +104,33 @@ describe('LLM trace logger — prompt-cache persistence', () => {
     expect(data.cached_prompt_tokens).toBeNull();
     expect(data.cache_creation_tokens).toBeNull();
   });
+
+  it('persists OpenRouter cost from response.body.usage.cost', async () => {
+    await llmTraceLogger.logTrace({
+      ...baseParams,
+      result: {
+        text: 'done',
+        usage: { promptTokens: 1000, completionTokens: 50 },
+        steps: [],
+        response: { body: { usage: { prompt_tokens: 1000, completion_tokens: 50, cost: 0.00123 } } },
+      },
+    });
+
+    const data = createMock.mock.calls[0][0].data;
+    expect(data.cost_usd).toBe(0.00123);
+  });
+
+  it('persists explicit costUsd override (batch path)', async () => {
+    await llmTraceLogger.logTrace({
+      ...baseParams,
+      result: {
+        text: 'done',
+        steps: [],
+        usage: { promptTokens: 500, completionTokens: 20, costUsd: 0.0045 },
+      },
+    });
+
+    const data = createMock.mock.calls[0][0].data;
+    expect(data.cost_usd).toBe(0.0045);
+  });
 });

@@ -64,6 +64,8 @@ interface TraceData {
   total_tokens?: number;
   cached_prompt_tokens?: number | null;
   cache_creation_tokens?: number | null;
+  /** Provider-reported USD cost (e.g. OpenRouter usage.cost). May arrive as string from Decimal. */
+  cost_usd?: number | string | null;
   steps_count?: number;
   tools_called?: string[];
   model_name?: string;
@@ -76,6 +78,12 @@ interface TraceData {
   feedback?: string;
   created_at: string;
   steps?: TraceStep[];
+}
+
+function parseCostUsd(value?: number | string | null): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 function formatDuration(ms?: number): string {
@@ -350,14 +358,16 @@ export const LLMTraceDetailPage: React.FC = () => {
     promptTokens > 0 && cachedPrompt > 0
       ? Math.round((100 * cachedPrompt) / promptTokens)
       : null;
+  const billedCost = parseCostUsd(trace.cost_usd);
   const isGeminiFlash = /gemini-3\.5-flash/i.test(trace.llm_model || "");
-  const costEstimate = isGeminiFlash
-    ? estimateGemini35FlashCost({
-        promptTokens: trace.prompt_tokens,
-        completionTokens: trace.completion_tokens,
-        cachedPromptTokens: trace.cached_prompt_tokens,
-      })
-    : null;
+  const costEstimate =
+    billedCost == null && isGeminiFlash
+      ? estimateGemini35FlashCost({
+          promptTokens: trace.prompt_tokens,
+          completionTokens: trace.completion_tokens,
+          cachedPromptTokens: trace.cached_prompt_tokens,
+        })
+      : null;
 
   return (
     <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
@@ -451,6 +461,14 @@ export const LLMTraceDetailPage: React.FC = () => {
                 )}
               </div>
             </DetailField>
+            {billedCost != null && (
+              <DetailField label="Cost">
+                <div className="space-y-0.5">
+                  <p className="font-medium tabular-nums">{formatUsd(billedCost)}</p>
+                  <p className="text-xs text-muted-foreground">Provider-reported</p>
+                </div>
+              </DetailField>
+            )}
             {costEstimate && costEstimate.savings > 0 && (
               <DetailField label="Est. cost (OpenRouter)">
                 <div className="space-y-0.5">
