@@ -526,6 +526,63 @@ export interface HistoricalMapping {
   counterAccountId: string;
   counterAccountName: string;
   classification: string;
+  /** Original AI/manual categorization reasoning from the source posting notes, if any. */
+  sourceReasoning: string | null;
+}
+
+/** Prefix applied to historical-match reasoning (idempotent — not re-added if already present). */
+export const HISTORICAL_MATCH_REASONING_PREFIX = 'Historical match: ';
+
+const AI_CLASSIFICATION_MARKER = '--- AI classification';
+
+/**
+ * Pull categorization reasoning from posting.notes (AI classification block, "AI:" line,
+ * or a short single-line note). Returns null when nothing usable is found.
+ */
+export function extractCategorizationReasoningFromNotes(
+  notes: string | null | undefined
+): string | null {
+  if (!notes?.trim()) return null;
+  const text = notes.trim();
+
+  const markerIdx = text.indexOf(AI_CLASSIFICATION_MARKER);
+  const searchIn = markerIdx >= 0 ? text.slice(markerIdx) : text;
+
+  const catMatch = searchIn.match(/Categorization:\s*(.+?)(?:\n|$)/i);
+  if (catMatch) {
+    const cat = catMatch[1].trim();
+    if (cat && cat !== '—' && cat !== '-') return cat;
+  }
+
+  const aiLine = text.match(/(?:^|\n)AI:\s*(.+?)(?:\n|$)/i);
+  if (aiLine?.[1]?.trim()) return aiLine[1].trim();
+
+  if (text.toLowerCase().startsWith(HISTORICAL_MATCH_REASONING_PREFIX.toLowerCase())) {
+    return text;
+  }
+
+  // Import path may write reasoning alone when notes were empty
+  if (!text.includes('\n') && text.length <= 500 && !text.startsWith('---')) {
+    return text;
+  }
+
+  return null;
+}
+
+/**
+ * Build reasoning for a historically matched posting.
+ * Copies source reasoning when present; always ensures a single "Historical match: " prefix.
+ */
+export function formatHistoricalMatchReasoning(
+  sourceReasoning: string | null | undefined,
+  descriptionNormalized: string
+): string {
+  const prefix = HISTORICAL_MATCH_REASONING_PREFIX;
+  const body = (sourceReasoning?.trim() || `similar to "${descriptionNormalized}"`);
+  if (body.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return body;
+  }
+  return prefix + body;
 }
 
 /**
@@ -672,6 +729,7 @@ export async function fetchHistoricalMappings(orgId: string): Promise<Historical
     },
     select: {
       description: true,
+      notes: true,
       account_id: true,
       credit_account_id: true,
       created_at: true,
@@ -714,6 +772,7 @@ export async function fetchHistoricalMappings(orgId: string): Promise<Historical
       counterAccountId: counterAccount.id,
       counterAccountName: counterAccount.name ?? '',
       classification: counterAccount.classification ?? '',
+      sourceReasoning: extractCategorizationReasoningFromNotes(posting.notes),
       createdAt: posting.created_at,
       aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
     };
@@ -736,11 +795,18 @@ export async function fetchHistoricalMappings(orgId: string): Promise<Historical
   }
 
   const mappings = Array.from(byNormalized.values()).map(
-    ({ descriptionNormalized, counterAccountId, counterAccountName, classification }) => ({
+    ({
       descriptionNormalized,
       counterAccountId,
       counterAccountName,
       classification,
+      sourceReasoning,
+    }) => ({
+      descriptionNormalized,
+      counterAccountId,
+      counterAccountName,
+      classification,
+      sourceReasoning,
     })
   );
 

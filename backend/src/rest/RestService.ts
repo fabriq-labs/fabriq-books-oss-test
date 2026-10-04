@@ -83,7 +83,7 @@ export class RestService {
       const finalViewName = viewName || viewId;
 
       // Build query options using SearchQueryBuilder
-      const queryOptions = SearchQueryBuilder.buildQueryOptions(req.query);
+      const queryOptions = SearchQueryBuilder.buildQueryOptions(req.query, modelName);
       // Add default sorting by createdAt if it exists and no sort is specified
       if (!queryOptions.orderBy) {
         if (this.getPermissionForField(context, modelName, 'created_at')) {

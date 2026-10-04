@@ -21,6 +21,8 @@ import {
   resolveUseHistoricalMatching,
   findFuzzyMatch,
   fetchHistoricalMappings,
+  extractCategorizationReasoningFromNotes,
+  formatHistoricalMatchReasoning,
   HistoricalMapping,
 } from '../handlers/erp/utils/categorizationUtils';
 import { BankStatementWithCategorizationExtractor } from '../../lib/extractors/bank-statement-with-categorization-extractor';
@@ -86,6 +88,7 @@ async function createFixtures() {
   await prisma.posting.create({ data: {
     id: 'post_hist_1_v2', org_id: ORG,
     description: 'Swiggy',
+    notes: '--- AI classification (2026-01-10 12:00:00) ---\nCategorization: Food delivery from Swiggy app\n\nReconciliation: Skipped (outgoing/expense).',
     account_id: ACCT.expMeals, credit_account_id: ACCT.bankHdfc,
     amount: -450, ai_cat_score: null,
     created_at: new Date('2026-01-10'),
@@ -97,6 +100,7 @@ async function createFixtures() {
   await prisma.posting.create({ data: {
     id: 'post_hist_2_v2', org_id: ORG,
     description: 'Uber India',
+    notes: 'Historical match: Ride-hailing expense from prior Uber posting',
     account_id: ACCT.expTravel, credit_account_id: ACCT.bankHdfc,
     amount: -320, ai_cat_score: 0.91,
     created_at: new Date('2026-01-15'),
@@ -315,6 +319,40 @@ describe('normalizeDescription', () => {
   });
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Historical match reasoning helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('historical match reasoning helpers', () => {
+  it('extracts Categorization line from AI classification block', () => {
+    const notes =
+      'Statement junk\n\n--- AI classification (2026-01-10 12:00:00) ---\nCategorization: Fuel at Circle K\n\nReconciliation: Skipped (outgoing/expense).';
+    expect(extractCategorizationReasoningFromNotes(notes)).toBe('Fuel at Circle K');
+  });
+
+  it('extracts AI: line and single-line notes', () => {
+    expect(extractCategorizationReasoningFromNotes('AI: Office supplies from Amazon')).toBe(
+      'Office supplies from Amazon'
+    );
+    expect(extractCategorizationReasoningFromNotes('Simple one-line reasoning')).toBe(
+      'Simple one-line reasoning'
+    );
+  });
+
+  it('formatHistoricalMatchReasoning prefixes once only', () => {
+    expect(formatHistoricalMatchReasoning('Fuel at Circle K', 'circle k')).toBe(
+      'Historical match: Fuel at Circle K'
+    );
+    expect(
+      formatHistoricalMatchReasoning('Historical match: Fuel at Circle K', 'circle k')
+    ).toBe('Historical match: Fuel at Circle K');
+    expect(formatHistoricalMatchReasoning(null, 'circle k')).toBe(
+      'Historical match: similar to "circle k"'
+    );
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // T9–T14: findFuzzyMatch
 // ─────────────────────────────────────────────────────────────────────────────
@@ -325,18 +363,21 @@ describe('findFuzzyMatch', () => {
     counterAccountId: ACCT.expMeals,
     counterAccountName: 'Meals & Entertainment',
     classification: 'Expense',
+    sourceReasoning: null,
   };
   const zomatoMapping: HistoricalMapping = {
     descriptionNormalized: 'zomato food delivery',
     counterAccountId: ACCT.expMeals,
     counterAccountName: 'Meals & Entertainment',
     classification: 'Expense',
+    sourceReasoning: null,
   };
   const amazonMapping: HistoricalMapping = {
     descriptionNormalized: 'amazon in',
     counterAccountId: ACCT.expOffice,
     counterAccountName: 'Office Supplies',
     classification: 'Expense',
+    sourceReasoning: null,
   };
 
   // T9: exact normalized match
@@ -428,8 +469,8 @@ describe('fetchHistoricalMappings + batch handler', () => {
     expect(mappings).toHaveLength(0);
   });
 
-  // T19: historical match bypasses LLM, sets confidence high + "Historical match" in reasoning (AC-A1)
-  it('T19 historical match bypasses LLM, returns high confidence with Historical match reasoning (AC-A1)', async () => {
+  // T19: historical match bypasses LLM, sets confidence high + copies source AI reasoning (AC-A1)
+  it('T19 historical match bypasses LLM, returns high confidence with copied source reasoning (AC-A1)', async () => {
     const result = await categorizeTransactionBatchHandler.execute(
       null as any,
       {
@@ -443,8 +484,30 @@ describe('fetchHistoricalMappings + batch handler', () => {
     expect(result.success).toBe(true);
     const prediction = result.data!.results[0];
     expect(prediction.confidence).toBe('high');
-    expect(prediction.reasoning).toMatch(/historical match/i);
+    expect(prediction.reasoning).toBe(
+      'Historical match: Food delivery from Swiggy app'
+    );
     expect(mockGenerateObject).not.toHaveBeenCalled();
+  });
+
+  it('T19b historical match does not double-prefix when source reasoning already prefixed', async () => {
+    const result = await categorizeTransactionBatchHandler.execute(
+      null as any,
+      {
+        posting_ids: ['post_new_2_v2'],
+        options: { dry_run: true, use_historical_matching: true },
+      },
+      undefined,
+      mockAuth
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data!.results[0].reasoning).toBe(
+      'Historical match: Ride-hailing expense from prior Uber posting'
+    );
+    expect(result.data!.results[0].reasoning).not.toMatch(
+      /Historical match: Historical match:/i
+    );
   });
 
   // T20: 3 historical matches + 1 already-categorized + 2 no-match-to-LLM (different directions)

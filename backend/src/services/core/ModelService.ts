@@ -267,7 +267,7 @@ export class ModelService {
       if (queryForBuilder.select && typeof queryForBuilder.select === 'object' && !Array.isArray(queryForBuilder.select)) {
         delete queryForBuilder.select;
       }
-      const optionsFromQuery = SearchQueryBuilder.buildQueryOptions(queryForBuilder);
+      const optionsFromQuery = SearchQueryBuilder.buildQueryOptions(queryForBuilder, modelName);
       if (select) {
         optionsFromQuery.select = select;
       }

@@ -27,6 +27,7 @@ import {
   mapConfidenceLevel,
   buildBulkPrompt,
   buildBulkSystemPrompt,
+  formatHistoricalMatchReasoning,
   updatePostingWithCategorization,
   resolveUseHistoricalMatching,
   validateAccount,
@@ -500,7 +501,10 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
               predicted_account_name: match.counterAccountName,
               confidence: mapConfidenceLevel(confidenceScore),
               confidence_score: confidenceScore,
-              reasoning: `Historical match: similar to "${match.descriptionNormalized}"`,
+              reasoning: formatHistoricalMatchReasoning(
+                match.sourceReasoning,
+                match.descriptionNormalized
+              ),
               applied,
               skipped_reason: !meetsThreshold ? `Confidence below threshold` : undefined,
             });

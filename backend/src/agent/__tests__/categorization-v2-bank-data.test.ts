@@ -10,11 +10,11 @@ import { normalizeDescription, findFuzzyMatch, HistoricalMapping } from '../hand
 
 // Shared corpus entries that real descriptions should match
 const CORPUS: HistoricalMapping[] = [
-  { descriptionNormalized: 'swiggy',              counterAccountId: 'exp_meals',   counterAccountName: 'Meals & Entertainment', classification: 'Expense' },
-  { descriptionNormalized: 'zomato',               counterAccountId: 'exp_meals',   counterAccountName: 'Meals & Entertainment', classification: 'Expense' },
-  { descriptionNormalized: 'amazon in',            counterAccountId: 'exp_office',  counterAccountName: 'Office Supplies',       classification: 'Expense' },
-  { descriptionNormalized: 'ola cabs',             counterAccountId: 'exp_travel',  counterAccountName: 'Travel Expenses',       classification: 'Expense' },
-  { descriptionNormalized: 'home loan emi',        counterAccountId: 'liab_loan',   counterAccountName: 'Home Loan',             classification: 'Liabilities' },
+  { descriptionNormalized: 'swiggy',              counterAccountId: 'exp_meals',   counterAccountName: 'Meals & Entertainment', classification: 'Expense' , sourceReasoning: null },
+  { descriptionNormalized: 'zomato',               counterAccountId: 'exp_meals',   counterAccountName: 'Meals & Entertainment', classification: 'Expense' , sourceReasoning: null },
+  { descriptionNormalized: 'amazon in',            counterAccountId: 'exp_office',  counterAccountName: 'Office Supplies',       classification: 'Expense' , sourceReasoning: null },
+  { descriptionNormalized: 'ola cabs',             counterAccountId: 'exp_travel',  counterAccountName: 'Travel Expenses',       classification: 'Expense' , sourceReasoning: null },
+  { descriptionNormalized: 'home loan emi',        counterAccountId: 'liab_loan',   counterAccountName: 'Home Loan',             classification: 'Liabilities' , sourceReasoning: null },
 ];
 
 // ─── ICICI Savings Account ────────────────────────────────────────────────────
@@ -101,12 +101,14 @@ describe('US debit card — normalizeDescription', () => {
         counterAccountId: 'exp_operating',
         counterAccountName: 'Operating Expenses',
         classification: 'Expense',
+        sourceReasoning: null,
       },
       {
         descriptionNormalized: 'office depot',
         counterAccountId: 'exp_office',
         counterAccountName: 'Office Supplies',
         classification: 'Expense',
+        sourceReasoning: null,
       },
     ]);
     expect(match).not.toBeNull();
