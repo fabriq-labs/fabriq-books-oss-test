@@ -339,15 +339,36 @@ export function FilterModal({ isOpen, onClose, onApplyFilters, initialFilters, m
                                         )}
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
+                                <PopoverContent className="w-auto p-0 overflow-hidden" align="start">
+                                    <div className="border-b border-[#E5DEFF] bg-[#FBF8FE] px-3 py-2">
+                                        <p className="text-[11px] font-medium uppercase tracking-wide text-[#8b7aa0]">
+                                            Date range
+                                        </p>
+                                        <p className="mt-0.5 text-sm text-[#374151]">
+                                            {dateRange?.from
+                                                ? `${format(dateRange.from, "dd MMM yyyy")}${
+                                                    dateRange.to
+                                                      ? ` → ${format(dateRange.to, "dd MMM yyyy")}`
+                                                      : " → …"
+                                                  }`
+                                                : "Pick a start and end date"}
+                                        </p>
+                                    </div>
                                     <Calendar
                                         initialFocus
                                         mode="range"
-                                        defaultMonth={dateRange?.from}
-                                        selected={{ from: dateRange?.from, to: dateRange?.to }}
-                                        onSelect={(range) => setDateRange?.({ from: range?.from, to: range?.to })}
+                                        defaultMonth={dateRange?.from ?? undefined}
+                                        selected={{ from: dateRange?.from ?? undefined, to: dateRange?.to ?? undefined }}
+                                        onSelect={(range) => setDateRange?.({ from: range?.from ?? null, to: range?.to ?? null })}
                                         numberOfMonths={2}
-                                        className="p-3 pointer-events-auto"
+                                        captionLayout="dropdown-buttons"
+                                        fromYear={2000}
+                                        toYear={new Date().getFullYear() + 2}
+                                        className="pointer-events-auto"
+                                        classNames={{
+                                            caption_label:
+                                                "inline-flex items-center rounded-md border border-[#E5DEFF] bg-white px-2 py-1 text-sm font-medium text-[#374151]",
+                                        }}
                                     />
                                 </PopoverContent>
                             </Popover>

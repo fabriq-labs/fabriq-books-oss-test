@@ -7,6 +7,16 @@ import { buttonVariants } from "@/components/ui/button";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
+/**
+ * Shared calendar (react-day-picker v8).
+ *
+ * For month/year dropdowns (`captionLayout="dropdown" | "dropdown-buttons"`),
+ * DayPicker expects:
+ * - `vhidden` for accessibility-only labels ("Month:", "Year:", screen-reader caption)
+ * - a transparent overlay `select` over a visible `caption_label` (selected value + chevron)
+ *
+ * Without `vhidden`, those labels leak into the UI (the broken "Month: October October" look).
+ */
 function Calendar({
   className,
   classNames,
@@ -20,8 +30,18 @@ function Calendar({
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
+        caption: "flex justify-center pt-1 relative items-center px-8",
+        // Visible value inside each month/year control (select is the invisible overlay).
+        caption_label: "inline-flex items-center text-sm font-medium",
+        caption_dropdowns: "flex items-center justify-center gap-1.5",
+        dropdown_month: "relative inline-flex items-center",
+        dropdown_year: "relative inline-flex items-center",
+        // Native <select> sits on top of the visible label; keep it invisible but clickable.
+        dropdown:
+          "absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 appearance-none",
+        dropdown_icon: "ml-0.5 h-3.5 w-3.5 shrink-0 opacity-50",
+        // Critical: DayPicker puts "Month:", "Year:", and the SR caption here.
+        vhidden: "sr-only",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
