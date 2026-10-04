@@ -155,7 +155,7 @@ Use this to discover what expense categories apply before queuing approval actio
             dry_run: true,
             skip_already_categorized: true,
             min_confidence: 'low', // Return all predictions; agent/user decides threshold
-            use_historical_matching: true,
+            // use_historical_matching omitted → CATEGORIZE_USE_HISTORICAL_MATCHING env (default true)
           },
         },
         {},

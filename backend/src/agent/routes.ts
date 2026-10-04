@@ -611,7 +611,10 @@ export function createAgentRouter() {
    * Reconcile one or more transactions (categorize + suggest confirm)
    * POST /api/agent/erp/reconcile-transaction
    *
-   * Body: { posting_ids: string[] }
+   * Body: {
+   *   posting_ids: string[],
+   *   use_historical_matching?: boolean  // optional; overrides CATEGORIZE_USE_HISTORICAL_MATCHING
+   * }
    *
    * Returns an array of results. Each entry contains the updated posting model
    * plus reconciliation suggestions (best match + alternatives).
@@ -624,7 +627,7 @@ export function createAgentRouter() {
         return res.status(401).json({ error: 'Unauthorized: Missing auth context' });
       }
 
-      const { posting_ids } = req.body;
+      const { posting_ids, use_historical_matching } = req.body;
       if (!posting_ids || !Array.isArray(posting_ids) || posting_ids.length === 0) {
         return res.status(400).json({
           success: false,
@@ -640,6 +643,13 @@ export function createAgentRouter() {
         });
       }
 
+      if (use_historical_matching !== undefined && typeof use_historical_matching !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          error: 'use_historical_matching must be a boolean when provided',
+        });
+      }
+
       const auth: AuthContext = {
         user: req.context.auth.user,
         permissions: req.context.auth.permissions,
@@ -651,6 +661,7 @@ export function createAgentRouter() {
         orgId,
         postingIds: posting_ids,
         count: posting_ids.length,
+        use_historical_matching,
       });
 
       // Verify all postings exist and belong to org
@@ -669,7 +680,9 @@ export function createAgentRouter() {
       }
 
       // Run the full pipeline (categorize + reconcile) for all postings
-      const scorecard = await reconcileImportedPostings(posting_ids, auth);
+      const scorecard = await reconcileImportedPostings(posting_ids, auth, {
+        use_historical_matching,
+      });
 
       // Build a lookup from pipeline results
       const pipelineResultMap = new Map(

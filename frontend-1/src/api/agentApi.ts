@@ -310,7 +310,11 @@ export const agentAPI = {
       body: JSON.stringify(params),
     }),
 
-  reconcileTransaction: async (params: { posting_ids: string[] }) =>
+  reconcileTransaction: async (params: {
+    posting_ids: string[];
+    /** Optional; when set, overrides CATEGORIZE_USE_HISTORICAL_MATCHING for this run. */
+    use_historical_matching?: boolean;
+  }) =>
     fetchAPI<{
       success: boolean;
       data?: {

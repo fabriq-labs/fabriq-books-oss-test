@@ -136,14 +136,22 @@ function buildNotesWithAiBlock(
 // Pipeline
 // ---------------------------------------------------------------------------
 
+export interface ReconcileImportedPostingsOptions {
+  /** When set, overrides CATEGORIZE_USE_HISTORICAL_MATCHING for this run. */
+  use_historical_matching?: boolean;
+}
+
 export async function reconcileImportedPostings(
   postingIds: string[],
-  auth: AuthContext
+  auth: AuthContext,
+  options?: ReconcileImportedPostingsOptions
 ): Promise<PipelineScorecard> {
   const orgId = auth.user?.org_id;
   if (!orgId) throw new Error('org_id is required in auth context');
 
-  logger.info(`[reconciliation-pipeline] Starting for ${postingIds.length} postings`);
+  logger.info(`[reconciliation-pipeline] Starting for ${postingIds.length} postings`, {
+    use_historical_matching: options?.use_historical_matching,
+  });
 
   // -----------------------------------------------------------------------
   // Phase 1: Batch categorization
@@ -158,7 +166,7 @@ export async function reconcileImportedPostings(
         skip_already_categorized: false,
         min_confidence: 'low' as any,
         dry_run: false,
-        use_historical_matching: true,
+        use_historical_matching: options?.use_historical_matching,
       },
     },
     undefined,

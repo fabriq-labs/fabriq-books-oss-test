@@ -18,6 +18,7 @@
 import prisma from '../../lib/prisma';
 import {
   normalizeDescription,
+  resolveUseHistoricalMatching,
   findFuzzyMatch,
   fetchHistoricalMappings,
   HistoricalMapping,
@@ -256,6 +257,30 @@ describe('normalizeDescription', () => {
   // T8: null input returns empty string
   it('T8 null input returns empty string', () => {
     expect(normalizeDescription(null)).toBe('');
+  });
+
+  describe('resolveUseHistoricalMatching', () => {
+    const original = process.env.CATEGORIZE_USE_HISTORICAL_MATCHING;
+    afterEach(() => {
+      if (original === undefined) delete process.env.CATEGORIZE_USE_HISTORICAL_MATCHING;
+      else process.env.CATEGORIZE_USE_HISTORICAL_MATCHING = original;
+    });
+
+    it('defaults to true when env is unset; false only when env is "false"', () => {
+      delete process.env.CATEGORIZE_USE_HISTORICAL_MATCHING;
+      expect(resolveUseHistoricalMatching()).toBe(true);
+      process.env.CATEGORIZE_USE_HISTORICAL_MATCHING = 'true';
+      expect(resolveUseHistoricalMatching()).toBe(true);
+      process.env.CATEGORIZE_USE_HISTORICAL_MATCHING = 'false';
+      expect(resolveUseHistoricalMatching()).toBe(false);
+    });
+
+    it('lets an explicit caller override win over env', () => {
+      process.env.CATEGORIZE_USE_HISTORICAL_MATCHING = 'false';
+      expect(resolveUseHistoricalMatching(true)).toBe(true);
+      process.env.CATEGORIZE_USE_HISTORICAL_MATCHING = 'true';
+      expect(resolveUseHistoricalMatching(false)).toBe(false);
+    });
   });
 
   // T8b: US debit-card PIN layout — keep merchant, drop rail/date/city/card

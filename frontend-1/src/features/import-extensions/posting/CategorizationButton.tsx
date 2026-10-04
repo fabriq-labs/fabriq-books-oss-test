@@ -159,7 +159,7 @@ export function CategorizationButton({
         options: {
           dry_run: true, // Don't save, just predict
           min_confidence: 'low', // Return all predictions
-          use_historical_matching: true,
+          // omit use_historical_matching → backend CATEGORIZE_USE_HISTORICAL_MATCHING (default true)
         },
       });
 

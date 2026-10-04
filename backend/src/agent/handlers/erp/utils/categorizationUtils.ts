@@ -513,6 +513,11 @@ export const CATEGORIZATION_CONFIG = {
   HISTORICAL_MATCH_CONFIDENCE: 0.95,
 };
 
+/** Caller override wins; else env (default true unless CATEGORIZE_USE_HISTORICAL_MATCHING=false). */
+export function resolveUseHistoricalMatching(override?: boolean): boolean {
+  return override ?? process.env.CATEGORIZE_USE_HISTORICAL_MATCHING !== 'false';
+}
+
 /**
  * Historical mapping from past transactions
  */

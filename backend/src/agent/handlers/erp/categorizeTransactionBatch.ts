@@ -28,6 +28,7 @@ import {
   buildBulkPrompt,
   buildBulkSystemPrompt,
   updatePostingWithCategorization,
+  resolveUseHistoricalMatching,
   validateAccount,
   getAccountById,
   PostingForCategorization,
@@ -58,7 +59,8 @@ interface CategorizeTransactionBatchParams {
     skip_already_categorized?: boolean; // Skip if counter-account exists (default: true)
     min_confidence?: ConfidenceLevel; // Threshold to auto-apply (default: 'medium')
     dry_run?: boolean; // Return predictions without applying (default: false)
-    use_historical_matching?: boolean; // Use past transactions for matching (default: true)
+    /** Explicit override; otherwise CATEGORIZE_USE_HISTORICAL_MATCHING env (default true). */
+    use_historical_matching?: boolean;
   };
 }
 
@@ -290,12 +292,15 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
       throw new Error('postings array cannot be empty');
     }
 
-    // Set default options
+    // Set default options. Historical matching: explicit caller option overrides
+    // CATEGORIZE_USE_HISTORICAL_MATCHING env; unset env defaults to true.
     const options = {
       skip_already_categorized: params.options?.skip_already_categorized ?? true,
       min_confidence: params.options?.min_confidence ?? ('medium' as ConfidenceLevel),
       dry_run: params.options?.dry_run ?? false,
-      use_historical_matching: params.options?.use_historical_matching ?? true,
+      use_historical_matching: resolveUseHistoricalMatching(
+        params.options?.use_historical_matching
+      ),
     };
 
     return { ...params, options };
@@ -318,11 +323,16 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
       const orgId = auth.user.org_id;
       const userId = auth.user.id;
       const llmModel = getModelId('categorization');
+      // Explicit options.use_historical_matching overrides env; unset → env → default true.
+      // Resolve here too: some callers invoke execute() without validateParams().
+      const useHistoricalMatching = resolveUseHistoricalMatching(
+        params.options?.use_historical_matching
+      );
 
       logger.info('Starting optimized batch transaction categorization', {
         postingIdsCount: params.posting_ids?.length,
         postingsCount: params.postings?.length,
-        options: params.options,
+        options: { ...params.options, use_historical_matching: useHistoricalMatching },
         orgId,
       });
 
@@ -387,7 +397,7 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
 
       // Step 3: Fetch historical mappings (if enabled)
       let historicalMappings: HistoricalMapping[] = [];
-      if (params.options?.use_historical_matching !== false) {
+      if (useHistoricalMatching) {
         toolTracker.track('fetchHistoricalMappings', true);
         historicalMappings = await fetchHistoricalMappings(orgId);
         logger.warn('Historical mappings loaded', historicalMappings);
