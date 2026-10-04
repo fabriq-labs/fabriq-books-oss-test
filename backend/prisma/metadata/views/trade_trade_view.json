@@ -80,7 +80,9 @@
         "id": "read",
         "name": "read"
       },
-      "displayName": "Account"
+      "dataType": "table",
+      "displayName": "Account",
+      "isColumnShow": false
     },
     "quantity": {
       "orderNo": 6,
@@ -213,7 +215,9 @@
         "id": "read",
         "name": "read"
       },
-      "displayName": "Target Account"
+      "dataType": "table",
+      "displayName": "Target Account",
+      "isColumnShow": false
     },
     "target_account_id": {
       "datatype": "string",

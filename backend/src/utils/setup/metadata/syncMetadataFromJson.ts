@@ -4,7 +4,12 @@ import * as path from 'path';
 import { runSeedAgentModelToolsSql } from './seedAgentModelToolsSql';
 import { runSeedAgentTemplatesSql } from './seedAgentTemplatesSql';
 import { runSeedCurrenciesSql } from './seedCurrenciesSql';
-import { resolveSyncTargets, type SyncMetadataTarget } from './syncMetadataTargets';
+import {
+  parseViewNames,
+  resolveSyncTargets,
+  selectViewsByName,
+  type SyncMetadataTarget,
+} from './syncMetadataTargets';
 
 const prisma = new PrismaClient();
 
@@ -34,8 +39,14 @@ export interface SyncMetadataResult {
 
 export type { SyncMetadataTarget };
 
+export type SyncMetadataRequest = {
+  targets?: unknown;
+  /** View `name` values (for example `account_view`). Omit to sync every view JSON file. */
+  viewNames?: string[];
+};
+
 export async function main(
-  filterType?: 'view' | 'prompttemplate' | { targets?: unknown }
+  filterType?: 'view' | 'prompttemplate' | SyncMetadataRequest
 ): Promise<SyncMetadataResult> {
   const emptyCounts = (): SyncMetadataCounts => ({
     created: 0,
@@ -58,8 +69,15 @@ export async function main(
   try {
     const backendRoot = getBackendRootDir();
     const targets = resolveSyncTargets(filterType);
+    const viewNames =
+      filterType && typeof filterType === 'object' && filterType.viewNames != null
+        ? parseViewNames(filterType.viewNames)
+        : undefined;
     const shouldSyncViews = targets.includes('views');
     const shouldSyncTemplates = targets.includes('promptTemplates');
+    if (viewNames && !shouldSyncViews) {
+      throw new Error('viewNames requires the views target.');
+    }
 
     let viewsCreatedCount = 0;
     let viewsUpdatedCount = 0;
@@ -79,22 +97,37 @@ export async function main(
         const files = fs.readdirSync(viewsDir).filter((file) => file.endsWith('.json'));
 
         if (files.length > 0) {
-          console.log(`Found ${files.length} view files to sync`);
-          console.log('');
+          type ParsedViewFile = { file: string; name: string; viewData: any };
+          const parsed: ParsedViewFile[] = [];
 
           for (const file of files) {
             const filepath = path.join(viewsDir, file);
-
             try {
-              const fileContent = fs.readFileSync(filepath, 'utf-8');
-              const viewData = JSON.parse(fileContent);
-
+              const viewData = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
               if (!viewData.name || !viewData.model_name) {
-                console.log(`  ⚠️  Skipping ${file}: missing name or model_name`);
-                viewsErrorCount++;
+                if (!viewNames) {
+                  console.log(`  ⚠️  Skipping ${file}: missing name or model_name`);
+                  viewsErrorCount++;
+                }
                 continue;
               }
+              parsed.push({ file, name: viewData.name, viewData });
+            } catch (error) {
+              console.error(`  ❌ Error reading ${file}:`, error);
+              viewsErrorCount++;
+            }
+          }
 
+          const toSync = viewNames ? selectViewsByName(parsed, viewNames) : parsed;
+          if (viewNames) {
+            console.log(`Syncing ${toSync.length} selected view(s): ${viewNames.join(', ')}`);
+          } else {
+            console.log(`Found ${files.length} view files to sync`);
+          }
+          console.log('');
+
+          for (const { file, viewData } of toSync) {
+            try {
               let existingView: any = null;
               if (viewData.id) {
                 existingView = await prisma.view.findUnique({
@@ -143,9 +176,13 @@ export async function main(
               viewsErrorCount++;
             }
           }
+        } else if (viewNames) {
+          throw new Error(`Views not found in metadata JSON: ${viewNames.join(', ')}`);
         } else {
           console.log('  ⚠️  No view JSON files found');
         }
+      } else if (viewNames) {
+        throw new Error(`Views directory not found: ${viewsDir}`);
       } else {
         console.log('  ⚠️  Views directory not found, skipping...');
       }
