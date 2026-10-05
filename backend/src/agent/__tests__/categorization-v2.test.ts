@@ -1,12 +1,11 @@
 /**
  * Categorization V2 — Unit & Integration Tests
  *
- * 27 tests covering Feature A (smarter historical matching) and Feature B (per-account extraction hints).
+ * Tests covering Feature A (exact historical matching) and Feature B (per-account extraction hints).
  * Zero real LLM calls — generateObject is mocked throughout.
  *
  * Test structure:
  *   T1–T8   normalizeDescription (pure unit)
- *   T9–T14  findFuzzyMatch (pure unit)
  *   T15–T18 fetchHistoricalMappings (DB)
  *   T19–T23 categorizeTransactionBatchHandler (DB + mocked LLM)
  *   T24–T26 BankStatementWithCategorizationExtractor extraction hints (pure unit)
@@ -19,11 +18,9 @@ import prisma from '../../lib/prisma';
 import {
   normalizeDescription,
   resolveUseHistoricalMatching,
-  findFuzzyMatch,
   fetchHistoricalMappings,
   extractCategorizationReasoningFromNotes,
   formatHistoricalMatchReasoning,
-  HistoricalMapping,
 } from '../handlers/erp/utils/categorizationUtils';
 import { BankStatementWithCategorizationExtractor } from '../../lib/extractors/bank-statement-with-categorization-extractor';
 import { categorizeTransactionBatchHandler } from '../handlers/erp/categorizeTransactionBatch';
@@ -77,53 +74,50 @@ async function createFixtures() {
   });
 
   // ── Historical corpus (both sides filled — already categorized) ──────────────
-  //
-  // These use clean short descriptions as they would appear from a credit card
-  // statement import or manual entry. The normalization pipeline reduces these to
-  // 1-2 token vendor names, which then score 100 via token_set_ratio against the
-  // noisy UPI/NEFT/IMPS format descriptions that arrive in later imports.
+  // Exact match uses persisted merchant_key (not fuzzy normalize).
 
   // post_hist_1: manual entry, Swiggy food order → Meals & Entertainment
-  // Normalized corpus entry: "swiggy"
   await prisma.posting.create({ data: {
     id: 'post_hist_1_v2', org_id: ORG,
     description: 'Swiggy',
     notes: '--- AI classification (2026-01-10 12:00:00) ---\nCategorization: Food delivery from Swiggy app\n\nReconciliation: Skipped (outgoing/expense).',
     account_id: ACCT.expMeals, credit_account_id: ACCT.bankHdfc,
     amount: -450, ai_cat_score: null,
+    merchant_key: 'swiggy', merchant_key_provider: 'llm',
     created_at: new Date('2026-01-10'),
   }});
 
   // post_hist_2: AI-categorized + human-approved (ai_cat_score non-null) — T15 verifies corpus includes it
-  // Kotak CC statement format, Uber → Travel Expenses
-  // Normalized corpus entry: "uber india"
   await prisma.posting.create({ data: {
     id: 'post_hist_2_v2', org_id: ORG,
     description: 'Uber India',
     notes: 'Historical match: Ride-hailing expense from prior Uber posting',
     account_id: ACCT.expTravel, credit_account_id: ACCT.bankHdfc,
     amount: -320, ai_cat_score: 0.91,
+    merchant_key: 'uber india', merchant_key_provider: 'llm',
     created_at: new Date('2026-01-15'),
   }});
 
   // post_hist_3: OLDER Amazon → Travel Expenses (wrong category, later corrected)
-  // Both normalize to "amazon.in" — T17 verifies only the newer entry survives
   await prisma.posting.create({ data: {
     id: 'post_hist_3_v2', org_id: ORG,
     description: 'Amazon.in',
     account_id: ACCT.expTravel, credit_account_id: ACCT.bankHdfc,
     amount: -1200, ai_cat_score: null,
+    merchant_key: 'amazon.in', merchant_key_provider: 'llm',
     created_at: new Date('2026-01-05'),
+    modified_at: new Date('2026-01-05'),
   }});
 
-  // post_hist_4: NEWER Amazon → Office Supplies (user corrected it)
-  // Same description normalizes to same "amazon.in" — this entry should WIN (T17)
+  // post_hist_4: NEWER Amazon → Office Supplies (user corrected it) — T17 winner
   await prisma.posting.create({ data: {
     id: 'post_hist_4_v2', org_id: ORG,
     description: 'Amazon.in',
     account_id: ACCT.expOffice, credit_account_id: ACCT.bankHdfc,
     amount: -890, ai_cat_score: null,
+    merchant_key: 'amazon.in', merchant_key_provider: 'llm',
     created_at: new Date('2026-03-01'),
+    modified_at: new Date('2026-03-01'),
   }});
 
   // post_hist_5: ICICI→Kotak fund transfer (bank-to-bank) — T16 verifies excluded from corpus
@@ -132,47 +126,47 @@ async function createFixtures() {
     description: 'NEFT/TRF/KKBK12345678901234/ICICI CURRENT ACCOUNT',
     account_id: ACCT.bankIcici, credit_account_id: ACCT.bankHdfc,
     amount: -50000, ai_cat_score: null,
+    merchant_key: 'icici current account', merchant_key_provider: 'legacy_normalize',
     created_at: new Date('2026-02-01'),
   }});
 
   // post_hist_6: money_in — tenant rent via UPI → Rental Income
-  // Normalized corpus entry: "rental credit sharma"
   await prisma.posting.create({ data: {
     id: 'post_hist_6_v2', org_id: ORG,
     description: 'Rental Credit Sharma',
     account_id: ACCT.bankHdfc, credit_account_id: ACCT.incRental,
     amount: 25000, ai_cat_score: null,
+    merchant_key: 'rental credit sharma', merchant_key_provider: 'llm',
     created_at: new Date('2026-02-05'),
   }});
 
-  // ── New uncategorized postings (realistic bank format descriptions) ───────────
-  //
-  // These use real ICICI/Kotak UPI/IMPS/NEFT format strings as they appear in
-  // downloaded bank statements. After normalization, the vendor core matches the
-  // corpus entries above (score = 100 via token_set_ratio).
+  // ── New uncategorized postings — merchant_key set for exact hist hits ────────
 
-  // post_new_1: ICICI UPI debit — Swiggy, different reference → matches "swiggy" corpus (score 100)
+  // post_new_1: exact key "swiggy" → hist_1
   await prisma.posting.create({ data: {
     id: 'post_new_1_v2', org_id: ORG,
     description: 'UPI/DR/987654321098/SWIGGY TECHNOLOGIES/swiggy@axisbank',
     credit_account_id: ACCT.bankHdfc, account_id: null,
     amount: -520,
+    merchant_key: 'swiggy', merchant_key_provider: 'llm',
   }});
 
-  // post_new_2: ICICI IMPS — Uber, different operator → matches "uber india" corpus (score 100)
+  // post_new_2: exact key "uber india" → hist_2
   await prisma.posting.create({ data: {
     id: 'post_new_2_v2', org_id: ORG,
     description: 'MMT/IMPS/412345678901/UBER INDIA PVT LTD',
     credit_account_id: ACCT.bankHdfc, account_id: null,
     amount: -280,
+    merchant_key: 'uber india', merchant_key_provider: 'llm',
   }});
 
-  // post_new_3: Kotak UPI — Amazon, different ref → matches "amazon.in" corpus (newer = Office Supplies, score 100)
+  // post_new_3: exact key "amazon.in" → hist_4 (Office Supplies)
   await prisma.posting.create({ data: {
     id: 'post_new_3_v2', org_id: ORG,
     description: 'UPI/DR/500600700800/AMAZON.IN/amazonpay@icici',
     credit_account_id: ACCT.bankHdfc, account_id: null,
     amount: -1500,
+    merchant_key: 'amazon.in', merchant_key_provider: 'llm',
   }});
 
   // post_new_4: ICICI EBA — equity trade on ICICI Direct → no corpus match (score 39) → LLM
@@ -354,72 +348,6 @@ describe('historical match reasoning helpers', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T9–T14: findFuzzyMatch
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('findFuzzyMatch', () => {
-  const swiggyMapping: HistoricalMapping = {
-    descriptionNormalized: 'swiggy',
-    counterAccountId: ACCT.expMeals,
-    counterAccountName: 'Meals & Entertainment',
-    classification: 'Expense',
-    sourceReasoning: null,
-  };
-  const zomatoMapping: HistoricalMapping = {
-    descriptionNormalized: 'zomato food delivery',
-    counterAccountId: ACCT.expMeals,
-    counterAccountName: 'Meals & Entertainment',
-    classification: 'Expense',
-    sourceReasoning: null,
-  };
-  const amazonMapping: HistoricalMapping = {
-    descriptionNormalized: 'amazon in',
-    counterAccountId: ACCT.expOffice,
-    counterAccountName: 'Office Supplies',
-    classification: 'Expense',
-    sourceReasoning: null,
-  };
-
-  // T9: exact normalized match
-  it('T9 returns mapping on exact normalized match', () => {
-    const match = findFuzzyMatch('swiggy', [swiggyMapping]);
-    expect(match).not.toBeNull();
-    expect(match!.counterAccountId).toBe(ACCT.expMeals);
-  });
-
-  // T10: "swiggy technologies pvt ltd" matches "swiggy" at ≥ 0.80 (AC-A1, AC-A8)
-  it('T10 partial match swiggy technologies matches swiggy corpus entry (AC-A1, AC-A8)', () => {
-    const match = findFuzzyMatch('swiggy technologies pvt ltd', [swiggyMapping]);
-    expect(match).not.toBeNull();
-    expect(match!.counterAccountId).toBe(ACCT.expMeals);
-  });
-
-  // T11: low-similarity string returns null
-  it('T11 returns null when best score is below threshold', () => {
-    const match = findFuzzyMatch('completely unrelated payment xyz', [zomatoMapping]);
-    expect(match).toBeNull();
-  });
-
-  // T12: empty description string returns null
-  it('T12 returns null on empty description string', () => {
-    expect(findFuzzyMatch('', [swiggyMapping])).toBeNull();
-  });
-
-  // T13: empty corpus returns null
-  it('T13 returns null when corpus is empty', () => {
-    expect(findFuzzyMatch('swiggy technologies', [])).toBeNull();
-  });
-
-  // T14: picks highest-scoring match when multiple candidates
-  it('T14 picks highest-scoring match when multiple candidates exist', () => {
-    // "amazon in purchase" should score higher against amazonMapping than zomatoMapping
-    const match = findFuzzyMatch('amazon in purchase', [zomatoMapping, amazonMapping, swiggyMapping]);
-    expect(match).not.toBeNull();
-    expect(match!.counterAccountId).toBe(ACCT.expOffice);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // T15–T23: fetchHistoricalMappings + batch handler (DB + mocked LLM)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -517,7 +445,13 @@ describe('fetchHistoricalMappings + batch handler', () => {
     mockGenerateObject.mockResolvedValue({
       object: {
         categorizations: [
-          { index: 0, predicted_account_id: ACCT.expRent, confidence_score: 0.75, reasoning: 'mocked' },
+          {
+            index: 0,
+            predicted_account_id: ACCT.expRent,
+            confidence_score: 0.75,
+            reasoning: 'mocked',
+            merchant_key: 'icici direct',
+          },
         ],
       },
       usage: { promptTokens: 100, completionTokens: 50 },
@@ -550,7 +484,17 @@ describe('fetchHistoricalMappings + batch handler', () => {
   // T21: dry_run: true returns predictions without writing to DB
   it('T21 dry_run: true returns predictions without applying to DB', async () => {
     mockGenerateObject.mockResolvedValue({
-      object: { categorizations: [{ index: 0, predicted_account_id: ACCT.expMeals, confidence_score: 0.88, reasoning: 'mocked' }] },
+      object: {
+        categorizations: [
+          {
+            index: 0,
+            predicted_account_id: ACCT.expMeals,
+            confidence_score: 0.88,
+            reasoning: 'mocked',
+            merchant_key: 'swiggy',
+          },
+        ],
+      },
       usage: { promptTokens: 50, completionTokens: 20 },
     });
 
@@ -571,7 +515,17 @@ describe('fetchHistoricalMappings + batch handler', () => {
   it('T22 money_out batch — LLM prompt contains expense/liability accounts, not income accounts (AC-A10)', async () => {
     const buildBulkPromptSpy = jest.spyOn(categorizationUtils, 'buildBulkPrompt');
     mockGenerateObject.mockResolvedValue({
-      object: { categorizations: [{ index: 0, predicted_account_id: ACCT.expRent, confidence_score: 0.80, reasoning: 'mocked' }] },
+      object: {
+        categorizations: [
+          {
+            index: 0,
+            predicted_account_id: ACCT.expRent,
+            confidence_score: 0.80,
+            reasoning: 'mocked',
+            merchant_key: 'icici direct',
+          },
+        ],
+      },
       usage: { promptTokens: 50, completionTokens: 20 },
     });
 
@@ -596,7 +550,17 @@ describe('fetchHistoricalMappings + batch handler', () => {
   it('T23 money_in batch — LLM prompt contains income/asset accounts, not expense accounts (AC-A10)', async () => {
     const buildBulkPromptSpy = jest.spyOn(categorizationUtils, 'buildBulkPrompt');
     mockGenerateObject.mockResolvedValue({
-      object: { categorizations: [{ index: 0, predicted_account_id: ACCT.incInterest, confidence_score: 0.80, reasoning: 'mocked' }] },
+      object: {
+        categorizations: [
+          {
+            index: 0,
+            predicted_account_id: ACCT.incInterest,
+            confidence_score: 0.80,
+            reasoning: 'mocked',
+            merchant_key: 'interest',
+          },
+        ],
+      },
       usage: { promptTokens: 50, completionTokens: 20 },
     });
 

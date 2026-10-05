@@ -19,9 +19,7 @@ import { llmTraceLogger } from '../../../lib/llm-trace-logger';
 import {
   fetchAccountsForCategorization,
   fetchPostingsByIds,
-  fetchHistoricalMappings,
-  findFuzzyMatch,
-  normalizeDescription,
+  findExactHistoricalMatches,
   determineTransactionDirection,
   getFieldToUpdate,
   mapConfidenceLevel,
@@ -30,15 +28,21 @@ import {
   formatHistoricalMatchReasoning,
   updatePostingWithCategorization,
   resolveUseHistoricalMatching,
+  resolveEntityForIdentity,
   validateAccount,
   getAccountById,
   PostingForCategorization,
   AccountsGrouped,
   ConfidenceLevel,
-  HistoricalMapping,
   BulkCategorizationItem,
+  HistoricalMapping,
   CATEGORIZATION_CONFIG,
 } from './utils/categorizationUtils';
+import {
+  resolveIdentityEnricher,
+  toMerchantKey,
+  type MerchantKeyProvider,
+} from '../../../services/transaction-identity';
 
 /**
  * Input parameters for batch transaction categorization
@@ -78,6 +82,9 @@ interface BatchPostingResult {
   applied: boolean;
   skipped_reason?: string;
   error?: string;
+  /** Persisted / proposed merchant key (debug / dry-run). */
+  merchant_key?: string;
+  merchant_key_provider?: MerchantKeyProvider | string;
 }
 
 /**
@@ -116,6 +123,13 @@ const bulkCategorizationSchema = z.object({
       predicted_account_id: z.string().describe('The ID of the predicted account'),
       confidence_score: z.number().min(0).max(1).describe('Confidence score from 0.0 to 1.0'),
       reasoning: z.string().describe('Brief explanation of why this account was chosen'),
+      merchant_key: z
+        .string()
+        .optional()
+        .default('')
+        .describe(
+          'Shortest stable lowercase brand core (e.g. "soul fish", "marathon"). Expand truncations; drop cafe/restaurant/#n; never city-only.'
+        ),
     })
   ),
 });
@@ -230,6 +244,7 @@ async function bulkCategorizeWithLLM(
           predicted_account_id: cat.predicted_account_id,
           confidence_score: cat.confidence_score,
           reasoning: cat.reasoning,
+          merchant_key: toMerchantKey(cat.merchant_key),
         });
       }
 
@@ -396,12 +411,98 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
         throw new Error('No accounts available for categorization');
       }
 
-      // Step 3: Fetch historical mappings (if enabled)
-      let historicalMappings: HistoricalMapping[] = [];
+      // Step 2b: Resolve merchant keys (only when historical matching is on)
+      // Prefer persisted posting.merchant_key; enrich only unkeyed rows (Plaid/Legacy).
+      type ResolvedIdentity = {
+        merchantKey: string;
+        provider: MerchantKeyProvider;
+      };
+      const identityByPostingId = new Map<string, ResolvedIdentity>();
+
       if (useHistoricalMatching) {
-        toolTracker.track('fetchHistoricalMappings', true);
-        historicalMappings = await fetchHistoricalMappings(orgId);
-        logger.warn('Historical mappings loaded', historicalMappings);
+        const entityIdentity = await resolveEntityForIdentity(orgId);
+        const enrichCtx = {
+          orgId,
+          userId,
+          legalEntityId: entityIdentity.legalEntityId,
+          country: entityIdentity.country,
+          accountType: 'depository' as const,
+        };
+        const identityEnricher = resolveIdentityEnricher(enrichCtx);
+        toolTracker.track(`identityEnricher:${identityEnricher.id}`, true);
+
+        const needsEnrich: PostingForCategorization[] = [];
+        for (const p of postings) {
+          const stored = toMerchantKey(p.merchantKey);
+          if (stored) {
+            identityByPostingId.set(p.id, {
+              merchantKey: stored,
+              provider: (p.merchantKeyProvider as MerchantKeyProvider) || 'legacy_normalize',
+            });
+          } else {
+            needsEnrich.push(p);
+          }
+        }
+
+        if (needsEnrich.length > 0) {
+          const enriched = await identityEnricher.enrichBatch(
+            needsEnrich.map((p) => {
+              let direction: 'INFLOW' | 'OUTFLOW' = 'OUTFLOW';
+              try {
+                const d = determineTransactionDirection(
+                  p.amount,
+                  p.accountType,
+                  p.creditAccountType
+                );
+                direction = d === 'money_in' ? 'INFLOW' : 'OUTFLOW';
+              } catch {
+                direction = p.amount >= 0 ? 'INFLOW' : 'OUTFLOW';
+              }
+              return {
+                id: p.id,
+                description: p.description,
+                amount: Math.abs(p.amount),
+                direction,
+                currency: 'USD',
+              };
+            }),
+            enrichCtx
+          );
+          for (const [id, identity] of enriched) {
+            if (!identity.merchantKey) continue;
+            identityByPostingId.set(id, {
+              merchantKey: identity.merchantKey,
+              provider: identity.provider,
+            });
+          }
+        }
+
+        logger.info('Identity enrichment complete', {
+          orgId,
+          provider: identityEnricher.id,
+          country: entityIdentity.country,
+          storedKeys: postings.length - needsEnrich.length,
+          enrichedKeys: needsEnrich.length,
+          resolved: identityByPostingId.size,
+        });
+      } else {
+        logger.info('Historical matching off — skipping identity enrich (LLM will supply merchant_key)', {
+          orgId,
+          count: postings.length,
+        });
+      }
+
+      // Step 3: Exact SQL historical match for resolved keys (no fuzzy)
+      let exactMatches = new Map<string, HistoricalMapping>();
+      if (useHistoricalMatching && identityByPostingId.size > 0) {
+        toolTracker.track('findExactHistoricalMatches', true);
+        const keys = [...identityByPostingId.values()].map((v) => v.merchantKey);
+        exactMatches = await findExactHistoricalMatches(orgId, keys);
+        logger.info('Exact historical matches loaded', {
+          orgId,
+          queryKeys: keys.length,
+          hits: exactMatches.size,
+        });
       }
 
       // Step 4: Process postings - separate into categories
@@ -411,8 +512,8 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
 
       for (let i = 0; i < postings.length; i++) {
         const posting = postings[i];
-        const normalizedDescription = normalizeDescription(posting.description);
-
+        const identity = identityByPostingId.get(posting.id);
+        const merchantKey = identity?.merchantKey ?? '';
 
         // Check if already categorized
         let postingAlreadyCategorized = false;
@@ -448,35 +549,29 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
             reasoning: null,
             applied: false,
             skipped_reason: 'Already categorized',
+            merchant_key: merchantKey || undefined,
+            merchant_key_provider: identity?.provider,
           });
           continue;
         }
 
-        // Try historical matching
-        if (historicalMappings.length > 0 && posting.description) {
-          logger.debug('Step 4: attempting historical match', {
-            postingId: posting.id,
-            index: i,
-            normalizedDescription,
-            historicalCorpusSize: historicalMappings.length,
-          });
-          const match = findFuzzyMatch(posting.description, historicalMappings);
+        // Exact historical match only
+        if (useHistoricalMatching && merchantKey) {
+          const match = exactMatches.get(merchantKey);
           if (match) {
-            logger.debug('Step 4: historical match found', {
+            logger.debug('Step 4: exact historical match found', {
               postingId: posting.id,
               index: i,
-              normalizedDescription,
-              matchedDescription: match.descriptionNormalized,
+              merchantKey,
               matchedAccountId: match.counterAccountId,
               matchedAccountName: match.counterAccountName,
-              matchedClassification: match.classification,
             });
             const direction = determineTransactionDirection(
-            posting.amount,
-            posting.accountType,
-            posting.creditAccountType,
-            { strict: true }
-          );
+              posting.amount,
+              posting.accountType,
+              posting.creditAccountType,
+              { strict: true }
+            );
             const fieldToUpdate = getFieldToUpdate(direction);
             const confidenceScore = CATEGORIZATION_CONFIG.HISTORICAL_MATCH_CONFIDENCE;
             const minScore = getMinConfidenceScore(params.options?.min_confidence ?? 'medium');
@@ -490,7 +585,11 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
                 match.counterAccountId,
                 confidenceScore,
                 fieldToUpdate,
-                userId
+                userId,
+                {
+                  merchantKey,
+                  merchantKeyProvider: identity?.provider,
+                }
               );
               applied = true;
             }
@@ -503,27 +602,30 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
               confidence_score: confidenceScore,
               reasoning: formatHistoricalMatchReasoning(
                 match.sourceReasoning,
-                match.descriptionNormalized
+                match.merchantKey || match.descriptionNormalized
               ),
               applied,
               skipped_reason: !meetsThreshold ? `Confidence below threshold` : undefined,
+              merchant_key: merchantKey,
+              merchant_key_provider: identity?.provider,
             });
             historicalMatchCount++;
             continue;
           }
 
-          logger.debug('Step 4: no historical match found, queuing for LLM', {
+          logger.debug('Step 4: no exact historical match, queuing for LLM', {
             postingId: posting.id,
             index: i,
-            normalizedDescription,
+            merchantKey,
           });
         } else {
           logger.debug('Step 4: historical match skipped', {
             postingId: posting.id,
             index: i,
-            reason: historicalMappings.length === 0 ? 'empty_historical_corpus' : 'missing_description',
-            hasDescription: !!posting.description,
-            historicalCorpusSize: historicalMappings.length,
+            reason: !useHistoricalMatching
+              ? 'historical_matching_disabled'
+              : 'missing_merchant_key',
+            merchantKey,
           });
         }
 
@@ -534,7 +636,6 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
           index: i,
           llmQueueSize: postingsNeedingLLM.length,
         });
-        // Add placeholder to maintain order
         results.push({
           posting_id: posting.id,
           predicted_account_id: null,
@@ -543,6 +644,8 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
           confidence_score: null,
           reasoning: null,
           applied: false,
+          merchant_key: merchantKey || undefined,
+          merchant_key_provider: identity?.provider,
         });
       }
 
@@ -647,6 +750,7 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
               const meetsThreshold = llmResult.confidence_score >= minScore;
               const shouldApply = !params.options?.dry_run && meetsThreshold;
 
+              const llmMerchantKey = toMerchantKey(llmResult.merchant_key);
               let applied = false;
               if (shouldApply) {
                 const direction = determineTransactionDirection(
@@ -661,7 +765,10 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
                   llmResult.predicted_account_id,
                   llmResult.confidence_score,
                   fieldToUpdate,
-                  userId
+                  userId,
+                  llmMerchantKey
+                    ? { merchantKey: llmMerchantKey, merchantKeyProvider: 'llm' }
+                    : undefined
                 );
                 applied = true;
               }
@@ -675,6 +782,8 @@ export const categorizeTransactionBatchHandler: ERPMethodHandler = {
                 reasoning: llmResult.reasoning,
                 applied,
                 skipped_reason: !meetsThreshold ? `Confidence below threshold` : undefined,
+                merchant_key: llmMerchantKey || undefined,
+                merchant_key_provider: llmMerchantKey ? 'llm' : undefined,
               };
               llmCategorizedCount++;
             } else {

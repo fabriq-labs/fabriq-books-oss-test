@@ -174,6 +174,8 @@ const CategorizeTransactionExecutor: PendingActionHandler = {
         predicted_account_id: string;
         predicted_account_name?: string;
         confidence_score: number;
+        merchant_key?: string;
+        merchant_key_provider?: 'plaid_enrich' | 'legacy_normalize' | 'llm';
         // The account_id and credit_account_id of the posting at queue time
         // are stored so we can determine direction without re-querying.
         posting_account_id?: string;
@@ -216,7 +218,13 @@ const CategorizeTransactionExecutor: PendingActionHandler = {
         payload.predicted_account_id,
         payload.confidence_score ?? 0,
         fieldToUpdate,
-        auth.user.id
+        auth.user.id,
+        payload.merchant_key
+          ? {
+              merchantKey: payload.merchant_key,
+              merchantKeyProvider: payload.merchant_key_provider ?? 'llm',
+            }
+          : undefined
       );
 
       logger.info('CategorizeTransactionExecutor: posting updated', {

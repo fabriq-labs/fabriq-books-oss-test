@@ -15,12 +15,10 @@ import {
   buildSystemPrompt,
   buildUserPrompt,
   normalizeDescription,
-  findFuzzyMatch,
   buildBulkPrompt,
   buildBulkSystemPrompt,
   PostingForCategorization,
   AccountsGrouped,
-  HistoricalMapping,
   CATEGORIZATION_CONFIG,
 } from '../../../agent/handlers/erp/utils/categorizationUtils';
 import { aiActivityLogger } from '../../../agent/utils/aiActivityLogger';
@@ -233,36 +231,6 @@ describe('Categorization Utilities', () => {
     });
   });
 
-  describe('findFuzzyMatch', () => {
-    const mockMappings: HistoricalMapping[] = [
-      { descriptionNormalized: 'monthly account fee', counterAccountId: 'acc1', counterAccountName: 'Bank Fees', classification: 'Expense' },
-      { descriptionNormalized: 'amazon web services', counterAccountId: 'acc2', counterAccountName: 'Cloud Services', classification: 'Expense' },
-      { descriptionNormalized: 'payroll deposit', counterAccountId: 'acc3', counterAccountName: 'Salary Income', classification: 'Income' },
-    ];
-
-    it('should find exact match', () => {
-      const match = findFuzzyMatch('MONTHLY ACCOUNT FEE', mockMappings);
-      expect(match).not.toBeNull();
-      expect(match?.counterAccountId).toBe('acc1');
-    });
-
-    it('should find fuzzy match above threshold', () => {
-      const match = findFuzzyMatch('MONTHLY ACCT FEE', mockMappings, 0.7);
-      expect(match).not.toBeNull();
-      expect(match?.counterAccountId).toBe('acc1');
-    });
-
-    it('should return null for no match', () => {
-      const match = findFuzzyMatch('COMPLETELY DIFFERENT', mockMappings);
-      expect(match).toBeNull();
-    });
-
-    it('should return null for empty description', () => {
-      const match = findFuzzyMatch('', mockMappings);
-      expect(match).toBeNull();
-    });
-  });
-
   describe('buildBulkPrompt', () => {
     it('should build a prompt with multiple transactions', () => {
       const postings = [
@@ -292,7 +260,6 @@ describe('Categorization Utilities', () => {
   describe('CATEGORIZATION_CONFIG', () => {
     it('should have expected default values', () => {
       expect(CATEGORIZATION_CONFIG.BULK_LLM_BATCH_SIZE).toBe(20);
-      expect(CATEGORIZATION_CONFIG.FUZZY_MATCH_THRESHOLD).toBe(0.80);
       expect(CATEGORIZATION_CONFIG.HISTORICAL_MATCH_CONFIDENCE).toBe(0.95);
     });
   });

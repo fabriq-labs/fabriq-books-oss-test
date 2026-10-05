@@ -108,6 +108,10 @@ model posting {
   ai_cat_score      Decimal?  @db.Decimal(5, 4) // AI confidence score (0.0000 to 1.0000)
   ai_categorized_at DateTime? // Timestamp of AI categorization
 
+  // Stable merchant identity for historical categorization matching (exact key only)
+  merchant_key          String? @db.VarChar(255)
+  merchant_key_provider String? @db.VarChar(32) // plaid_enrich | legacy_normalize | llm
+
   // Bank/ledger reconciliation (agentic reconciliation demo)
   reconciliation_status String? // 'UNMATCHED', 'SUGGESTED', 'MATCHED', 'CONFIRMED'
   matched_reference     String? // e.g. "payment_receipt:payr_demo_001" or "invoice:inv_demo_001"
@@ -118,6 +122,7 @@ model posting {
   payment_receipt payment_receipt? @relation("PostingToPaymentReceipt", fields: [payment_receipt_id], references: [id])
   plaid_transaction plaid_transaction?
 
+  @@index([org_id, merchant_key, modified_at(sort: Desc)])
   @@map("posting")
 }
 

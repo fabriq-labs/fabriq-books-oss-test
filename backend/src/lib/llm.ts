@@ -2,7 +2,8 @@
  * LLMService — Unified LLM interface for non-agent use cases.
  *
  * Delegates all calls to Vercel AI SDK via the shared model provider factory.
- * Supports financial analysis, text generation, and binary (PDF/image) extraction.
+ * Supports financial analysis, text generation, binary (PDF/image) extraction,
+ * and traced structured object generation (llm_trace + ai_activity_log).
  *
  * Public API is unchanged from the original Vertex-direct implementation so that
  * callers (rest/routes.ts, base-extractor.ts) require zero changes.
@@ -10,7 +11,10 @@
 
 import { generateText, generateObject } from 'ai';
 import { z } from 'zod';
+import { aiActivityLogger } from '../agent/utils/aiActivityLogger';
 import { getModel, getModelId } from './ai/modelProvider';
+import { extractCacheUsage, extractCostUsd } from './ai/usage';
+import { llmTraceLogger } from './llm-trace-logger';
 import logger from '../utils/logger';
 
 // ---------------------------------------------------------------------------
@@ -23,6 +27,38 @@ const financialAnalysisSchema = z.object({
   recommendations: z.array(z.string()).describe('Actionable recommendations'),
   immediateActions: z.array(z.string()).describe('Immediate actions to take'),
 });
+
+export interface GenerateStructuredObjectTracedParams<T> {
+  /** Optional task for LLM_MODEL_{TASK}; omit to use LLM_MODEL. */
+  task?: string;
+  schema: z.ZodType<T>;
+  system: string;
+  prompt: string;
+  temperature?: number;
+  orgId: string;
+  userId?: string;
+  /** llm_trace.query_type / ai_activity.activityType */
+  queryType: string;
+  question: string;
+  /** Target domain model name for activity log (e.g. posting). */
+  modelName?: string;
+  recordId?: string;
+  applied?: boolean;
+  inputSummary?: string;
+}
+
+export interface GenerateStructuredObjectTracedResult<T> {
+  object: T;
+  usage: {
+    promptTokens?: number;
+    completionTokens?: number;
+    cachedPromptTokens?: number;
+    cacheCreationTokens?: number;
+    costUsd?: number;
+  };
+  llmModel: string;
+  durationMs: number;
+}
 
 export class LLMService {
   private static instance: LLMService;
@@ -160,6 +196,166 @@ Focus on providing practical and realistic advice.`;
         method: 'analyzeFinancialData',
         model: modelId,
       });
+      throw error;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Structured object generation with llm_trace + ai_activity_log
+  // -------------------------------------------------------------------------
+
+  /**
+   * Schema-validated generateObject with usage/cache/cost and product observability.
+   * Prefer this over calling `generateObject` from `ai` directly for app features.
+   * Omit `task` to use LLM_MODEL; set task for LLM_MODEL_{TASK}.
+   */
+  public async generateStructuredObjectTraced<T>(
+    params: GenerateStructuredObjectTracedParams<T>
+  ): Promise<GenerateStructuredObjectTracedResult<T>> {
+    const startTime = Date.now();
+    const llmModel = getModelId(params.task);
+    const modelName = params.modelName ?? 'posting';
+
+    try {
+      const llmResult = await generateObject({
+        model: getModel(params.task),
+        schema: params.schema as any,
+        system: params.system,
+        prompt: params.prompt,
+        temperature: params.temperature,
+      });
+
+      const durationMs = Date.now() - startTime;
+      const promptTokens = llmResult.usage?.promptTokens ?? 0;
+      const completionTokens = llmResult.usage?.completionTokens ?? 0;
+      const cache = extractCacheUsage((llmResult as any).providerMetadata);
+      const costUsd =
+        extractCostUsd({
+          usage: llmResult.usage as any,
+          providerMetadata: (llmResult as any).providerMetadata,
+          responseBody: (llmResult as any).response?.body,
+        }) ?? undefined;
+
+      const usage = {
+        promptTokens: promptTokens || undefined,
+        completionTokens: completionTokens || undefined,
+        cachedPromptTokens: cache.cachedPromptTokens ?? undefined,
+        cacheCreationTokens: cache.cacheCreationTokens ?? undefined,
+        costUsd,
+      };
+
+      llmTraceLogger
+        .logTrace({
+          orgId: params.orgId,
+          userId: params.userId,
+          modelName,
+          recordId: params.recordId,
+          queryType: params.queryType,
+          question: params.question,
+          llmModel,
+          result: {
+            text:
+              typeof (llmResult as any).object === 'object'
+                ? JSON.stringify((llmResult as any).object).slice(0, 4000)
+                : String((llmResult as any).object ?? ''),
+            steps: [],
+            usage: {
+              promptTokens,
+              completionTokens,
+              cachedPromptTokens: cache.cachedPromptTokens,
+              cacheCreationTokens: cache.cacheCreationTokens,
+              costUsd: costUsd ?? null,
+            },
+            providerMetadata: (llmResult as any).providerMetadata,
+            response: (llmResult as any).response,
+          },
+          durationMs,
+          status: 'success',
+        })
+        .catch(() => {});
+
+      await aiActivityLogger
+        .log({
+          orgId: params.orgId,
+          userId: params.userId,
+          activityType: params.queryType,
+          modelName,
+          recordId: params.recordId,
+          llmModel,
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+          durationMs,
+          stepsCount: 1,
+          toolsUsed: [],
+          applied: params.applied ?? false,
+          inputSummary: params.inputSummary ?? params.question.slice(0, 500),
+          prediction: { usage },
+        })
+        .catch((err: any) => {
+          logger.warn('Failed to log AI activity for generateStructuredObjectTraced', {
+            queryType: params.queryType,
+            error: err?.message,
+          });
+        });
+
+      logger.info('LLM Call Completed', {
+        method: params.queryType,
+        model: llmModel,
+        duration_ms: durationMs,
+        tokens: {
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_tokens: promptTokens + completionTokens,
+        },
+        cost_usd: costUsd,
+      });
+
+      return {
+        object: llmResult.object as T,
+        usage,
+        llmModel,
+        durationMs,
+      };
+    } catch (error: any) {
+      const durationMs = Date.now() - startTime;
+      llmTraceLogger
+        .logTrace({
+          orgId: params.orgId,
+          userId: params.userId,
+          modelName,
+          recordId: params.recordId,
+          queryType: params.queryType,
+          question: params.question,
+          llmModel,
+          result: {
+            text: '',
+            steps: [],
+            usage: { promptTokens: 0, completionTokens: 0 },
+          },
+          durationMs,
+          status: 'error',
+          errorMessage: error?.message ?? String(error),
+        })
+        .catch(() => {});
+
+      await aiActivityLogger
+        .log({
+          orgId: params.orgId,
+          userId: params.userId,
+          activityType: params.queryType,
+          modelName,
+          recordId: params.recordId,
+          llmModel,
+          durationMs,
+          stepsCount: 1,
+          toolsUsed: [],
+          applied: false,
+          error: error?.message ?? String(error),
+          inputSummary: params.inputSummary ?? params.question.slice(0, 500),
+        })
+        .catch(() => {});
+
+      this.logError('generateStructuredObjectTraced', llmModel, startTime, error);
       throw error;
     }
   }

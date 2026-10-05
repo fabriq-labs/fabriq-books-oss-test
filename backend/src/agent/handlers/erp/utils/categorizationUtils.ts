@@ -5,10 +5,15 @@
  * Used by categorizeTransaction and categorizeTransactionBatch handlers.
  */
 
+import { Prisma } from '@prisma/client';
 import prisma from '../../../../lib/prisma';
 import logger from '../../../../utils/logger';
 import { AuthContext } from '../../../../auth/types';
-import * as fuzz from 'fuzzball';
+import {
+  toMerchantKey,
+  type MerchantKeyProvider,
+} from '../../../../services/transaction-identity/types';
+import { MERCHANT_KEY_CANON_RULES } from '../../../../services/transaction-identity/merchantKeyCanonPrompt';
 
 /**
  * Account structure for categorization
@@ -47,6 +52,8 @@ export interface PostingForCategorization {
   creditAccountName: string | null;
   creditAccountType: string[];
   aiCatScore: number | null;
+  merchantKey?: string | null;
+  merchantKeyProvider?: string | null;
 }
 
 /**
@@ -85,6 +92,43 @@ export async function getHQEntityId(orgId: string): Promise<string | null> {
   });
 
   return firstEntity?.id ?? null;
+}
+
+/**
+ * Resolve legal entity + country for identity enrichment routing.
+ */
+export async function resolveEntityForIdentity(
+  orgId: string,
+  legalEntityId?: string | null
+): Promise<{ legalEntityId: string | null; country: string }> {
+  if (legalEntityId) {
+    const entity = await prisma.entity.findFirst({
+      where: { id: legalEntityId, org_id: orgId },
+      select: { id: true, country: true },
+    });
+    if (entity) {
+      return { legalEntityId: entity.id, country: entity.country ?? '' };
+    }
+  }
+
+  const hqEntity = await prisma.entity.findFirst({
+    where: { org_id: orgId, is_it_headquartres: 'yes' },
+    select: { id: true, country: true },
+  });
+  if (hqEntity) {
+    return { legalEntityId: hqEntity.id, country: hqEntity.country ?? '' };
+  }
+
+  const firstEntity = await prisma.entity.findFirst({
+    where: { org_id: orgId },
+    select: { id: true, country: true },
+    orderBy: { created_at: 'asc' },
+  });
+
+  return {
+    legalEntityId: firstEntity?.id ?? null,
+    country: firstEntity?.country ?? '',
+  };
 }
 
 /**
@@ -217,6 +261,8 @@ export async function fetchPostingById(
     creditAccountName: posting.credit_account?.name ?? null,
     creditAccountType: posting.credit_account?.type ?? [],
     aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
+    merchantKey: posting.merchant_key ?? null,
+    merchantKeyProvider: posting.merchant_key_provider ?? null,
   };
 }
 
@@ -262,6 +308,8 @@ export async function fetchPostingsByIds(
     creditAccountName: posting.credit_account?.name ?? null,
     creditAccountType: posting.credit_account?.type ?? [],
     aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
+    merchantKey: posting.merchant_key ?? null,
+    merchantKeyProvider: posting.merchant_key_provider ?? null,
   }));
 }
 
@@ -408,17 +456,23 @@ ${formatAllAccountsForPrompt(accounts)}
 Analyze the transaction and return your prediction.`;
 }
 
+export interface CategorizationIdentityWrite {
+  merchantKey?: string | null;
+  merchantKeyProvider?: MerchantKeyProvider | null;
+}
+
 /**
- * Update posting with categorization result
+ * Update posting with categorization result (and optional persisted merchant key).
  */
 export async function updatePostingWithCategorization(
   postingId: string,
   predictedAccountId: string,
   confidenceScore: number,
   fieldToUpdate: 'account_id' | 'credit_account_id',
-  modifiedBy: string
+  modifiedBy: string,
+  identity?: CategorizationIdentityWrite
 ): Promise<void> {
-  const updateData: any = {
+  const updateData: Record<string, unknown> = {
     ai_cat_score: confidenceScore,
     ai_categorized_at: new Date(),
     modified_at: new Date(),
@@ -431,6 +485,12 @@ export async function updatePostingWithCategorization(
     updateData.credit_account_id = predictedAccountId;
   }
 
+  const key = toMerchantKey(identity?.merchantKey);
+  if (key) {
+    updateData.merchant_key = key;
+    updateData.merchant_key_provider = identity?.merchantKeyProvider ?? null;
+  }
+
   await prisma.posting.update({
     where: { id: postingId },
     data: updateData,
@@ -441,6 +501,8 @@ export async function updatePostingWithCategorization(
     predictedAccountId,
     confidenceScore,
     fieldToUpdate,
+    merchantKey: key || undefined,
+    merchantKeyProvider: identity?.merchantKeyProvider,
   });
 }
 
@@ -507,8 +569,6 @@ export async function getAccountById(
 export const CATEGORIZATION_CONFIG = {
   /** Maximum number of transactions per LLM call */
   BULK_LLM_BATCH_SIZE: 20,
-  /** Minimum token_set_ratio score for fuzzy matching (0-1 scale; fuzzball returns 0-100 internally) */
-  FUZZY_MATCH_THRESHOLD: 0.80,
   /** Fixed confidence score for historical matches */
   HISTORICAL_MATCH_CONFIDENCE: 0.95,
 };
@@ -522,7 +582,14 @@ export function resolveUseHistoricalMatching(override?: boolean): boolean {
  * Historical mapping from past transactions
  */
 export interface HistoricalMapping {
+  /** Legacy stripped narrative (normalizeDescription); used in reasoning fallback. */
   descriptionNormalized: string;
+  /**
+   * Stable match key from the identity enricher.
+   * Legacy adapter: same as descriptionNormalized.
+   * Plaid Enrich: normalized merchant_name.
+   */
+  merchantKey: string;
   counterAccountId: string;
   counterAccountName: string;
   classification: string;
@@ -593,6 +660,8 @@ export interface BulkCategorizationItem {
   predicted_account_id: string;
   confidence_score: number;
   reasoning: string;
+  /** Stable merchant identity for exact historical matching. */
+  merchant_key?: string;
 }
 
 const BANK_TYPE_SET = new Set(['BANK', 'CREDIT_CARD', 'CHECKING', 'SAVINGS']);
@@ -602,7 +671,7 @@ const US_STATE_CODES =
   'al|ak|az|ar|ca|co|ct|de|fl|ga|hi|id|il|in|ia|ks|ky|la|me|md|ma|mi|mn|ms|mo|mt|ne|nv|nh|nj|nm|ny|nc|nd|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy|dc';
 
 /**
- * Normalize a transaction description for fuzzy matching.
+ * Normalize a transaction description for the legacy merchant key path.
  *
  * Two-pass pipeline (A2):
  *   Pass 1 — strip noise tokens (payment rails, reference numbers, dates, bank prefixes, card masks)
@@ -676,139 +745,195 @@ export function normalizeDescription(description: string | null): string {
   // 9. Collapse multiple spaces
   s = s.replace(/\s{2,}/g, ' ').trim();
 
-  // Pass 2 — take first 6 tokens to prevent long descriptions from diluting similarity scores
+  // Pass 2 — take first 6 tokens to keep legacy keys stable and short
   if (!s) return '';
   return s.split(/\s+/).slice(0, 6).join(' ');
 }
 
+const BANK_TYPES_SQL = ['BANK', 'CREDIT_CARD', 'CHECKING', 'SAVINGS'];
+
+type ExactHistRow = {
+  merchantKey: string;
+  description: string | null;
+  notes: string | null;
+  counterAccountId: string;
+  counterAccountName: string | null;
+  classification: string | null;
+};
+
 /**
- * Find a fuzzy match in historical mappings using fuzzball.token_set_ratio (A3).
- * Returns the best match above threshold, or null.
- * Threshold is in 0–1 scale (0.80 default); fuzzball scores are divided by 100 internally.
+ * Exact historical match for a batch of merchant keys (Postgres DISTINCT ON, key-scoped).
+ * No fuzzy matching — miss means caller should use LLM / human review.
  */
-export function findFuzzyMatch(
-  description: string,
-  historicalMappings: HistoricalMapping[],
-  threshold: number = CATEGORIZATION_CONFIG.FUZZY_MATCH_THRESHOLD
-): HistoricalMapping | null {
-  const normalized = normalizeDescription(description);
-  if (!normalized) return null;
-  if (historicalMappings.length === 0) return null;
+export async function findExactHistoricalMatches(
+  orgId: string,
+  merchantKeys: string[]
+): Promise<Map<string, HistoricalMapping>> {
+  const keys = [
+    ...new Set(merchantKeys.map((k) => toMerchantKey(k)).filter((k) => k.length > 0)),
+  ];
+  const out = new Map<string, HistoricalMapping>();
+  if (keys.length === 0) return out;
 
-  const thresholdPct = threshold * 100;
-  let bestMatch: HistoricalMapping | null = null;
-  let bestScore = 0;
+  const rows = await prisma.$queryRaw<ExactHistRow[]>(Prisma.sql`
+    SELECT DISTINCT ON (p.merchant_key)
+      p.merchant_key AS "merchantKey",
+      p.description AS description,
+      p.notes AS notes,
+      CASE
+        WHEN credit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (debit.type && ${BANK_TYPES_SQL}::text[])
+          THEN debit.id
+        WHEN debit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (credit.type && ${BANK_TYPES_SQL}::text[])
+          THEN credit.id
+        ELSE NULL
+      END AS "counterAccountId",
+      CASE
+        WHEN credit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (debit.type && ${BANK_TYPES_SQL}::text[])
+          THEN debit.name
+        WHEN debit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (credit.type && ${BANK_TYPES_SQL}::text[])
+          THEN credit.name
+        ELSE NULL
+      END AS "counterAccountName",
+      CASE
+        WHEN credit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (debit.type && ${BANK_TYPES_SQL}::text[])
+          THEN debit.classification
+        WHEN debit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (credit.type && ${BANK_TYPES_SQL}::text[])
+          THEN credit.classification
+        ELSE NULL
+      END AS classification
+    FROM posting p
+    INNER JOIN account debit ON debit.id = p.account_id
+    INNER JOIN account credit ON credit.id = p.credit_account_id
+    WHERE p.org_id = ${orgId}
+      AND p.merchant_key = ANY(${keys})
+      AND p.account_id IS NOT NULL
+      AND p.credit_account_id IS NOT NULL
+      AND NOT (
+        (debit.type && ${BANK_TYPES_SQL}::text[])
+        AND (credit.type && ${BANK_TYPES_SQL}::text[])
+      )
+      AND (
+        (
+          (credit.type && ${BANK_TYPES_SQL}::text[])
+          AND NOT (debit.type && ${BANK_TYPES_SQL}::text[])
+        )
+        OR (
+          (debit.type && ${BANK_TYPES_SQL}::text[])
+          AND NOT (credit.type && ${BANK_TYPES_SQL}::text[])
+        )
+      )
+    ORDER BY
+      p.merchant_key,
+      p.modified_at DESC NULLS LAST,
+      p.created_at DESC,
+      (p.ai_cat_score IS NULL) DESC
+  `);
 
-  for (const mapping of historicalMappings) {
-    if (!mapping.descriptionNormalized) continue;
-    const score = fuzz.token_set_ratio(normalized, mapping.descriptionNormalized);
-    if (score >= thresholdPct && score > bestScore) {
-      bestScore = score;
-      bestMatch = mapping;
-    }
+  for (const row of rows) {
+    if (!row.counterAccountId || !row.merchantKey) continue;
+    const descriptionNormalized = normalizeDescription(row.description);
+    out.set(row.merchantKey, {
+      merchantKey: row.merchantKey,
+      descriptionNormalized,
+      counterAccountId: row.counterAccountId,
+      counterAccountName: row.counterAccountName ?? '',
+      classification: row.classification ?? '',
+      sourceReasoning: extractCategorizationReasoningFromNotes(row.notes),
+    });
   }
 
-  return bestMatch;
+  logger.debug('Exact historical matches loaded', {
+    orgId,
+    queryKeys: keys.length,
+    hits: out.size,
+  });
+
+  return out;
 }
 
 /**
- * Fetch historical description → counter-account mappings from past transactions (A1–A4).
- *
- * Includes all postings where both sides are filled, regardless of ai_cat_score (A1).
- * Excludes bank-to-bank transfers (both sides are bank/credit-card accounts) (A1 edge case).
- * Resolves duplicates by most-recent created_at; ties broken by manual entry (null score) > AI (A4).
+ * Load deduped historical corpus for an org from persisted merchant_key (SQL DISTINCT ON).
+ * Used by tests / diagnostics. Batch categorize uses findExactHistoricalMatches instead.
  */
 export async function fetchHistoricalMappings(orgId: string): Promise<HistoricalMapping[]> {
-  const postings = await prisma.posting.findMany({
-    where: {
-      org_id: orgId,
-      account_id: { not: null },
-      credit_account_id: { not: null },
-      description: { not: null },
-      // A1: removed ai_cat_score: null filter — include AI-categorized postings that were approved
-    },
-    select: {
-      description: true,
-      notes: true,
-      account_id: true,
-      credit_account_id: true,
-      created_at: true,
-      ai_cat_score: true,
-      account: {
-        select: { id: true, name: true, type: true, classification: true },
-      },
-      credit_account: {
-        select: { id: true, name: true, type: true, classification: true },
-      },
-    },
-    orderBy: { created_at: 'desc' },
-  });
+  const rows = await prisma.$queryRaw<ExactHistRow[]>(Prisma.sql`
+    SELECT DISTINCT ON (p.merchant_key)
+      p.merchant_key AS "merchantKey",
+      p.description AS description,
+      p.notes AS notes,
+      CASE
+        WHEN credit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (debit.type && ${BANK_TYPES_SQL}::text[])
+          THEN debit.id
+        WHEN debit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (credit.type && ${BANK_TYPES_SQL}::text[])
+          THEN credit.id
+        ELSE NULL
+      END AS "counterAccountId",
+      CASE
+        WHEN credit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (debit.type && ${BANK_TYPES_SQL}::text[])
+          THEN debit.name
+        WHEN debit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (credit.type && ${BANK_TYPES_SQL}::text[])
+          THEN credit.name
+        ELSE NULL
+      END AS "counterAccountName",
+      CASE
+        WHEN credit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (debit.type && ${BANK_TYPES_SQL}::text[])
+          THEN debit.classification
+        WHEN debit.type && ${BANK_TYPES_SQL}::text[]
+             AND NOT (credit.type && ${BANK_TYPES_SQL}::text[])
+          THEN credit.classification
+        ELSE NULL
+      END AS classification
+    FROM posting p
+    INNER JOIN account debit ON debit.id = p.account_id
+    INNER JOIN account credit ON credit.id = p.credit_account_id
+    WHERE p.org_id = ${orgId}
+      AND p.merchant_key IS NOT NULL
+      AND p.account_id IS NOT NULL
+      AND p.credit_account_id IS NOT NULL
+      AND NOT (
+        (debit.type && ${BANK_TYPES_SQL}::text[])
+        AND (credit.type && ${BANK_TYPES_SQL}::text[])
+      )
+      AND (
+        (
+          (credit.type && ${BANK_TYPES_SQL}::text[])
+          AND NOT (debit.type && ${BANK_TYPES_SQL}::text[])
+        )
+        OR (
+          (debit.type && ${BANK_TYPES_SQL}::text[])
+          AND NOT (credit.type && ${BANK_TYPES_SQL}::text[])
+        )
+      )
+    ORDER BY
+      p.merchant_key,
+      p.modified_at DESC NULLS LAST,
+      p.created_at DESC,
+      (p.ai_cat_score IS NULL) DESC
+  `);
 
-  type CandidateEntry = HistoricalMapping & { createdAt: Date; aiCatScore: number | null };
-  const byNormalized = new Map<string, CandidateEntry>();
-
-  for (const posting of postings) {
-    const normalized = normalizeDescription(posting.description);
-    if (!normalized) continue;
-
-    const creditIsBank = posting.credit_account?.type?.some((t) => BANK_TYPE_SET.has(t));
-    const debitIsBank = posting.account?.type?.some((t) => BANK_TYPE_SET.has(t));
-
-    // A1 edge case: exclude bank-to-bank transfers from corpus
-    if (creditIsBank && debitIsBank) continue;
-
-    let counterAccount: { id: string; name: string | null; classification: string | null } | null = null;
-
-    if (creditIsBank && !debitIsBank && posting.account) {
-      counterAccount = posting.account;
-    } else if (debitIsBank && !creditIsBank && posting.credit_account) {
-      counterAccount = posting.credit_account;
-    }
-
-    if (!counterAccount) continue;
-
-    const candidate: CandidateEntry = {
-      descriptionNormalized: normalized,
-      counterAccountId: counterAccount.id,
-      counterAccountName: counterAccount.name ?? '',
-      classification: counterAccount.classification ?? '',
-      sourceReasoning: extractCategorizationReasoningFromNotes(posting.notes),
-      createdAt: posting.created_at,
-      aiCatScore: posting.ai_cat_score?.toNumber() ?? null,
-    };
-
-    const existing = byNormalized.get(normalized);
-    if (!existing) {
-      byNormalized.set(normalized, candidate);
-      continue;
-    }
-
-    // A4: most-recent created_at wins
-    if (candidate.createdAt > existing.createdAt) {
-      byNormalized.set(normalized, candidate);
-    } else if (candidate.createdAt.getTime() === existing.createdAt.getTime()) {
-      // Tie-break: manual entry (null ai_cat_score) beats AI-categorized
-      if (existing.aiCatScore !== null && candidate.aiCatScore === null) {
-        byNormalized.set(normalized, candidate);
-      }
-    }
+  const mappings: HistoricalMapping[] = [];
+  for (const row of rows) {
+    if (!row.counterAccountId || !row.merchantKey) continue;
+    mappings.push({
+      merchantKey: row.merchantKey,
+      descriptionNormalized: normalizeDescription(row.description),
+      counterAccountId: row.counterAccountId,
+      counterAccountName: row.counterAccountName ?? '',
+      classification: row.classification ?? '',
+      sourceReasoning: extractCategorizationReasoningFromNotes(row.notes),
+    });
   }
-
-  const mappings = Array.from(byNormalized.values()).map(
-    ({
-      descriptionNormalized,
-      counterAccountId,
-      counterAccountName,
-      classification,
-      sourceReasoning,
-    }) => ({
-      descriptionNormalized,
-      counterAccountId,
-      counterAccountName,
-      classification,
-      sourceReasoning,
-    })
-  );
 
   logger.debug('Fetched historical mappings', {
     orgId,
@@ -852,6 +977,7 @@ For each transaction, return:
 - predicted_account_id: the account ID from the list above
 - confidence_score: 0.0 to 1.0 based on how confident you are
 - reasoning: brief explanation
+- merchant_key: stable lowercase merchant/brand identity for future exact matching (see system rules)
 
 Return exactly ${postings.length} categorizations, one per transaction.`;
 }
@@ -860,6 +986,11 @@ Return exactly ${postings.length} categorizations, one per transaction.`;
  * Build the system prompt for bulk categorization
  */
 export function buildBulkSystemPrompt(): string {
+  const merchantKeyRules = MERCHANT_KEY_CANON_RULES
+    .split('\n')
+    .map((line) => `   ${line}`)
+    .join('\n');
+
   return `You are a financial transaction categorization assistant. Your task is to categorize multiple transactions at once.
 
 CRITICAL - Transaction direction is determined by the label in the transaction:
@@ -882,6 +1013,8 @@ RULES:
    - High (0.8-1.0): Clear keyword match
    - Medium (0.5-0.79): Reasonable inference
    - Low (0.0-0.49): Ambiguous, guessing
+7. Always return merchant_key using the same canonicalization as identity normalize:
+${merchantKeyRules}
 
 Common patterns for Money OUT (Expenses):
 - FEES, INTEREST charges → Bank/Processing Fees

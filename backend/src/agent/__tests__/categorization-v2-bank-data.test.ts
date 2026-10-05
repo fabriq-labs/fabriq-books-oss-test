@@ -3,19 +3,10 @@
  *
  * Representative synthetic data based on actual ICICI and Kotak statement formats.
  * Covers savings accounts and credit cards for each bank.
- * No DB, no LLM — pure normalization and fuzzy match tests.
+ * No DB, no LLM — pure normalizeDescription tests (legacy merchant key path).
  */
 
-import { normalizeDescription, findFuzzyMatch, HistoricalMapping } from '../handlers/erp/utils/categorizationUtils';
-
-// Shared corpus entries that real descriptions should match
-const CORPUS: HistoricalMapping[] = [
-  { descriptionNormalized: 'swiggy',              counterAccountId: 'exp_meals',   counterAccountName: 'Meals & Entertainment', classification: 'Expense' , sourceReasoning: null },
-  { descriptionNormalized: 'zomato',               counterAccountId: 'exp_meals',   counterAccountName: 'Meals & Entertainment', classification: 'Expense' , sourceReasoning: null },
-  { descriptionNormalized: 'amazon in',            counterAccountId: 'exp_office',  counterAccountName: 'Office Supplies',       classification: 'Expense' , sourceReasoning: null },
-  { descriptionNormalized: 'ola cabs',             counterAccountId: 'exp_travel',  counterAccountName: 'Travel Expenses',       classification: 'Expense' , sourceReasoning: null },
-  { descriptionNormalized: 'home loan emi',        counterAccountId: 'liab_loan',   counterAccountName: 'Home Loan',             classification: 'Liabilities' , sourceReasoning: null },
-];
+import { normalizeDescription } from '../handlers/erp/utils/categorizationUtils';
 
 // ─── ICICI Savings Account ────────────────────────────────────────────────────
 
@@ -89,30 +80,16 @@ describe('US debit card — normalizeDescription', () => {
     expect(result).not.toContain('germantown');
   });
 
-  it('PIN layout: Marathon gas does not fuzzy-match Office Depot', () => {
-    const officeDesc =
-      'DEBIT CARD PURCHASE-PIN 12-27-24 GERMANTOWN TN 2356 OFFICE DEPOT 00 1275 S GE';
+  it('PIN layout: Marathon gas key stays distinct from Office Depot', () => {
+    const officeNorm = normalizeDescription(
+      'DEBIT CARD PURCHASE-PIN 12-27-24 GERMANTOWN TN 2356 OFFICE DEPOT 00 1275 S GE'
+    );
     const gasNorm = normalizeDescription(
       'DEBIT CARD PURCHASE-PIN 12-12-24 MEMPHIS 2356 SUMMER AVE MARAT'
     );
-    const match = findFuzzyMatch(officeDesc, [
-      {
-        descriptionNormalized: gasNorm,
-        counterAccountId: 'exp_operating',
-        counterAccountName: 'Operating Expenses',
-        classification: 'Expense',
-        sourceReasoning: null,
-      },
-      {
-        descriptionNormalized: 'office depot',
-        counterAccountId: 'exp_office',
-        counterAccountName: 'Office Supplies',
-        classification: 'Expense',
-        sourceReasoning: null,
-      },
-    ]);
-    expect(match).not.toBeNull();
-    expect(match!.counterAccountId).toBe('exp_office');
+    expect(officeNorm).toContain('office depot');
+    expect(gasNorm).not.toContain('office depot');
+    expect(officeNorm).not.toBe(gasNorm);
   });
 
   it('non-PIN layout: Uber keeps merchant tokens', () => {
@@ -135,33 +112,5 @@ describe('Credit card — normalizeDescription', () => {
   it('Kotak CC: merchant with city suffix', () => {
     const result = normalizeDescription('ZOMATO ONLINE FOOD MUMBAI');
     expect(result).toContain('zomato online food');
-  });
-});
-
-// ─── Fuzzy match: real descriptions match corpus entries ─────────────────────
-
-describe('findFuzzyMatch — real descriptions vs corpus', () => {
-  it('ICICI UPI Swiggy matches corpus "swiggy"', () => {
-    const match = findFuzzyMatch('UPI/DR/423156789012/SWIGGY INDIA PVTLTD/OKICICI', CORPUS);
-    expect(match).not.toBeNull();
-    expect(match!.counterAccountId).toBe('exp_meals');
-  });
-
-  it('ICICI IMPS Zomato matches corpus "zomato"', () => {
-    const match = findFuzzyMatch('MMT/IMPS/412345678901/ZOMATO LIMITED', CORPUS);
-    expect(match).not.toBeNull();
-    expect(match!.counterAccountId).toBe('exp_meals');
-  });
-
-  it('Kotak CC Swiggy (clean) matches corpus "swiggy"', () => {
-    const match = findFuzzyMatch('SWIGGY FOOD DELIVERY BENGALURU', CORPUS);
-    expect(match).not.toBeNull();
-    expect(match!.counterAccountId).toBe('exp_meals');
-  });
-
-  it('Kotak ECS home loan matches corpus "home loan emi"', () => {
-    const match = findFuzzyMatch('ECS DR HDFC BANK LTD HOME LOAN EMI', CORPUS);
-    expect(match).not.toBeNull();
-    expect(match!.counterAccountId).toBe('liab_loan');
   });
 });

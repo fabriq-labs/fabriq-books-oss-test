@@ -21,6 +21,7 @@
  * Tasks used in the codebase:
  *   agent          – multi-step agent chat with tool calling
  *   categorization – structured output for transaction categorization
+ *   merchant_key   – LLM merchant_key normalize (LLM_MODEL_MERCHANT_KEY)
  *   extraction     – document / PDF extraction (may need vision)
  *   analysis       – financial analysis (structured JSON output)
  */
