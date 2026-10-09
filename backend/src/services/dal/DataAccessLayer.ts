@@ -8,6 +8,7 @@ import { buildCreateManyErrorLogPayload } from '../../utils/formatPrismaError';
 import { execute_Action } from '../../lib/actions';
 import { PrismaSchemaParser } from '../../utils/PrismaSchemaParser';
 import { EntityDefinition, RelationshipDefinition } from '../../models/ModelRegistry';
+import { SearchQueryBuilder } from '../query/SearchQueryBuilder';
 
 export class DataAccessLayer {
   private static instance: DataAccessLayer;
@@ -832,11 +833,13 @@ export class DataAccessLayer {
       const pageSize = Math.max(1, Math.min(maxPageSize, filteredOptions.take || 10));
       const skip = (page - 1) * pageSize;
 
-      // Transform orderBy from { field: string, direction: string } to Prisma format
+      // Transform orderBy from { field: string, direction: string } to Prisma format,
+      // then append a unique id tiebreaker so OFFSET pagination is stable.
       let orderBy = filteredOptions.orderBy || [{ created_at: "desc" }];
       if (orderBy && !Array.isArray(orderBy) && orderBy.field && orderBy.direction) {
         orderBy = { [orderBy.field]: orderBy.direction };
       }
+      orderBy = SearchQueryBuilder.ensureStableOrderBy(orderBy);
 
       // Prepare optimized query options
       const queryOptions = {

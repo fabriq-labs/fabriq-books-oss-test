@@ -309,6 +309,31 @@ npx prisma generate
 
 **Operators**: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`, `contains`, `startsWith`, `endsWith`, `is_null`, `some`, `every`, `none`
 
+## Pagination
+
+List search pages with `OFFSET`/`LIMIT` (`skip`/`take`). PostgreSQL returns a stable page only when `ORDER BY` ends in a key that is unique for each output row.
+
+With no `ORDER BY`, row order is undefined and can change between requests. A sort on a non-unique column (`value_date`, `created_at`) leaves ties undefined, so the same `OFFSET` can skip or repeat rows. Transactions looked random for this reason: many postings share a `value_date`.
+
+`SearchQueryBuilder.ensureStableOrderBy` and `DataAccessLayer` append `{ id: 'desc' }` when the sort does not already include `id`. `Master` sends `id` with the page's default sort.
+
+```sql
+ORDER BY value_date DESC, id DESC
+```
+
+The tiebreaker's direction does not affect stability. `id DESC` and `id ASC` are both stable.
+
+### Pitfalls of `id` as the last sort key
+
+Fabriq primary keys are `'prefix_' || gen_random_uuid()` varchars. `id` makes the order stable. It does not mean newest-first. Same-day rows stay in one order, and that order is the random UUID text order, not insert time. `created_at` is not a substitute: a bulk insert often shares one timestamp. Use a sequence or a time-ordered id when ties must follow entry time.
+
+Other limits:
+
+- The query errors if the result has no `id` column. In raw SQL, an unqualified `id` is ambiguous when more than one joined table has that column.
+- A join that emits the same parent twice still ties. The last sort key has to be unique on the output row.
+- An index on the leading column alone (`value_date`) does not order `id` inside each tie. Postgres sorts, or incremental-sorts within each group. Add `(value_date, id)` only when `EXPLAIN` shows that sort is expensive.
+- A stable `ORDER BY` does not stop `OFFSET` pages from shifting when rows are inserted or deleted between requests. Keyset pagination holds the cursor on both columns: `WHERE (value_date, id) < ($1, $2)`.
+
 ## Database Schema Conventions
 
 ```prisma

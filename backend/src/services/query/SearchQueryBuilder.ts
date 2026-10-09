@@ -102,7 +102,7 @@ export class SearchQueryBuilder {
     if (query.sort) {
       const orderBy = this.parseSort(query.sort);
       if (orderBy) {
-        options.orderBy = orderBy;
+        options.orderBy = this.ensureStableOrderBy(orderBy);
       }
     }
 
@@ -110,7 +110,7 @@ export class SearchQueryBuilder {
     if (query.sortOption) {
       const orderBy = this.parseSort(query.sortOption);
       if (orderBy) {
-        options.orderBy = orderBy;
+        options.orderBy = this.ensureStableOrderBy(orderBy);
       }
     }
 
@@ -154,11 +154,15 @@ export class SearchQueryBuilder {
       sort = sort.split(',');
     }
 
-    // Handle array
+    // Handle array (string shorthand "-field" / "field", or Prisma clause objects)
     if (Array.isArray(sort)) {
       return sort.map(field => {
-        const isDesc = field.startsWith('-');
-        const fieldName = isDesc ? field.substring(1) : field;
+        if (field && typeof field === 'object') {
+          return field;
+        }
+        const fieldStr = String(field);
+        const isDesc = fieldStr.startsWith('-');
+        const fieldName = isDesc ? fieldStr.substring(1) : fieldStr;
         return {
           [fieldName]: isDesc ? 'desc' : 'asc'
         };
@@ -171,6 +175,45 @@ export class SearchQueryBuilder {
     }
 
     return undefined;
+  }
+
+  /**
+   * Append a unique `id` tiebreaker so OFFSET/LIMIT pagination is deterministic.
+   * Non-unique sorts (e.g. value_date alone) otherwise reshuffle rows between pages.
+   */
+  static ensureStableOrderBy(orderBy: any): any[] {
+    let clauses: any[];
+
+    if (!orderBy) {
+      clauses = [{ created_at: 'desc' }];
+    } else if (Array.isArray(orderBy)) {
+      clauses = orderBy.map((clause) => {
+        if (clause && typeof clause === 'object' && clause.field && clause.direction) {
+          return { [clause.field]: clause.direction };
+        }
+        return clause;
+      });
+    } else if (typeof orderBy === 'object' && orderBy.field && orderBy.direction) {
+      clauses = [{ [orderBy.field]: orderBy.direction }];
+    } else if (typeof orderBy === 'object') {
+      // Expand `{ a: 'desc', b: 'asc' }` so we can detect an existing id clause.
+      const keys = Object.keys(orderBy);
+      clauses = keys.length > 1
+        ? keys.map((key) => ({ [key]: orderBy[key] }))
+        : [orderBy];
+    } else {
+      clauses = [{ created_at: 'desc' }];
+    }
+
+    const hasIdTiebreaker = clauses.some(
+      (clause) => clause && typeof clause === 'object' && Object.prototype.hasOwnProperty.call(clause, 'id')
+    );
+
+    if (!hasIdTiebreaker) {
+      clauses.push({ id: 'desc' });
+    }
+
+    return clauses;
   }
 
   private static parseInclude(include: string | string[]): any {

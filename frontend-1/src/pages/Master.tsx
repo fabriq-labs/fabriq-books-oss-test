@@ -450,13 +450,22 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
     return mergeFiltersWithAnd(userFilters, defaultFilters || {});
   }, [filterOutput, filterSearchOutput, defaultFilters]);
 
+  const buildSortOption = () => {
+    if (!defaultSortOption) return {};
+    // Include id as a tiebreaker so OFFSET pagination stays stable when the
+    // primary sort field (e.g. value_date) has many duplicates.
+    const sortOption: Record<string, "asc" | "desc"> = {
+      [defaultSortOption.field]: defaultSortOption.direction,
+    };
+    if (defaultSortOption.field !== "id") {
+      sortOption.id = defaultSortOption.direction;
+    }
+    return sortOption;
+  };
+
   const fetchModelData = () => {
     setIsLoading(true);
-    const sortOption = defaultSortOption
-      ? {
-        [defaultSortOption.field]: defaultSortOption.direction,
-      }
-      : {};
+    const sortOption = buildSortOption();
 
     const rawUserFilters = {
       ...JSON.parse(filterOutput || "{}"),
@@ -1072,7 +1081,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
           view={view}
           currentFilters={computedFilters}
           displayName={displayName}
-          sortOption={defaultSortOption ? { [defaultSortOption.field]: defaultSortOption.direction } : {}}
+          sortOption={buildSortOption()}
         />
       )}
       {showColumnSelector && masterList?.metaData && (

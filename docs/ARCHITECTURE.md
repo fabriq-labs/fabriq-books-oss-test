@@ -244,11 +244,13 @@ Converts to Prisma:
     status: { in: ["pending", "approved"] },
     org_id: "user-org-id"  // Auto-added for multi-tenancy
   },
-  orderBy: { created_at: 'desc' },
+  orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
   skip: 0,
   take: 20
 }
 ```
+
+`SearchQueryBuilder` appends `id` when the caller did not, so `OFFSET` pages stay stable when the leading sort key ties. See [Pagination](./BACKEND.md#pagination).
 
 **Supported Operators**: eq, neq, gt, gte, lt, lte, in, nin, contains, startsWith, endsWith, is_null, and, or, not, some, every, none
 

@@ -66,4 +66,38 @@ describe('SearchQueryBuilder field-type validation', () => {
       description: { contains: 'alex', mode: 'insensitive' },
     });
   });
+
+  it('appends id tiebreaker for non-unique sortOption (stable pagination)', () => {
+    const options = SearchQueryBuilder.buildQueryOptions(
+      {
+        sortOption: { value_date: 'desc' },
+        page: 2,
+        pageSize: 10,
+      },
+      'posting'
+    );
+    expect(options.orderBy).toEqual([{ value_date: 'desc' }, { id: 'desc' }]);
+    expect(options.skip).toBe(10);
+    expect(options.take).toBe(10);
+  });
+
+  it('does not duplicate id when sortOption already includes id', () => {
+    const options = SearchQueryBuilder.buildQueryOptions(
+      {
+        sortOption: { value_date: 'desc', id: 'desc' },
+      },
+      'posting'
+    );
+    expect(options.orderBy).toEqual([{ value_date: 'desc' }, { id: 'desc' }]);
+  });
+
+  it('accepts Prisma clause objects in sortOption arrays', () => {
+    const options = SearchQueryBuilder.buildQueryOptions(
+      {
+        sortOption: [{ value_date: 'desc' }, { id: 'asc' }],
+      },
+      'posting'
+    );
+    expect(options.orderBy).toEqual([{ value_date: 'desc' }, { id: 'asc' }]);
+  });
 });
