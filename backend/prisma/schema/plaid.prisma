@@ -12,6 +12,12 @@ model plaid_item {
   item_id          String    @unique @db.VarChar(255)
   cursor           String?   @db.Text
   last_synced_at   DateTime?
+  // Last itemGet result. error = Plaid reported an item error; Reconnect uses Link update mode.
+  status             String    @default("healthy") @db.VarChar(32)
+  error_code         String?   @db.VarChar(64)
+  error_message      String?   @db.Text
+  consent_expires_at DateTime?
+  status_checked_at  DateTime?
   created_at       DateTime  @default(now())
   modified_at      DateTime  @default(now()) @updatedAt
   created_by       String?   @db.VarChar(255)

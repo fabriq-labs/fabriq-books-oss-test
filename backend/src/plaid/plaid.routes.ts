@@ -66,6 +66,43 @@ export function createPlaidRouter(): Router {
     }
   });
 
+  router.post('/items/:id/update-link-token', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const auth = getAuth(req);
+      if (!auth?.user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const linkToken = await plaid.createUpdateLinkToken(
+        req.params.id,
+        auth.user.id,
+        auth.user.org_id,
+      );
+      return res.json({ link_token: linkToken });
+    } catch (err: any) {
+      logger.error('Plaid update link-token error', { err });
+      if (err.message?.includes('not configured')) {
+        return serviceUnavailable(res, err.message);
+      }
+      const status = err.message?.includes('not found') ? 404 : 500;
+      return res.status(status).json({ error: err.message ?? 'Failed to start reconnect' });
+    }
+  });
+
+  router.post('/items/:id/repair', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const auth = getAuth(req);
+      if (!auth?.user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const item = await plaid.repairItem(req.params.id, auth.user.org_id);
+      return res.json({ data: item });
+    } catch (err: any) {
+      logger.error('Plaid repair item error', { err });
+      const status = err.message?.includes('not found') ? 404 : 500;
+      return res.status(status).json({ error: err.message ?? 'Failed to refresh connection' });
+    }
+  });
+
   router.post('/link-token', authMiddleware, async (req: Request, res: Response) => {
     try {
       const auth = getAuth(req);

@@ -17,6 +17,13 @@ import type {
   PlaidLinkAccountResult,
   StoredPlaidAccount,
 } from './plaid.types';
+import {
+  extractPlaidApiError,
+  healthFromPlaidItem,
+  healthFromThrown,
+  plaidErrorToThrow,
+  type PlaidConnectionHealth,
+} from './plaid.health';
 import type { AccountBase, Transaction } from 'plaid';
 
 function encryptAccessToken(token: string): string {
@@ -206,6 +213,36 @@ export class PlaidService {
     return response.data.link_token;
   }
 
+  /** Link update mode for an existing connection. Does not exchange a new access token. */
+  async createUpdateLinkToken(itemDbId: string, userId: string, orgId: string): Promise<string> {
+    this.assertConfigured();
+    const item = await prisma.plaid_item.findFirst({
+      where: { id: itemDbId, org_id: orgId },
+    });
+    if (!item) {
+      throw new Error('Plaid connection not found');
+    }
+
+    const accessToken = decryptAccessToken(item.access_token);
+    try {
+      const response = await getPlaidClient().linkTokenCreate({
+        user: { client_user_id: userId },
+        client_name: 'Fabriq',
+        country_codes: PLAID_COUNTRY_CODES,
+        language: 'en',
+        access_token: accessToken,
+      });
+      return response.data.link_token;
+    } catch (err) {
+      throw await this.rethrowWithItemHealth(item.id, err);
+    }
+  }
+
+  /** Re-read item health after the user finishes Link update mode. */
+  async repairItem(itemDbId: string, orgId: string): Promise<PlaidItemSummary> {
+    return this.getItemSummary(itemDbId, orgId);
+  }
+
   async exchangePublicToken(
     publicToken: string,
     auth: AuthContext,
@@ -265,7 +302,7 @@ export class PlaidService {
       where: { org_id: orgId },
       orderBy: { created_at: 'desc' },
     });
-    return Promise.all(items.map((item) => this.toItemSummary(item)));
+    return Promise.all(items.map((item) => this.toStoredItemSummary(item)));
   }
 
   async getItemSummary(itemDbId: string, orgId: string): Promise<PlaidItemSummary> {
@@ -295,8 +332,7 @@ export class PlaidService {
     }
 
     this.assertConfigured();
-    const accessToken = decryptAccessToken(item.access_token);
-    const response = await getPlaidClient().accountsGet({ access_token: accessToken });
+    const response = await this.accountsGetForItem(item);
     const selected = response.data.accounts.filter((a) => plaidAccountIds.includes(a.account_id));
     if (selected.length === 0) {
       throw new Error('No matching Plaid accounts found for this connection');
@@ -450,8 +486,7 @@ export class PlaidService {
     }
 
     this.assertConfigured();
-    const accessToken = decryptAccessToken(item.access_token);
-    const response = await getPlaidClient().accountsGet({ access_token: accessToken });
+    const response = await this.accountsGetForItem(item);
     const plaidAccount = response.data.accounts.find((a) => a.account_id === plaidAccountId);
     if (!plaidAccount) {
       throw new Error('Plaid account not found on this connection');
@@ -658,6 +693,7 @@ export class PlaidService {
     let skipped = 0;
     const now = new Date();
 
+    try {
     while (hasMore) {
       const response = await client.transactionsSync({ access_token: accessToken, cursor });
       const { added: addedTxns, modified: modifiedTxns, removed: removedTxns, next_cursor, has_more } = response.data;
@@ -759,7 +795,11 @@ export class PlaidService {
         data: { cursor: cursor ?? null, last_synced_at: now },
       });
     }
+    } catch (err) {
+      throw await this.rethrowWithItemHealth(item.id, err);
+    }
 
+    await this.markConnectionHealthy(item.id);
     logger.info('Plaid sync complete', { itemId: item.id, added, modified, removed, skipped, singleAccountSync, updateCursor });
 
     return { added, modified, removed, skipped };
@@ -796,6 +836,7 @@ export class PlaidService {
     let totalAvailable = 0;
     const now = new Date();
 
+    try {
     while (true) {
       const response = await client.transactionsGet({
         access_token: accessToken,
@@ -841,7 +882,11 @@ export class PlaidService {
       offset += transactions.length;
       if (offset >= totalAvailable || transactions.length === 0) break;
     }
+    } catch (err) {
+      throw await this.rethrowWithItemHealth(item.id, err);
+    }
 
+    await this.markConnectionHealthy(item.id);
     logger.info('Plaid single-account sync complete', {
       itemId: item.id,
       plaidAccountId: account.inst_id,
@@ -885,17 +930,9 @@ export class PlaidService {
     return posting.id;
   }
 
-  private async loadPlaidAccounts(item: {
-    id: string;
-    access_token: string;
-  }): Promise<StoredPlaidAccount[]> {
-    this.assertConfigured();
-    const accessToken = decryptAccessToken(item.access_token);
-    const client = getPlaidClient();
-    const response = await client.accountsGet({ access_token: accessToken });
-
+  private async loadFabriqAccountMappings(plaidItemId: string) {
     const mappings = await prisma.account.findMany({
-      where: { plaid_item_id: item.id, inst_id: { not: null } },
+      where: { plaid_item_id: plaidItemId, inst_id: { not: null } },
       select: {
         id: true,
         inst_id: true,
@@ -906,24 +943,68 @@ export class PlaidService {
         last_sync_at: true,
       },
     });
-    const fabriqByPlaidId = new Map(
-      mappings
-        .filter((m): m is typeof m & { inst_id: string } => m.inst_id !== null)
-        .map((m) => [
-          m.inst_id,
-          {
-            id: m.id,
-            name: m.name,
-            code: m.code,
-            classification: m.classification,
-            connectedAt: m.created_at,
-            lastSyncAt: m.last_sync_at,
-          },
-        ]),
-    );
+    return mappings.filter((m): m is typeof m & { inst_id: string } => m.inst_id !== null);
+  }
 
-    return response.data.accounts.map((acct) => {
-      const mapped = fabriqByPlaidId.get(acct.account_id);
+  private mappingToStoredAccount(
+    mapped: Awaited<ReturnType<PlaidService['loadFabriqAccountMappings']>>[number],
+  ): StoredPlaidAccount {
+    return {
+      plaid_account_id: mapped.inst_id,
+      name: mapped.name ?? null,
+      mask: null,
+      type: null,
+      subtype: null,
+      balance: null,
+      fabriq_account_id: mapped.id,
+      fabriq_account_name: mapped.name ?? null,
+      fabriq_account_code: mapped.code ?? null,
+      fabriq_classification: mapped.classification ?? null,
+      fabriq_connected_at: mapped.created_at?.toISOString() ?? null,
+      fabriq_last_sync_at: mapped.last_sync_at?.toISOString() ?? null,
+    };
+  }
+
+  /** Keep chart-of-accounts links visible even when Plaid omits or fails to return those sub-accounts. */
+  private mergeMappedAccounts(
+    plaidAccounts: StoredPlaidAccount[],
+    mappings: Awaited<ReturnType<PlaidService['loadFabriqAccountMappings']>>,
+  ): StoredPlaidAccount[] {
+    const byPlaidId = new Map(mappings.map((m) => [m.inst_id, m]));
+    const seen = new Set<string>();
+    const merged = plaidAccounts.map((acct) => {
+      seen.add(acct.plaid_account_id);
+      const mapped = byPlaidId.get(acct.plaid_account_id);
+      if (!mapped) return acct;
+      return {
+        ...acct,
+        fabriq_account_id: mapped.id,
+        fabriq_account_name: mapped.name ?? null,
+        fabriq_account_code: mapped.code ?? null,
+        fabriq_classification: mapped.classification ?? null,
+        fabriq_connected_at: mapped.created_at?.toISOString() ?? null,
+        fabriq_last_sync_at: mapped.last_sync_at?.toISOString() ?? null,
+      };
+    });
+    for (const mapped of mappings) {
+      if (!seen.has(mapped.inst_id)) {
+        merged.push(this.mappingToStoredAccount(mapped));
+      }
+    }
+    return merged;
+  }
+
+  private async loadPlaidAccounts(item: {
+    id: string;
+    access_token: string;
+  }): Promise<StoredPlaidAccount[]> {
+    this.assertConfigured();
+    const accessToken = decryptAccessToken(item.access_token);
+    const client = getPlaidClient();
+    const response = await client.accountsGet({ access_token: accessToken });
+    const mappings = await this.loadFabriqAccountMappings(item.id);
+
+    const fromPlaid = response.data.accounts.map((acct) => {
       const balance =
         acct.balances?.current ?? acct.balances?.available ?? acct.balances?.limit ?? null;
       return {
@@ -933,14 +1014,137 @@ export class PlaidService {
         type: acct.type ?? null,
         subtype: acct.subtype ?? null,
         balance: balance != null ? Number(balance) : null,
-        fabriq_account_id: mapped?.id ?? null,
-        fabriq_account_name: mapped?.name ?? null,
-        fabriq_account_code: mapped?.code ?? null,
-        fabriq_classification: mapped?.classification ?? null,
-        fabriq_connected_at: mapped?.connectedAt?.toISOString() ?? null,
-        fabriq_last_sync_at: mapped?.lastSyncAt?.toISOString() ?? null,
+        fabriq_account_id: null,
+        fabriq_account_name: null,
+        fabriq_account_code: null,
+        fabriq_classification: null,
+        fabriq_connected_at: null,
+        fabriq_last_sync_at: null,
       };
     });
+    return this.mergeMappedAccounts(fromPlaid, mappings);
+  }
+
+  private async storedAccountsFromMappings(plaidItemId: string): Promise<StoredPlaidAccount[]> {
+    const mappings = await this.loadFabriqAccountMappings(plaidItemId);
+    return mappings.map((mapped) => this.mappingToStoredAccount(mapped));
+  }
+
+  private async persistItemHealth(
+    itemDbId: string,
+    health: PlaidConnectionHealth,
+    options?: { keepConsent?: boolean },
+  ): Promise<void> {
+    await prisma.plaid_item.update({
+      where: { id: itemDbId },
+      data: {
+        status: health.status,
+        error_code: health.error_code,
+        error_message: health.error_message,
+        status_checked_at: new Date(),
+        ...(options?.keepConsent ? {} : { consent_expires_at: health.consent_expires_at }),
+      },
+    });
+  }
+
+  private async markConnectionHealthy(itemDbId: string): Promise<void> {
+    await this.persistItemHealth(
+      itemDbId,
+      {
+        status: 'healthy',
+        error_code: null,
+        error_message: null,
+        consent_expires_at: null,
+      },
+      { keepConsent: true },
+    );
+  }
+
+  private async rethrowWithItemHealth(itemDbId: string, err: unknown): Promise<never> {
+    if (extractPlaidApiError(err)) {
+      try {
+        await this.persistItemHealth(itemDbId, healthFromThrown(err), { keepConsent: true });
+      } catch (saveErr) {
+        logger.warn('Failed to persist Plaid item health', { itemDbId, saveErr });
+      }
+      throw plaidErrorToThrow(err);
+    }
+    throw err instanceof Error ? err : new Error('Plaid request failed');
+  }
+
+  private async accountsGetForItem(item: { id: string; access_token: string }) {
+    const accessToken = decryptAccessToken(item.access_token);
+    try {
+      const response = await getPlaidClient().accountsGet({ access_token: accessToken });
+      await this.markConnectionHealthy(item.id);
+      return response;
+    } catch (err) {
+      throw await this.rethrowWithItemHealth(item.id, err);
+    }
+  }
+
+  private async probeItemHealth(item: { id: string; access_token: string }): Promise<PlaidConnectionHealth> {
+    let accessToken: string;
+    try {
+      accessToken = decryptAccessToken(item.access_token);
+    } catch (err) {
+      const health: PlaidConnectionHealth = {
+        status: 'error',
+        error_code: 'TOKEN_DECRYPT_FAILED',
+        error_message: err instanceof Error ? err.message : 'Could not read the stored Plaid access token',
+        consent_expires_at: null,
+      };
+      await this.persistItemHealth(item.id, health);
+      return health;
+    }
+
+    try {
+      const response = await getPlaidClient().itemGet({ access_token: accessToken });
+      const health = healthFromPlaidItem(response.data.item);
+      await this.persistItemHealth(item.id, health);
+      return health;
+    } catch (err) {
+      const health = healthFromThrown(err);
+      try {
+        await this.persistItemHealth(item.id, health, { keepConsent: true });
+      } catch (saveErr) {
+        logger.warn('Failed to persist Plaid item health', { itemId: item.id, saveErr });
+      }
+      return health;
+    }
+  }
+
+  /** List view: saved connection, status, and mapped accounts. Does not call Plaid. */
+  private async toStoredItemSummary(item: {
+    id: string;
+    item_id: string;
+    institution_id: string | null;
+    institution_name: string | null;
+    legal_entity_id: string | null;
+    last_synced_at: Date | null;
+    created_at: Date;
+    status: string;
+    error_code: string | null;
+    error_message: string | null;
+    consent_expires_at: Date | null;
+    status_checked_at: Date | null;
+  }): Promise<PlaidItemSummary> {
+    const status = item.status === 'error' ? 'error' : 'healthy';
+    return {
+      id: item.id,
+      item_id: item.item_id,
+      institution_id: item.institution_id,
+      institution_name: item.institution_name,
+      legal_entity_id: item.legal_entity_id,
+      last_synced_at: item.last_synced_at?.toISOString() ?? null,
+      created_at: item.created_at.toISOString(),
+      status,
+      error_code: status === 'error' ? item.error_code : null,
+      error_message: status === 'error' ? item.error_message : null,
+      consent_expires_at: item.consent_expires_at?.toISOString() ?? null,
+      status_checked_at: item.status_checked_at?.toISOString() ?? null,
+      accounts: await this.storedAccountsFromMappings(item.id),
+    };
   }
 
   private async toItemSummary(item: {
@@ -953,11 +1157,24 @@ export class PlaidService {
     created_at: Date;
     access_token: string;
   }): Promise<PlaidItemSummary> {
+    let health = await this.probeItemHealth(item);
     let accounts: StoredPlaidAccount[] = [];
-    try {
-      accounts = await this.loadPlaidAccounts(item);
-    } catch (err) {
-      logger.warn('Failed to load Plaid accounts for item summary', { itemId: item.id, err });
+    if (health.status === 'healthy') {
+      try {
+        accounts = await this.loadPlaidAccounts(item);
+      } catch (err) {
+        logger.warn('Failed to load Plaid accounts for item summary', { itemId: item.id, err });
+        const thrown = healthFromThrown(err);
+        health = { ...thrown, consent_expires_at: health.consent_expires_at };
+        try {
+          await this.persistItemHealth(item.id, health);
+        } catch (saveErr) {
+          logger.warn('Failed to persist Plaid item health', { itemId: item.id, saveErr });
+        }
+        accounts = await this.storedAccountsFromMappings(item.id);
+      }
+    } else {
+      accounts = await this.storedAccountsFromMappings(item.id);
     }
 
     return {
@@ -968,6 +1185,11 @@ export class PlaidService {
       legal_entity_id: item.legal_entity_id,
       last_synced_at: item.last_synced_at?.toISOString() ?? null,
       created_at: item.created_at.toISOString(),
+      status: health.status,
+      error_code: health.error_code,
+      error_message: health.error_message,
+      consent_expires_at: health.consent_expires_at?.toISOString() ?? null,
+      status_checked_at: new Date().toISOString(),
       accounts,
     };
   }

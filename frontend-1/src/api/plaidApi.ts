@@ -25,6 +25,11 @@ export interface PlaidItem {
   legal_entity_id: string | null;
   last_synced_at: string | null;
   created_at: string;
+  status: 'healthy' | 'error';
+  error_code: string | null;
+  error_message: string | null;
+  consent_expires_at: string | null;
+  status_checked_at: string | null;
   accounts: PlaidAccount[];
 }
 
@@ -78,6 +83,18 @@ export const plaidAPI = {
 
   createLinkToken: () =>
     fetchAPI<{ link_token: string }>('/api/plaid/link-token', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  createUpdateLinkToken: (itemId: string) =>
+    fetchAPI<{ link_token: string }>(`/api/plaid/items/${itemId}/update-link-token`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  repairItem: (itemId: string) =>
+    fetchAPI<{ data: PlaidItem }>(`/api/plaid/items/${itemId}/repair`, {
       method: 'POST',
       body: JSON.stringify({}),
     }),

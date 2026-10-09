@@ -28,6 +28,12 @@ export interface PlaidItemSummary {
   legal_entity_id: string | null;
   last_synced_at: string | null;
   created_at: string;
+  /** `healthy` when Plaid item.error is empty. Any Plaid item error is `error`. */
+  status: 'healthy' | 'error';
+  error_code: string | null;
+  error_message: string | null;
+  consent_expires_at: string | null;
+  status_checked_at: string | null;
   accounts: StoredPlaidAccount[];
 }
 

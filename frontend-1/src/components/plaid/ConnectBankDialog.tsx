@@ -21,7 +21,7 @@ import { useEntity } from '@/contexts/EntityContext';
 import { Building2, Landmark, Loader2, Search } from 'lucide-react';
 
 /** Opens Plaid Link outside any modal — Radix dialogs block the Link overlay. */
-function PlaidLinkLauncher({
+export function PlaidLinkLauncher({
   linkToken,
   onSuccess,
   onExit,

@@ -1,12 +1,14 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { plaidAPI, PlaidItem } from '@/api/plaidApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConnectBankButton } from '@/components/plaid/ConnectBankDialog';
+import { ConnectBankButton, PlaidLinkLauncher } from '@/components/plaid/ConnectBankDialog';
 import { ConnectedAccounts } from '@/components/plaid/ConnectedAccounts';
 import { PlaidAccountSelectPanel } from '@/components/plaid/PlaidAccountSelectPanel';
 import { useToast } from '@/hooks/use-toast';
 import { Landmark, Loader2 } from 'lucide-react';
+import { PlaidLinkError, PlaidLinkOnExitMetadata } from 'react-plaid-link';
+import { plaidUserError } from '@/components/plaid/plaidUserErrors';
 
 export default function BankConnectionsPage() {
   const { toast } = useToast();
@@ -14,6 +16,10 @@ export default function BankConnectionsPage() {
   const [loading, setLoading] = useState(true);
   const [plaidConfigured, setPlaidConfigured] = useState(true);
   const [importItem, setImportItem] = useState<PlaidItem | null>(null);
+  const [repairItemId, setRepairItemId] = useState<string | null>(null);
+  const [updateLinkToken, setUpdateLinkToken] = useState<string | null>(null);
+  const repairItemIdRef = useRef<string | null>(null);
+  const updateCompleted = useRef(false);
 
   const loadItems = useCallback(async () => {
     try {
@@ -62,11 +68,84 @@ export default function BankConnectionsPage() {
     loadItems();
   };
 
-  const pendingImportItems = items.filter(
-    (item) =>
-      item.accounts.some((a) => !a.fabriq_account_id) &&
-      !item.accounts.some((a) => a.fabriq_account_id),
+  const handleReconnect = async (item: PlaidItem) => {
+    repairItemIdRef.current = item.id;
+    setRepairItemId(item.id);
+    try {
+      const res = await plaidAPI.createUpdateLinkToken(item.id);
+      setUpdateLinkToken(res.link_token);
+    } catch (err: unknown) {
+      repairItemIdRef.current = null;
+      setRepairItemId(null);
+      toast({
+        title: 'Could not start reconnect',
+        description: err instanceof Error ? err.message : 'Plaid did not return a link token',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUpdateSuccess = useCallback(async () => {
+    updateCompleted.current = true;
+    const itemId = repairItemIdRef.current;
+    setUpdateLinkToken(null);
+    if (!itemId) return;
+    try {
+      const res = await plaidAPI.repairItem(itemId);
+      await loadItems();
+      if (res.data.status === 'healthy') {
+        toast({
+          title: 'Bank reconnected',
+          description: 'Plaid accepted the login. You can sync this connection again.',
+        });
+      } else {
+        toast({
+          title: 'Reconnect incomplete',
+          description: plaidUserError(res.data.error_code).message,
+          variant: 'destructive',
+        });
+      }
+    } catch (err: unknown) {
+      toast({
+        title: 'Could not refresh connection',
+        description: err instanceof Error ? err.message : 'Failed to check the connection after login',
+        variant: 'destructive',
+      });
+      await loadItems();
+    } finally {
+      repairItemIdRef.current = null;
+      setRepairItemId(null);
+    }
+  }, [loadItems, toast]);
+
+  const handleUpdateExit = useCallback(
+    (error: PlaidLinkError | null, _metadata: PlaidLinkOnExitMetadata) => {
+      if (updateCompleted.current) {
+        updateCompleted.current = false;
+        return;
+      }
+      repairItemIdRef.current = null;
+      setUpdateLinkToken(null);
+      setRepairItemId(null);
+      if (error) {
+        toast({
+          title: 'Reconnect cancelled',
+          description:
+            error.display_message || plaidUserError(error.error_code).message,
+          variant: 'destructive',
+        });
+      }
+    },
+    [toast],
   );
+
+  const pendingImportItems = items.filter((item) => {
+    const accounts = item.accounts ?? [];
+    return (
+      accounts.some((a) => !a.fabriq_account_id) &&
+      !accounts.some((a) => a.fabriq_account_id)
+    );
+  });
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -130,8 +209,18 @@ export default function BankConnectionsPage() {
           items={items}
           onRefresh={loadItems}
           onImportAccounts={openImportStep}
+          onReconnect={handleReconnect}
+          reconnectingId={repairItemId}
         />
       )}
+
+      <PlaidLinkLauncher
+        linkToken={updateLinkToken}
+        onSuccess={() => {
+          void handleUpdateSuccess();
+        }}
+        onExit={handleUpdateExit}
+      />
 
       <PlaidAccountSelectPanel
         open={importItem !== null}
