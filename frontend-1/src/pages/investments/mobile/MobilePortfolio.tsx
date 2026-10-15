@@ -73,6 +73,7 @@ function HoldingCard({ row }: { row: HoldingRow }) {
   const currency = row.native_currency_code ?? "USD";
   const rate = row.conversion_rate || 1;
   const avgCost = toNative(row.average_cost, rate);
+  const curPrice = toNative(row.current_price, rate);
   const mktValue = toNative(row.market_value, rate);
   const unrPnl = toNative(row.unrealized_pnl, rate);
   const pnlPositive = (unrPnl ?? 0) >= 0;
@@ -96,9 +97,10 @@ function HoldingCard({ row }: { row: HoldingRow }) {
           </p>
         </div>
       </div>
-      <div className="mt-1.5 flex justify-between text-[11px] text-slate-500">
+      <div className="mt-1.5 flex justify-between gap-2 text-[11px] text-slate-500">
         <span>{fmtQty(row.quantity)} shares</span>
         <span>Avg {avgCost != null ? formatCurrency(avgCost, currency) : "—"}</span>
+        <span>Price {curPrice != null ? formatCurrency(curPrice, currency) : "—"}</span>
       </div>
     </div>
   );

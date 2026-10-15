@@ -16,9 +16,18 @@ import {
   useOptionsIncomeReport,
   computeLegMarketValue,
   computeLegUnrealizedPnl,
+  getUnderlyingPriceStatus,
   type OpenPositionFilter,
   type OptionsIncomeTransactionRow,
+  type PriceStatus,
 } from "../data/useOptionsIncomeData";
+
+const priceStatusClass: Record<PriceStatus, string> = {
+  safe: "text-emerald-700",
+  warning: "text-orange-600",
+  danger: "text-red-600",
+  neutral: "text-slate-700",
+};
 
 function fmtQty(n: number) {
   return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
@@ -80,6 +89,8 @@ function OpenPositionCard({ row, currency }: { row: OptionsIncomeTransactionRow;
   const leg = row.open_leg;
   const marketValue = computeLegMarketValue(row);
   const unrealizedPnl = computeLegUnrealizedPnl(row);
+  const underlyingStatus = getUnderlyingPriceStatus(row);
+  const underlyingPx = row.underlying_current_price;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -106,6 +117,9 @@ function OpenPositionCard({ row, currency }: { row: OptionsIncomeTransactionRow;
         )}
       </div>
       <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+        <span className={cn("font-mono", underlyingPx != null ? priceStatusClass[underlyingStatus] : "text-slate-400")}>
+          Underlying {underlyingPx != null ? formatCurrency(underlyingPx, currency) : "—"}
+        </span>
         <span>
           Mark {row.option_current_price != null ? formatCurrency(row.option_current_price, currency) : "—"}
         </span>
