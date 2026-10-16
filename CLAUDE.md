@@ -40,6 +40,7 @@ cd frontend-1 && npm run dev           # Start frontend (port 5173)
 | Question / Task | Document |
 |-----------------|----------|
 | How does the system architecture work? | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
+| Kernel boundary, system org, and future Postgres RLS | [docs/kernel/README.md](./docs/kernel/README.md) |
 | Backend development (adding models, APIs) | [docs/BACKEND.md](./docs/BACKEND.md) |
 | Frontend development (adding pages, forms) | [docs/FRONTEND.md](./docs/FRONTEND.md) |
 | Multi-brand / white-label frontend (`config/<brand>/`, select-brand) | [docs/FRONTEND.md#multi-brand-app-configuration](./docs/FRONTEND.md#multi-brand-app-configuration) |
