@@ -1,11 +1,13 @@
 /**
- * Verifies METADATA_MODELS_WITHOUT_ORG_FILTER models are not org-scoped by DAL.
+ * Two orgs. Act as org A. Shareable rows include org_system.
+ * A write where-clause for org A does not match org B.
  */
 import { DataAccessLayer } from '../../services/dal/DataAccessLayer';
 import prisma from '../../lib/prisma';
 import type { AuthContext } from '../../auth/types';
+import { ORG_SYSTEM, buildScopedWhere } from '../../tenancy/orgScope';
 
-const EXEMPT_MODELS = [
+const SHAREABLE = [
   'role',
   'workflow_flow',
   'workflow_state',
@@ -14,31 +16,30 @@ const EXEMPT_MODELS = [
   'permission',
   'role_view',
   'prompt_template',
-  'agent_model_tool_config',
   'currency',
-  'instrument',
 ] as const;
 
-const NON_EXEMPT_MODELS = ['account', 'posting', 'supplier', 'user', 'role_user'] as const;
+const PRIVATE = ['user', 'role_user', 'workflow_instance', 'comment'] as const;
 
-function mockContext(orgId = 'org_test'): AuthContext {
+function mockContext(orgId = 'org_a', isPlatformAdmin = false): AuthContext {
   return {
     user: {
       id: 'user_test',
       email: 'test@example.com',
       name: 'Test User',
       org_id: orgId,
-      roles: ['Admin'],
     },
-  } as AuthContext;
+    isPlatformAdmin,
+  };
 }
 
-describe('METADATA_MODELS_WITHOUT_ORG_FILTER', () => {
+describe('org scope', () => {
   const dal = DataAccessLayer.getInstance(prisma);
   const addOrgFilter = (dal as any).addOrgFilter.bind(dal) as (
     model: string,
     options: { where?: Record<string, unknown> },
-    context: AuthContext
+    context: AuthContext,
+    mode?: 'read' | 'write'
   ) => { where?: Record<string, unknown> };
   const applyWriteScopeDefaults = (dal as any).applyWriteScopeDefaults.bind(dal) as (
     model: string,
@@ -46,28 +47,41 @@ describe('METADATA_MODELS_WITHOUT_ORG_FILTER', () => {
     context: AuthContext
   ) => void;
 
-  it.each(EXEMPT_MODELS)('read: %s does not get org_id filter', (model) => {
+  it.each(SHAREABLE)('read: %s includes the caller org and org_system', (model) => {
     const result = addOrgFilter(model, { where: { id: 'x' } }, mockContext());
-    expect(result.where).toEqual({ id: 'x' });
-    expect(result.where).not.toHaveProperty('org_id');
+    expect(result.where).toEqual({
+      AND: [{ id: 'x' }, { OR: [{ org_id: 'org_a' }, { org_id: ORG_SYSTEM }] }],
+    });
   });
 
-  it.each(EXEMPT_MODELS)('write: %s does not get org_id injected', (model) => {
-    const data: Record<string, unknown> = { name: 'test', org_id: 'should_be_stripped' };
+  it.each(SHAREABLE)('write: %s is stamped with the caller org', (model) => {
+    const data: Record<string, unknown> = { name: 'test', org_id: 'should_be_replaced' };
     applyWriteScopeDefaults(model, data, mockContext());
-    expect(data.org_id).toBeUndefined();
+    expect(data.org_id).toBe('org_a');
     expect(data.created_by).toBe('user_test');
-    expect(data.modified_by).toBe('user_test');
   });
 
-  it.each(NON_EXEMPT_MODELS)('read: %s gets org_id filter', (model) => {
-    const result = addOrgFilter(model, { where: { id: 'x' } }, mockContext('org_abc'));
-    expect(result.where).toEqual({ id: 'x', org_id: 'org_abc' });
+  it('platform admin may create a shareable row on org_system', () => {
+    const data: Record<string, unknown> = { name: 'default', org_id: ORG_SYSTEM };
+    applyWriteScopeDefaults('workflow_flow', data, mockContext('org_a', true));
+    expect(data.org_id).toBe(ORG_SYSTEM);
   });
 
-  it.each(NON_EXEMPT_MODELS)('write: %s gets org_id injected', (model) => {
-    const data: Record<string, unknown> = { name: 'test' };
-    applyWriteScopeDefaults(model, data, mockContext('org_abc'));
-    expect(data.org_id).toBe('org_abc');
+  it.each(PRIVATE)('read: %s is limited to the caller org', (model) => {
+    const result = addOrgFilter(model, { where: { id: 'x' } }, mockContext());
+    expect(result.where).toEqual({ AND: [{ id: 'x' }, { org_id: 'org_a' }] });
+  });
+
+  it('deleteMany for org A does not match an org B id by itself', () => {
+    const where = buildScopedWhere('user', { id: { in: ['user_b'] } }, 'org_a', 'write');
+    expect(where).toEqual({
+      AND: [{ id: { in: ['user_b'] } }, { org_id: 'org_a' }],
+    });
+    expect(JSON.stringify(where)).not.toContain('org_b');
+  });
+
+  it('agent_model_tool_config has no org column and is not filtered', () => {
+    const result = addOrgFilter('agent_model_tool_config', { where: { id: 'x' } }, mockContext());
+    expect(result.where).toEqual({ id: 'x' });
   });
 });

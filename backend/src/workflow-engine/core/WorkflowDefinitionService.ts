@@ -1,6 +1,7 @@
 import { WorkflowPrismaClient } from '../types/prisma.types';
 import { WorkflowFlow, WorkflowState, WorkflowAction } from '../types/workflow.types';
 import logger from '../../utils/logger';
+import { ORG_SYSTEM } from '../../tenancy/orgScope';
 
 export class WorkflowDefinitionService {
   private prisma: WorkflowPrismaClient;
@@ -31,7 +32,7 @@ export class WorkflowDefinitionService {
     };
   }
 
-  async createWorkflowFlow(name: string, model_name: string, description?: string): Promise<WorkflowFlow> {
+  async createWorkflowFlow(name: string, model_name: string, description?: string, orgId?: string): Promise<WorkflowFlow> {
     try {
       if (!name || !model_name) {
         throw new Error('Name and model_name are required');
@@ -42,6 +43,7 @@ export class WorkflowDefinitionService {
           name,
           model_name,
           description,
+          org_id: orgId,
         },
       });
 
@@ -52,9 +54,10 @@ export class WorkflowDefinitionService {
     }
   }
 
-  async getWorkflowFlows(): Promise<WorkflowFlow[]> {
+  async getWorkflowFlows(orgId?: string): Promise<WorkflowFlow[]> {
     try {
       const flows = await this.prisma.workflow_flow.findMany({
+        where: orgId ? { OR: [{ org_id: orgId }, { org_id: ORG_SYSTEM }] } : undefined,
         include: {
           states: {
             orderBy: [{ sequence: 'asc' }, { created_at: 'asc' }],

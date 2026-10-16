@@ -11,6 +11,8 @@ import {
   WorkflowHistory,
 } from '../types/workflow.types';
 import { PermissionService } from '../../services/permissions/PermissionService';
+import { NotFoundError } from '../../tenancy/errors';
+import { assignmentDenial } from './assignment';
 import { ExpressionEvaluator } from './ExpressionEvaluator';
 import logger from '../../utils/logger';
 import { AuthContext } from '../../auth/types';
@@ -138,8 +140,8 @@ export class WorkflowEngine {
       },
     });
 
-    if (!instance) {
-      throw new Error(`Workflow instance ${instanceId} not found`);
+    if (!instance || instance.org_id !== authContext.user.org_id) {
+      throw new NotFoundError('Workflow instance not found');
     }
 
     const currentState = await this.prisma.workflow_state.findFirst({
@@ -200,37 +202,33 @@ export class WorkflowEngine {
       errors.push(`Action ${action.name} is not available in current state`);
     }
 
-    // Check authorization based on assigned_for
     const state = context.currentState;
-    switch (state.assigned_for) {
-      case 'USER':
-        // If the action is assigned to a user, check if the user is the assigned user or the creator of the instance
-        if (state.assigned_user_id !== context.user.id && context.instance.created_by !== context.user.id) {
-          errors.push(`User ${context.user.id} is not authorized to perform this action`);
-        }
-        break;
+    const denial = assignmentDenial({
+      assigned_for: state.assigned_for,
+      assigned_role_id: state.assigned_role_id,
+      assigned_user_id: state.assigned_user_id,
+      userId: context.user.id,
+      userRoleIds: context.user.roles,
+      createdBy: context.instance.created_by,
+    });
+    if (denial) {
+      errors.push(denial);
+    }
 
-      case 'ROLE':
-        if (state.assigned_role_id && !context.user.roles.includes(state.assigned_role_id)) {
-          errors.push(`User ${context.user.id} does not have required role`);
+    if (state.assigned_for === 'EXPRESSION' && state.assigned_expression) {
+      const authorizedUserId = await this.expressionEvaluator.evaluateExpression(
+        state.assigned_expression,
+        {
+          modelType: context.instance.model_name,
+          modelId: context.instance.model_id,
+          orgId: context.instance.org_id
         }
-        break;
-
-      case 'EXPRESSION':
-        if (state.assigned_expression) {
-          const authorizedUserId = await this.expressionEvaluator.evaluateExpression(
-            state.assigned_expression,
-            {
-              modelType: context.instance.model_name,
-              modelId: context.instance.model_id,
-              orgId: context.instance.org_id
-            }
-          );
-          if (authorizedUserId !== context.user.id) {
-            errors.push(`User ${context.user.id} is not authorized by expression`);
-          }
-        }
-        break;
+      );
+      if (authorizedUserId !== context.user.id) {
+        errors.push(`User ${context.user.id} is not authorized by expression`);
+      }
+    } else if (state.assigned_for === 'EXPRESSION' && !state.assigned_expression) {
+      errors.push('Expression assignment has no expression');
     }
 
     return {
@@ -806,9 +804,16 @@ export class WorkflowEngine {
     return context.availableActions;
   }
 
-  async getWorkflowHistory(instanceId: string): Promise<WorkflowHistory[]> {
+  async getWorkflowHistory(instanceId: string, orgId: string): Promise<WorkflowHistory[]> {
+    const instance = await this.prisma.workflow_instance.findFirst({
+      where: { id: instanceId, org_id: orgId },
+      select: { id: true },
+    });
+    if (!instance) {
+      throw new NotFoundError('Workflow instance not found');
+    }
     const history = await this.prisma.workflow_history.findMany({
-      where: { instance_id: instanceId },
+      where: { instance_id: instanceId, org_id: orgId },
       orderBy: { performed_at: 'asc' },
     });
     return history.map((h: any) => ({
@@ -817,7 +822,7 @@ export class WorkflowEngine {
     })) as WorkflowHistory[];
   }
 
-  async getWorkflowInstancesByState(stateId: string, userId: string, userRoleIds: string[]): Promise<any[]> {
+  async getWorkflowInstancesByState(stateId: string, userId: string, userRoleIds: string[], orgId: string): Promise<any[]> {
     try {
       const state = await this.prisma.workflow_state.findUnique({
         where: { id: stateId },
@@ -828,26 +833,41 @@ export class WorkflowEngine {
         throw new Error('Workflow state not found');
       }
 
+      const denial = assignmentDenial({
+        assigned_for: state.assigned_for,
+        assigned_role_id: state.assigned_role_id,
+        assigned_user_id: userId,
+        userId,
+        userRoleIds,
+        createdBy: userId,
+      });
+      if (state.assigned_for !== 'USER' && state.assigned_for !== 'EXPRESSION' && denial) {
+        throw new Error(denial);
+      }
+
       let where: any = {
         current_state_id: stateId,
-        status: 'active'
+        status: 'active',
+        org_id: orgId,
       };
 
-      // Add access conditions based on assignment type
       switch (state.assigned_for) {
         case 'USER':
           where.assigned_user_id = userId;
           break;
 
         case 'ROLE':
-          if (!state.assigned_role_id || !userRoleIds.includes(state.assigned_role_id)) {
-            throw new Error('User does not have the required role for this state');
+          if (denial) {
+            throw new Error(denial);
           }
           break;
 
         case 'EXPRESSION':
           where.assigned_user_id = userId;
           break;
+
+        default:
+          throw new Error(denial || 'Assignment is not allowed');
       }
 
       const instances = await this.prisma.workflow_instance.findMany({
@@ -951,15 +971,29 @@ export class WorkflowEngine {
     return { createdByList, assignedToList, roleBasedList };
   }
 
-  async getComments(instanceId: string): Promise<any[]> {
+  async getComments(instanceId: string, orgId: string): Promise<any[]> {
+    const instance = await this.prisma.workflow_instance.findFirst({
+      where: { id: instanceId, org_id: orgId },
+      select: { id: true },
+    });
+    if (!instance) {
+      throw new NotFoundError('Workflow instance not found');
+    }
     const comments = await this.prisma.comment.findMany({
-      where: { wf_instance_id: instanceId },
+      where: { wf_instance_id: instanceId, org_id: orgId },
     });
     return comments;
   }
 
   async addComment(instanceId: string, comment: string, authContext: AuthContext, historyId?: string, tx?: any): Promise<any> {
     try {
+      const instance = await this.prisma.workflow_instance.findFirst({
+        where: { id: instanceId, org_id: authContext.user.org_id },
+        select: { id: true },
+      });
+      if (!instance) {
+        throw new NotFoundError('Workflow instance not found');
+      }
       const newComment = await (tx || this.prisma).comment.create({
         data: {
           comment: comment,
@@ -982,9 +1016,12 @@ export class WorkflowEngine {
     }
   }
 
-  async getHistory(modelName: string, instanceId: string): Promise<any[]> {
+  async getHistory(modelName: string, instanceId: string, orgId?: string): Promise<any[]> {
     const history = await this.prisma.workflow_history.findMany({
-      where: { instance_id: instanceId },
+      where: {
+        instance_id: instanceId,
+        ...(orgId ? { org_id: orgId } : {}),
+      },
     });
     return history;
   }

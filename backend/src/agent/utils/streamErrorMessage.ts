@@ -1,4 +1,5 @@
 import { APICallError } from 'ai';
+import { isNotFoundError } from '../../tenancy/errors';
 
 /**
  * AI SDK masks stream errors by default in toDataStreamResponse() → client sees
@@ -75,6 +76,7 @@ export function isAbortError(error: unknown): boolean {
  * (e.g. POST /api/agent/extract).
  */
 export function getAgentHttpStatusCode(error: unknown): number {
+  if (isNotFoundError(error)) return 404;
   if (isAbortError(error)) return 504;
 
   const providerStatus = getApiCallStatusCode(error);

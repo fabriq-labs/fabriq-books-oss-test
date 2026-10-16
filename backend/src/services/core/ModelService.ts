@@ -471,7 +471,8 @@ export class ModelService {
       options?.viewName,
       options
     );
-    const dalResult = await this.dal.deleteMany(modelName, context, ids, { select });
+    const idList = Array.isArray(ids) ? ids : ids?.ids;
+    const dalResult = await this.dal.deleteMany(modelName, context, { ids: idList ?? [] }, { select });
     return {
       success: dalResult.success,
       data: dalResult.data,
@@ -481,71 +482,12 @@ export class ModelService {
   }
 
   /**
-   * Execute advanced SQL queries for complex operations
+   * Analytics SQL lives in the analytics executor so the generic model service
+   * does not run raw queries.
    */
   async executeSqlQuery(query: string, context: AuthContext): Promise<DataAccessResult> {
-    logger.debug('Executing advanced SQL query', { query: query.substring(0, 100) + '...' });
-
-    try {
-      // Require authentication for all SQL queries
-      if (!context.user) {
-        logger.warn('No user context found for SQL query');
-        return { success: false, error: 'Authentication required' };
-      }
-
-      // Basic SQL injection prevention - check for dangerous keywords
-      // Only block standalone dangerous keywords, not keywords that are part of field names or values
-      const dangerousKeywords = ['DROP', 'DELETE', 'TRUNCATE', 'ALTER', 'INSERT', 'UPDATE'];
-      const upperQuery = query.toUpperCase();
-
-      // Remove "CREATE" from dangerous keywords since it's commonly used in field names like created_at, created_by
-      // Instead, we'll rely on the SELECT-only check below
-
-      for (const keyword of dangerousKeywords) {
-        if (upperQuery.includes(keyword)) {
-          logger.warn('Potentially dangerous SQL keyword detected', { keyword, query: query.substring(0, 100) });
-          return {
-            success: false,
-            error: `SQL query contains potentially dangerous keyword: ${keyword}. Only SELECT queries are allowed.`
-          };
-        }
-      }
-
-      // Ensure query starts with SELECT
-      if (!upperQuery.trim().startsWith('SELECT')) {
-        logger.warn('Non-SELECT SQL query attempted', { query: query.substring(0, 100) });
-        return {
-          success: false,
-          error: 'Only SELECT queries are allowed for security reasons.'
-        };
-      }
-
-      // Execute the query using Prisma's $queryRaw
-      const result = await this.prisma.$queryRawUnsafe(query);
-
-      logger.debug('SQL query executed successfully', {
-        rowCount: Array.isArray(result) ? result.length : 1
-      });
-
-      return {
-        success: true,
-        data: Array.isArray(result) ? result : [result],
-        metaData: null,
-        error: undefined
-      };
-
-    } catch (error: any) {
-      logger.error('Error executing SQL query', {
-        error: error.message,
-        query: query.substring(0, 100) + '...'
-      });
-      return {
-        success: false,
-        data: null,
-        metaData: null,
-        error: error.message
-      };
-    }
+    const { executeAnalyticsSql } = await import('../analytics/sqlExecutor');
+    return executeAnalyticsSql(query, context);
   }
 
   /**

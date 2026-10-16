@@ -1,6 +1,6 @@
 # Kernel
 
-**Status**: Design notes. The security fixes are not started. Postgres row-level security is not implemented.
+**Status**: Application tenancy is in the data access layer, auth middleware, workflow engine, and agent runtime. Postgres row-level security is not implemented.
 
 The shell branch has no books models. Domain code goes in the folders described in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md). The work waiting for approval is [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md).
 
@@ -100,13 +100,13 @@ Check these points in the implementation review:
 4. **Foreign keys ignore RLS.** A string column can store another tenant's id. The setup-script foreign key checks that the id exists. It does not check that the org matches. Add that check only where a cross-tenant reference is unacceptable.
 5. **Align `currency.org_id`.** Replace the existing `'system'` value with `org_system` in the same change that turns RLS on.
 
-## Queued engine work
+## Engine work now in code
 
-These are the first code changes on this branch, still ahead of RLS:
-
-1. Auth middleware fails closed except on an explicit public list.
-2. Every data-access mutation, including bulk delete and nested relations, filters on `org_id`.
-3. Shareable reads include the caller org and `org_system`. Tenant writes do not.
+1. Auth middleware fails closed except on `/api/auth/login`, `/api/health`, and `/api/agent/health`.
+2. Data-access reads and mutations, including bulk delete and nested relations, filter on `org_id`.
+3. Shareable reads include the caller org and `org_system`. Tenant writes stay on the caller org. A platform admin may write `org_system`.
 4. Workflow instance reads and transitions require the instance org. Unknown `assigned_for` is denied.
-5. Agent admin routes require platform admin. Pending-action updates and session turns require the caller org. Supervised mode drops mutating tools in code.
-6. Raw SQL leaves the generic model service.
+5. Workflow definition writes and `/api/agent/admin/*` require platform admin. Pending-action updates and session turns require the caller org. Supervised mode drops mutating tools in `ToolManager`.
+6. Raw SQL runs in `services/analytics/sqlExecutor.ts`, which allowlists tables and requires the caller org id on tenant tables.
+
+Rows whose `org_id` is null are not returned. Setup should store shared defaults as `org_system`. Row-level security is still the later review in the section above.

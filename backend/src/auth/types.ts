@@ -37,6 +37,8 @@ export interface Permissions {
 
 export interface AuthContext {
   user: User;
+  /** True when the user has the Super Admin role. */
+  isPlatformAdmin?: boolean;
   permissions?: Permissions;
   model?: string;
   view?: string;

@@ -1,6 +1,7 @@
 import { Router, Request } from 'express';
 import { AgentService } from './AgentService';
 import { authMiddleware } from '../auth/middleware';
+import { requirePlatformAdmin } from '../auth/platformAdmin';
 import { AuthContext } from '../auth/types';
 import logger from '../utils/logger';
 import { Readable } from 'stream';
@@ -599,6 +600,10 @@ export function createAgentRouter() {
       if (!req.context?.auth?.user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
+      const existing = await getAgentSession(req.params.id);
+      if (existing.org_id !== req.context.auth.user.org_id) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
       const { status, mode, plan, current_step_index, accumulated_context } = req.body;
       const session = await updateAgentSession(req.params.id, {
         status,
@@ -817,7 +822,7 @@ export function createAgentRouter() {
   // ==========================================
 
   /** GET /api/agent/admin/templates — List all templates (active + inactive) for admin */
-  router.get('/admin/templates', authMiddleware, async (req: Request, res) => {
+  router.get('/admin/templates', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const templates = await prisma.agent_template.findMany({
@@ -831,7 +836,7 @@ export function createAgentRouter() {
   });
 
   /** GET /api/agent/admin/templates/:id — Get a single agent template by ID */
-  router.get('/admin/templates/:id', authMiddleware, async (req: Request, res) => {
+  router.get('/admin/templates/:id', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const template = await prisma.agent_template.findUnique({ where: { id: req.params.id } });
@@ -843,7 +848,7 @@ export function createAgentRouter() {
   });
 
   /** POST /api/agent/admin/templates — Create a new agent template */
-  router.post('/admin/templates', authMiddleware, async (req: Request, res) => {
+  router.post('/admin/templates', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const {
@@ -879,7 +884,7 @@ export function createAgentRouter() {
   });
 
   /** PUT /api/agent/admin/templates/:id — Update an agent template */
-  router.put('/admin/templates/:id', authMiddleware, async (req: Request, res) => {
+  router.put('/admin/templates/:id', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const { id } = req.params;
@@ -919,7 +924,7 @@ export function createAgentRouter() {
   });
 
   /** DELETE /api/agent/admin/templates/:id — Delete an agent template */
-  router.delete('/admin/templates/:id', authMiddleware, async (req: Request, res) => {
+  router.delete('/admin/templates/:id', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const { id } = req.params;
@@ -938,7 +943,7 @@ export function createAgentRouter() {
   // ==========================================
 
   /** GET /api/agent/admin/model-tools/catalog — Tool names + labels for checkboxes */
-  router.get('/admin/model-tools/catalog', authMiddleware, async (req: Request, res) => {
+  router.get('/admin/model-tools/catalog', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const { AGENT_TOOL_CATALOG } = await import('./toolRegistry');
@@ -949,7 +954,7 @@ export function createAgentRouter() {
   });
 
   /** GET /api/agent/admin/model-tools — List per-model tool configs */
-  router.get('/admin/model-tools', authMiddleware, async (req: Request, res) => {
+  router.get('/admin/model-tools', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const { listModelToolConfigsForAdmin } = await import('./agentModelToolConfigCache');
@@ -962,7 +967,7 @@ export function createAgentRouter() {
   });
 
   /** GET /api/agent/admin/model-tools/:modelName */
-  router.get('/admin/model-tools/:modelName', authMiddleware, async (req: Request, res) => {
+  router.get('/admin/model-tools/:modelName', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const { listModelToolConfigsForAdmin } = await import('./agentModelToolConfigCache');
@@ -976,7 +981,7 @@ export function createAgentRouter() {
   });
 
   /** PUT /api/agent/admin/model-tools/:modelName — Upsert model tool config */
-  router.put('/admin/model-tools/:modelName', authMiddleware, async (req: Request, res) => {
+  router.put('/admin/model-tools/:modelName', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const { modelName } = req.params;
@@ -1002,7 +1007,7 @@ export function createAgentRouter() {
   });
 
   /** POST /api/agent/admin/model-tools/seed — Apply prisma/seed-agent-model-tools.sql (idempotent) */
-  router.post('/admin/model-tools/seed', authMiddleware, async (req: Request, res) => {
+  router.post('/admin/model-tools/seed', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
     try {
       if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
       const { seedDefaultModelToolConfigs } = await import('./agentModelToolConfigCache');

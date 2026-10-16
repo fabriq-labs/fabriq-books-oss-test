@@ -1,8 +1,8 @@
 # Kernel implementation plan
 
-**Status: waiting for review. Do not start the code changes in this document until they are approved.**
+**Status: phases 1–4 are in the shell branch. Phase 5 (row-level security) is not started.**
 
-The shell branch `agentc/kernel-shell-53fb` is the domain-neutral tree. It contains this plan, the tenancy notes in [README.md](./README.md), and empty domain folders. Books models, books services, and the books route table are not on that branch. Some unreferenced books UI files are still in `frontend-1` and are not mounted. The security work below is not implemented.
+The shell branch `agentc/kernel-shell-53fb` is the domain-neutral tree. It contains this plan, the tenancy notes in [README.md](./README.md), and empty domain folders. Books models, books services, and the books route table are not on that branch. Unreferenced books screens are removed. Chat renders search, SQL, and metrics results. Shared helpers still contain a few books field names in comments and option lists.
 
 ## Goal
 

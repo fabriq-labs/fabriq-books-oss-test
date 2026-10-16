@@ -32,19 +32,15 @@ export function createSlackRouter() {
                 return res.status(200).send(payload.challenge);
             }
 
-            // Verify the request is from Slack
-            if (process.env.SLACK_SIGNING_SECRET) {
-                try {
-                    await verifyRequest({
-                        requestType,
-                        headers: req.headers,
-                        rawBody,
-                    });
-                } catch (error) {
-                    logger.warn('Could not verify Slack request', error);
-                    // In production, you might want to reject unverified requests
-                    // return res.status(401).json({ error: 'Invalid Slack signature' });
-                }
+            try {
+                await verifyRequest({
+                    requestType,
+                    headers: req.headers,
+                    rawBody,
+                });
+            } catch (error) {
+                logger.warn('Could not verify Slack request', error);
+                return res.status(401).json({ error: 'Invalid Slack signature' });
             }
 
             // Get bot user ID

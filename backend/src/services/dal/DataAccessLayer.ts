@@ -9,28 +9,18 @@ import { execute_Action } from '../../domain/actions';
 import { PrismaSchemaParser } from '../../utils/PrismaSchemaParser';
 import { EntityDefinition, RelationshipDefinition } from '../../models/ModelRegistry';
 import { SearchQueryBuilder } from '../query/SearchQueryBuilder';
+import {
+  applyOrgOnWrite,
+  mergeWhere,
+  readOrgScope,
+  writeOrgScope,
+} from '../../tenancy/orgScope';
+import { NotFoundError } from '../../tenancy/errors';
 
 export class DataAccessLayer {
   private static instance: DataAccessLayer;
   private prisma: PrismaClient;
   private schemaParser: PrismaSchemaParser;
-
-  // Models that should not have org_id filtering applied
-  private static readonly METADATA_MODELS_WITHOUT_ORG_FILTER = [
-    'role',
-    'workflow_flow',
-    'workflow_state',
-    'workflow_action',
-    'view',
-    'permission',
-    'role_view',
-    'prompt_template',
-    'agent_model_tool_config', // Global agent tool assignment per model (no org_id)
-    'currency', // Global platform data — seeded once, shared across all tenants
-    'instrument', // Global security master — shared across orgs; isolation via holding
-    'tax_region', // System (and shared) place-of-supply regions; org_id may be 'system'
-    // 'chat_thread', // Scoped by user_id, not org_id
-  ];
 
   private constructor(prisma: PrismaClient) {
     this.prisma = prisma;
@@ -144,35 +134,42 @@ export class DataAccessLayer {
     return PermissionService.validatePermissions(context, modelName, operation);
   }
 
-  private addOrgFilter(modelName: string, options: any, context: AuthContext): any {
-    const normalizedModel = modelName.toLowerCase();
+  private orgScope(modelName: string, context: AuthContext, mode: 'read' | 'write'): Record<string, unknown> | null {
+    const orgId = context.user?.org_id;
+    if (!orgId) return { org_id: '__missing_org__' };
+    return mode === 'write'
+      ? writeOrgScope(modelName, orgId, !!context.isPlatformAdmin)
+      : readOrgScope(modelName, orgId);
+  }
 
-    // Skip org filtering for metadata models that don't use org_id
-    if (DataAccessLayer.METADATA_MODELS_WITHOUT_ORG_FILTER.includes(normalizedModel)) {
-      return options;
+  private addOrgFilter(modelName: string, options: any, context: AuthContext, mode: 'read' | 'write' = 'read'): any {
+    const scope = this.orgScope(modelName, context, mode);
+    return {
+      ...options,
+      where: mergeWhere(options?.where, scope),
+    };
+  }
+
+  /**
+   * Unique writes cannot take an OR scope. Confirm the row is in scope, then
+   * return a where Prisma can use for update and delete.
+   */
+  private async scopedUniqueWhere(
+    modelName: string,
+    where: Record<string, unknown>,
+    context: AuthContext,
+    mode: 'read' | 'write'
+  ): Promise<Record<string, unknown> | null> {
+    const scope = this.orgScope(modelName, context, mode);
+    if (!scope) return where;
+    if (typeof scope.org_id === 'string') {
+      return { ...where, org_id: scope.org_id };
     }
-
-    // Skip org filtering if no user context or no org_id
-    if (!context.user?.org_id) {
-      return options;
-    }
-
-    // Create a new options object to avoid mutating the original
-    const newOptions = { ...options };
-
-    // Add org_id to where clause
-    if (newOptions.where) {
-      newOptions.where = {
-        ...newOptions.where,
-        org_id: context.user.org_id
-      };
-    } else {
-      newOptions.where = {
-        org_id: context.user.org_id
-      };
-    }
-
-    return newOptions;
+    const row = await this.getModel(modelName).findFirst({
+      where: mergeWhere(where, scope),
+      select: { id: true },
+    });
+    return row ? where : null;
   }
 
   private applyWriteScopeDefaults(
@@ -182,12 +179,18 @@ export class DataAccessLayer {
   ): void {
     filteredData.created_by = context.user!.id;
     filteredData.modified_by = context.user!.id;
+    applyOrgOnWrite(modelName, filteredData, context.user!.org_id, !!context.isPlatformAdmin, true);
+  }
 
-    const normalizedModel = modelName.toLowerCase();
-    if (!DataAccessLayer.METADATA_MODELS_WITHOUT_ORG_FILTER.includes(normalizedModel)) {
-      filteredData.org_id = context.user!.org_id;
-    } else {
-      delete filteredData.org_id;
+  private async assertParentWritable(modelName: string, id: string, context: AuthContext, tx: any): Promise<void> {
+    const scope = this.orgScope(modelName, context, 'write');
+    const client = tx?.[modelName.toLowerCase()] ?? this.getModel(modelName);
+    const row = await client.findFirst({
+      where: mergeWhere({ id }, scope),
+      select: { id: true },
+    });
+    if (!row) {
+      throw new NotFoundError(`${modelName} ${id} not found`);
     }
   }
 
@@ -298,16 +301,16 @@ export class DataAccessLayer {
         ...options
       };
 
-      // Add org filter to options
-      const filteredOptions = this.addOrgFilter(modelName, queryOptions, context);
+      const filteredOptions = this.addOrgFilter(modelName, queryOptions, context, 'read');
 
       // Handle select options
       if (options.select) {
         filteredOptions.select = options.select;
       }
 
-      // Execute query
-      const result = await model.findUnique(filteredOptions);
+      const result = filteredOptions.where?.OR || filteredOptions.where?.AND
+        ? await model.findFirst(filteredOptions)
+        : await model.findUnique(filteredOptions);
 
       if (!result) {
         logger.warn('Record not found', {
@@ -379,8 +382,9 @@ export class DataAccessLayer {
         };
       }
 
-      // Execute query      
-      const result = await model.findUnique(filteredOptions);
+      const result = filteredOptions.where?.OR || filteredOptions.where?.AND
+        ? await model.findFirst(filteredOptions)
+        : await model.findUnique(filteredOptions);
 
       if (!result) {
         logger.warn('Record not found', {
@@ -502,18 +506,20 @@ export class DataAccessLayer {
       // Filter input data based on permissions
       const filteredData = PermissionService.filterFieldsByPermission(data, permissions);
       filteredData.modified_by = context.user?.id;
+      applyOrgOnWrite(modelName, filteredData, context.user!.org_id, !!context.isPlatformAdmin, false);
 
-      // Build the query options
+      const scopedWhere = await this.scopedUniqueWhere(modelName, { id }, context, 'write');
+      if (!scopedWhere) {
+        return { success: false, error: 'Record not found' };
+      }
+
       const queryOptions: any = {
-        where: {
-          id
-        },
+        where: scopedWhere,
         data: filteredData,
         ...options
       };
 
-      // Add org filter to where clause
-      const filteredOptions = this.addOrgFilter(modelName, queryOptions, context);
+      const filteredOptions = queryOptions;
       filteredOptions.data = filteredData;
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -573,13 +579,13 @@ export class DataAccessLayer {
       // Filter input data based on child model permissions
       const filteredData = PermissionService.filterFieldsByPermission(data, childPermissions);
       filteredData.modified_by = context.user?.id;
-      // Get the Prisma model
+      applyOrgOnWrite(relationMetadata.relatedModel, filteredData, context.user!.org_id, !!context.isPlatformAdmin, false);
       const model = this.getModel(modelName);
       if (!model) {
         logger.error('Model not found', { model: modelName });
         return { success: false, error: `Model ${modelName} not found` };
       }
-      // Update child through parent relation using transaction client
+      await this.assertParentWritable(modelName, id, context, tx);
       const updated = await tx[modelName.toLowerCase()].update({
         where: { id },
         data: {
@@ -629,18 +635,13 @@ export class DataAccessLayer {
     try {
       await this.validatePermissions(context, modelName, 'write');
 
-      // Build query options
-      const queryOptions: any = {
-        where: {
-          id
-        }
-      };
-
-      // Add org filter to where clause
-      const filteredOptions = this.addOrgFilter(modelName, queryOptions, context);
+      const scopedWhere = await this.scopedUniqueWhere(modelName, { id }, context, 'write');
+      if (!scopedWhere) {
+        return { success: false, error: 'Record not found' };
+      }
 
       await this.getModel(modelName).delete({
-        where: filteredOptions.where
+        where: scopedWhere
       });
 
       logger.debug('Data deleted successfully');
@@ -676,13 +677,16 @@ export class DataAccessLayer {
         throw new Error(`Model ${parentModelName} not found`);
       }
       // Add created_by and modified_by to all children
-      const childrenWithUserInfo = children.map(child => ({
-        ...child,
-        created_by: context.user?.id,
-        modified_by: context.user?.id,
-        org_id: context.user?.org_id
-      }));
-      // Update the parent with new children
+      const childrenWithUserInfo = children.map(child => {
+        const row: Record<string, unknown> = {
+          ...child,
+          created_by: context.user?.id,
+          modified_by: context.user?.id,
+        };
+        applyOrgOnWrite(parentModelName, row, context.user!.org_id, !!context.isPlatformAdmin, true);
+        return row;
+      });
+      await this.assertParentWritable(parentModelName, parentId, context, tx);
       const updated = await tx[parentModelName.toLowerCase()].update({
         where: { id: parentId },
         data: {
@@ -745,7 +749,7 @@ export class DataAccessLayer {
       if (!model) {
         throw new Error(`Model ${modelName} not found`);
       }
-      // Delete relation using transaction client
+      await this.assertParentWritable(modelName, id, context, tx);
       const updated = await tx[modelName.toLowerCase()].update({
         where: { id: id },
         data: {
@@ -1005,8 +1009,7 @@ export class DataAccessLayer {
       const queryOptions: any = {
         where: { id: { in: payload.ids } }
       };
-      // Add org filter to where clause
-      const filteredOptions = this.addOrgFilter(modelName, queryOptions, context);
+      const filteredOptions = this.addOrgFilter(modelName, queryOptions, context, 'write');
       // Execute batch update
       const result = await model.updateMany({
         where: filteredOptions.where,
@@ -1046,38 +1049,22 @@ export class DataAccessLayer {
       user: context.user?.id,
     });
     try {
-      // Require authentication
       if (!context.user) {
         logger.warn("No user context found for deleteMany");
         return { success: false, error: "Authentication required" };
       }
-      // Validate permissions
-      const permissions = this.validatePermissions(context, modelName, "write");
-      logger.debug("Permissions validated for deleteMany", { permissions });
-      // Get Prisma model
+      const ids = Array.isArray(payload?.ids) ? payload.ids : [];
+      this.validatePermissions(context, modelName, "write");
       const model = this.getModel(modelName);
       if (!model) {
         logger.error("Model not found", { model: modelName });
         return { success: false, error: `Model ${modelName} not found` };
       }
-      // Perform deletion
-      await model.deleteMany({
-        where: { id: { in: payload } },
-      });
-      // Fetch remaining records (excluding deleted ones)
-      const remainingRecords = await model.findMany({
-        where: {
-          id: { notIn: payload.ids },
-        },
-        select: options.select,
-      });
-      logger.debug("Records deleted and remaining data fetched", {
-        model: modelName,
-        remainingCount: remainingRecords.length,
-      });
+      const where = this.addOrgFilter(modelName, { where: { id: { in: ids } } }, context, 'write').where;
+      const result = await model.deleteMany({ where });
       return {
         success: true,
-        data: remainingRecords as T,
+        data: { count: result.count } as T,
       };
     } catch (error: any) {
       logger.error("Error in deleteMany", {

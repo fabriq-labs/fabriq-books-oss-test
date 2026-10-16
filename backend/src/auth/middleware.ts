@@ -5,6 +5,8 @@ import logger from '../utils/logger';
 import prisma from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import { PermissionService } from '../services/permissions/PermissionService';
+import { isPublicAuthPath } from './publicPaths';
+import { isSuperAdmin } from './platformAdmin';
 
 // Get the auth provider from environment
 const authProvider = (process.env.AUTH_PROVIDER || 'local') as 'clerk' | 'auth0' | 'cognito' | 'local';
@@ -31,15 +33,14 @@ export const authMiddleware = async (
   res: ExpressResponse,
   next: NextFunction
 ) => {
-  try {
-    // Check if this is an introspection query or HTML page to load the GraphQL Playground
-    const isIntrospectionQuery = req.body?.operationName === 'IntrospectionQuery' ||
-      (req.query.operationName === 'IntrospectionQuery' && req.method === 'GET');
+  const publicPath = isPublicAuthPath(req.originalUrl || req.path);
+  if (publicPath) {
+    return next();
+  }
 
-    if (isIntrospectionQuery) {
-      (req as any).context = { auth: null };
-      return next();
-    }
+  const unauthorized = () => res.status(401).json({ error: 'Unauthorized' });
+
+  try {
 
     // Log request details
     // logger.debug('New request received', {
@@ -79,6 +80,7 @@ export const authMiddleware = async (
             org_id: matchedUser.org_id,
             name: matchedUser.name
           },
+          isPlatformAdmin: await isSuperAdmin(matchedUser.id),
           permissions
         };
 
@@ -119,7 +121,6 @@ export const authMiddleware = async (
       //   models: Object.keys(permissions)
       // });
 
-      // Create final context with user and permissions
       const context: AuthContext = {
         user: {
           id: user.id,
@@ -127,6 +128,7 @@ export const authMiddleware = async (
           org_id: user.org_id,
           name: user.name
         },
+        isPlatformAdmin: await isSuperAdmin(user.id),
         permissions
       };
 
@@ -145,9 +147,9 @@ export const authMiddleware = async (
         errorType: typeof error,
         errorString: String(error)
       });
-      // Continue without authentication
+      return unauthorized();
     }
-    next();
+    return next();
   } catch (error) {
     logger.error('Auth middleware error:', {
       error: error instanceof Error ? error.message : error,
@@ -155,7 +157,7 @@ export const authMiddleware = async (
       errorType: typeof error,
       errorString: String(error)
     });
-    next();
+    return unauthorized();
   }
 };
 

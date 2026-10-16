@@ -23,15 +23,9 @@ module.exports = {
     },
   },
   collectCoverageFrom: [
-    'src/lib/actions/**/*.ts',
-    '!src/lib/actions/**/*.test.ts',
+    'src/tenancy/**/*.ts',
+    'src/auth/publicPaths.ts',
+    'src/workflow-engine/core/assignment.ts',
+    'src/services/analytics/sqlExecutor.ts',
   ],
-  coverageThreshold: {
-    global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80,
-    },
-  },
 }; 

@@ -170,6 +170,18 @@ export async function resolvePendingAction(
   params: ResolvePendingActionParams,
   auth?: AuthContext
 ) {
+  if (!auth?.user?.org_id) {
+    const { NotFoundError } = await import('../../tenancy/errors');
+    throw new NotFoundError('Pending action not found');
+  }
+  const existingForOrg = await prisma.pending_action.findFirst({
+    where: { id: actionId, org_id: auth.user.org_id },
+  });
+  if (!existingForOrg) {
+    const { NotFoundError } = await import('../../tenancy/errors');
+    throw new NotFoundError('Pending action not found');
+  }
+
   const now = new Date();
 
   const updateData: any = {
@@ -185,9 +197,7 @@ export async function resolvePendingAction(
 
   if (params.status === 'approved_with_edits' && params.edited_payload) {
     // Store the edited payload — merge with original
-    const existing = await prisma.pending_action.findUniqueOrThrow({
-      where: { id: actionId },
-    });
+    const existing = existingForOrg;
     updateData.payload = { ...existing.payload as object, ...params.edited_payload };
   }
 
@@ -329,11 +339,13 @@ export async function bulkApproveByConfidence(
   auth?: AuthContext
 ) {
   // Find matching pending actions
+  if (!auth?.user?.org_id) return [];
   const actions = await prisma.pending_action.findMany({
     where: {
       batch_id: batchId,
       status: 'pending',
       confidence,
+      org_id: auth.user.org_id,
     },
   });
 

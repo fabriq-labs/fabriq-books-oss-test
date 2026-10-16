@@ -27,6 +27,23 @@ import { CORE_SESSION_TOOLS } from './templateToolFilter';
 
 type ToolFactory = () => unknown;
 
+/** Direct writes. Supervised mode keeps queueActions and drops these. */
+export const MUTATING_AGENT_TOOLS = new Set([
+    'createRecord',
+    'updateRecord',
+    'createChildItem',
+    'updateChildItem',
+]);
+
+export function withoutMutatingTools(tools: Record<string, unknown>, mode?: string): Record<string, unknown> {
+    if (mode !== 'supervised') return tools;
+    const next = { ...tools };
+    for (const name of MUTATING_AGENT_TOOLS) {
+        delete next[name];
+    }
+    return next;
+}
+
 /**
  * Manages tool availability based on model context.
  * Per-model tool names come from DB table `agent_model_tool_config.model_tools`
@@ -117,7 +134,7 @@ export class ToolManager {
         context?: any,
         sessionId?: string,
         allowedTools?: string[],
-        options?: { omitCreatePlan?: boolean }
+        options?: { omitCreatePlan?: boolean; mode?: string }
     ): Promise<any> {
         logger.debug('Getting unified tools', { modelName, hasSession: !!sessionId, allowedTools, omitCreatePlan: options?.omitCreatePlan });
 
@@ -163,6 +180,6 @@ export class ToolManager {
             });
         }
 
-        return tools;
+        return withoutMutatingTools(tools, options?.mode);
     }
 }

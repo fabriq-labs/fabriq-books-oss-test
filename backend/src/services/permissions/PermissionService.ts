@@ -3,7 +3,12 @@ import logger from '../../utils/logger';
 import prisma from '../../lib/prisma';
 
 export class PermissionService {
-  private static readonly skipPermissionChecks: boolean = process.env.SKIP_PERMISSION_CHECKS === 'true';
+  private static permissionChecksSkipped(): boolean {
+    if (process.env.NODE_ENV === 'production' && process.env.SKIP_PERMISSION_CHECKS === 'true') {
+      throw new Error('SKIP_PERMISSION_CHECKS is not allowed when NODE_ENV is production');
+    }
+    return process.env.SKIP_PERMISSION_CHECKS === 'true';
+  }
 
   static async getView(viewName: string | null, modelName: string) {
     const whereClause: any = {
@@ -109,7 +114,7 @@ export class PermissionService {
     operation: 'read' | 'write' | undefined
   ): { [field: string]: 'read' | 'write' | 'none' } {
 
-    if (this.skipPermissionChecks) {
+    if (this.permissionChecksSkipped()) {
       // logger.debug('Permission checks disabled, granting full access', { modelName, operation });
       return { '*': 'write' };
     }
@@ -188,7 +193,7 @@ export class PermissionService {
   }
 
   static checkFieldAccess(field: string, permission: 'read' | 'write' | 'none'): boolean {
-    if (this.skipPermissionChecks) {
+    if (this.permissionChecksSkipped()) {
       return true;
     }
     return permission === 'read' || permission === 'write';
@@ -198,7 +203,7 @@ export class PermissionService {
     requestedFields: string[],
     permissions: { [field: string]: 'read' | 'write' | 'none' }
   ): void {
-    if (this.skipPermissionChecks) {
+    if (this.permissionChecksSkipped()) {
       // logger.debug('Permission checks disabled, allowing all fields');
       return;
     }

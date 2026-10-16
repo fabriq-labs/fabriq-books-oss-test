@@ -7,6 +7,16 @@ import { PrismaClient } from '@prisma/client';
 import { AuthContext } from '../../auth/types';
 import logger from '../../utils/logger';
 import { PermissionService } from '../../services/permissions/PermissionService';
+import { requirePlatformAdmin } from '../../auth/platformAdmin';
+import { isNotFoundError } from '../../tenancy/errors';
+
+function sendWorkflowError(res: Response, error: unknown, label: string) {
+  if (isNotFoundError(error)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  logger.error(label, { error });
+  return res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+}
 
 interface AuthRequest extends Request {
   context?: {
@@ -18,26 +28,37 @@ const router = Router();
 const workflowEngine = new WorkflowEngine(prisma);
 const workflowDefinitionService = new WorkflowDefinitionService(prisma);
 
+router.use((req: AuthRequest, res, next) => {
+  const definitionWrite = req.path.startsWith('/flows') && req.method !== 'GET' && req.method !== 'HEAD';
+  if (!definitionWrite) return next();
+  return requirePlatformAdmin(req, res, next);
+});
+
 // Create a new workflow definition
-router.post('/flows', async (req, res) => {
+router.post('/flows', async (req: AuthRequest, res) => {
   try {
-    const { name, model_name, description } = req.body;
-    const flow = await workflowDefinitionService.createWorkflowFlow(name, model_name, description);
+    const { name, model_name, description, org_id } = req.body;
+    const callerOrg = req.context?.auth?.user?.org_id;
+    const flow = await workflowDefinitionService.createWorkflowFlow(
+      name,
+      model_name,
+      description,
+      org_id || callerOrg
+    );
     res.json(flow);
   } catch (error: unknown) {
-    logger.error('Error creating workflow flow', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error creating workflow flow');
   }
 });
 
 // Get all workflow definitions
-router.get('/flows', async (req, res) => {
+router.get('/flows', async (req: AuthRequest, res) => {
   try {
-    const flows = await workflowDefinitionService.getWorkflowFlows();
+    const orgId = req.context?.auth?.user?.org_id;
+    const flows = await workflowDefinitionService.getWorkflowFlows(orgId);
     res.json(flows);
   } catch (error: unknown) {
-    logger.error('Error fetching workflow flows', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching workflow flows');
   }
 });
 
@@ -46,15 +67,15 @@ router.get('/flows/:flowId', async (req, res) => {
   try {
     const { flowId } = req.params;
     const flow = await workflowDefinitionService.getWorkflowFlowById(flowId);
+    const orgId = (req as AuthRequest).context?.auth?.user?.org_id;
 
-    if (!flow) {
+    if (!flow || (orgId && flow.org_id !== orgId && flow.org_id !== 'org_system')) {
       return res.status(404).json({ error: 'Workflow not found' });
     }
 
     res.json({ data: flow });
   } catch (error: unknown) {
-    logger.error('Error fetching workflow flow', { error, flowId: req.params.flowId });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching workflow flow');
   }
 });
 
@@ -73,8 +94,7 @@ router.post('/flows/:flowId/states', async (req, res) => {
     });
     res.json(state);
   } catch (error: unknown) {
-    logger.error('Error creating workflow state', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error creating workflow state');
   }
 });
 
@@ -117,8 +137,7 @@ router.put('/flows/:flowId/states/:stateId', async (req, res) => {
     });
     res.json(state);
   } catch (error: unknown) {
-    logger.error('Error updating workflow state', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error updating workflow state');
   }
 });
 
@@ -134,8 +153,7 @@ router.put('/flows/:flowId/states', async (req, res) => {
     const updatedStates = await workflowDefinitionService.batchUpdateWorkflowStates(states);
     res.json(updatedStates);
   } catch (error: unknown) {
-    logger.error('Error batch updating workflow states', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error batch updating workflow states');
   }
 });
 
@@ -154,8 +172,7 @@ router.patch('/flows/:flowId/states/:stateId/toggle-active', async (req, res) =>
     });
     res.json(state);
   } catch (error: unknown) {
-    logger.error('Error toggling workflow state active status', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error toggling workflow state active status');
   }
 });
 
@@ -173,8 +190,7 @@ router.post('/flows/:flowId/actions', async (req, res) => {
     });
     res.json(action);
   } catch (error: unknown) {
-    logger.error('Error creating workflow action', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error creating workflow action');
   }
 });
 
@@ -193,8 +209,7 @@ router.put('/flows/:flowId/states/:stateId/actions/:actionId', async (req, res) 
     });
     res.json(action);
   } catch (error: unknown) {
-    logger.error('Error updating workflow action', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error updating workflow action');
   }
 });
 
@@ -205,8 +220,7 @@ router.delete('/flows/:flowId/states/:stateId/actions/:actionId', async (req, re
     await workflowDefinitionService.deleteWorkflowAction(actionId);
     res.json({ success: true });
   } catch (error: unknown) {
-    logger.error('Error deleting workflow action', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error deleting workflow action');
   }
 });
 
@@ -229,8 +243,7 @@ router.post('/instances', async (req: AuthRequest, res: Response) => {
     res.json(instance);
   } catch (error: unknown) {
     console.log('error', error);
-    logger.error('Error starting workflow instance', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error starting workflow instance');
   }
 });
 
@@ -247,8 +260,7 @@ router.get('/instances/:instanceId', async (req: AuthRequest, res) => {
     const context = await workflowEngine.getWorkflowContext(instanceId, req.context?.auth as AuthContext);
     res.json(context);
   } catch (error: unknown) {
-    logger.error('Error fetching workflow context', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching workflow context');
   }
 });
 
@@ -274,8 +286,7 @@ router.post('/instances/:instanceId/actions/:actionId', async (req: AuthRequest,
     res.json(transition);
   } catch (error: unknown) {
     console.log('error', error);
-    logger.error('Error executing workflow action', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error executing workflow action');
   }
 });
 
@@ -283,11 +294,14 @@ router.post('/instances/:instanceId/actions/:actionId', async (req: AuthRequest,
 router.get('/instances/:instanceId/history', async (req, res) => {
   try {
     const { instanceId } = req.params;
-    const history = await workflowEngine.getWorkflowHistory(instanceId);
+    const user = (req as AuthRequest).context?.auth?.user;
+    if (!user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    const history = await workflowEngine.getWorkflowHistory(instanceId, user.org_id);
     res.json(history);
   } catch (error: unknown) {
-    logger.error('Error fetching workflow history', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching workflow history');
   }
 });
 
@@ -304,8 +318,7 @@ router.get('/instances/:instanceId/actions', async (req: AuthRequest, res) => {
     const actions = await workflowEngine.getAvailableActions(instanceId, req.context?.auth as AuthContext);
     res.json(actions);
   } catch (error: unknown) {
-    logger.error('Error fetching available actions', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching available actions');
   }
 });
 
@@ -323,11 +336,14 @@ router.get('/instances/state/:stateId', async (req: AuthRequest, res) => {
     const userRoles = await PermissionService.getRoles(userId);
     const userRoleIds = userRoles.map((role: { id: string }) => role.id);
 
-    const instances = await workflowEngine.getWorkflowInstancesByState(stateId, userId, userRoleIds);
+    const orgId = req.context?.auth?.user?.org_id;
+    if (!orgId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    const instances = await workflowEngine.getWorkflowInstancesByState(stateId, userId, userRoleIds, orgId);
     res.json({ data: instances });
   } catch (error: unknown) {
-    logger.error('Error fetching workflow instances by state', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching workflow instances by state');
   }
 });
 
@@ -335,11 +351,14 @@ router.get('/instances/state/:stateId', async (req: AuthRequest, res) => {
 router.get('/instances/:instanceId/comments', async (req: AuthRequest, res) => {
   try {
     const { instanceId } = req.params;
-    const comments = await workflowEngine.getComments(instanceId);
+    const orgId = req.context?.auth?.user?.org_id;
+    if (!orgId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    const comments = await workflowEngine.getComments(instanceId, orgId);
     res.json({ data: comments });
   } catch (error: unknown) {
-    logger.error('Error fetching comments', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching comments');
   }
 });
 
@@ -351,8 +370,7 @@ router.post('/instances/:instanceId/comments', async (req: AuthRequest, res) => 
     const comments = await workflowEngine.addComment(instanceId, comment, req.context?.auth as AuthContext);
     res.json({ data: comments });
   } catch (error: unknown) {
-    logger.error('Error adding comment', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error adding comment');
   }
 });
 
@@ -374,8 +392,7 @@ router.get('/instances/:modelName/state', async (req: AuthRequest, res) => {
     const instances = await workflowEngine.getWorkflowInstancesByModel(modelName, userId, userRoleIds, orgId);
     res.json(instances);
   } catch (error: unknown) {
-    logger.error('Error fetching workflow instances by state', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching workflow instances by state');
   }
 });
 
@@ -383,11 +400,14 @@ router.get('/instances/:modelName/state', async (req: AuthRequest, res) => {
 router.get('/instances/:modelName/:instanceId/history', async (req: AuthRequest, res) => {
   try {
     const { modelName, instanceId } = req.params;
-    const history = await workflowEngine.getHistory(modelName, instanceId);
+    const orgId = req.context?.auth?.user?.org_id;
+    if (!orgId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    const history = await workflowEngine.getHistory(modelName, instanceId, orgId);
     res.json({ data: history });
   } catch (error: unknown) {
-    logger.error('Error fetching workflow history', { error });
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return sendWorkflowError(res, error, 'Error fetching workflow history');
   }
 });
 

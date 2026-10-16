@@ -16,6 +16,7 @@ export interface WorkflowFlow {
   is_active: boolean;
   created_at: Date;
   modified_at: Date;
+  org_id?: string | null;
 }
 
 export interface WorkflowState {

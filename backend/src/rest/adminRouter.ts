@@ -9,20 +9,14 @@ import bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 import { main as syncMetadataFromJson } from '../utils/setup/metadata/syncMetadataFromJson';
 import { parseSyncTargets } from '../utils/setup/metadata/syncMetadataTargets';
+import { isSuperAdmin } from '../auth/platformAdmin';
 const adminRouter = Router();
 
 let indianDemoReconResetInProgress = false;
 let nriTaxPackageResetInProgress = false;
 let legalEntityDropInProgress = false;
 
-/** Check if the given user id has the Super Admin role (any of their roles). */
-export async function isSuperAdmin(userId: string): Promise<boolean> {
-  const roleUsers = await prisma.role_user.findMany({
-    where: { user_id: userId },
-    include: { role: true },
-  });
-  return roleUsers.some((ru) => ru.role?.name?.toLowerCase().includes('super admin'));
-}
+export { isSuperAdmin } from '../auth/platformAdmin';
 
 interface TenantPayload {
   name: string;

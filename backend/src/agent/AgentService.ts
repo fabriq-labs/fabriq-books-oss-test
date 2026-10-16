@@ -21,6 +21,7 @@ import { buildAvailableToolsDirective, buildSessionStateBlock, SESSION_DIRECTIVE
 import { STEP_STALL_FAIL_REASON, toSessionHistoryMessages } from './sessionHistory';
 import { sessionEventBus } from './services/SessionEventBus';
 import { sessionTimeoutService } from './services/SessionTimeoutService';
+import { NotFoundError } from '../tenancy/errors';
 import {
   consumeStreamAndThrowOnError,
   getAgentStreamErrorMessage,
@@ -156,6 +157,9 @@ export class AgentService {
       let templateForHandleRequest: any = null;
       if (sessionId) {
         sessionForContextHandleRequest = await getAgentSession(sessionId);
+        if (sessionForContextHandleRequest.org_id !== auth.user?.org_id) {
+          throw new NotFoundError('Session not found');
+        }
 
         // Load template early — needed for focus_models (system prompt) and allowed_tools (tool filter)
         if (sessionForContextHandleRequest.template_id) {
@@ -252,7 +256,10 @@ export class AgentService {
         || sessionForContextHandleRequest?.plan
       );
       const tools = await toolManager.getUnifiedTools(
-        modelName, auth, enhancedContext, sessionId, templateAllowedTools, { omitCreatePlan }
+        modelName, auth, enhancedContext, sessionId, templateAllowedTools, {
+          omitCreatePlan,
+          mode: sessionForContextHandleRequest?.mode,
+        }
       );
       if (sessionId) {
         finalSystemPrompt += buildAvailableToolsDirective(Object.keys(tools));
@@ -658,6 +665,9 @@ export class AgentService {
       let templateForStreaming: any = null;
       if (sessionId) {
         sessionForContextStreaming = await getAgentSession(sessionId);
+        if (sessionForContextStreaming.org_id !== auth.user?.org_id) {
+          throw new NotFoundError('Session not found');
+        }
 
         // Load template early — needed for focus_models and allowed_tools
         if (sessionForContextStreaming.template_id) {
@@ -745,7 +755,7 @@ export class AgentService {
       );
       const tools = await toolManager.getUnifiedTools(
         modelName, auth, enhancedContext, sessionId, templateAllowedToolsStreaming,
-        { omitCreatePlan: omitCreatePlanStreaming }
+        { omitCreatePlan: omitCreatePlanStreaming, mode: sessionForContextStreaming?.mode }
       );
       if (sessionId) {
         finalSystemPrompt += buildAvailableToolsDirective(Object.keys(tools));
