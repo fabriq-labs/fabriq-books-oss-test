@@ -3,29 +3,18 @@ import {
     createRecordTool,
     updateRecordTool,
     searchRecordsTool,
-    searchLocationsTool,
-    searchCOATool,
-    searchEntitiesTool,
     searchUsersTool,
     createChildItemTool,
     updateChildItemTool,
     advancedSqlQueryTool,
-    processInvoiceFromPdfTool,
-    extractInvoiceFromFileTool,
-    erpConnectorTool,
 } from './AgentTools';
 import {
     getAnalyticsContextTool,
     analyticsQueryTool,
-    suggestReconciliationMatchesTool,
     createPlanTool,
     completeStepTool,
     queueActionsTool,
     requestClarificationTool,
-    categorizePostingsTool,
-    runFinancialReportTool,
-    prepareTaxPackageTool,
-    getOptionChainTool,
 } from './tools';
 import { QueryClassification } from './utils/questionClassifier';
 import logger from '../utils/logger';
@@ -63,22 +52,11 @@ export class ToolManager {
             createChildItem: () => createChildItemTool(auth),
             updateChildItem: () => updateChildItemTool(auth),
             advancedSqlQuery: () => advancedSqlQueryTool(auth),
-            suggestReconciliationMatches: () => suggestReconciliationMatchesTool(auth),
-            categorizePostings: () => categorizePostingsTool(auth),
-            runFinancialReport: () => runFinancialReportTool(auth, toolContext),
-            prepareTaxPackage: () => prepareTaxPackageTool(auth, sessionId),
-            searchLocations: () => searchLocationsTool(auth),
-            searchCOA: () => searchCOATool(auth),
-            searchEntities: () => searchEntitiesTool(auth),
             searchUsers: () => searchUsersTool(auth),
             getAnalyticsContext: () => getAnalyticsContextTool(auth),
             analyticsQuery: () => analyticsQueryTool(auth, toolContext),
-            processInvoiceFromPdf: () => processInvoiceFromPdfTool(auth),
-            extractInvoiceFromFile: () => extractInvoiceFromFileTool(auth, toolContext),
-            erpConnector: () => erpConnectorTool(auth, toolContext),
-            queueActions: () => null, // session-only — wired in getUnifiedTools
+            queueActions: () => null,
             requestClarification: () => null,
-            getOptionChain: () => getOptionChainTool(auth),
         };
     }
 
@@ -159,7 +137,6 @@ export class ToolManager {
             tools.completeStep = completeStepTool(sessionId, auth);
             tools.queueActions = queueActionsTool(sessionId, auth);
             tools.requestClarification = requestClarificationTool(sessionId, auth);
-            tools.prepareTaxPackage = prepareTaxPackageTool(auth, sessionId);
         }
 
         if (allowedTools && allowedTools.length > 0) {

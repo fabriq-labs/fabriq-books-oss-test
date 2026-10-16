@@ -1,0 +1,6 @@
+// Domain models for this application.
+// See docs/kernel/BUILDING_A_DOMAIN.md.
+//
+// Add models here. Every model carries org_id.
+// A relation to user, org, or workflow_instance needs the matching field
+// on that kernel model in metadata.prisma.

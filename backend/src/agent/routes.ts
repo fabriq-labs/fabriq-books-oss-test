@@ -5,10 +5,6 @@ import { AuthContext } from '../auth/types';
 import logger from '../utils/logger';
 import { Readable } from 'stream';
 import multer from 'multer';
-import { categorizeTransactionHandler } from './handlers/erp/categorizeTransaction';
-import { categorizeTransactionBatchHandler } from './handlers/erp/categorizeTransactionBatch';
-import { reconcileImportedPostings } from '../services/reconciliation/reconcileImportedPostings';
-import { confirmReconciliation } from '../services/reconciliation/confirmReconciliation';
 import prisma from '../lib/prisma';
 import { PermissionService } from '../services/permissions/PermissionService';
 import { LegacyDataGraphParser } from '../utils/LegacyDataGraphParser';
@@ -38,8 +34,6 @@ import {
   buildBillUploadDataUri,
   resolveBillUploadMime,
 } from './utils/billUploadMime';
-import { TAX_PACKAGE_TEMPLATE_ID, buildPinnedPlan } from './taxPackage/constants';
-import { parseTaxPackageGoal, calendarBounds } from './taxPackage/parseGoal';
 import type { PlanStep } from './tools/sessionTools';
 // Removing ai/express import since it appears to be causing issues
 // import { createStreamDataHandler } from 'ai/express';
@@ -505,312 +499,6 @@ export function createAgentRouter() {
   });
 
   // ==========================================
-  // AI Categorization Endpoints
-  // ==========================================
-
-  /**
-   * Categorize a single transaction
-   * POST /api/agent/erp/categorize-transaction
-   */
-  router.post('/erp/categorize-transaction', authMiddleware, async (req: Request, res) => {
-    try {
-      if (!req.context?.auth?.user) {
-        return res.status(401).json({ error: 'Unauthorized: Missing auth context' });
-      }
-
-      const params = req.body;
-
-      logger.debug('Received categorize-transaction request', {
-        userId: req.context.auth.user.id,
-        orgId: req.context.auth.user.org_id,
-        postingId: params.posting_id,
-      });
-
-      // Validate parameters
-      const validatedParams = categorizeTransactionHandler.validateParams(
-        params,
-        undefined,
-        req.context.auth
-      );
-
-      // Execute handler (connector is not used for categorization)
-      const result = await categorizeTransactionHandler.execute(
-        null as any, // Connector not needed for AI categorization
-        validatedParams,
-        undefined,
-        req.context.auth
-      );
-
-      res.json(result);
-    } catch (error: any) {
-      logger.error('Error in categorize-transaction request:', {
-        error: error.message,
-        stack: error.stack,
-      });
-
-      res.status(error.message?.includes('requires') ? 400 : 500).json({
-        success: false,
-        error: error.message || 'Failed to categorize transaction',
-      });
-    }
-  });
-
-  /**
-   * Categorize multiple transactions in batch
-   * POST /api/agent/erp/categorize-transaction-batch
-   */
-  router.post('/erp/categorize-transaction-batch', authMiddleware, async (req: Request, res) => {
-    try {
-      if (!req.context?.auth?.user) {
-        return res.status(401).json({ error: 'Unauthorized: Missing auth context' });
-      }
-
-      const params = req.body;
-
-      logger.debug('Received categorize-transaction-batch request', {
-        userId: req.context.auth.user.id,
-        orgId: req.context.auth.user.org_id,
-        postingIdsCount: params.posting_ids?.length,
-        postingsCount: params.postings?.length,
-      });
-
-      // Validate parameters
-      const validatedParams = categorizeTransactionBatchHandler.validateParams(
-        params,
-        undefined,
-        req.context.auth
-      );
-
-      // Execute handler (connector is not used for categorization)
-      const result = await categorizeTransactionBatchHandler.execute(
-        null as any, // Connector not needed for AI categorization
-        validatedParams,
-        undefined,
-        req.context.auth
-      );
-
-      res.json(result);
-    } catch (error: any) {
-      logger.error('Error in categorize-transaction-batch request:', {
-        error: error.message,
-        stack: error.stack,
-      });
-
-      res.status(error.message?.includes('requires') ? 400 : 500).json({
-        success: false,
-        error: error.message || 'Failed to categorize transactions',
-      });
-    }
-  });
-
-  // ==========================================
-  // Reconciliation Pipeline Endpoint
-  // ==========================================
-
-  /**
-   * Reconcile one or more transactions (categorize + suggest confirm)
-   * POST /api/agent/erp/reconcile-transaction
-   *
-   * Body: {
-   *   posting_ids: string[],
-   *   use_historical_matching?: boolean  // optional; overrides CATEGORIZE_USE_HISTORICAL_MATCHING
-   * }
-   *
-   * Returns an array of results. Each entry contains the updated posting model
-   * plus reconciliation suggestions (best match + alternatives).
-   * The pipeline writes categorization and reconciliation status to each posting,
-   * so the UI can refresh directly from the returned data.
-   */
-  router.post('/erp/reconcile-transaction', authMiddleware, async (req: Request, res) => {
-    try {
-      if (!req.context?.auth?.user) {
-        return res.status(401).json({ error: 'Unauthorized: Missing auth context' });
-      }
-
-      const { posting_ids, use_historical_matching } = req.body;
-      if (!posting_ids || !Array.isArray(posting_ids) || posting_ids.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'posting_ids is required and must be a non-empty array of strings',
-        });
-      }
-
-      // Validate all entries are strings
-      if (!posting_ids.every((id: any) => typeof id === 'string')) {
-        return res.status(400).json({
-          success: false,
-          error: 'All posting_ids must be strings',
-        });
-      }
-
-      if (use_historical_matching !== undefined && typeof use_historical_matching !== 'boolean') {
-        return res.status(400).json({
-          success: false,
-          error: 'use_historical_matching must be a boolean when provided',
-        });
-      }
-
-      const auth: AuthContext = {
-        user: req.context.auth.user,
-        permissions: req.context.auth.permissions,
-      };
-      const orgId = auth.user?.org_id;
-
-      logger.debug('Received reconcile-transaction request', {
-        userId: auth.user.id,
-        orgId,
-        postingIds: posting_ids,
-        count: posting_ids.length,
-        use_historical_matching,
-      });
-
-      // Verify all postings exist and belong to org
-      const existingPostings = await prisma.posting.findMany({
-        where: { id: { in: posting_ids }, org_id: orgId },
-        select: { id: true },
-      });
-
-      const foundIds = new Set(existingPostings.map((p: { id: string }) => p.id));
-      const missingIds = posting_ids.filter((id: string) => !foundIds.has(id));
-      if (missingIds.length > 0) {
-        return res.status(404).json({
-          success: false,
-          error: `Postings not found: ${missingIds.join(', ')}`,
-        });
-      }
-
-      // Run the full pipeline (categorize + reconcile) for all postings
-      const scorecard = await reconcileImportedPostings(posting_ids, auth, {
-        use_historical_matching,
-      });
-
-      // Build a lookup from pipeline results
-      const pipelineResultMap = new Map(
-        scorecard.results.map((r) => [r.posting_id, r])
-      );
-
-      // Build Prisma select from the posting_view data_graph so the response
-      // includes nested relationships (account names, etc.) — same shape as the
-      // list view API.
-      const VIEW_NAME = 'posting_view';
-      let selectClause: any = undefined;
-      try {
-        const view = await PermissionService.getView(VIEW_NAME, 'posting');
-        const dataGraph = view?.data_graph as { select?: any } | null;
-        if (dataGraph) {
-          selectClause = dataGraph.select || LegacyDataGraphParser.parseToSelect(dataGraph);
-        }
-      } catch (err: any) {
-        logger.warn('Could not load posting_view data_graph, falling back to flat select', {
-          error: err.message,
-        });
-      }
-
-      // Re-fetch all postings with the data_graph select (nested relationships)
-      const findManyArgs: any = {
-        where: { id: { in: posting_ids } },
-      };
-      if (selectClause) {
-        findManyArgs.select = selectClause;
-      }
-      const updatedPostings = await prisma.posting.findMany(findManyArgs);
-
-      const results = updatedPostings.map((posting: any) => {
-        const pipelineResult = pipelineResultMap.get(posting.id);
-        return {
-          posting,
-          reconciliation: pipelineResult
-            ? {
-              status: pipelineResult.reconciliation_status,
-              best_match: pipelineResult.best_match,
-              alternatives: pipelineResult.alternatives,
-            }
-            : null,
-        };
-      });
-
-      res.json({
-        success: true,
-        data: { results },
-      });
-    } catch (error: any) {
-      logger.error('Error in reconcile-transaction request:', {
-        error: error.message,
-        stack: error.stack,
-      });
-
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to reconcile transaction(s)',
-      });
-    }
-  });
-
-  /**
-   * Confirm bank-only reconciliation (categorize + CONFIRMED).
-   * POST /api/agent/erp/confirm-reconciliation
-   * Body: { posting_id: string }
-   */
-  router.post('/erp/confirm-reconciliation', authMiddleware, async (req: Request, res) => {
-    try {
-      if (!req.context?.auth?.user) {
-        return res.status(401).json({ error: 'Unauthorized: Missing auth context' });
-      }
-
-      const { posting_id } = req.body;
-      if (!posting_id || typeof posting_id !== 'string') {
-        return res.status(400).json({
-          success: false,
-          error: 'posting_id is required',
-        });
-      }
-
-      const auth: AuthContext = {
-        user: req.context.auth.user,
-        permissions: req.context.auth.permissions,
-      };
-
-      const result = await confirmReconciliation(posting_id, auth);
-
-      // Re-fetch the posting with the view's data_graph select so the response
-      // includes nested relationships (same shape as the list view).
-      let fullPosting: any = result.posting;
-      try {
-        const view = await PermissionService.getView('posting_view', 'posting');
-        const dataGraph = view?.data_graph as { select?: any } | null;
-        if (dataGraph) {
-          const selectClause = dataGraph.select || LegacyDataGraphParser.parseToSelect(dataGraph);
-          if (selectClause) {
-            const fetched = await prisma.posting.findUnique({
-              where: { id: posting_id },
-              select: selectClause,
-            });
-            if (fetched) fullPosting = fetched;
-          }
-        }
-      } catch (err: any) {
-        logger.warn('Could not load posting_view data_graph for confirm response, using default', {
-          error: err.message,
-        });
-      }
-
-      res.json({
-        success: true,
-        data: { posting: fullPosting },
-      });
-    } catch (error: any) {
-      logger.error('Error in confirm-reconciliation request:', {
-        error: error.message,
-        stack: error.stack,
-      });
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to confirm reconciliation',
-      });
-    }
-  });
-
-  // ==========================================
   // Agent Session Endpoints
   // ==========================================
 
@@ -837,7 +525,7 @@ export function createAgentRouter() {
       let accumulated_context: Record<string, any> | undefined;
       const pinned = tmpl?.pinned_plan;
       if (Array.isArray(pinned) && pinned.length > 0) {
-        plan = (template_id === TAX_PACKAGE_TEMPLATE_ID ? buildPinnedPlan() : pinned).map((s: any, i: number) => ({
+        plan = pinned.map((s: any, i: number) => ({
           index: i,
           type: s.type,
           title: s.title,
@@ -848,45 +536,7 @@ export function createAgentRouter() {
         current_step_index = 0;
       }
 
-      if (template_id === TAX_PACKAGE_TEMPLATE_ID) {
-        const parsed = parseTaxPackageGoal(goal, {
-          tax_year: intake?.tax_year != null ? Number(intake.tax_year) : undefined,
-          recipient: intake?.recipient,
-          include_foreign: intake?.include_foreign,
-          basement_rentable_pct: intake?.basement_pct != null && intake.basement_pct !== ''
-            ? Number(intake.basement_pct)
-            : intake?.basement_rentable_pct ?? null,
-        });
-        const tax_year = parsed.tax_year || 2025;
-        const bounds = calendarBounds(tax_year);
-        accumulated_context = {
-          tax_package_kind: 'ca_t1',
-          tax_year,
-          recipient: parsed.recipient || 'Meera Patel CPA',
-          include_foreign: parsed.include_foreign ?? true,
-          basement_rentable_pct: parsed.basement_rentable_pct ?? null,
-          ...bounds,
-        };
-        if (!plan) {
-          plan = buildPinnedPlan();
-          current_step_index = 0;
-        }
-        // Intake already has year + recipient — skip the lock-year LLM turn.
-        if (plan.length > 1 && accumulated_context.tax_year && accumulated_context.recipient) {
-          const basement = accumulated_context.basement_rentable_pct;
-          plan[0] = {
-            ...plan[0],
-            status: 'completed',
-            result_summary:
-              `TY ${accumulated_context.tax_year} for ${accumulated_context.recipient}. `
-              + (accumulated_context.include_foreign ? 'Include India foreign income. ' : 'Canada-source only. ')
-              + (basement != null ? `Basement rentable share ${basement}%.` : 'Basement rentable share unknown.'),
-            completed_at: new Date().toISOString(),
-          };
-          plan[1] = { ...plan[1], status: 'in_progress' };
-          current_step_index = 1;
-        }
-      }
+
 
       const session = await createAgentSession({
         org_id: req.context.auth.user.org_id,
@@ -894,10 +544,7 @@ export function createAgentRouter() {
         goal,
         goal_model: resolvedGoalModel,
         template_id,
-        mode: template_id === TAX_PACKAGE_TEMPLATE_ID ? 'supervised' : mode,
-        name: template_id === TAX_PACKAGE_TEMPLATE_ID
-          ? `T1 package TY ${accumulated_context?.tax_year || ''}`.trim()
-          : undefined,
+        mode,
         plan,
         current_step_index,
         accumulated_context,

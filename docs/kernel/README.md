@@ -2,6 +2,8 @@
 
 **Status**: Design notes. The security fixes are not started. Postgres row-level security is not implemented.
 
+The shell branch has no books models. Domain code goes in the folders described in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md). The work waiting for approval is [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md).
+
 **Review this document again before writing any RLS policy.** The tenancy rules below are the contract. The SQL in the RLS section is a sketch to review, not a migration.
 
 ## What the kernel is

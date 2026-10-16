@@ -5,7 +5,7 @@ import { AuthContext } from '../../auth/types';
 import logger from '../../utils/logger';
 import prisma from '../../lib/prisma';
 import { buildCreateManyErrorLogPayload } from '../../utils/formatPrismaError';
-import { execute_Action } from '../../lib/actions';
+import { execute_Action } from '../../domain/actions';
 import { PrismaSchemaParser } from '../../utils/PrismaSchemaParser';
 import { EntityDefinition, RelationshipDefinition } from '../../models/ModelRegistry';
 import { SearchQueryBuilder } from '../query/SearchQueryBuilder';

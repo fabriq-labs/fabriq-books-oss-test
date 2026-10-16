@@ -1,0 +1,71 @@
+# Building a domain on the kernel
+
+Give this file, plus [README.md](./README.md), to an agent that is adding a new application on the shell branch. The books product is not in this tree. Domain code belongs only in the folders below.
+
+## Folders
+
+| Path | What goes here |
+|---|---|
+| `backend/prisma/schema/domain.prisma` | Domain models |
+| `backend/src/domain/actions.ts` | Post-write hooks and workflow side-effect handlers |
+| `backend/src/domain/workflowModels.ts` | Model names that participate in workflow |
+| `backend/src/domain/reports.ts` | Report handlers keyed by report id |
+| `frontend-1/src/domain/navigation.ts` | Sidebar entries |
+
+The kernel calls these files. It does not contain product behavior.
+
+## Rules that already apply
+
+- Every model has `org_id`. Use a required `String` once the tenancy migration has run. Until then, `String?` matches the current kernel models.
+- Shared defaults use org id `org_system`, seeded by setup. A tenant row uses the caller's org.
+- Audit fields on every model: `created_at`, `modified_at`, `created_by`, `modified_by`.
+- Ids use a prefixed `dbgenerated` default, for example `'todo_' || gen_random_uuid()`.
+- A Prisma relation has two sides. Adding `assignee user? @relation(...)` on a domain model requires the matching array on `user` in `metadata.prisma`.
+- Do not run `prisma db push`. Add the table and its foreign keys to the setup script, then run `npx prisma generate`.
+
+## Walkthrough: a todo list
+
+1. Add the model to `backend/prisma/schema/domain.prisma`.
+
+```prisma
+model todo {
+  id          String   @id @default(dbgenerated("'todo_' || gen_random_uuid()"))
+  title       String
+  notes       String?
+  done        Boolean  @default(false)
+  org_id      String
+  created_by  String?
+  modified_by String?
+  created_at  DateTime @default(now())
+  modified_at DateTime @updatedAt
+  assignee_id String?
+  assignee    user?    @relation("TodoAssignee", fields: [assignee_id], references: [id])
+
+  @@index([org_id, done])
+  @@map("todo")
+}
+```
+
+2. Add the other side on `user` in `backend/prisma/schema/metadata.prisma`:
+
+```prisma
+todos todo[] @relation("TodoAssignee")
+```
+
+3. Generate the client: `cd backend && npx prisma generate`.
+
+4. Add the table and the assignee foreign key in the setup script. The script also inserts `org_system` if it is missing.
+
+5. Insert a `view` row for model `todo` and `permission` rows for the fields the role may read or write. The generic REST API is `GET/POST /api/todo` and `POST /api/todo/search`. The list screen is `/master/app/todo`, which renders the kernel Master page for view `todo_view`.
+
+6. Optional workflow. Append `'todo'` in `backend/src/domain/workflowModels.ts`. Create a `workflow_flow` whose `model_name` is `todo`. A system-wide default uses `org_id = 'org_system'`. A tenant-only flow uses that tenant's org.
+
+7. Optional side effect. Register a handler in `workflowActionMap` inside `backend/src/domain/actions.ts`. The workflow action's `side_effects` JSON names that handler.
+
+8. Optional nav item in `frontend-1/src/domain/navigation.ts`.
+
+9. Run `cd backend && npx tsc --noEmit --pretty false` and the kernel tests once they exist (`npm test -- --testPathPattern=kernel`).
+
+## What the kernel already does
+
+Creating a `todo` row through `POST /api/todo` checks the view permissions, stamps `org_id` from the caller, and runs `execute_Action` from `domain/actions.ts` when a hook is registered for that model. No books module is involved.

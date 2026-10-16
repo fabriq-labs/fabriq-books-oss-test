@@ -1,6 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import logger from '../utils/logger';
-import { sourceSystemEncryptionMiddleware } from './integrations/shared/prisma-encryption-middleware';
 
 const prismaClientOptions: {
   log?: Array<{ emit: 'event'; level: 'query' | 'error' | 'info' | 'warn' }>;
@@ -31,10 +30,6 @@ const prismaClientOptions: {
 };
 
 const prisma = new PrismaClient(prismaClientOptions);
-
-// Enable custom encryption middleware for source_system.connection_config
-// Uses AES-256-CBC encryption (compatible with Python DBT decryption)
-prisma.$use(sourceSystemEncryptionMiddleware());
 
 if (process.env.PRISMA_SHOW_QUERY === 'true') {
   (prisma as any).$on('query', (e: any) => {

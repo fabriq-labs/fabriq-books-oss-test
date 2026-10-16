@@ -13,7 +13,6 @@ import { getModelId } from '../lib/ai/modelProvider';
 import multer from 'multer';
 import { AttachmentController } from './AttachmentController';
 import { AxiosError } from 'axios';
-import { executeSourceSystemSync } from '../services/external-apis';
 import { customActionRegistry } from './customActionRegistry';
 
 export const setupRestRoutes = (router: Router) => {
@@ -229,96 +228,15 @@ export const setupRestRoutes = (router: Router) => {
     );
   });
 
-  // Add specific action endpoints BEFORE generic model routes to ensure precedence
-  // Add endpoint to fetch expense accounts for ERP connection
-  router.post(
-    '/actions/source_system/:id/fetch-expense-accounts',
-    authMiddleware,
-    async (req: any, res: Response) => {
-      try {
-        const connectionId = req.params.id;
-
-        if (!connectionId) {
-          return res.status(400).json({
-            success: false,
-            message: 'Connection ID is required',
-          });
-        }
-
-        // Use the unified connector factory
-        const { createERPConnector } = await import('../lib/integrations/connectors');
-        const connector = await createERPConnector(connectionId);
-
-        // Fetch expense accounts using the connector
-        const accounts = await connector.getExpenseAccounts();
-
-        res.status(200).json({
-          success: true,
-          data: accounts,
-        });
-      } catch (error: any) {
-        logger.error('Error fetching expense accounts:', error);
-
-        // Handle specific error cases
-        if (error.message?.includes('not found') || error.message?.includes('Connection not found')) {
-          return res.status(404).json({
-            success: false,
-            message: error.message || 'Connection not found',
-          });
-        }
-
-        if (error.message?.includes('inactive')) {
-          return res.status(400).json({
-            success: false,
-            message: error.message || 'Connection is inactive',
-          });
-        }
-
-        res.status(500).json({
-          success: false,
-          message: error.message || 'Failed to fetch expense accounts',
-        });
-      }
-    }
-  );
-
-  // Must be registered BEFORE generic POST /:model/:id/:relation or "sync" is treated as a child relation name.
-  router.post(
-    '/source_system/:id/sync',
-    authMiddleware,
-    async (req: any, res: Response) => {
-      const auth = req.context?.auth;
-      if (!auth?.user?.org_id) {
-        return res.status(401).json({ success: false, message: 'Unauthorized' });
-      }
-
-      const { id } = req.params;
-      const result = await executeSourceSystemSync({
-        connectionId: id,
-        orgId: auth.user.org_id,
-        userId: auth.user.id,
-        syncModeRaw: req.body?.sync_mode,
-      });
-      return res.status(result.httpStatus).json(result.body);
-    }
-  );
-
-  // Import run discard endpoint (must be before generic /:model/:id/:relation routes)
-  router.post(
-    '/import_run/:id/discard',
-    authMiddleware,
-    restService.discardImportRun.bind(restService)
-  );
-
-  // Setup routes for each model
+  // Setup routes for each model which has a view in the path (legacy support)
   models.forEach(model => {
     const basePath = `/${model.toLowerCase()}`;
 
     // GET /model - Get all records
-    router.get(basePath, authMiddleware, restService.getAll.bind(restService));
+    router.get(`${basePath}/view/:viewId`, authMiddleware, restService.getAll.bind(restService));
 
     // GET /model/search - Redirect to POST
-    router.get(`${basePath}/search`, (req, res) => {
+    router.get(`${basePath}/view/:viewId/search`, (req, res) => {
       res.status(405).json({
         error: 'Method Not Allowed',
         message: 'Search endpoint requires POST method. Please use POST /{model}/search instead.'
@@ -327,72 +245,70 @@ export const setupRestRoutes = (router: Router) => {
 
     // POST /model/search - Search records with complex filters
     router.post(
-      `${basePath}/search`,
+      `${basePath}/view/:viewId/search`,
       authMiddleware,
       restService.search.bind(restService)
     );
-
-
-
+    // PUT /model/- Update Many
+    router.put(
+      `${basePath}/view/:viewId`,
+      authMiddleware,
+      restService.updateMany.bind(restService)
+    );
+    // Delete /model/- Delete Many
+    router.delete(
+      `${basePath}/view/:viewId`,
+      authMiddleware,
+      restService.deleteMany.bind(restService)
+    );
     // GET /model/:id - Get record by ID
-    router.get(`${basePath}/:id`, authMiddleware, restService.getById.bind(restService));
+    router.get(`${basePath}/:id/view/:viewId`, authMiddleware, restService.getById.bind(restService));
+    router.get(`${basePath}/:id/state/:stateId`, authMiddleware, restService.getById.bind(restService));
 
     // POST /model - Create new record
-    router.post(basePath, authMiddleware, restService.create.bind(restService));
+    router.post(`${basePath}/view/:viewId`, authMiddleware, restService.create.bind(restService));
+    router.post(`${basePath}/state/:stateId`, authMiddleware, restService.create.bind(restService));
 
     // PUT /model/:id - Update record
-    router.put(`${basePath}/:id`, authMiddleware, restService.update.bind(restService));
+    router.put(`${basePath}/:id/view/:viewId`, authMiddleware, restService.update.bind(restService));
+    router.put(`${basePath}/:id/state/:stateId`, authMiddleware, restService.update.bind(restService));
 
     // DELETE /model/:id - Delete record
-    router.delete(`${basePath}/:id`, authMiddleware, restService.delete.bind(restService));
-
-    // Attachment endpoints
-    router.post(
-      `${basePath}/:id/attachment`,
-      authMiddleware,
-      upload.single('file'),
-      AttachmentController.upload
-    );
-    router.get(
-      `${basePath}/:id/attachment`,
-      authMiddleware,
-      AttachmentController.list
-    );
-    router.delete(
-      `${basePath}/:id/attachment/:attachmentId`,
-      authMiddleware,
-      AttachmentController.delete
-    );
-
-    // Download attachment endpoint
-    router.get(
-      `${basePath}/:id/attachment/:attachmentId`,
-      authMiddleware,
-      AttachmentController.download
-    );
+    router.delete(`${basePath}/:id/view/:viewId`, authMiddleware, restService.delete.bind(restService));
+    router.delete(`${basePath}/:id/state/:stateId`, authMiddleware, restService.delete.bind(restService));
 
     // POST /model/:id/:relation - Add children to parent
     router.post(
-      `${basePath}/:id/:relation`,
+      `${basePath}/:id/view/:viewId/:relation`,
       authMiddleware,
       restService.addChildrenToParent.bind(restService)
     );
 
     // PUT /model/:id/:relation/:childId - Update a child
     router.put(
-      `${basePath}/:id/:relation/:childId`,
+      `${basePath}/:id/view/:viewId/:relation/:childId`,
       authMiddleware,
       restService.updateChild.bind(restService)
     );
 
-    // DELETE /model/:id/:relation/:id - Delete relation
+    // DELETE /model/:junctionModel/:id - Delete relation
     router.delete(
-      `${basePath}/:id/:relation/:childId`,
+      `${basePath}/:id/view/:viewId/:relation/:childId`,
       authMiddleware,
       restService.deleteRelation.bind(restService)
     );
 
-
+    // POST /model/view/:viewId/upload - Upload CSV data
+    router.post(
+      `${basePath}/view/:viewId/upload`,
+      authMiddleware,
+      upload.single('file'),
+      (req, res, next) => {
+        req.params.modelName = model;
+        next();
+      },
+      restService.uploadCSV.bind(restService)
+    );
   });
 
   // Add report endpoint
@@ -418,56 +334,6 @@ export const setupRestRoutes = (router: Router) => {
 
   // Add workflow routes
   router.use('/workflow', authMiddleware, workflowRouter);
-
-  // Add ERP connection test endpoint
-  router.post(
-    '/source_system/test-connection',
-    authMiddleware,
-    async (req: any, res: Response) => {
-      try {
-        const { system_type, oauth, connection_id } = req.body;
-
-        if (!system_type || !oauth) {
-          return res.status(400).json({
-            success: false,
-            message: 'Missing required fields: system_type and oauth credentials are required',
-          });
-        }
-
-        const { testErpConnection } = await import('../lib/integrations/shared/test-connection');
-        const result = await testErpConnection(system_type, oauth, connection_id);
-
-        if (result.success) {
-          res.status(200).json(result);
-        } else {
-          res.status(400).json(result);
-        }
-      } catch (error: any) {
-        // Extract error information without circular references
-        const errorInfo: any = {
-          message: error.message || 'Unknown error',
-        };
-
-        if (error instanceof Error) {
-          errorInfo.name = error.name;
-          errorInfo.stack = error.stack;
-        }
-
-        // If it's an AxiosError, extract response info
-        if (error.response) {
-          errorInfo.status = error.response.status;
-          errorInfo.statusText = error.response.statusText;
-          errorInfo.responseData = error.response.data;
-        }
-
-        logger.error('Error testing ERP connection:', errorInfo);
-        res.status(500).json({
-          success: false,
-          message: error.message || 'Failed to test connection',
-        });
-      }
-    }
-  );
 
   // Add auth routes
   // Auth routes (login/register don't need auth middleware)

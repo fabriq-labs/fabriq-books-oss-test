@@ -1,7 +1,4 @@
 import { DocumentExtractor, DocumentType } from './types';
-import { BankStatementExtractor } from './bank-statement-extractor';
-import { InvoiceExtractor } from './invoice-extractor';
-// Note: BankStatementWithCategorizationExtractor has been moved to import-extensions/posting
 
 export class ExtractorRegistry {
   private static instance: ExtractorRegistry;
@@ -21,24 +18,7 @@ export class ExtractorRegistry {
   }
 
   private initializeExtractors(): void {
-    // Initialize bank statement extractor (extraction only)
-    const bankStatementExtractor = new BankStatementExtractor();
-
-    // Register extractor by its supported types
-    bankStatementExtractor.getSupportedTypes().forEach(type => {
-      this.extractors.set(type, bankStatementExtractor);
-    });
-
-    // Note: Bank statement with categorization is now handled by ImportExtensionRegistry
-    // See: lib/import-extensions/posting/
-
-    // Initialize invoice extractor
-    const invoiceExtractor = new InvoiceExtractor();
-
-    // Register invoice extractor by its supported types
-    invoiceExtractor.getSupportedTypes().forEach(type => {
-      this.extractors.set(type, invoiceExtractor);
-    });
+    // Domain extractors register themselves from backend/src/domain.
   }
 
   private initializeDocumentTypes(): void {

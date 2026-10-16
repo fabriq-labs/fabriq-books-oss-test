@@ -12,7 +12,7 @@ model org {
   active_subscription Boolean   @default(false)
   basecurrency_id     String?
   base_currency       String?   @default("USD") // ISO 4217 code for the org's reporting currency
-  erp_system_type     String? // ERP system type for this organization (e.g., 'zoho_books', 'xero', 'quickbooks')
+  erp_system_type     String? // Optional external-system tag for this organization
   currency            currency? @relation(fields: [basecurrency_id], references: [id])
   users               user[]    @relation("UserOrg")
 
@@ -38,12 +38,6 @@ model user {
   role_users               role_user[]            @relation("UserToRoleUser")
   wf_histories             workflow_history[]     @relation("workflow_action")
   comments                 comment[]              @relation("UserComments")
-  department_id            String?                @db.VarChar(50)
-  prs_created              purchase_requisition[] @relation(name: "created_user")
-  prs_behalf               purchase_requisition[] @relation(name: "behalf_user")
-  department               department?            @relation(fields: [department_id], references: [id])
-  employees                employee_master[]      @relation("EmployeeUserRelation")
-  managers                 employee_master[]      @relation("ManagerRelation")
   assigned_workflow_states workflow_state[]       @relation("AssignedUserToWorkflowState")
   external_config          Json?                  @default("{}") // For storing external service configurations (e.g., Slack user ID)
   api_key                  String?                @db.VarChar(255) // Bcrypt-hashed API key for programmatic access
@@ -62,7 +56,6 @@ model role {
   role_users      role_user[]       @relation("RoleToRoleUser")
   role_views      role_view[]       @relation("RoleToRoleView")
   workflow_states workflow_state[]  @relation("RoleToWorkflowState")
-  employees       employee_master[]
 
   @@map("role")
 }
@@ -147,7 +140,7 @@ model base_model {
 model workflow_flow {
   id          String              @id @default(dbgenerated("'flow_' || gen_random_uuid()"))
   name        String              @unique
-  model_name  String // e.g., "invoice"
+  model_name  String // domain model this flow applies to, e.g. "todo"
   description String?
   is_active   Boolean             @default(true)
   created_by  String?
@@ -218,7 +211,7 @@ model workflow_action {
 model workflow_instance {
   id                    String                 @id @default(dbgenerated("'wins_' || gen_random_uuid()"))
   flow_id               String
-  model_id              String // ID of the actual model instance (e.g., invoice_id)
+  model_id              String // ID of the domain record this instance tracks
   current_state         String
   current_state_id      String? // Reference to workflow_state.id
   assigned_user_id      String? // The user assigned to this instance in current state
@@ -233,10 +226,6 @@ model workflow_instance {
   history               workflow_history[]
   base_models           base_model[]
   comments              comment[]              @relation("wf_comments")
-  purchase_requisitions purchase_requisition[]
-  purchase_orders       purchase_order[]
-  invoices              invoice[]
-  sales_orders          sales_order[]
 
   @@map("workflow_instance")
 }
@@ -298,36 +287,4 @@ model prompt_template {
   org_id      String?
   app_name    String?
   view        view      @relation(fields: [view_id], references: [id], onDelete: Cascade)
-}
-
-model source_system {
-  id                            String    @id @default(dbgenerated("'srcsys_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id                        String    @db.VarChar(50) // Required, one connection per org per system
-  system_type                   String    @db.VarChar(255)
-  name                          String    @db.VarChar(255)
-  region                        String?   @db.VarChar(255)
-  connector_version             String?   @db.VarChar(255)
-  connection_config             Json      @db.JsonB // Encrypted OAuth credentials only (encrypted via custom Prisma middleware)
-  extraction_config             Json?     @db.JsonB // Encrypted Airbyte API credentials + connection id (same encryption as connection_config)
-  is_active                     Boolean?  @default(true)
-  default_purchase_account_id   String?   @db.VarChar(255)
-  default_purchase_account_name String?   @db.VarChar(255)
-  last_sync_at                  DateTime?
-  last_sync_status              Json?     @db.JsonB
-  created_at                    DateTime  @default(now())
-  modified_at                   DateTime  @default(now()) @updatedAt
-  created_by                    String?   @db.VarChar(255)
-  modified_by                   String?   @db.VarChar(255)
-
-  // Legal entity this connection belongs to (optional — used by broker sync to set legal_entity_id on created accounts)
-  legal_entity_id  String?
-  legal_entity     entity?   @relation(fields: [legal_entity_id], references: [id])
-
-  // Back-relations for forward sync lineage (broker sync)
-  synced_holdings       holding[]            @relation("HoldingSourceSystem")
-  synced_trades         trade[]              @relation("TradeSourceSystem")
-  option_chain_caches   option_chain_cache[] @relation("OptionChainCacheSourceSystem")
-
-  @@unique([org_id, system_type]) // One connection per org per ERP type
-  @@map("source_system")
 }

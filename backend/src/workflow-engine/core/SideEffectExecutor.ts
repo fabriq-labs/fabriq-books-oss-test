@@ -2,7 +2,7 @@ import { WorkflowPrismaClient } from '../types/prisma.types';
 import { WorkflowContext, WorkflowAction } from '../types/workflow.types';
 import { AuthContext } from '../../auth/types';
 import logger from '../../utils/logger';
-import { workflowActionMap } from '../../lib/actions';
+import { workflowActionMap } from '../../domain/actions';
 
 export interface SideEffect {
     type: 'database' | 'notification';

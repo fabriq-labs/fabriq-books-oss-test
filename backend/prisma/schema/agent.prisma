@@ -1,0 +1,342 @@
+// Kernel agent and observability models. Domain models go in domain.prisma.
+
+// AI Activity Logging - tracks all AI automated tasks for audit and analytics
+model ai_activity_log {
+  id         String   @id @default(dbgenerated("'aial_' || gen_random_uuid()")) @db.VarChar(50)
+  created_at DateTime @default(now())
+  org_id     String
+  user_id    String? // User who triggered (null if system-initiated)
+
+  // Activity identification
+  activity_type String // 'categorize_transaction', 'extract_invoice', etc.
+  model_name    String // Target model: 'posting', 'invoice', etc.
+  record_id     String? // ID of affected record
+
+  // AI execution details
+  llm_model         String // 'gemini-2.0-flash-001', etc.
+  prompt_tokens     Int? // Token usage for cost tracking
+  completion_tokens Int?
+  duration_ms       Int? // Execution time in milliseconds
+
+  // Agentic execution tracking
+  steps_count Int? // Number of agentic steps/iterations
+  tools_used  Json? // Array: [{name, calls, success}]
+
+  // Result
+  confidence_score Decimal? @db.Decimal(5, 4)
+  prediction       Json? // The AI's prediction/output
+  applied          Boolean  @default(false) // Was the prediction applied?
+
+  // Context for debugging
+  input_summary String? @db.Text // Summary of input (for debugging)
+  reasoning     String? @db.Text // AI's reasoning
+  error         String? @db.Text // Error message if failed
+
+  @@index([org_id, activity_type])
+  @@index([org_id, model_name, record_id])
+  @@index([created_at])
+  @@map("ai_activity_log")
+}
+
+enum import_run_status {
+  RECEIVED
+  PROCESSING
+  SUCCESS
+  FAILED
+  PARTIAL_SUCCESS
+  ABANDONED
+}
+
+model import_run {
+  id                     String            @id @default(dbgenerated("'impr_' || gen_random_uuid()")) @db.VarChar(50)
+  created_by             String?
+  modified_by            String?
+  created_at             DateTime          @default(now())
+  modified_at            DateTime          @updatedAt
+  org_id                 String
+  target_model           String
+  target_view            String?
+  import_channel         String
+  source_file_name       String
+  source_mime_type       String?
+  source_file_size_bytes Int?
+  storage_path           String?
+  status                 import_run_status
+  started_at             DateTime
+  completed_at           DateTime?
+  is_dry_run             Boolean           @default(false)
+  records_total          Int?
+  records_success        Int?
+  records_failed         Int?
+  error_summary          String?           @db.Text
+  error_details          Json?
+  request_context        Json?
+  source_sha256          String?
+  discard_reason         String?
+
+  @@index([org_id, created_at])
+  @@index([org_id, status])
+  @@index([target_model, created_at])
+  @@map("import_run")
+}
+
+// LLM Observability - logs every agent request for prompt improvement
+model llm_trace {
+  id          String   @id @default(dbgenerated("'llmt_' || gen_random_uuid()")) @db.VarChar(50)
+  created_at  DateTime @default(now())
+  created_by  String?
+  modified_by String?
+  assigned_to String?
+  modified_at DateTime @updatedAt
+  org_id      String
+  user_id     String?
+  session_id  String?
+
+  model_name String? // business model: 'posting', 'invoice'
+  view_name  String?
+  record_id  String?
+  query_type String? // 'analytical' | 'transactional'
+
+  question  String @db.Text
+  llm_model String
+
+  prompt_tokens     Int?
+  completion_tokens Int?
+  total_tokens      Int?
+  duration_ms       Int?
+
+  // Prompt-cache accounting (populated from provider usage metadata; null when the
+  // provider reports no caching). cached_prompt_tokens = input tokens served from
+  // cache at a discount (OpenAI cachedPromptTokens / Anthropic cacheReadInputTokens /
+  // Google cachedContentTokenCount). cache_creation_tokens = tokens written to the
+  // cache at a premium (Anthropic cacheCreationInputTokens); null for providers with
+  // no distinct write metric.
+  cached_prompt_tokens  Int?
+  cache_creation_tokens Int?
+
+  // Provider-reported call cost in USD. Null when the provider does not return a cost.
+  cost_usd Decimal? @db.Decimal(18, 8)
+
+  steps_count  Int?
+  tools_called String[]
+
+  response_text String? @db.Text
+  status        String  @default("success")
+  error_message String? @db.Text
+  feedback      String? @db.Text
+
+  steps llm_trace_step[]
+
+  @@index([org_id, created_at])
+  @@index([org_id, model_name])
+  @@index([org_id, status])
+  @@map("llm_trace")
+}
+
+model llm_trace_step {
+  id          String   @id @default(dbgenerated("'llms_' || gen_random_uuid()")) @db.VarChar(50)
+  created_at  DateTime @default(now())
+  created_by  String?
+  modified_by String?
+  assigned_to String?
+  modified_at DateTime @updatedAt
+
+  trace_id String
+  trace    llm_trace @relation(fields: [trace_id], references: [id], onDelete: Cascade)
+
+  step_number       Int
+  prompt_tokens     Int?
+  completion_tokens Int?
+  duration_ms       Int?
+
+  // Prompt-cache accounting for this step (see llm_trace for field semantics).
+  cached_prompt_tokens  Int?
+  cache_creation_tokens Int?
+
+  tool_calls   Json? // [{toolName, args}]
+  tool_results Json? // [{toolName, result_preview}]
+  sql_queries  Json? // [{sql, description, reasoning}]
+
+  response_text String? @db.Text
+  status        String  @default("success")
+  error_message String? @db.Text
+
+  @@unique([trace_id, step_number])
+  @@index([trace_id])
+  @@map("llm_trace_step")
+}
+
+// ── Agentic Sessions & Pending Actions ──────────────────────────
+
+/// Per-model agent tool assignment (Super Admin UI — Settings → AI Templates → Model Tools)
+model agent_model_tool_config {
+  id                      String   @id @default(dbgenerated("'amtc_' || gen_random_uuid()")) @db.VarChar(50)
+  model_name              String   @unique @db.VarChar(80)
+  display_name            String   @db.VarChar(120)
+  description             String?  @db.Text
+  model_tools             String[] @default([])
+  include_analytics_tools Boolean  @default(true)
+  is_active               Boolean  @default(true)
+  sort_order              Int      @default(0)
+  created_at              DateTime @default(now())
+  created_by              String?
+  modified_by             String?
+  assigned_to             String?
+  modified_at             DateTime @updatedAt
+
+  @@map("agent_model_tool_config")
+}
+
+model agent_template {
+  id            String   @id @default(dbgenerated("'atpl_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id        String? // null = system-level template (available to all orgs)
+  name          String
+  description   String
+  icon          String // lucide icon name e.g. "arrow-right-left"
+  goal_model    String?
+  system_prompt String   @db.Text
+  user_hint     String // placeholder text shown to user in GoalSetter
+  default_mode  String   @default("supervised")
+  is_active     Boolean  @default(true)
+  sort_order    Int      @default(0)
+  focus_models  String[] @default([]) // models to include in system prompt; empty = RELATED_MODELS fallback
+  allowed_tools String[] @default([]) // tools the LLM may call; empty = model-switch fallback
+  pinned_plan   Json?
+  intake_schema Json?
+  created_at    DateTime @default(now())
+
+  sessions agent_session[]
+
+  @@index([org_id, is_active])
+  @@map("agent_template")
+}
+
+model agent_session {
+  id      String @id @default(dbgenerated("'ses_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id  String
+  user_id String
+
+  goal        String
+  name        String? // auto-generated short title e.g. "HDFC March Reconciliation"
+  goal_model  String?
+  template_id String? @db.VarChar(50)
+
+  plan Json?
+
+  status String @default("planning")
+  // 'planning' | 'awaiting_approval' | 'executing'
+  // | 'paused' | 'completed' | 'failed' | 'abandoned'
+
+  current_step_index Int?
+
+  accumulated_context   Json?
+  clarification_request Json? // set by requestClarification tool; cleared by /clarify endpoint
+
+  pending_actions_count   Int @default(0)
+  completed_actions_count Int @default(0)
+
+  mode String @default("supervised")
+  // 'supervised' | 'semi_auto' | 'autonomous'
+
+  started_at     DateTime  @default(now())
+  last_active_at DateTime  @updatedAt
+  completed_at   DateTime?
+  expires_at     DateTime?
+
+  template        agent_template?  @relation(fields: [template_id], references: [id])
+  messages        agent_message[]
+  pending_actions pending_action[]
+
+  @@index([org_id, user_id])
+  @@index([org_id, status])
+  @@map("agent_session")
+}
+
+model agent_message {
+  id           String   @id @default(dbgenerated("'msg_' || gen_random_uuid()")) @db.VarChar(50)
+  session_id   String
+  role         String // 'user' | 'assistant' | 'tool'
+  content      String   @db.Text
+  tool_calls   Json?
+  tool_results Json?
+  step_index   Int?
+  created_at   DateTime @default(now())
+
+  session agent_session @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id, created_at])
+  @@map("agent_message")
+}
+
+model pending_action {
+  id            String  @id @default(dbgenerated("'pa_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id        String
+  session_id    String?
+  created_by    String // 'agent' or user_id
+  assigned_to   String?
+  assigned_role String?
+
+  action_type String
+  // V1: 'reconcile_posting'
+  // Future: 'invoice_match' | 'send_email' | 'escalate_collection'
+
+  batch_id    String?
+  batch_total Int?
+
+  title       String
+  description String? @db.Text
+
+  payload Json
+
+  confidence       String // 'high' | 'medium' | 'low'
+  confidence_score Float?
+
+  status String @default("pending")
+  // 'pending' | 'approved' | 'approved_with_edits'
+  // | 'rejected' | 'deferred' | 'executed' | 'expired'
+
+  resolved_by     String?
+  resolved_at     DateTime?
+  resolution_note String?   @db.Text
+
+  on_approve String
+  // 'execute_immediately' | 'queue_for_batch' | 'notify_only'
+
+  executed_at      DateTime?
+  execution_result Json?
+  execution_error  String?   @db.Text
+
+  defer_until DateTime?
+  expires_at  DateTime?
+
+  created_at  DateTime @default(now())
+  modified_at DateTime @updatedAt
+
+  session agent_session? @relation(fields: [session_id], references: [id])
+
+  @@index([org_id, status])
+  @@index([session_id, status])
+  @@index([batch_id])
+  @@map("pending_action")
+}
+
+/// Persisted Vercel AI SDK useChat threads (UIMessage[] + audit metadata)
+model chat_thread {
+  id                String   @id @db.VarChar(255) // Maps to useChat / streamText chatId
+  org_id            String   @db.VarChar(255)
+  user_id           String   @db.VarChar(255)
+  title             String   @default("New Financial Inquiry") @db.VarChar(255)
+  messages          Json     @default("[]") @db.JsonB
+  metadata          Json     @default("{}") @db.JsonB
+  model_used        String?  @db.VarChar(255)
+  total_tokens_used Int      @default(0)
+  created_by        String?
+  modified_by       String?
+  assigned_to       String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([org_id, user_id])
+  @@map("chat_thread")
+}

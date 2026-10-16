@@ -1,7 +1,6 @@
 /**
  * Builders — deterministic handlers for action and report steps.
- *
- * Import this module once at startup to register all builders and formatters.
+ * Domain handlers register from backend/src/domain/agentBuilders.ts.
  */
 
 export { ActionBuilderRegistry } from './ActionBuilderRegistry';
@@ -10,17 +9,8 @@ export type { ActionBuilder, ActionBuildResult } from './ActionBuilderRegistry';
 export { ReportFormatterRegistry } from './ReportFormatterRegistry';
 export type { ReportFormatter } from './ReportFormatterRegistry';
 
-// ── Register built-in builders ──────────────────────────────────
-
 import { ActionBuilderRegistry } from './ActionBuilderRegistry';
 import { ReportFormatterRegistry } from './ReportFormatterRegistry';
-import { ReconciliationActionBuilder } from './ReconciliationActionBuilder';
-import { ReconciliationReportFormatter } from './ReconciliationReportFormatter';
-import { TaxPackageBooksReadyBuilder, TaxPackageSendBuilder } from './TaxPackageBuilders';
-import { TaxPackageReportFormatter } from './TaxPackageReportFormatter';
+import { registerDomainBuilders } from '../../domain/agentBuilders';
 
-ActionBuilderRegistry.register(TaxPackageBooksReadyBuilder);
-ActionBuilderRegistry.register(TaxPackageSendBuilder);
-ActionBuilderRegistry.register(ReconciliationActionBuilder);
-ReportFormatterRegistry.register(TaxPackageReportFormatter);
-ReportFormatterRegistry.register(ReconciliationReportFormatter);
+registerDomainBuilders(ActionBuilderRegistry, ReportFormatterRegistry);

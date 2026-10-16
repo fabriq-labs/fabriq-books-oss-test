@@ -13,15 +13,8 @@ import { AuthContext } from './auth/types';
 import { setupRestRoutes } from './rest/routes';
 import { errorHandler } from './rest/middleware/errorHandler';
 import agentModule from './agent';
-import { createBrokerSyncRouter } from './routes/broker-sync';
-import { createInvestmentsRouter } from './routes/investments';
 import { GracefulShutdown } from './utils/gracefulShutdown';
-import { ensureDatabaseViews } from './utils/setup/ensureDatabaseViews';
 import { initializeImportExtensions } from './lib/import-extensions';
-import './rest/postingCustomActions'; // registers posting/import-bank-statement custom action
-import './services/book-keeping/migration-journal'; // registers setup/migration-journal custom actions
-import { mcpRouter } from './mcp/McpRouter';
-import { createPlaidRouter } from './plaid/plaid.routes';
 
 const app: Express = express();
 const port: number = parseInt(process.env.BACKEND_PORT || process.env.PORT || '4000', 10);
@@ -29,9 +22,6 @@ let httpServer: Server | null = null;
 
 async function startServer(): Promise<void> {
   try {
-    await ensureDatabaseViews();
-
-    // Initialize import extensions (model-specific import behaviors)
     initializeImportExtensions();
 
     // Initialize model registry and parse entities
@@ -71,18 +61,7 @@ async function startServer(): Promise<void> {
     setupRestRoutes(router);
     app.use('/api', router);
 
-    // Setup Agent routes
     app.use('/api/agent', agentModule.createAgentRouter());
-
-    // Broker forward sync (Questrade)
-    app.use('/api/broker-sync', createBrokerSyncRouter());
-    app.use('/api/investments', createInvestmentsRouter());
-
-    // MCP endpoint
-    app.use('/api/mcp', mcpRouter);
-
-    // Plaid bank feed integration
-    app.use('/api/plaid', createPlaidRouter());
 
     // GraphQL endpoint with authentication
     app.use(

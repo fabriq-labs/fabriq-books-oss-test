@@ -1,10 +1,11 @@
 import { AuthContext } from '../../auth/types';
 import { ModelInstance } from './model.types';
+import { isDomainWorkflowModel } from '../../domain/workflowModels';
 
 export type WorkflowStatus = 'active' | 'completed' | 'cancelled';
 
 export const is_workflow_model = (modelName: string) => {
-  return modelName === 'purchase_requisition'  || modelName === 'purchase_order' || modelName === 'invoice' || modelName === 'sales_order';
+  return isDomainWorkflowModel(modelName);
 }
 
 export interface WorkflowFlow {

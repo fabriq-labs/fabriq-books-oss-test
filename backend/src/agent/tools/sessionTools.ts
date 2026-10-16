@@ -23,8 +23,6 @@ import {
 import '../builders';
 import { ActionBuilderRegistry } from '../builders/ActionBuilderRegistry';
 import { ReportFormatterRegistry } from '../builders/ReportFormatterRegistry';
-import { assembleTaxPackage } from '../taxPackage/workpapers';
-import { TAX_PACKAGE_KIND, TAX_PACKAGE_TEMPLATE_ID } from '../taxPackage/constants';
 import logger from '../../utils/logger';
 import { sessionEventBus } from '../services/SessionEventBus';
 import { sessionTimeoutService } from '../services/SessionTimeoutService';
@@ -130,36 +128,6 @@ export function completeStepTool(sessionId: string, auth: AuthContext) {
       // Merge accumulated context
       const existingContext = (session.accumulated_context as Record<string, any>) || {};
       let mergedContext = { ...existingContext, ...accumulated_context_update };
-
-      const isTaxPackage = session.template_id === TAX_PACKAGE_TEMPLATE_ID
-        || existingContext.tax_package_kind === TAX_PACKAGE_KIND
-        || mergedContext.tax_package_kind === TAX_PACKAGE_KIND;
-      const completedTitle = plan[idx]?.title || '';
-      if (
-        isTaxPackage
-        && /assemble/i.test(completedTitle)
-        && !mergedContext.workpapers
-        && auth.user?.org_id
-      ) {
-        try {
-          const assembled = await assembleTaxPackage(auth.user.org_id, {
-            tax_year: Number(mergedContext.tax_year) || 2025,
-            recipient: mergedContext.recipient || 'Meera Patel CPA',
-            include_foreign: mergedContext.include_foreign !== false,
-            basement_rentable_pct: mergedContext.basement_rentable_pct ?? null,
-          });
-          mergedContext = { ...mergedContext, ...assembled };
-          logger.info('completeStep: hydrated tax-package workpapers', {
-            sessionId,
-            unmatched: assembled.unmatched_count,
-          });
-        } catch (hydrateErr: any) {
-          logger.warn('completeStep: tax-package assemble hydrate failed', {
-            sessionId,
-            error: hydrateErr?.message,
-          });
-        }
-      }
 
       let cursor = idx + 1;
       let newStatus: string = session.status as string;
@@ -356,34 +324,6 @@ export function queueActionsTool(sessionId: string, auth: AuthContext) {
           executedCount++;
         } else {
           toQueue.push(action);
-        }
-      }
-
-      // Enrich categorize_transaction payloads with account_name for inbox display
-      if (params.action_type === 'categorize_transaction' && toQueue.length > 0) {
-        const postingIds = toQueue.map(a => a.payload?.posting_id).filter((id): id is string => !!id);
-        if (postingIds.length > 0) {
-          const postings = await prisma.posting.findMany({
-            where: { id: { in: postingIds }, org_id: auth.user.org_id },
-            select: {
-              id: true,
-              account: { select: { id: true, name: true, type: true } },
-              credit_account: { select: { id: true, name: true, type: true } },
-            },
-          });
-          const postingMap = new Map(postings.map(p => [p.id, p]));
-          for (const action of toQueue) {
-            if (action.payload?.account_name) continue;
-            const posting = postingMap.get(action.payload?.posting_id);
-            if (!posting) continue;
-            const acct = posting.account as any;
-            const crAcct = posting.credit_account as any;
-            const bankAcct =
-              acct?.type?.includes('BANK') || acct?.type?.includes('CREDIT_CARD') ? acct :
-              crAcct?.type?.includes('BANK') || crAcct?.type?.includes('CREDIT_CARD') ? crAcct :
-              (acct ?? crAcct);
-            if (bankAcct?.name) (action.payload as any).account_name = bankAcct.name;
-          }
         }
       }
 

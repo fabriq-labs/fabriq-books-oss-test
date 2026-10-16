@@ -18,7 +18,7 @@ import {
 import prisma from '../lib/prisma';
 import { AuthContext } from '../auth/types';
 import { SearchQueryBuilder } from '../services/query/SearchQueryBuilder';
-import { run_report } from '../lib/reports';
+import { run_report } from '../domain/reports';
 import { ModelService } from '../services/core/ModelService';
 import { ImportAuditService } from '../services/import/ImportAuditService';
 import { ExtractionProgress } from '../lib/extractors/types';

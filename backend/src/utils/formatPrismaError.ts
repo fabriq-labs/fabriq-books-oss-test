@@ -150,41 +150,6 @@ export function summarizeCreateManyBatchForLog(
   return { recordCount: n, head, tail };
 }
 
-async function postingAccountFkHint(
-  prisma: PrismaClient,
-  orgId: string,
-  records: Record<string, unknown>[]
-): Promise<Record<string, unknown>> {
-  const ids = new Set<string>();
-  for (const r of records) {
-    if (r.account_id != null && r.account_id !== '') ids.add(String(r.account_id));
-    if (r.credit_account_id != null && r.credit_account_id !== '') ids.add(String(r.credit_account_id));
-  }
-  const all = [...ids];
-  if (!all.length) {
-    return { distinct_account_refs: 0, missing_in_org: [], exists_other_org: [] };
-  }
-  const inOrg = await prisma.account.findMany({
-    where: { id: { in: all }, org_id: orgId },
-    select: { id: true },
-  });
-  const inOrgSet = new Set(inOrg.map((a) => a.id));
-  const missingInOrg = all.filter((id) => !inOrgSet.has(id));
-  let existsOtherOrg: { id: string; org_id: string | null }[] = [];
-  if (missingInOrg.length) {
-    existsOtherOrg = await prisma.account.findMany({
-      where: { id: { in: missingInOrg } },
-      select: { id: true, org_id: true },
-    });
-  }
-  return {
-    distinct_account_refs: all.length,
-    missing_in_org: missingInOrg.slice(0, 80),
-    missing_in_org_count: missingInOrg.length,
-    exists_other_org: existsOtherOrg.map((r) => ({ id: r.id, org_id: r.org_id })).slice(0, 40),
-  };
-}
-
 export type CreateManyErrorLogOptions = {
   prisma: PrismaClient;
   modelName: string;
@@ -205,26 +170,9 @@ export async function buildCreateManyErrorLogPayload(
   const base = formatPrismaErrorForLog(error);
   const batch = summarizeCreateManyBatchForLog(modelName, batchRecords);
 
-  let fkHint: Record<string, unknown> | undefined;
-  if (
-    orgId &&
-    modelName.toLowerCase() === 'posting' &&
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2003'
-  ) {
-    try {
-      fkHint = await postingAccountFkHint(prisma, orgId, batchRecords);
-    } catch (hintErr) {
-      fkHint = {
-        hint_error: hintErr instanceof Error ? hintErr.message : String(hintErr),
-      };
-    }
-  }
-
   return {
     model: modelName,
     ...base,
     batch,
-    ...(fkHint ? { posting_account_fk_hint: fkHint } : {}),
   };
 }

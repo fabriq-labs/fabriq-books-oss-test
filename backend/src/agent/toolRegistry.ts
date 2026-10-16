@@ -8,7 +8,7 @@ export type ToolCatalogEntry = {
   name: string;
   label: string;
   description: string;
-  category: 'crud' | 'search' | 'analytics' | 'session' | 'finance' | 'erp' | 'other';
+  category: 'crud' | 'search' | 'analytics' | 'session' | 'other';
 };
 
 /** All tools that can be assigned to a model (session tools are injected separately). */
@@ -21,19 +21,9 @@ export const AGENT_TOOL_CATALOG: ToolCatalogEntry[] = [
   { name: 'advancedSqlQuery', label: 'Advanced SQL', description: 'Permission-aware SQL for joins and aggregates', category: 'analytics' },
   { name: 'getAnalyticsContext', label: 'Analytics Context', description: 'Schema and relationship context for analytics', category: 'analytics' },
   { name: 'analyticsQuery', label: 'Analytics Query', description: 'Run analytical SQL queries', category: 'analytics' },
-  { name: 'runFinancialReport', label: 'Financial Report', description: 'Trial balance / monthly trial balance / income statement', category: 'finance' },
-  { name: 'suggestReconciliationMatches', label: 'Reconciliation Matches', description: 'List uncategorized bank postings to confirm', category: 'finance' },
-  { name: 'categorizePostings', label: 'Categorize Postings', description: 'Batch categorise uncategorised postings', category: 'finance' },
-  { name: 'searchLocations', label: 'Search Locations', description: 'Search locations', category: 'search' },
-  { name: 'searchCOA', label: 'Search COA', description: 'Search chart of accounts (legacy)', category: 'search' },
-  { name: 'searchEntities', label: 'Search Entities', description: 'Search legal entities', category: 'search' },
   { name: 'searchUsers', label: 'Search Users', description: 'Search users', category: 'search' },
   { name: 'queueActions', label: 'Queue Actions', description: 'Queue pending actions for human review (sessions)', category: 'session' },
   { name: 'requestClarification', label: 'Request Clarification', description: 'Ask the user a structured question (sessions)', category: 'session' },
-  { name: 'prepareTaxPackage', label: 'Prepare Tax Package', description: 'Scan unmatched lines and assemble a Canadian T1 organizer', category: 'finance' },
-  { name: 'processInvoiceFromPdf', label: 'Process Invoice PDF', description: 'Extract invoice data from a PDF for form review', category: 'other' },
-  { name: 'extractInvoiceFromFile', label: 'Extract Invoice From File', description: 'Accept AI-extracted invoice data and optionally create the invoice', category: 'other' },
-  { name: 'erpConnector', label: 'ERP Connector', description: 'Query external ERP data (e.g. purchase order status)', category: 'erp' },
 ];
 
 /** model_name in agent_model_tool_config for unlisted page models (see seed SQL). */

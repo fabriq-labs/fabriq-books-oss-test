@@ -7,7 +7,7 @@ import logger from '../../utils/logger';
 import { DataAccessResult } from '../types';
 import { WorkflowEngine } from '../../workflow-engine/core/WorkflowEngine';
 import { is_workflow_model } from '../../workflow-engine/types/workflow.types';
-import { executeCustomAction } from '../../lib/actions';
+import { executeCustomAction } from '../../domain/actions';
 import { ExtractorRegistry } from '../../lib/extractors/extractor-registry';
 import { ImportExtensionRegistry, initializeImportExtensions } from '../../lib/import-extensions';
 import { ValidationError } from '../../rest/errors/ApiError';

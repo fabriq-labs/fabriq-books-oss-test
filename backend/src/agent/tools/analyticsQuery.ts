@@ -15,8 +15,12 @@ import { ModelService } from '../../services/core/ModelService';
 import { ModelRegistry, SYSTEM_FIELDS } from '../../services/registry/ModelRegistry';
 import logger from '../../utils/logger';
 import { computeDatePlaceholders } from '../prompt/datePlaceholders';
-import { userRequestedAllEntities, userRequestedLastWeek } from '../search/searchIntent';
-import { resolvePostingHeaderLegalEntityId } from '../postingCreateHelpers';
+function userRequestedAllEntities(question: string): boolean {
+  return /\ball entities\b/i.test(question);
+}
+function userRequestedLastWeek(question: string): boolean {
+  return /\blast week\b/i.test(question);
+}
 
 const modelService = ModelService.getInstance();
 
@@ -34,7 +38,7 @@ function resolveSearchAllEntities(toolContext?: AnalyticsToolContext): boolean {
     toolContext?.userQuestion ??
     toolContext?.lastUserMessage ??
     toolContext?.questionText;
-  return userRequestedAllEntities(question);
+  return typeof question === 'string' && userRequestedAllEntities(question);
 }
 
 function escapeRegExp(value: string): string {
@@ -149,7 +153,7 @@ export function normalizeAnalyticsLastWeekValueDateBounds(
   if (!/\bvalue_date\b/i.test(query)) return query;
 
   const ph = computeDatePlaceholders();
-  const wantsLastWeek = userRequestedLastWeek(userQuestion);
+  const wantsLastWeek = typeof userQuestion === 'string' && userRequestedLastWeek(userQuestion);
   const hasLastWeekLower = query.includes(ph.lastWeekStart);
   const misusedThisWeek = new RegExp(
     `(?:p\\.)?value_date\\s*>=\\s*'${escapeRegExp(ph.weekStart)}'`,
@@ -179,7 +183,7 @@ export async function normalizeAnalyticsPostingSql(
   const searchAllEntities = resolveSearchAllEntities(toolContext);
   const headerLegalEntityId = searchAllEntities
     ? null
-    : await resolvePostingHeaderLegalEntityId(auth, toolContext);
+    : null;
   const userQuestion = resolveUserQuestion(toolContext);
 
   let out = stripTrailingSqlSemicolon(query);
