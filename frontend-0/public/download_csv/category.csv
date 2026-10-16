@@ -1,0 +1,6 @@
+name,code,description,contra_account
+Office Supplies,OFF-SUP,Day-to-day stationery and consumables,5000-Office Expense
+Travel-Air,TRV-AIR,Domestic and international airfare,5100-Travel
+Software Subscriptions,SW-SUB,Cloud SaaS and license fees,5200-IT Expense
+Professional Fees,PRO-FEE,Legal audit and consulting,5300-Professional Services
+Utilities,UTIL-PWR,Electricity water and facility utilities,5400-Utilities

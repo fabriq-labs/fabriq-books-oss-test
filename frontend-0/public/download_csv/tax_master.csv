@@ -1,0 +1,6 @@
+Geo,Status,Tax Code,Tax Name,Tax Rate,Expires ON,Effective From
+IN,Active,GST28SAMPLE,GST 28% (CSV sample),28,2028-03-31,2025-04-01
+IN,Active,CESS05SAMPLE,Cess 5% (CSV sample),5,2028-03-31,2025-04-01
+IN,Active,GST15SAMPLE,GST 15% (CSV sample),15,2028-03-31,2025-04-01
+IN,Active,SURCH2SAMPLE,Surcharge 2% (CSV sample),2,2028-03-31,2025-04-01
+IN,Active,WHT05SAMPLE,Withholding 5% (CSV sample),5,2028-03-31,2025-04-01

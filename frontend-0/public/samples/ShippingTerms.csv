@@ -1,0 +1,6 @@
+shipping_terms,description,status
+FOB,Free On Board - buyer pays shipping from port,Active
+FOB,Free On Board - buyer pays shipping from port,Active
+CIF,Cost Insurance and Freight - seller covers cost to destination,Active
+EXW,Ex Works - buyer takes full responsibility from seller's premises,Active
+DDP,Delivered Duty Paid - seller covers all costs to buyer's location,Active

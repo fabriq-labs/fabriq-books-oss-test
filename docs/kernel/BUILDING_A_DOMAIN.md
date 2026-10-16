@@ -10,10 +10,12 @@ Give this file, plus [README.md](./README.md), to an agent that is adding a new 
 | `backend/src/domain/actions.ts` | Post-write hooks and workflow side-effect handlers |
 | `backend/src/domain/workflowModels.ts` | Model names that participate in workflow |
 | `backend/src/domain/reports.ts` | Report handlers keyed by report id |
-| `frontend-1/src/domain/navigation.ts` | Sidebar entries |
-| `frontend-1/src/domain/home.tsx` | Home screen rendered at `/` |
+| `frontend-0/src/domain/navigation.ts` | Sidebar entries for the kernel app |
+| `frontend-0/src/domain/home.tsx` | Home screen rendered at `/` |
 
 The kernel calls these files. It does not contain product behavior.
+
+The kernel app UI is `frontend-0` (port 5174). `frontend-1` is the earlier shell the pages were brought over from.
 
 ## Platform models
 
@@ -79,19 +81,19 @@ todos todo[] @relation("TodoAssignee")
 
 7. Optional side effect. Register a handler in `workflowActionMap` inside `backend/src/domain/actions.ts`. The workflow action's `side_effects` JSON names that handler.
 
-8. Optional nav item in `frontend-1/src/domain/navigation.ts`.
+8. Optional nav item in `frontend-0/src/domain/navigation.ts`.
 
 ## Home screen
 
-`/` is the default page after login. `frontend-1/src/App.tsx` mounts it as the index route inside the app layout:
+The kernel app is `frontend-0`. `/` is the default page after login. `frontend-0/src/App.tsx` mounts it as the index route inside the app layout:
 
 ```tsx
 <Route index element={<DomainHome />} />
 ```
 
-`DomainHome` is exported from `frontend-1/src/domain/home.tsx`. The kernel ships a dashboard there: counts of users, roles, views, permissions, currencies, and workflows.
+`DomainHome` is exported from `frontend-0/src/domain/home.tsx`. The kernel ships a dashboard there: counts of users, roles, views, permissions, currencies, and workflows.
 
-To make another page the home screen, replace the component in `domain/home.tsx`. Keep the `DomainHome` export. The index route stays pointed at that export, so `App.tsx` does not need a change. Add a sidebar link in `domain/navigation.ts` if the page should also appear in the nav. The kernel Dashboard link points at `/`.
+To make another page the home screen, replace the component in `frontend-0/src/domain/home.tsx`. Keep the `DomainHome` export. The index route stays pointed at that export, so `App.tsx` does not need a change. Add a sidebar link in `frontend-0/src/domain/navigation.ts` if the page should also appear in the nav. The kernel Dashboard link points at `/`.
 
 9. Run `cd backend && npx tsc --noEmit --pretty false` and the kernel tests once they exist (`npm test -- --testPathPattern=kernel`).
 

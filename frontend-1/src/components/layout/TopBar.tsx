@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Menu, UserRound, LogOut, MessageSquare, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserData } from '@/hooks/useUserData';
+import { useUserRoles } from '@/hooks/useUserRoles';
 import { useChat } from '@/contexts/ChatContext';
 import { useIsMobileDevice } from '@/hooks/useIsMobileDevice';
 import { isMobileOptedOut, setMobileOptedOut } from '@/config/mobileRoutes';
@@ -29,6 +31,7 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { isTenantAdmin } = useUserRoles();
   const { toggleChat } = useChat();
   const isMobileDevice = useIsMobileDevice();
   const showSwitchToMobile = isMobileDevice && isMobileOptedOut();
@@ -120,6 +123,19 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
               >
                 <UserRound className="h-4 w-4" />
                 <span>My Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="flex items-center gap-2 cursor-pointer"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  if (!isTenantAdmin()) {
+                    toast.error("You do not have access to organization settings.");
+                    return;
+                  }
+                  navigate("/settings/connections");
+                }}
+              >
+
               </DropdownMenuItem>
               {showSwitchToMobile && (
                 <DropdownMenuItem
