@@ -12,6 +12,7 @@
     "start": "node config/scripts/select-brand.js --interactive && vite",
     "dev:fabriq": "node config/scripts/select-brand.js fabriq && vite",
     "dev:zeiv": "node config/scripts/select-brand.js zeiv && vite",
+    "dev:kernel": "node config/scripts/select-brand.js kernel && vite",
     "build": "node config/scripts/select-brand.js && vite build",
     "build:fabriq": "node config/scripts/select-brand.js fabriq && vite build",
     "build:zeiv": "node config/scripts/select-brand.js zeiv && vite build",

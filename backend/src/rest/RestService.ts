@@ -151,7 +151,6 @@ export class RestService {
         external_id: true,
         org_id: true,
         manager_id: true,
-        department_id: true,
         role_users: {
           select: {
             id: true,

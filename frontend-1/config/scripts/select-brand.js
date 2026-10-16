@@ -99,7 +99,7 @@ function resolveAppName() {
   const cliBrand = positional[0]?.trim();
   if (cliBrand) return cliBrand;
 
-  return process.env.APP_NAME?.trim() || "zeiv";
+  return process.env.APP_NAME?.trim() || "kernel";
 }
 
 function applyBrand(appName) {

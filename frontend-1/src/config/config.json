@@ -1,7 +1,7 @@
 {
-  "appName": "Fabriq Books",
-  "appTagline": "Agentic FinOps",
-  "sidebarFallbackName": "Fabriq Books",
+  "appName": "Kernel",
+  "appTagline": "Kernel app",
+  "sidebarFallbackName": "Kernel",
   "copyright": "fabriq labs inc",
-  "appId": "fabriq_books"
+  "appId": "kernel"
 }

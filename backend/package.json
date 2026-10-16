@@ -19,6 +19,7 @@
     "apply-views": "ts-node src/utils/setup/applyDatabaseViews.ts",
     "sync-metadata": "ts-node prisma/sync-metadata.ts",
     "seed-sql-metadata": "ts-node prisma/seed-sql-metadata.ts",
+    "setup:kernel": "node scripts/setup-kernel-db.js",
     "pull-metadata": "ts-node prisma/pull-metadata.ts",
     "pull": "ts-node prisma/pull-metadata-interactive.ts",
     "sync": "ts-node prisma/sync-metadata-interactive.ts",
