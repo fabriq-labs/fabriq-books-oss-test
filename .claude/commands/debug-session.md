@@ -99,7 +99,7 @@ WHERE s.id = '<SESSION_ID>';
 ### Step 3 — Match to a known failure pattern
 
 Use the evidence from Step 2 to match against the patterns in
-`docs/agent/debugging/SESSION_FAILURE_PATTERNS.md`.
+`docs/kernel/agent/03-SESSION_LIFECYCLE.md`.
 
 Use this decision tree:
 
@@ -160,7 +160,7 @@ If the symptoms don't match any existing pattern in `SESSION_FAILURE_PATTERNS.md
 
 ### Step 6 — Append report to debug-session.log
 
-After outputting the report, append it to `docs/agent/debugging/debug-session.log` using the following format. Create the file if it does not exist.
+After outputting the report, append it to `docs/kernel/agent/debugging/debug-session.log` using the following format. Create the file if it does not exist.
 
 ```
 ---
@@ -216,7 +216,6 @@ What each reset does:
 
 ## Reference
 
-- Failure patterns: `docs/agent/debugging/SESSION_FAILURE_PATTERNS.md`
-- Session lifecycle: `docs/agent/WORKBENCH_BACKEND.md` (sections 9, 10, 16)
+- Session lifecycle: `docs/kernel/agent/03-SESSION_LIFECYCLE.md`
 - Key tables: `agent_session`, `agent_message`, `llm_trace`, `pending_action`, `agent_template`
 - Timeout default: 300s (`AGENT_SESSION_TIMEOUT_MS` env, `SessionTimeoutService.ts`)

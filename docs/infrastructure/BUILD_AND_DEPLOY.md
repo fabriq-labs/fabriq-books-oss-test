@@ -1,6 +1,6 @@
 # Fabriq — Build and deploy (monorepo + GHCR)
 
-One **Dockerfile** at the repo root builds **backend/** and **frontend-1/** from the same Git tree (no clone token). CI pushes images to **GitHub Container Registry (GHCR)** via [`.github/workflows/docker-ghcr.yml`](../.github/workflows/docker-ghcr.yml).
+One **Dockerfile** at the repo root builds **backend/** and **frontend-1/** from the same Git tree (no clone token). CI pushes images to **GitHub Container Registry (GHCR)** via [`.github/workflows/docker-ghcr.yml`](../../.github/workflows/docker-ghcr.yml).
 
 ---
 

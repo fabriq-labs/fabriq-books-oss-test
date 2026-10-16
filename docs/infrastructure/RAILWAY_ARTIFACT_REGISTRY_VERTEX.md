@@ -1,6 +1,6 @@
 # Railway: pull from Artifact Registry + Vertex (Gemini)
 
-Fabriq’s backend uses **Vertex AI** via `@ai-sdk/google-vertex` ([`backend/src/lib/ai/vertexProvider.ts`](../backend/src/lib/ai/vertexProvider.ts)). That stack expects **Google Application Default Credentials (ADC)** in practice: either a **metadata server** (Cloud Run/GCE) or **`GOOGLE_APPLICATION_CREDENTIALS`** pointing at a **service account JSON key file**.
+Fabriq’s backend uses **Vertex AI** via `@ai-sdk/google-vertex` ([`backend/src/lib/ai/vertexProvider.ts`](../../backend/src/lib/ai/vertexProvider.ts)). That stack expects **Google Application Default Credentials (ADC)** in practice: either a **metadata server** (Cloud Run/GCE) or **`GOOGLE_APPLICATION_CREDENTIALS`** pointing at a **service account JSON key file**.
 
 Railway is **not** on GCP, so there is **no metadata-based ADC**. You must supply credentials explicitly (see below).
 
@@ -78,7 +78,7 @@ The Vertex SDK still uses Google’s auth library; you satisfy it by providing a
 
 5. Set env vars the app already expects:
    - **`GOOGLE_CLOUD_PROJECT_ID`** (or `GOOGLE_CLOUD_PROJECT` if your code reads that—align with app)
-   - **`GOOGLE_LOCATION`** (e.g. `us-central1`) — see [`vertexProvider.ts`](../backend/src/lib/ai/vertexProvider.ts)
+   - **`GOOGLE_LOCATION`** (e.g. `us-central1`) — see [`vertexProvider.ts`](../../backend/src/lib/ai/vertexProvider.ts)
 
 After this, libraries treat the key file as **ADC** for application purposes.
 

@@ -1,20 +1,10 @@
-# Frontend Development Guide
+# Frontend shell
 
-> **📚 Moved**: This documentation has been consolidated.
-> 
-> **See**: [`/docs/FRONTEND.md`](../docs/FRONTEND.md) for the full frontend development guide.
-
-## Quick Links
-
-- [Frontend Development Guide](../docs/FRONTEND.md) - Full frontend guide
-- [Architecture Overview](../docs/ARCHITECTURE.md) - System architecture
-- [Backend Development](../docs/BACKEND.md) - Backend guide
-
-## Quick Start
+The kernel UI guide is [docs/kernel/frontend.md](../docs/kernel/frontend.md). The index is [docs/README.md](../docs/README.md).
 
 ```bash
 npm install
 cp .env.example .env.local
 # Set VITE_API_BASE_URL=http://localhost:4000
-npm run dev  # Port 5173
+npm run dev  # Port 5174
 ```

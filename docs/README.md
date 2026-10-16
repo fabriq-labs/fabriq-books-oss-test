@@ -23,15 +23,34 @@ Application tenancy is in the data access layer, auth middleware, workflow engin
 
 Do not run `prisma db push` or `prisma migrate`. Setup applies generated schema SQL and seeds `org_system`.
 
-## Read this
+## Kernel
 
 | Document | What it teaches |
 |---|---|
-| [metadata.md](./metadata.md) | How a view, a permission, and a role produce an API and a screen. Request path from HTTP to the data access layer. |
-| [tenancy.md](./tenancy.md) | Org scope, shareable and private reads, platform-admin writes, and the row-level security sketch to review. |
-| [examples.md](./examples.md) | Worked steps on tables and routes that exist: model, view, permission, role, workflow, instance. |
-| [workflows.md](./workflows.md) | States, actions, assignment, history, and who may write a definition. |
-| [auth.md](./auth.md) | Login, public paths, and the platform-admin check. |
-| [frontend.md](./frontend.md) | The shell: home, Super Admin navigation, the profile menu, and a metadata list. |
-| [agent/README.md](./agent/README.md) | Sessions, tools, prompts, pending actions, supervised mode. |
+| [kernel/metadata.md](./kernel/metadata.md) | How a view, a permission, and a role produce an API and a screen. Request path from HTTP to the data access layer. |
+| [kernel/tenancy.md](./kernel/tenancy.md) | Org scope, shareable and private reads, platform-admin writes, and the row-level security sketch to review. |
+| [kernel/examples.md](./kernel/examples.md) | Worked steps on tables and routes that exist: model, view, permission, role, workflow, instance. |
+| [kernel/workflows.md](./kernel/workflows.md) | States, actions, assignment, history, and who may write a definition. |
+| [kernel/auth.md](./kernel/auth.md) | Login, public paths, and the platform-admin check. |
+| [kernel/frontend.md](./kernel/frontend.md) | The shell: home, Super Admin navigation, the profile menu, and a metadata list. |
+| [kernel/DESIGN_SYSTEM.md](./kernel/DESIGN_SYSTEM.md) | Colors, type, and spacing used by the shell. |
+| [kernel/agent/README.md](./kernel/agent/README.md) | Sessions, tools, prompts, pending actions, supervised mode. |
 | [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md) | Where a future domain's files go. |
+
+## Infrastructure
+
+Build, deploy, and host notes. These are not part of the kernel contract.
+
+| Document | What it covers |
+|---|---|
+| [infrastructure/DEPLOYMENT.md](./infrastructure/DEPLOYMENT.md) | Environment, setup, and deployment |
+| [infrastructure/BUILD_AND_DEPLOY.md](./infrastructure/BUILD_AND_DEPLOY.md) | Root Dockerfile, GHCR, and the image workflow |
+| [infrastructure/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./infrastructure/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md) | Railway image and Vertex credentials |
+| [infrastructure/UBUNTU_DOCKER_COMPOSE_SETUP.md](./infrastructure/UBUNTU_DOCKER_COMPOSE_SETUP.md) | Docker Compose on Ubuntu |
+| [infrastructure/VM_REMOTE_DEV.md](./infrastructure/VM_REMOTE_DEV.md) | Remote VM development |
+| [infrastructure/WORKTREE_CLOUD_AGENT_SETUP.md](./infrastructure/WORKTREE_CLOUD_AGENT_SETUP.md) | Cloud agent worktrees |
+| [infrastructure/AGENT_PROMPT_CLOUD_VM.md](./infrastructure/AGENT_PROMPT_CLOUD_VM.md) | Prompt for an agent on the cloud VM |
+
+## Security
+
+Policy PDFs in [security/](./security/): `DATA_POLICY.pdf` and `INFORMATION_SECURITY_POLICY.pdf`.

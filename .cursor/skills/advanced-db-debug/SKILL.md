@@ -553,5 +553,5 @@ LIMIT 20;
 - **[../database-debug/SKILL.md](../database-debug/SKILL.md)** - Basic skill for simple queries
 - **[./BUSINESS_MODELS.md](./BUSINESS_MODELS.md)** - Comprehensive entity relationships
 - **[../../CLAUDE.md](../../CLAUDE.md)** - System overview
-- **[../../docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)** - Permission/view architecture
+- **[../../docs/kernel/metadata.md](../../docs/kernel/metadata.md)** - views and permissions
 - **[../../docs/WORKFLOWS.md](../../docs/WORKFLOWS.md)** - Workflow engine details

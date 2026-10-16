@@ -44,7 +44,7 @@ Workflow definition writes (any method except GET and HEAD under `/api/workflow/
 
 Prisma requires both sides of a relation. A one-sided relation fails `prisma validate`. A plain string column with no `@relation` validates, and then `include` stops working.
 
-This repo is one Prisma client. The relation that exists today is `org.basecurrency_id` to `currency`, with `currency.orgs` on the other side. A future domain model that points at `user` needs the matching array on `user` in `metadata.prisma`. The folder for that model is in [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md).
+This repo is one Prisma client. The relation that exists today is `org.basecurrency_id` to `currency`, with `currency.orgs` on the other side. A future domain model that points at `user` needs the matching array on `user` in `metadata.prisma`. The folder for that model is in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md).
 
 The setup script creates foreign keys in the database. Do not use `prisma db push`. Editing a relation in the schema does not create or drop a database foreign key until setup is changed on purpose.
 

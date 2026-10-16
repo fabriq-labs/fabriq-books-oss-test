@@ -13,7 +13,7 @@ The kernel calls these files. Product behavior stays inside them.
 | `frontend-0/src/domain/navigation.ts` | Sidebar entries |
 | `frontend-0/src/domain/home.tsx` | Home screen rendered at `/` |
 
-The app UI is `frontend-0` (port 5174). `/` mounts `DomainHome` from `home.tsx`. Keep that export if you replace the page. See [../frontend.md](../frontend.md).
+The app UI is `frontend-0` (port 5174). `/` mounts `DomainHome` from `home.tsx`. Keep that export if you replace the page. See [frontend.md](./frontend.md).
 
 ## Platform models
 
@@ -31,7 +31,7 @@ Further currencies are more rows on `currency`, not a new model.
 
 ## Rules the engine already applies
 
-Follow [../tenancy.md](../tenancy.md) and [../examples.md](../examples.md).
+Follow [tenancy.md](./tenancy.md) and [examples.md](./examples.md).
 
 - Put `org_id` on the model. Match the Prisma nullability you intend. Several kernel metadata models still use `String?`. `currency` and `workflow_instance` use a required `String`.
 - Shared defaults use `org_system`. A tenant row uses the caller org.

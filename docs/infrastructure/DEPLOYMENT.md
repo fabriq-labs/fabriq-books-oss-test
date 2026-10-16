@@ -1,7 +1,7 @@
 # Fabriq Base - Deployment & Setup Guide
 
 **When to read**: Setting up a new instance, deploying to production, loading demo data
-**Related docs**: [ARCHITECTURE.md](./ARCHITECTURE.md), [AUTHENTICATION.md](./AUTHENTICATION.md), [UBUNTU_DOCKER_COMPOSE_SETUP.md](./UBUNTU_DOCKER_COMPOSE_SETUP.md) (pre-built image + Docker Compose on Ubuntu)
+**Related docs**: [Kernel](../README.md), [auth](../kernel/auth.md), [UBUNTU_DOCKER_COMPOSE_SETUP.md](./UBUNTU_DOCKER_COMPOSE_SETUP.md) (pre-built image + Docker Compose on Ubuntu)
 
 **Last Updated**: 2026-01-02
 **Purpose**: Complete guide for deploying and bootstrapping a new Fabriq instance
@@ -555,8 +555,7 @@ cd backend
 npx ts-node prisma/setup-IN/setup-indian-demo.ts --sync-invoices
 ```
 
-Use this after running reconciliations/confirmations in the UI when you want the posting list back to the initial demo state. See [RECONCILIATION_TOOL.md](./agent/RECONCILIATION_TOOL.md#seed-data--demo-indian-demo) for details.
-Use this after running reconciliations/confirmations in the UI when you want the posting list back to the initial demo state. See [docs/agent/07-WORKED_EXAMPLES.md](./agent/07-WORKED_EXAMPLES.md#trace-2-reconciliation-atpl_reconcile) for the reconciliation flow.
+Use this after running reconciliations or confirmations in the UI when you want the posting list back to the initial demo state.
 
 ### 2. US-CA Demo Data 🇺🇸
 
@@ -1186,6 +1185,5 @@ After running `node setup-db.js`:
 
 **End of Deployment Guide**
 
-For architecture details, see [CLAUDE.md](./CLAUDE.md)
-For API reference, see [API_REFERENCE.md](./API_REFERENCE.md) (if created)
-For workflow details, see [WORKFLOWS.md](./WORKFLOWS.md) (if created)
+For the kernel, see [README.md](../README.md).
+For workflow details, see [workflows.md](../kernel/workflows.md).

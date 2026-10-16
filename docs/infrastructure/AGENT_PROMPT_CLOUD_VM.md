@@ -9,7 +9,7 @@
 When you connect to the VM (workspace at `~/repos/fabriq`), paste this into the agent chat:
 
 ```
-I'm on the Fabriq cloud VM. Workspace is ~/repos/fabriq (full monorepo: backend/, frontend-1/, Dockerfile, docs). Read docs/AGENT_PROMPT_CLOUD_VM.md and docs/BUILD_AND_DEPLOY.md. Use docker compose for the all-in-one stack (port 8080). CI builds the same Dockerfile and pushes to GHCR via GitHub Actions — no gcloud Cloud Build.
+I'm on the Fabriq cloud VM. Workspace is ~/repos/fabriq (full monorepo: backend/, frontend-1/, Dockerfile, docs). Read docs/infrastructure/AGENT_PROMPT_CLOUD_VM.md and docs/infrastructure/BUILD_AND_DEPLOY.md. Use docker compose for the all-in-one stack (port 8080). CI builds the same Dockerfile and pushes to GHCR via GitHub Actions — no gcloud Cloud Build.
 ```
 
 ---
