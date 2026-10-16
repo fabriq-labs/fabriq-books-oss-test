@@ -86,6 +86,11 @@ const AppRoutes: React.FC = () => {
               <Route path="master/:category/:model" element={<DomainMaster />} />
 
               <Route path="settings/users" element={<Master type="user" view="user_view" displayName="Users" />} />
+              <Route path="accounting/currency" element={
+                <SuperAdminGuard>
+                  <Master type="currency" view="currency_view" displayName="Currency" />
+                </SuperAdminGuard>
+              } />
               <Route path="user/:id/view/:viewId" element={<UserMasterForm />} />
               <Route path="user/view/:viewId" element={<UserMasterForm />} />
 
