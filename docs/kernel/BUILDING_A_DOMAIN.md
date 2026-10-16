@@ -14,6 +14,22 @@ Give this file, plus [README.md](./README.md), to an agent that is adding a new 
 
 The kernel calls these files. It does not contain product behavior.
 
+## Platform models
+
+`backend/prisma/schema/platform.prisma` is not a place for domain reference data. A model stays there only when both are true:
+
+1. Kernel code reads or writes it when no domain is installed.
+2. It is not a catalog of product objects.
+
+Shared rows live on `org_system`, and the kernel seed inserts only the rows the engine needs.
+
+| Model | In the kernel | Seed |
+|---|---|---|
+| `currency` | Yes. `org.basecurrency_id` points at it. | One USD row, `curr_kernel_usd`, owned by `org_system`. Both seeded orgs point at it. |
+| `attachment` | Yes. The upload and download routes write it. | None. A row is a file a tenant uploaded. |
+
+A domain that needs more currencies inserts more `currency` rows. It does not add a new model. A product catalog (accounts, tax codes, units) goes in `domain.prisma` and in that domain's own seed.
+
 ## Rules that already apply
 
 - Every model has `org_id`. Use a required `String` once the tenancy migration has run. Until then, `String?` matches the current kernel models.

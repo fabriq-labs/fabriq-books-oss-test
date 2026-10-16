@@ -1,4 +1,11 @@
-// Shared reference data used by the kernel. Domain models go in domain.prisma.
+// Platform models are storage the kernel uses with no domain installed.
+// A model belongs here only when kernel code reads or writes it, and it is
+// not a catalog of product objects. Shared rows are seeded on org_system,
+// and only the rows the engine needs. Domain models go in domain.prisma.
+//
+// currency — org.basecurrency_id. Seed is one USD row. Further codes are
+// domain seed data on this same model, not new kernel models.
+// attachment — upload routes write a row per file. No shared seed.
 
 model currency {
   id             String   @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)

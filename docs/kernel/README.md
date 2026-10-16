@@ -31,7 +31,7 @@ The agent ships inside the kernel. A books executor, such as reconcile-posting, 
 
 Every model has `org_id`, and the column is required.
 
-Setup seeds one system organization. Its id is `org_system`. Rows owned by that org are the shared defaults: default workflow definitions, default roles, shared reference data. `currency` rows today use `org_id = 'system'`. When tenancy is implemented, those rows move to `org_system` so there is a single sentinel.
+Setup seeds one system organization. Its id is `org_system`. Rows owned by that org are the shared defaults: default workflow definitions, default roles, and the platform rows below.
 
 Rules:
 
@@ -98,7 +98,7 @@ Check these points in the implementation review:
 2. **Set the org inside the transaction.** `SELECT set_config('app.org_id', $1, true)` so the value dies at commit. Prisma runs queries as autocommit, and the pool will reuse the connection. The kernel needs one wrapper that starts a transaction, sets the config, then runs the query. A missing setting must fail the query, not default to `org_system`.
 3. **Prefer the tenant row in application code.** RLS returns both the system default and the tenant override. It does not choose between them.
 4. **Foreign keys ignore RLS.** A string column can store another tenant's id. The setup-script foreign key checks that the id exists. It does not check that the org matches. Add that check only where a cross-tenant reference is unacceptable.
-5. **Align `currency.org_id`.** Replace the existing `'system'` value with `org_system` in the same change that turns RLS on.
+5. **Keep `currency.org_id` on `org_system`.** The kernel seed already writes USD that way. An existing database that still has `org_id = 'system'` must be moved in the same change that turns RLS on.
 
 ## Engine work now in code
 

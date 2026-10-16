@@ -65,7 +65,7 @@ LLM calls stay out of this suite.
 
 ## Phase 5 — Row-level security
 
-Start only after a fresh read of [README.md](./README.md). The review checklist there is the gate: separate read and write policies, `set_config('app.org_id', ..., true)` inside the transaction, application choice of the tenant override, and moving `currency.org_id` from `system` to `org_system`.
+Start only after a fresh read of [README.md](./README.md). The review checklist there is the gate: separate read and write policies, `set_config('app.org_id', ..., true)` inside the transaction, application choice of the tenant override, and `currency.org_id` staying on `org_system` (the kernel seed already writes it that way).
 
 ## Explicitly not in this plan
 
