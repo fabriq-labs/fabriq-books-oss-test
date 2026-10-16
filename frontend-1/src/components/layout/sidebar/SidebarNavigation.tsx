@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Bot, LayoutDashboard, Shield } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { domainNavigation } from '@/domain/navigation';
@@ -23,8 +24,10 @@ const superAdminNav = [
 ];
 
 export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ collapsed }) => {
+  const { pathname } = useLocation();
   return (
     <div className="flex-1 overflow-y-auto py-2">
+      <NavItem icon={LayoutDashboard} label="Dashboard" path="/" collapsed={collapsed} active={pathname === '/'} />
       <NavItem icon={Shield} label="Super Admin" collapsed={collapsed} subNav={superAdminNav} />
       <NavItem icon={Bot} label="Workbench" path="/workbench" collapsed={collapsed} />
 

@@ -33,6 +33,7 @@ import { SessionView } from "./pages/workbench/SessionView";
 import { InboxPage } from "./pages/workbench/InboxPage";
 import { GoalSetter } from "./components/workbench/GoalSetter";
 import DomainMaster from "./domain/DomainMaster";
+import { DomainHome } from "./domain/home";
 import ProtectedRouteWithLoading from "./components/layout/ProtectedRouteWithLoading";
 
 const queryClient = new QueryClient();
@@ -81,7 +82,7 @@ const AppRoutes: React.FC = () => {
                 <AppLayout />
               </ProtectedRouteWithLoading>
             }>
-              <Route index element={<Navigate to="/settings/workflows" replace />} />
+              <Route index element={<DomainHome />} />
 
               <Route path="master/:category/:model" element={<DomainMaster />} />
 

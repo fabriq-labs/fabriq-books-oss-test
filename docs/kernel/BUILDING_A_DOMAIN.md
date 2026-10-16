@@ -11,6 +11,7 @@ Give this file, plus [README.md](./README.md), to an agent that is adding a new 
 | `backend/src/domain/workflowModels.ts` | Model names that participate in workflow |
 | `backend/src/domain/reports.ts` | Report handlers keyed by report id |
 | `frontend-1/src/domain/navigation.ts` | Sidebar entries |
+| `frontend-1/src/domain/home.tsx` | Home screen rendered at `/` |
 
 The kernel calls these files. It does not contain product behavior.
 
@@ -79,6 +80,18 @@ todos todo[] @relation("TodoAssignee")
 7. Optional side effect. Register a handler in `workflowActionMap` inside `backend/src/domain/actions.ts`. The workflow action's `side_effects` JSON names that handler.
 
 8. Optional nav item in `frontend-1/src/domain/navigation.ts`.
+
+## Home screen
+
+`/` is the default page after login. `frontend-1/src/App.tsx` mounts it as the index route inside the app layout:
+
+```tsx
+<Route index element={<DomainHome />} />
+```
+
+`DomainHome` is exported from `frontend-1/src/domain/home.tsx`. The kernel ships a dashboard there: counts of users, roles, views, permissions, currencies, and workflows.
+
+To make another page the home screen, replace the component in `domain/home.tsx`. Keep the `DomainHome` export. The index route stays pointed at that export, so `App.tsx` does not need a change. Add a sidebar link in `domain/navigation.ts` if the page should also appear in the nav. The kernel Dashboard link points at `/`.
 
 9. Run `cd backend && npx tsc --noEmit --pretty false` and the kernel tests once they exist (`npm test -- --testPathPattern=kernel`).
 

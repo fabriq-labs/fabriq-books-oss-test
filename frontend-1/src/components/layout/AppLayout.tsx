@@ -44,7 +44,7 @@ const routeTitles: Record<string, string> = {
 const getTitleFromRoute = (pathname: string, isBuyer: boolean): string => {
     // Special handling for dashboard route
     if (pathname === '/') {
-        return isBuyer ? 'PA Dashboard' : 'Requester Dashboard';
+        return 'Dashboard';
     }
 
     // Check exact matches first
