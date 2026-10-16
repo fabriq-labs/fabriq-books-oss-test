@@ -2,7 +2,7 @@
 
 TypeScript/Express backend for the [Fabriq Books](../README.md) monorepo. It provides a **metadata-driven API**: Prisma models drive auto-generated REST (and GraphQL) endpoints, with view-based RBAC, workflow engine, AI agent, document import, and ERP integrations.
 
-**Deep development guide:** [docs/BACKEND.md](../docs/BACKEND.md) — this file is a quick entry point, not a duplicate of that guide.
+**Deep development guide:** [docs/kernel/metadata.md](../docs/kernel/metadata.md) — this file is a quick entry point, not a duplicate of that guide.
 
 ---
 
@@ -33,7 +33,7 @@ cd backend && npm run dev
 cd backend
 npm install
 
-# Create backend/.env with DATABASE_URL, JWT_SECRET (see docs/DEPLOYMENT.md)
+# Create backend/.env with DATABASE_URL, JWT_SECRET (see docs/infrastructure/DEPLOYMENT.md)
 
 # Schema + metadata + workflows + demo data
 node setup-db.js --demo-data=indian-demo --skip-tests
@@ -43,7 +43,7 @@ npm run dev
 
 Default login (after demo setup): `admin@example.com` / `admin123`
 
-> Uses **`prisma db push`** (not migrations). `setup-db.js` syncs schema, generates the client, and loads metadata. See [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
+> Uses **`prisma db push`** (not migrations). `setup-db.js` syncs schema, generates the client, and loads metadata. See [docs/infrastructure/DEPLOYMENT.md](../docs/infrastructure/DEPLOYMENT.md).
 
 ---
 
@@ -88,13 +88,12 @@ backend/
 
 | Area | Entry | Documentation |
 |------|--------|----------------|
-| **CRUD (app path)** | `/api/{model}/view/{viewId}` (+ `/search`) | [docs/BACKEND.md](../docs/BACKEND.md) |
-| **Workflows** | `/api/workflow/*` | [docs/WORKFLOWS.md](../docs/WORKFLOWS.md) |
-| **AI agent** | `/api/agent/*` | [docs/AI_AGENT.md](../docs/AI_AGENT.md), [docs/agent/](../docs/agent/) |
+| **CRUD (app path)** | `/api/{model}/view/{viewId}` (+ `/search`) | [docs/kernel/metadata.md](../docs/kernel/metadata.md) |
+| **Workflows** | `/api/workflow/*` | [docs/kernel/workflows.md](../docs/kernel/workflows.md) |
+| **AI agent** | `/api/agent/*` | [docs/kernel/agent/](../docs/kernel/agent/) |
 | **GraphQL** | `/graphql` | Secondary to REST; schema from Prisma via `SchemaBuilder` |
-| **MCP** | `/api/mcp` | [docs/agent/MCP.md](../docs/agent/MCP.md) |
-| **Import / PDF** | Import extensions, `/api/parse-document/*` | [docs/IMPORT_FUNCTIONALITY.md](../docs/IMPORT_FUNCTIONALITY.md), [src/lib/extractors/README.md](src/lib/extractors/README.md) |
-| **Auth** | `/api/auth/*` | [docs/AUTHENTICATION.md](../docs/AUTHENTICATION.md) |
+| **MCP** | `/api/mcp` | [docs/kernel/agent/MCP.md](../docs/kernel/agent/MCP.md) |
+| **Auth** | `/api/auth/*` | [docs/kernel/auth.md](../docs/kernel/auth.md) |
 
 GraphQL supports introspection and nested reads; the **React app uses view-scoped REST**. Use GraphQL when you need ad hoc nested queries outside the view/datagraph path.
 
@@ -121,13 +120,12 @@ Database: `npx prisma db push`, `npx prisma generate`, `npx prisma studio`
 
 | Task | Document |
 |------|----------|
-| Add models, APIs, services | [docs/BACKEND.md](../docs/BACKEND.md) |
-| System architecture | [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) |
-| Deploy / env / demo data | [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md) |
+| Add models, APIs, services | [docs/kernel/metadata.md](../docs/kernel/metadata.md) |
+| System architecture | [docs/README.md](../docs/README.md) |
+| Deploy / env | [docs/infrastructure/DEPLOYMENT.md](../docs/infrastructure/DEPLOYMENT.md) |
 | Seed data only, remove org, CLI flags | [README-setup-db.md](README-setup-db.md) |
-| Auth providers | [docs/AUTHENTICATION.md](../docs/AUTHENTICATION.md) |
-| Business modules & rules | [docs/BUSINESS_DOMAIN.md](../docs/BUSINESS_DOMAIN.md) |
-| Full docs index | [docs/CLAUDE.md](../docs/CLAUDE.md) |
+| Auth providers | [docs/kernel/auth.md](../docs/kernel/auth.md) |
+| Full docs index | [docs/README.md](../docs/README.md) |
 
 ---
 
@@ -140,4 +138,4 @@ JWT_SECRET="your-secret-key"
 
 Optional: `GOOGLE_CLOUD_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS_JSON_BASE64` (agent + PDF extraction), `AUTH_PROVIDER=local|clerk`, `BACKEND_PORT=4000`.
 
-See [docs/BACKEND.md#environment-variables](../docs/BACKEND.md) and [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
+See [docs/infrastructure/DEPLOYMENT.md](../docs/infrastructure/DEPLOYMENT.md).

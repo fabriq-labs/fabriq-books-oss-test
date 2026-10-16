@@ -38,7 +38,7 @@ This repository ships the full stack in one place:
 
    ```bash
    cd backend
-   # Configure .env — see docs/DEPLOYMENT.md
+   # Configure .env — see docs/infrastructure/DEPLOYMENT.md
    node setup-db.js --demo-data=indian-demo --skip-tests
    ```
 
@@ -52,7 +52,7 @@ This repository ships the full stack in one place:
 
 5. **Open the editor workspace** (optional): double-click `fabriq.code-workspace` or *File → Open Workspace from File…*.
 
-6. **Container image / CI**: [docs/BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md).
+6. **Container image / CI**: [docs/infrastructure/BUILD_AND_DEPLOY.md](docs/infrastructure/BUILD_AND_DEPLOY.md).
 
 7. **Onboarding workbook**: [docs/onboarding/ONBOARDING_SESSION1_WORKBOOK.md](docs/onboarding/ONBOARDING_SESSION1_WORKBOOK.md).
 
@@ -69,7 +69,7 @@ fabriq/
 ├── docker-compose.external-pg.yml
 ├── backend/              # → backend/README.md
 ├── frontend-1/
-└── docs/                 # → docs/CLAUDE.md (documentation router)
+└── docs/                 # → docs/README.md
 ```
 
 ---
@@ -78,7 +78,7 @@ fabriq/
 
 | Audience | Start here |
 |----------|------------|
-| Anyone | [docs/CLAUDE.md](docs/CLAUDE.md) — index and reading order |
-| Backend | [backend/README.md](backend/README.md) → [docs/BACKEND.md](docs/BACKEND.md) |
-| Frontend | [docs/FRONTEND.md](docs/FRONTEND.md) |
-| Deploy / ops | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/BUILD_AND_DEPLOY.md](docs/BUILD_AND_DEPLOY.md) |
+| Anyone | [docs/README.md](docs/README.md) — kernel index |
+| Backend | [backend/README.md](backend/README.md) → [docs/kernel/metadata.md](docs/kernel/metadata.md) |
+| Frontend | [docs/kernel/frontend.md](docs/kernel/frontend.md) |
+| Deploy / ops | [docs/infrastructure/DEPLOYMENT.md](docs/infrastructure/DEPLOYMENT.md), [docs/infrastructure/BUILD_AND_DEPLOY.md](docs/infrastructure/BUILD_AND_DEPLOY.md) |

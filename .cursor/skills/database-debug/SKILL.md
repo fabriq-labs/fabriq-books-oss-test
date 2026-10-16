@@ -269,7 +269,7 @@ WHERE wi.model_id = 'preq_xyz123'  -- Replace with actual record ID
 For deeper understanding, refer to these documentation files:
 
 - **[../../CLAUDE.md](../../CLAUDE.md)** - Quick debugging SQL examples (lines 127-142) and system overview
-- **[../../docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)** - System architecture, permission/view relationships, multi-tenancy patterns
+- **[../../docs/kernel/metadata.md](../../docs/kernel/metadata.md)** and **[../../docs/kernel/tenancy.md](../../docs/kernel/tenancy.md)** - views, permissions, and org scope
 - **[../../docs/WORKFLOWS.md](../../docs/WORKFLOWS.md)** - Workflow engine details, schema relationships, debugging tips
 - **[../../docs/BUSINESS_DOMAIN.md](../../docs/BUSINESS_DOMAIN.md)** - Business context, module relationships, business rules
 

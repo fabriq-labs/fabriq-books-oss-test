@@ -361,7 +361,7 @@ cd backend && npm run remove-tenant-data -- org_indian_demo --confirm
 
 | Topic                             | Document                                                             |
 | --------------------------------- | -------------------------------------------------------------------- |
-| Full deployment & troubleshooting | [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md)                          |
+| Full deployment & troubleshooting | [docs/infrastructure/DEPLOYMENT.md](../docs/infrastructure/DEPLOYMENT.md) |
 | Indian demo details               | [prisma/setup-IN/README.md](prisma/setup-IN/README.md)               |
 | US-CA demo                        | [prisma/setup-US_CA/README.md](prisma/setup-US_CA/README.md)         |
 | Personal Finance demo             | [prisma/setup-PERFIN/README.md](prisma/setup-PERFIN/README.md)       |
