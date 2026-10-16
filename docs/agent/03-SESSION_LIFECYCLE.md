@@ -168,9 +168,9 @@ Called by the LLM at the end of each step. Parameters:
 - `result_summary` — human-readable summary (stored in `plan[index].result_summary`)
 - `accumulated_context_update` — key facts to carry forward (merged into `session.accumulated_context`)
 
-After marking the step complete, `completeStep` runs the **hybrid
-dispatcher** (see [06-BUILDERS_AND_EXECUTORS.md](./06-BUILDERS_AND_EXECUTORS.md))
-which may handle subsequent steps deterministically.
+After marking the step complete, `completeStep` may run a deterministic
+follow-up for the next step. That follow-up is a domain executor when one
+is registered. This tree does not ship one.
 
 ### Session Context Block
 
@@ -179,14 +179,14 @@ appends to the system prompt:
 
 ```
 ## Active Session Context
-Goal: Reconcile all unmatched HDFC transactions for March
+Goal: List roles on this org
 Mode: supervised
-Status: executing — Step 2 of 4: Suggest matches
+Status: executing — Step 2 of 3: Search roles
 Pending actions: 0 awaiting review
-Accumulated: {"unmatched_count": 23, "hdfc_account_id": "acc_..."}
+Accumulated: {"role_count": 1}
 
 ## Full Plan    ← only on first turn or after createPlan
-[{"index":0,"type":"query","title":"Find unmatched postings",...}, ...]
+[{"index":0,"type":"query","title":"Search roles",...}, ...]
 ```
 
 The `accumulated_context` JSON is how earlier steps pass data to later ones —
@@ -204,9 +204,7 @@ available to the LLM via `ToolManager` (`tools.requestClarification = ...`).
 
 **When the LLM should call it**: only from a `query` step, when a query
 returned 0 rows because the user's goal referenced an ambiguous or
-unresolvable entity — e.g. the user asked to "reconcile HDFC transactions"
-but there are two accounts named "HDFC Current" and "HDFC Savings" and the
-agent cannot tell which one. Per `SESSION_DIRECTIVE`
+unresolvable entity — the goal names something the search did not uniquely match. Per `SESSION_DIRECTIVE`
 (`prompt/constants.ts`), the LLM must run a broader query first to gather
 candidates, then call `requestClarification` with the question and those
 candidates — never respond in plain text instead of calling a tool.
@@ -256,8 +254,7 @@ fact.
 
 When the action step runs, the session transitions to `awaiting_approval`:
 
-1. Agent calls `queueActions` (or deterministic builder fires — see
-   [06-BUILDERS_AND_EXECUTORS.md](./06-BUILDERS_AND_EXECUTORS.md))
+1. Agent calls `queueActions`
 2. `pending_action` records are created in the DB
 3. `agent_session.status = 'awaiting_approval'`, `pending_actions_count` updated
 4. `action_queued` and `session_status_changed` SSE events emitted
@@ -266,10 +263,9 @@ The user then reviews actions in the Inbox or session view.
 
 ### Approval Flow
 
-`POST /api/agent/pending-actions/:id/resolve` → `PendingActionService.resolvePendingAction`:
-1. Updates `pending_action.status`
-2. If approved: runs the executor for the action type (see
-   [06-BUILDERS_AND_EXECUTORS.md](./06-BUILDERS_AND_EXECUTORS.md))
+`PATCH /api/agent/pending-actions/:id` → `resolvePendingAction`:
+1. Updates `pending_action.status` when the row's org is the caller org
+2. If approved: runs the executor registered for `action_type`, when one exists
 3. Updates `completed_actions_count`
 4. Calls `checkAllPendingActionsResolved()` — if 0 remaining, triggers session continuation
 
@@ -348,7 +344,7 @@ When `context.modelName === 'default'` and a `sessionId` is present,
 
 ```typescript
 if (sessionId && (!context?.modelName || context.modelName === 'default')) {
-  effectiveContext.modelName = session.goal_model; // e.g. 'posting'
+  effectiveContext.modelName = session.goal_model;
 }
 ```
 
@@ -461,7 +457,7 @@ The `event:` SSE field is NOT used — event type is in the JSON body.
 
 ## Frontend Session State Synchronization
 
-**File**: `frontend-1/src/hooks/useSessionEvents.ts`
+The workbench session view is in `frontend-0`. It consumes the SSE stream from `GET /api/agent/sessions/:id/events`.
 
 The frontend maintains a local session snapshot in React state by consuming
 SSE events. When `session_status_changed` is emitted, the **frontend
@@ -500,15 +496,11 @@ truth for mutable state. The backend is authoritative.
 | In-process execution | `setImmediate` runs agent continuation in same Node.js process — no BullMQ/Redis worker queue |
 | No crash recovery | Server restart mid-session leaves session in `executing` (will eventually be killed by the watchdog once a request comes in) |
 
-See [14-SHORTFALLS_AND_ROADMAP.md](./14-SHORTFALLS_AND_ROADMAP.md) for the
-full list of known gaps, deprecated tools, and roadmap items.
+The watchdog and the in-process continuation are the limits that matter for a stuck session.
 
 ---
 
 ## What's Next
 
-- **04-PROMPT_SYSTEM.md** — how `SESSION_DIRECTIVE`, the session context
-  block, and template prompts are assembled into the system prompt referenced
-  throughout this doc
-- **06-BUILDERS_AND_EXECUTORS.md** — the hybrid dispatcher that runs after
-  `completeStep`
+- **04-PROMPT_SYSTEM.md** — how the system prompt is assembled
+- **05-TOOLS.md** — which tools exist, and what supervised mode removes

@@ -628,7 +628,7 @@ data: {"result":{"content":[{"type":"text","text":"{...}"}]},"jsonrpc":"2.0","id
 | `import_bank_statement` tool | Deferred — requires document storage design (file-as-base64 in JSON is not a good pattern for large files) |
 | Order placement | MCP is read-only; no trade execution via Questrade |
 | More account tools | `get_account`, `list_transactions`, etc. — straightforward to add |
-| Write tools | `create_posting`, `update_record` — need careful permission scoping |
+| Write tools | `createRecord` and `updateRecord` — the same metadata writes as the screen. Supervised mode removes them. See [05-TOOLS.md](./05-TOOLS.md). |
 | Stateful SSE streaming | For long-running tools (e.g. batch imports) that need progress events |
 | Claude Desktop config | Same pattern as Cursor — needs a `claude_desktop_config.json` entry |
 | MCP auth via Bearer token | Currently API key only; JWT support would require extracting the token resolution logic from `authMiddleware` |
