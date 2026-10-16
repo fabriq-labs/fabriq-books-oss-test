@@ -1,5 +1,0 @@
-id,budget_line,budget_period_id,bp_start_date,bp_end_date,allocated_budget,org_id
-buli_us_it_2025,IT Budget 2025,bupe_us_fy25,2025-01-01,2025-12-31,1200000,org_techflow_us
-buli_us_ops_2025,Operations Budget 2025,bupe_us_fy25,2025-01-01,2025-12-31,900000,org_techflow_us
-buli_us_sales_2025,Sales Budget 2025,bupe_us_fy25,2025-01-01,2025-12-31,700000,org_techflow_us
-buli_us_eng_2025,Engineering Budget 2025,bupe_us_fy25,2025-01-01,2025-12-31,1500000,org_techflow_us

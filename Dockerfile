@@ -1,11 +1,11 @@
 # Single Dockerfile for both embedded-PG and external-PG. Mode at runtime via USE_EMBEDDED_PG.
 # Build: clone repos → build frontend, backend, Python sync service → final nginx image.
 # Works the same on Cloud Build, Railway, and local docker build.
-# Build context must be the repo root with ./backend and ./frontend-1 (same layout as fabriq-base + zeiv-v2).
+# Build context must be the repo root with ./backend and ./frontend-0.
 # CI: checkout backend + frontend into context, or build from a monorepo that contains both directories.
 # Runtime: nginx + Node (8080 via PORT), Python FastAPI integration sync on 8081 (POST /sync, GET /health).
 # Node uses INTEGRATION_SYNC_URL (set by start scripts when sync is not disabled).
-# Build: COPY monorepo backend/ + frontend-1/ → build → final nginx image.
+# Build: COPY monorepo backend/ + frontend-0/ → build → final nginx image.
 # CI: GitHub Actions → GHCR. Optional build-args: SOURCE_* for /app/build-info.json.
 #
 # Runtime Node is pinned (see node-runtime stage). Do not use unpinned `apk add nodejs` —
@@ -18,20 +18,20 @@ FROM node:${NODE_RUNTIME_VERSION}-alpine AS node-runtime
 # Stage 0: Application source from build context
 FROM scratch AS source
 COPY backend /src/backend
-COPY frontend-1 /src/frontend-1
+COPY frontend-0 /src/frontend-0
 
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
-COPY frontend-1/package*.json ./
+COPY frontend-0/package*.json ./
 RUN npm ci
 
-COPY frontend-1/ ./
+COPY frontend-0/ ./
 
 ENV VITE_API_BASE_URL=""
 ENV VITE_ENABLE_AI="true"
-RUN npm run build:fabriq
+RUN npm run build
 
 # Stage 2: Build Backend
 FROM node:20-alpine AS backend-builder

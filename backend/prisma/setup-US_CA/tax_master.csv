@@ -1,8 +1,0 @@
-id,tax_name,tax_code,tax_rate,effective_from,expires_on,geo,status,org_id
-tax_us_ca_sales_825,California Sales Tax 8.25%,CA825,8,2024-01-01T00:00:00Z,2026-12-31T23:59:59Z,US-CA,Active,org_techflow_us
-tax_us_tx_sales_625,Texas Sales Tax 6.25%,TX625,6,2024-01-01T00:00:00Z,2026-12-31T23:59:59Z,US-TX,Active,org_techflow_us
-tax_us_ga_sales_800,Georgia Sales Tax 8.00%,GA800,8,2024-01-01T00:00:00Z,2026-12-31T23:59:59Z,US-GA,Active,org_techflow_us
-tax_us_co_sales_290,Colorado Sales Tax 2.90%,CO290,3,2024-01-01T00:00:00Z,2026-12-31T23:59:59Z,US-CO,Active,org_techflow_us
-tax_us_az_sales_560,Arizona Sales Tax 5.60%,AZ560,6,2024-01-01T00:00:00Z,2026-12-31T23:59:59Z,US-AZ,Active,org_techflow_us
-tax_us_mi_sales_600,Michigan Sales Tax 6.00%,MI600,6,2024-01-01T00:00:00Z,2026-12-31T23:59:59Z,US-MI,Active,org_techflow_us
-tax_us_service_0,Professional Services Tax Exempt,SVC0,0,2024-01-01T00:00:00Z,,US,Active,org_techflow_us

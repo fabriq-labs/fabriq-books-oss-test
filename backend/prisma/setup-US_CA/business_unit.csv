@@ -1,5 +1,0 @@
-id,business_unit,name,legal_entity_id,status,created_by,org_id
-bu_us_hq,Headquarters,HQ,org_techflow_us,Active,user_john_smith,org_techflow_us
-bu_us_ops,Operations,Operations BU,org_techflow_us,Active,user_john_smith,org_techflow_us
-bu_us_sales,Sales,Sales BU,org_techflow_us,Active,user_john_smith,org_techflow_us
-bu_us_eng,Engineering,Engineering BU,org_techflow_us,Active,user_john_smith,org_techflow_us

@@ -1,5 +1,0 @@
-id,quote_number,days_offset,expiry_days_offset,customer_id,location_id,sales_order_id,project_id,status,total_amount,reference_number,org_id,created_by
-quote_demo_001,QUO-IN-2024-0901,-62,30,cust_wipro,loc_wipro_delivery,,,DRAFT,285000,RFP-WIPRO-IT-2024,org_indian_demo,user_arjun_sharma
-quote_demo_002,QUO-IN-2024-0902,-60,30,cust_tata_consultancy,loc_tcs_delivery,so_demo_001,,SENT,207500,RFQ-TCS-0142,org_indian_demo,user_arjun_sharma
-quote_demo_003,QUO-IN-2024-0903,-55,21,cust_infosys,loc_infosys_delivery,so_demo_002,,ACCEPTED,230000,RFQ-INFY-0188,org_indian_demo,user_ananya_singh
-quote_demo_004,QUO-IN-2024-0904,-70,14,cust_hdfc_bank,loc_hdfc_delivery,,,EXPIRED,95000,RFQ-HDFC-EXPIRED,org_indian_demo,user_priya_patel

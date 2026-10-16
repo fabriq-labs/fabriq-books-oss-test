@@ -1,4 +1,0 @@
-id,org_id,account_code,instrument_id,quantity,average_cost,current_price,market_value,currency,last_trade_days_offset,notes,tags
-hold_demo_001,org_indian_demo,1201,inst_demo_reliance,50,2465.0000,2890.5000,144525.0000,INR,-40,Treasury book — India demo equity,demo|equity|IN
-hold_demo_002,org_indian_demo,1201,inst_demo_infosys,40,1520.2500,1780.0000,71200.0000,INR,-38,Long-term IT sector exposure,demo|equity|IN
-hold_demo_003,org_indian_demo,1201,inst_demo_niftybees,250,245.8000,268.4000,67100.0000,INR,-25,Core index ETF allocation,demo|etf|IN

@@ -1,5 +1,0 @@
-id,delivery_challan_id,sales_order_item_id,item_master_id,quantity_ordered,quantity_delivered,rate,line_total,uom,delivery_status,org_id
-dci_demo_001,dc_demo_001,soi_demo_001,item_dell_laptop,2,2,85000,170000,uom_demo_unit,FULLY_DELIVERED,org_indian_demo
-dci_demo_002,dc_demo_001,soi_demo_002,item_dell_monitor,3,0,12500,37500,uom_demo_unit,PENDING,org_indian_demo
-dci_demo_003,dc_demo_002,soi_demo_003,item_hp_laptop,2,2,115000,230000,uom_demo_unit,FULLY_DELIVERED,org_indian_demo
-dci_demo_004,dc_demo_003,soi_demo_004,item_dell_monitor,10,10,12500,125000,uom_demo_unit,FULLY_DELIVERED,org_indian_demo

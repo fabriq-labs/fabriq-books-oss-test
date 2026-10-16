@@ -15,7 +15,7 @@ Give this file, plus [README.md](./README.md), to an agent that is adding a new 
 
 The kernel calls these files. It does not contain product behavior.
 
-The kernel app UI is `frontend-0` (port 5174). `frontend-1` is the earlier shell the pages were brought over from.
+The kernel app UI is `frontend-0` (port 5174).
 
 ## Platform models
 

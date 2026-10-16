@@ -1,3 +1,0 @@
-id,credit_note_number,days_offset,customer_id,location_id,invoice_id,sales_order_id,credit_note_total,balance_amount,credit_note_status,credit_note_type,reason,org_id,account_code
-cn_demo_001,CN-IN-2024-3011,-32,cust_hdfc_bank,loc_hdfc_delivery,inv_demo_005,,10000,0,ISSUED,PRODUCT_RETURN,Return of 2 monitors — packing damage in transit,org_indian_demo,1105
-cn_demo_002,CN-IN-2024-3012,-28,cust_infosys,loc_infosys_delivery,inv_demo_002,,15000,0,ISSUED,RATE_ADJUSTMENT,Volume discount applied post-invoice per contract IN-2024-88,org_indian_demo,1105

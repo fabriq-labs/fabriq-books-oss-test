@@ -1,6 +1,0 @@
-id,item_category,item_subcategory,org_id
-ic_us_hardware,Hardware,Computers and servers,org_techflow_us
-ic_us_networking,Networking,Switches and routers,org_techflow_us
-ic_us_components,Components,Boards and cards,org_techflow_us
-ic_us_accessories,Accessories,Portable and peripheral devices,org_techflow_us
-ic_us_services,Services,Professional IT services,org_techflow_us

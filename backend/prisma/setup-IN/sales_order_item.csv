@@ -1,5 +1,0 @@
-id,sales_order_id,item_master_id,item_name,quantity,rate,line_total,uom,org_id
-soi_demo_001,so_demo_001,item_dell_laptop,Dell Latitude 5420 Laptop,2,85000,170000,uom_demo_unit,org_indian_demo
-soi_demo_002,so_demo_001,item_dell_monitor,Dell P2422H Monitor,3,12500,37500,uom_demo_unit,org_indian_demo
-soi_demo_003,so_demo_002,item_hp_laptop,HP EliteBook 840 G8 Laptop,2,115000,230000,uom_demo_unit,org_indian_demo
-soi_demo_004,so_demo_003,item_dell_monitor,Dell P2422H Monitor,10,12500,125000,uom_demo_unit,org_indian_demo

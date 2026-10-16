@@ -1,6 +1,0 @@
-Receipt Number,Receipt Date,Amount,Payment Type,Payment Method,payment_reference,Customers,Status
-PR-2026-0301,2026-04-02,125000,FULL,NEFT,UTRIN9876543210,Tata Consultancy Services Ltd,Cleared
-PR-2026-0302,2026-04-04,45000,PARTIAL,IMPS,IMPS4455667788,Infosys Limited,Cleared
-PR-2026-0303,2026-04-08,360000,FULL,Wire,WF-2026-US-00912,Wipro Limited,Cleared
-PR-2026-0304,2026-04-10,14200,FULL,UPI,UPIfabriq001,HDFC Bank Ltd,Cleared
-PR-2026-0305,2026-04-15,50000,ADVANCE,Cheque,CHQ-HDFC-778899,Reliance Industries Ltd,Pending

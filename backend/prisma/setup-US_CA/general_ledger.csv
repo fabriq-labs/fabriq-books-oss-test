@@ -1,5 +1,0 @@
-id,gl_number,gl_code,gl_name,description,status,org_id
-gl_us_001,GL-US-001,1001,Sales Ledger,Sales and service revenue entries,Active,org_techflow_us
-gl_us_002,GL-US-002,2001,Purchasing Ledger,Procurement and expense entries,Active,org_techflow_us
-gl_us_003,GL-US-003,3001,Bank Ledger,Bank and cash movement entries,Active,org_techflow_us
-gl_us_004,GL-US-004,4001,Inventory Ledger,Inventory and stock value entries,Active,org_techflow_us

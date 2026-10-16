@@ -1,3 +1,0 @@
-id,role_id,user_id,created_at,modified_at,created_by,modified_by,org_id
-ru_rajesh_super,role_cc202e8c-204b-4451-b0fd-a9dc4cec5e38,user_rajesh_kumar,2024-01-15T10:00:00Z,2024-01-15T10:00:00Z,system,system,org_rajesh
-ru_rajesh_employee,role_83d156bf-0371-4f6d-9e6c-dddf2c6d4020,user_rajesh_kumar,2024-01-15T10:00:00Z,2024-01-15T10:00:00Z,system,system,org_rajesh

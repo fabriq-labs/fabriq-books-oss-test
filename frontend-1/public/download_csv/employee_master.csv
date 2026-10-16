@@ -1,6 +1,0 @@
-first_name,last_name,email,legal_entity,business_unit,location,cost_center,department,user_email,user_role,manager
-Ananya,Rao,ananya.rao.sample@fabriq.example,Fabriq Demo India Pvt Ltd,Corporate HQ,Head Office Bengaluru,CC-100 Corporate Overhead,Finance,import.sample01@fabriq.example,Import Reviewer,import.sample02@fabriq.example
-Karthik,Nair,karthik.nair.sample@fabriq.example,Fabriq Demo India Pvt Ltd,Shared Services,Head Office Bengaluru,CC-400 R&D Engineering,Information Technology,import.sample02@fabriq.example,Procurement Analyst,import.sample01@fabriq.example
-Meera,Iyer,meera.iyer.sample@fabriq.example,Fabriq Demo India Pvt Ltd,Manufacturing Unit A,Chennai Support Center,CC-200 Manufacturing Floor,Procurement,import.sample03@fabriq.example,AP Specialist,import.sample01@fabriq.example
-David,Kim,david.kim.sample@fabriq.example,Fabriq US LLC,Digital Products,Hyderabad R&D,CC-500 G&A Shared,Customer Success,import.sample04@fabriq.example,Sales Coordinator,import.sample05@fabriq.example
-Sofia,Martinez,sofia.martinez.sample@fabriq.example,Fabriq UK Ltd,Digital Products,Mumbai Branch,CC-300 Sales & Marketing,Sales,import.sample05@fabriq.example,Inventory Controller,import.sample04@fabriq.example

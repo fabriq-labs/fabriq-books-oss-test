@@ -1,6 +1,0 @@
-id,name,legal_entity_id,business_unit_id,org_id
-dept_us_finance,Finance,org_techflow_us,bu_us_hq,org_techflow_us
-dept_us_procurement,Procurement,org_techflow_us,bu_us_ops,org_techflow_us
-dept_us_delivery,Delivery,org_techflow_us,bu_us_ops,org_techflow_us
-dept_us_sales,Sales,org_techflow_us,bu_us_sales,org_techflow_us
-dept_us_engineering,Engineering,org_techflow_us,bu_us_eng,org_techflow_us

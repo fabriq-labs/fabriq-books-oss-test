@@ -1,5 +1,0 @@
-id,budget_period,from_date,to_date,status,org_id
-bupe_us_fy25,FY 2025,2025-01-01,2025-12-31,Active,org_techflow_us
-bupe_us_fy26,FY 2026,2026-01-01,2026-12-31,Active,org_techflow_us
-bupe_us_q1_2025,Q1 2025,2025-01-01,2025-03-31,Active,org_techflow_us
-bupe_us_q2_2025,Q2 2025,2025-04-01,2025-06-30,Active,org_techflow_us

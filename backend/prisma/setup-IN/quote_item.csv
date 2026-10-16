@@ -1,7 +1,0 @@
-id,quote_id,item_master_id,item_name,quantity,rate,line_total,uom,org_id
-qti_demo_001,quote_demo_001,item_lenovo_laptop,Lenovo ThinkPad T14s,2,120000,240000,uom_demo_unit,org_indian_demo
-qti_demo_002,quote_demo_001,item_hp_printer,HP LaserJet Pro MFP M182nw,1,35000,35000,uom_demo_unit,org_indian_demo
-qti_demo_003,quote_demo_002,item_dell_laptop,Dell Latitude 5420 Laptop,2,85000,170000,uom_demo_unit,org_indian_demo
-qti_demo_004,quote_demo_002,item_dell_monitor,Dell P2422H Monitor,3,12500,37500,uom_demo_unit,org_indian_demo
-qti_demo_005,quote_demo_003,item_hp_laptop,HP EliteBook 840 G8 Laptop,2,115000,230000,uom_demo_unit,org_indian_demo
-qti_demo_006,quote_demo_004,item_dell_desktop,Dell OptiPlex 7090 Desktop,1,95000,95000,uom_demo_unit,org_indian_demo

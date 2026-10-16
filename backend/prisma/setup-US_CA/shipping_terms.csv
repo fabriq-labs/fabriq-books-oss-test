@@ -1,5 +1,0 @@
-id,shipping_terms,description,status,org_id
-st_us_fob,FOB,Free on Board at shipping point,Active,org_techflow_us
-st_us_cif,CIF,Cost Insurance and Freight included,Active,org_techflow_us
-st_us_exw,EXW,Ex Works pickup by buyer,Active,org_techflow_us
-st_us_dap,DAP,Delivered at Place to buyer site,Active,org_techflow_us

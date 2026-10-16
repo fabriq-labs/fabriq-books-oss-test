@@ -1,7 +1,0 @@
-organization_name,legal_name,address,city,state,country,zip_code,basecurrency_id,is_it_headquartres,is_it_a_groupcompany
-Tech Innovators Inc.,Tech Innovators Pvt Ltd,123 Tech Street,San Francisco,California,USA,94105,USD,Yes,No
-Global Solutions Ltd,Global Solutions LLC,456 Innovation Road,New York,New York,USA,10001,USD,No,Yes
-Future Enterprises,Future Enterprises GmbH,789 Future Avenue,Berlin,Berlin,Germany,10115,EUR,Yes,No
-Bright Ideas Corp,Bright Ideas Ltd,321 Bright Lane,London,England,UK,EC1A 1BB,GBP,No,Yes
-Visionary Tech,Visionary Technologies,654 Vision Blvd,Sydney,New South Wales,Australia,2000,AUD,Yes,No
-Innovative Solutions,Innovative Solutions Inc,987 Innovation Way,Toronto,Ontario,Canada,M5V 1E1,CAD,No,Yes

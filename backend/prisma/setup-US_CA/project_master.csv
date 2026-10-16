@@ -1,4 +1,0 @@
-id,project_code,project_name,legal_entity_id,project_start_date,project_end_date,budget_line_id,org_id
-proj_us_cloud_core,US-CLOUD-001,Cloud Platform Modernization,org_techflow_us,2025-01-15,2025-12-15,buli_us_eng_2025,org_techflow_us
-proj_us_secure_edge,US-NET-002,Secure Edge Network Rollout,org_techflow_us,2025-02-01,2025-10-31,buli_us_it_2025,org_techflow_us
-proj_us_customer360,US-SALES-003,Customer 360 Analytics,org_techflow_us,2025-03-01,2025-11-30,buli_us_sales_2025,org_techflow_us

@@ -1,5 +1,0 @@
-id,org_id,instrument_id,account_code,target_account_code,type,quantity,price,brokerage,tax,net_amount,total_amount,exchange,value_days_offset,trade_id_external,name
-trad_demo_001,org_indian_demo,inst_demo_reliance,1201,1103,BUY,25,2450.00,25.00,0,61225.00,61250.00,NSE,-55,TXN-IN-TRD-9001,Buy RELIANCE — Indian demo
-trad_demo_002,org_indian_demo,inst_demo_reliance,1201,1103,BUY,25,2480.50,25.00,0,62037.50,62062.50,NSE,-42,TXN-IN-TRD-9002,Buy RELIANCE (avg cost build)
-trad_demo_003,org_indian_demo,inst_demo_infosys,1201,1103,BUY,40,1520.25,20.00,0,60790.00,60810.00,NSE,-38,TXN-IN-TRD-9003,Buy INFY — demo
-trad_demo_004,org_indian_demo,inst_demo_niftybees,1201,1103,BUY,250,245.80,15.00,0,61435.00,61450.00,NSE,-25,TXN-IN-TRD-9004,Buy NIFTYBEES — ETF ladder

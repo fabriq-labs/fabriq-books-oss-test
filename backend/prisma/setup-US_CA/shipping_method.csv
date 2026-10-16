@@ -1,5 +1,0 @@
-id,shipping_method,description,status,org_id
-ship_us_ground,Ground Shipping,Standard domestic ground shipping,Active,org_techflow_us
-ship_us_express,Express Shipping,Priority next-day or two-day service,Active,org_techflow_us
-ship_us_air,Air Freight,Air cargo for high-value shipments,Active,org_techflow_us
-ship_us_freight,LTL Freight,Less-than-truckload freight delivery,Active,org_techflow_us

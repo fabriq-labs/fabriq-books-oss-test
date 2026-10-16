@@ -1,6 +1,0 @@
-quote_number,quote_date,expiry_date,reference_number,total_amount,status,customer
-QT-2026-0142,2026-04-10,2026-05-10,RFQ-7781,245000,Draft,Tata Consultancy Services Ltd
-QT-2026-0143,2026-04-12,2026-05-12,RFQ-7782,11850,Sent,Infosys Limited
-QT-2026-0144,2026-04-15,2026-06-15,RFQ-7783,502000,Accepted,Wipro Limited
-QT-2026-0145,2026-04-18,2026-05-18,RFQ-7784,8900,Draft,Reliance Industries Ltd
-QT-2026-0146,2026-04-22,2026-05-22,RFQ-7785,332500,Sent,HDFC Bank Ltd

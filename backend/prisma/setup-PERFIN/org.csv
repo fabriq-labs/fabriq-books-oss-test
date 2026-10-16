@@ -1,2 +1,0 @@
-id,name,slug,settings,external_mapping,active_subscription
-org_perfin_demo,Personal Finance Manager,personalfinance-demo,"{""timezone"":""America/New_York"",""currency"":""USD""}","{""erp_system"":""demo_perfin""}",true
