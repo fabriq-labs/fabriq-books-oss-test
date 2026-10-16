@@ -49,7 +49,11 @@ export const FINANCE_CHAT_SUGGESTIONS = [
     ...ACCOUNT_CHAT_SUGGESTIONS,
 ] as const;
 
-export const DEFAULT_SUGGESTIONS = [...FINANCE_CHAT_SUGGESTIONS];
+export const DEFAULT_SUGGESTIONS = [
+    'Search records in this view',
+    'What can I do on this page?',
+    'Summarize the current list',
+] as const;
 
 const ACCOUNT_DETAIL_SUGGESTIONS = [
     'What is the current balance for this account?',
@@ -156,7 +160,10 @@ export const getContextSuggestions = (context: PageContext | null): string[] => 
             'Show reconciliation summary',
         ];
     }
-    if (hasFinanceFocus(context) || !context || context.currentPath === '/') {
+    if (!context || context.currentPath === '/') {
+        return [...DEFAULT_SUGGESTIONS];
+    }
+    if (hasFinanceFocus(context)) {
         return getFinanceSuggestions();
     }
     if (context && context.modelName === 'posting') {
@@ -194,7 +201,7 @@ export const getInputPlaceholder = (context: PageContext | null): string => {
     if (context && context.modelDisplayName) {
         return `Ask about this ${context.modelDisplayName.toLowerCase()}`;
     }
-    return 'Ask about postings and accounts';
+    return 'Ask about this page';
 };
 
 // ============================================================================

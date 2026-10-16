@@ -5,18 +5,10 @@ import { Button } from '@/components/ui/button';
 import { SearchResultsTable } from '../SearchResultsTable';
 import { SqlResultsTable } from '.';
 import { MetricsDisplay } from './MetricsDisplay';
-import { InvoiceMapPreview } from './InvoiceMapPreview';
-import { ReconciliationSuggestions } from './ReconciliationSuggestions';
-import { FinancialReportDisplay } from './FinancialReportDisplay';
-import { ToolLegalEntityScopeLabel } from './ToolLegalEntityScopeLabel';
-import { AccountLedgerDisplay } from './AccountLedgerDisplay';
-import { PostingJournalDisplay } from './PostingJournalDisplay';
-import { PostingDualDisplay, type PostingDualTable } from './PostingDualDisplay';
 import { ToolInvocation as BaseToolInvocation, ToolResult as BaseToolResult } from '@/components/utils/helper';
 import { useChat as useChatContext } from '@/contexts/ChatContext';
 import { getModelDisplayName, getViewName } from '@/utils/modelDisplayNames';
-import { normalizeToolInvocation, resolvePostingSearchDisplayHint } from '../chatUtils';
-import { resolveToolLegalEntityLabel } from '@/utils/toolEntityLabel';
+import { normalizeToolInvocation } from '../chatUtils';
 import { Wrench } from 'lucide-react';
 
 interface ExtendedToolResult extends BaseToolResult {
@@ -33,7 +25,6 @@ interface ExtendedToolResult extends BaseToolResult {
     journalFocusSide?: 'debit' | 'credit';
     journalFocusAccountName?: string;
     journalTitle?: string;
-    tables?: PostingDualTable[];
 }
 
 interface ToolInvocation extends Omit<BaseToolInvocation, 'result'> {
@@ -52,17 +43,9 @@ interface ToolResponseRendererProps {
 
 export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({
     toolInvocations,
-    sidebarMode,
-    defaultCurrencyCode,
-    onSendMessage,
 }) => {
     const navigate = useNavigate();
     const { setPageContext } = useChatContext();
-
-    const resolveCurrencyCode = (result?: ExtendedToolResult) =>
-        (typeof result?.currencyCode === 'string' && result.currencyCode.trim()
-            ? result.currencyCode.trim().toUpperCase()
-            : undefined) ?? defaultCurrencyCode;
 
     // Update context when createRecord is successful
     useEffect(() => {
@@ -190,9 +173,6 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({
 
             {validTools.map((tool, index) => {
                 const { uiHint, description, data, columns, resultType } = tool.result;
-                const postingModel =
-                    (tool.result?.model as string | undefined) ||
-                    (tool.args?.modelName as string | undefined);
 
                 const toolNameBadge = (
                     <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
@@ -205,102 +185,21 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({
                     <p className="text-sm text-slate-600">{description}</p>
                 ) : null;
 
-                const entityScopeLabel = resolveToolLegalEntityLabel(tool.result);
-
                 const wrapToolResult = (
                     content: React.ReactNode,
                     options?: {
                         showDescription?: boolean;
                         hideToolBadge?: boolean;
-                        hideEntityScope?: boolean;
                     }
                 ) => (
                     <div key={index} className="space-y-2">
                         {!options?.hideToolBadge && toolNameBadge}
                         {options?.showDescription !== false && descriptionElement}
-                        {!options?.hideEntityScope && (
-                            <ToolLegalEntityScopeLabel label={entityScopeLabel} />
-                        )}
                         {content}
                     </div>
                 );
 
-                // Financial reports (trial balance, etc.)
-                if (
-                    tool.toolName === 'runFinancialReport' ||
-                    uiHint === 'financial_report'
-                ) {
-                    return wrapToolResult(
-                        <FinancialReportDisplay
-                            reportId={String(tool.result.report_id ?? 'trial_balance')}
-                            data={Array.isArray(data) ? data : []}
-                            filters={tool.result.filters as Record<string, unknown> | undefined}
-                            description={description ?? (tool.result.description as string | undefined)}
-                            currencyCode={resolveCurrencyCode(tool.result)}
-                            sidebarMode={sidebarMode}
-                        />,
-                        { showDescription: false, hideEntityScope: true }
-                    );
-                }
-
-                // Posting search — ledger (+/−) or journal (debit/credit columns)
-                if (
-                    (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) &&
-                    Array.isArray(data) &&
-                    data.length > 0 &&
-                    resolvePostingSearchDisplayHint(uiHint, postingModel, data) != null
-                ) {
-                    const postingHint = resolvePostingSearchDisplayHint(
-                        uiHint,
-                        postingModel,
-                        data
-                    );
-
-                    if (postingHint === 'account_ledger') {
-                        return wrapToolResult(
-                                <AccountLedgerDisplay
-                                    rows={data}
-                                    focusAccountName={
-                                        (tool.result.focusAccountName as string | undefined) ??
-                                        undefined
-                                    }
-                                    currencyCode={resolveCurrencyCode(tool.result)}
-                                    sidebarMode={sidebarMode}
-                                />
-                        );
-                    }
-                    if (postingHint === 'posting_journal') {
-                        return wrapToolResult(
-                                <PostingJournalDisplay
-                                    rows={data}
-                                    title={tool.result.journalTitle as string | undefined}
-                                    highlightSide={tool.result.journalFocusSide as 'debit' | 'credit' | undefined}
-                                    highlightAccountName={tool.result.journalFocusAccountName as string | undefined}
-                                    currencyCode={resolveCurrencyCode(tool.result)}
-                                    sidebarMode={sidebarMode}
-                                />
-                        );
-                    }
-                    if (postingHint === 'posting_dual' && Array.isArray(tool.result.tables)) {
-                        return wrapToolResult(
-                                <PostingDualDisplay
-                                    tables={tool.result.tables as PostingDualTable[]}
-                                    currencyCode={resolveCurrencyCode(tool.result)}
-                                    sidebarMode={sidebarMode}
-                                />
-                        );
-                    }
-                    return wrapToolResult(
-                        <PostingJournalDisplay
-                            rows={data}
-                            title={tool.result.journalTitle as string | undefined}
-                            currencyCode={resolveCurrencyCode(tool.result)}
-                            sidebarMode={sidebarMode}
-                        />
-                    );
-                }
-
-                // Handle searchRecords - generic table for non-posting models
+                // Handle searchRecords — generic table for any model
                 if (tool.toolName === 'searchRecords' || tool.toolName.includes('search')) {
                     if (Array.isArray(data) && data.length > 0) {
                         return wrapToolResult(
@@ -395,47 +294,6 @@ export const ToolResponseRenderer: React.FC<ToolResponseRendererProps> = ({
                                 description={description}
                                 hideToolBadge
                             />
-                        );
-
-                    case 'reconciliation_suggestions':
-                        return wrapToolResult(
-                                <ReconciliationSuggestions
-                                    data={Array.isArray(data) ? data : []}
-                                    onSendMessage={onSendMessage}
-                                    sidebarMode={sidebarMode}
-                                />
-                        );
-
-                    case 'financial_report':
-                        return wrapToolResult(
-                            <FinancialReportDisplay
-                                reportId={String(tool.result.report_id ?? 'trial_balance')}
-                                data={Array.isArray(data) ? data : []}
-                                filters={tool.result.filters as Record<string, unknown> | undefined}
-                                description={description ?? tool.result.description as string | undefined}
-                                currencyCode={resolveCurrencyCode(tool.result)}
-                                sidebarMode={sidebarMode}
-                            />,
-                            { showDescription: false, hideEntityScope: true }
-                        );
-
-                    case 'invoice map':
-                        // Handle invoice extraction result
-                        if (tool.result.data && typeof tool.result.data === 'object' && !Array.isArray(tool.result.data)) {
-                            return wrapToolResult(
-                                    <InvoiceMapPreview
-                                        data={tool.result.data}
-                                        message={tool.result.message}
-                                        sidebarMode={sidebarMode}
-                                    />
-                            );
-                        }
-                        return wrapToolResult(
-                                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                    <p className="text-sm text-yellow-800">
-                                        Invoice data structure is unexpected
-                                    </p>
-                                </div>
                         );
 
                     default: {

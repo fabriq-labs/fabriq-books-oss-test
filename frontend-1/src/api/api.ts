@@ -9,6 +9,4 @@
 export * from "./apiClient";
 export * from "./metadataApi";
 export * from "./agentApi";
-export * from "./postingApi";
-export * from "./plaidApi";
 export * from "./superAdminApi";

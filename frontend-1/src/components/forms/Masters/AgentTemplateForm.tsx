@@ -19,18 +19,10 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const GOAL_MODELS = [
   { value: '', label: 'General (no specific model)' },
-  { value: 'posting', label: 'Posting' },
-  { value: 'account', label: 'Account' },
-  { value: 'invoice', label: 'Invoice' },
-  { value: 'purchase_order', label: 'Purchase Order' },
-  { value: 'purchase_requisition', label: 'Purchase Requisition' },
-  { value: 'payment_receipt', label: 'Payment Receipt' },
 ];
 
-const FOCUS_MODEL_OPTIONS = [
-  'posting', 'account', 'invoice', 'purchase_order', 'purchase_requisition',
-  'payment_receipt', 'category', 'supplier', 'customer',
-];
+/** Domain apps append their model names here. */
+const FOCUS_MODEL_OPTIONS: string[] = [];
 
 const MODES = [
   { value: 'supervised', label: 'Supervised — agent proposes, human approves every action' },

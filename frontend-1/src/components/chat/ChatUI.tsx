@@ -39,14 +39,6 @@ import {
     type MessagePart
 } from './chatUtils';
 import { useUserData } from '@/hooks/useUserData';
-import { useCurrencies } from '@/hooks/useCurrencies';
-import { useEntity } from '@/contexts/EntityContext';
-import {
-    buildDefaultPostingChatContext,
-    enrichFinanceChatContext,
-    resolveChatReportingEntity,
-    resolveEntityCurrencyCode,
-} from '@/utils/postingChatContext';
 import Cookies from 'js-cookie';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -92,13 +84,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     const { pageContext, messagesAi, setMessagesAi, clearMessages, chatSessionId } = useChatContext();
     const prevChatSessionId = useRef<number | null>(null);
     const { getBaseCurrencyCode, getUserInitials, user } = useUserData();
-    const { currentEntityId, currentEntity, entities } = useEntity();
-    const { currencyById } = useCurrencies();
-
-    const chatContext = useMemo(() => {
-        const base = pageContext ?? buildDefaultPostingChatContext(currentEntity, entities, currencyById);
-        return enrichFinanceChatContext(base, currentEntity, entities, currencyById);
-    }, [pageContext, currentEntity, entities, currencyById, currentEntityId, currentEntity?.legal_name]);
+    const chatContext = useMemo(() => pageContext, [pageContext]);
     const chatContextRef = useRef(chatContext);
     useEffect(() => {
         chatContextRef.current = chatContext;
@@ -112,14 +98,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({
 
     const chatCurrencyCode = useMemo(
         () =>
-            getChatCurrencyCode(
-                chatContext,
-                resolveEntityCurrencyCode(
-                    resolveChatReportingEntity(currentEntity, entities),
-                    currencyById
-                ) ?? getBaseCurrencyCode()
-            ),
-        [chatContext, currentEntity, entities, currencyById, getBaseCurrencyCode]
+            getChatCurrencyCode(chatContext, getBaseCurrencyCode()),
+        [chatContext, getBaseCurrencyCode]
     );
 
     const {

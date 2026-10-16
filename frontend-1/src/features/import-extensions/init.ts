@@ -5,18 +5,9 @@
  * Call initializeImportExtensions() once at application startup.
  */
 
-import { importExtensionRegistry } from './registry';
-import { postingImportExtension } from './posting';
-
 /**
- * Initialize and register all import extensions
+ * Domain import extensions register here. The kernel ships with none.
  */
 export function initializeImportExtensions(): void {
-  // Register posting extension (bank statement categorization)
-  importExtensionRegistry.register(postingImportExtension);
-
-  // Add other extensions here as they're created
-  // importExtensionRegistry.register(invoiceImportExtension);
-
-  console.log('[ImportExtensions] Initialized all import extensions');
+  // Domain code calls importExtensionRegistry.register(...) from this function.
 }

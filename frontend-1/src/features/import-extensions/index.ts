@@ -24,4 +24,3 @@
 export * from './types';
 export { importExtensionRegistry } from './registry';
 export { initializeImportExtensions } from './init';
-export { postingImportExtension } from './posting';
