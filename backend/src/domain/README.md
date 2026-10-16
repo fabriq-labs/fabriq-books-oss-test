@@ -1,6 +1,6 @@
 # Domain
 
-Product behavior lives here. The kernel calls `actions.ts`, `workflowModels.ts`, and `reports.ts`.
+Product behavior lives in `backend/lib/domain.ts`. The files here call those exports.
 
 Models live in `backend/prisma/schema/domain.prisma`.
 

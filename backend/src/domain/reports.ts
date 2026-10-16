@@ -1,9 +1,8 @@
 import { AuthContext } from '../auth/types';
+import { reportHandlers } from '../../lib/domain';
 
-export type ReportHandler = (context: AuthContext, reportId: string, filters: unknown) => Promise<unknown>;
-
-/** Report id → handler. Empty until a domain registers one. */
-export const reportHandlers: Record<string, ReportHandler> = {};
+export type { ReportHandler } from '../../lib/domain';
+export { reportHandlers };
 
 export async function run_report(context: AuthContext, reportId: string, filters: unknown) {
   const handler = reportHandlers[reportId];

@@ -7,9 +7,7 @@ The kernel calls these files. Product behavior stays inside them.
 | Path | What goes here |
 |---|---|
 | `backend/prisma/schema/domain.prisma` | Domain models |
-| `backend/src/domain/actions.ts` | Post-write hooks and workflow side-effect handlers |
-| `backend/src/domain/workflowModels.ts` | Model names that participate in workflow |
-| `backend/src/domain/reports.ts` | Report handlers keyed by report id |
+| `backend/lib/domain.ts` | SQL tables, workflow models, prompt examples, post-write hooks, and report handlers |
 | `frontend-0/src/domain/navigation.ts` | Sidebar entries |
 | `frontend-0/src/domain/home.tsx` | Home screen rendered at `/` |
 

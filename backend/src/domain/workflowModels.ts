@@ -1,8 +1,6 @@
-/**
- * Domain models that start a workflow instance on create.
- * Add a model name here after its workflow_flow row exists.
- */
-export const DOMAIN_WORKFLOW_MODELS: readonly string[] = [];
+import { DOMAIN_WORKFLOW_MODELS } from '../../lib/domain';
+
+export { DOMAIN_WORKFLOW_MODELS };
 
 export function isDomainWorkflowModel(modelName: string): boolean {
   return DOMAIN_WORKFLOW_MODELS.includes(modelName);
