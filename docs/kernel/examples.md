@@ -48,7 +48,7 @@ orgs org[]
 
 A model stays in `platform.prisma` only when both are true: kernel code reads or writes it with no domain installed, and it is not a product catalog. `attachment` meets that test. The upload routes write a row. There is no seed row.
 
-A new model for a future application does not go in `platform.prisma`. The folders are in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md). The same two-sided rule applies: a relation to `user` needs the matching field on `user` in `metadata.prisma`.
+A new model for a future application does not go in `platform.prisma`. The steps are in [adding-a-model.md](./adding-a-model.md). The same two-sided rule applies: a relation to `user` needs the matching field on `user` in `metadata.prisma`.
 
 `currency.org_id` is a required `String`. Read it as a shareable model: the caller org or `org_system`.
 
