@@ -28,7 +28,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 
 The image listens on `8080` only.
 
-`railway.toml` tells Railway to build this Dockerfile and to wait on `GET /health`.
+This repo has no Railway config file. A new service defaults to Railpack. Before the first upload, set the service build to the Dockerfile at the repo root and set the deploy health check to `GET /health`. The upload has to be the repo root. An upload rooted at `backend/` does not contain `Dockerfile`.
 
 Local image:
 
