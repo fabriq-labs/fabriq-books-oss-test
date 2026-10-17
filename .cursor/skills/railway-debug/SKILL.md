@@ -26,12 +26,12 @@ npx -y @railway/cli@latest service list
 
 ## Known services
 
-| Env | Branch / image tag | Service UUID | Workflow |
-|-----|--------------------|--------------|----------|
-| **dev** | `dev` / `:dev-latest` | `b82e07e5-9532-43f3-b15a-797403b7fc92` | `.github/workflows/deploy-dev.yml` |
-| **prod** | `prod` / `:prod-latest` | `36f474f5-fc9f-4ab7-866b-61800eb3c318` | `.github/workflows/deploy-prod.yml` |
+| Env | Branch / image tag | Workflow |
+|-----|--------------------|----------|
+| **dev** | `dev` / `:dev-latest` | `.github/workflows/deploy-dev.yml` |
+| **prod** | `prod` / `:prod-latest` | `.github/workflows/deploy-prod.yml` |
 
-Default to **dev** unless the user asks for prod. Be extra careful with prod (read logs first; avoid redeploy/restart unless explicitly requested).
+The service id is `service_id` in that workflow, or a row from `railway service list`. Do not copy ids into this skill. Default to **dev** unless the user asks for prod. Be extra careful with prod (read logs first; avoid redeploy/restart unless explicitly requested).
 
 Image: `ghcr.io/fabriq-labs/fabriq-ws-setup:<branch>-latest`  
 Container exposes **8080** (nginx/app) and **8081** (Python integration sync). Health: `GET /health`.
@@ -41,33 +41,32 @@ Container exposes **8080** (nginx/app) and **8081** (Python integration sync). H
 ### 1. Recent deploy / runtime logs
 
 ```bash
+# Set SERVICE_ID from `railway service list` or the workflow's service_id.
 # Last N deploy/runtime lines (recommended for agents)
 npx -y @railway/cli@latest logs \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -n 200
 
 # Build logs for latest deployment
 npx -y @railway/cli@latest logs \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   --build -n 200
 
 # JSON (easier to parse)
 npx -y @railway/cli@latest logs \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -n 100 --json
 ```
-
-Replace the service UUID with prod when needed.
 
 ### 2. Deployment status
 
 ```bash
 npx -y @railway/cli@latest deployment list \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   --json
 npx -y @railway/cli@latest status
 npx -y @railway/cli@latest metrics \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92
+  --service "$SERVICE_ID"
 ```
 
 ### 3. In-container checks (non-interactive)
@@ -76,16 +75,16 @@ npx -y @railway/cli@latest metrics \
 # One-shot remote command (prefer this over interactive ssh)
 # Hit the nginx health endpoint on the app port and the sync-service /health on 8081.
 npx -y @railway/cli@latest ssh \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -- sh -c 'wget -qO- "http://127.0.0.1:${NGINX_PORT:-8080}/health"'
 
 npx -y @railway/cli@latest ssh \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -- sh -c 'wget -qO- "http://127.0.0.1:8081/health"'
 
 # GCS / Vertex diagnostics already in the image
 npx -y @railway/cli@latest ssh \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -- sh /app/backend/scripts/railway-gcs-diagnose.sh
 ```
 

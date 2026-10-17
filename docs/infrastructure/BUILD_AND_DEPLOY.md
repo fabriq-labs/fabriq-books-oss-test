@@ -114,10 +114,12 @@ Reusable core: **Build and deploy (Railway)** (`.github/workflows/deploy-railway
 — `workflow_call` only. Thin callers pass the Railway **service UUID** and share
 one secret (`RAILWAY_TOKEN`):
 
-| Caller | Branch to run from | Service UUID | Expected image tag |
-|--------|--------------------|--------------|--------------------|
-| `deploy-dev.yml` → **Deploy (dev)** | `dev` | `b82e07e5-9532-43f3-b15a-797403b7fc92` | `…:dev-latest` |
-| `deploy-prod.yml` → **Deploy (prod)** | `prod` | `36f474f5-fc9f-4ab7-866b-61800eb3c318` | `…:prod-latest` |
+| Caller | Branch to run from | Expected image tag |
+|--------|--------------------|--------------------|
+| `deploy-dev.yml` → **Deploy (dev)** | `dev` | `…:dev-latest` |
+| `deploy-prod.yml` → **Deploy (prod)** | `prod` | `…:prod-latest` |
+
+Each caller passes its Railway service id as `service_id`. Read it from that workflow. Do not copy it into docs.
 
 Flow:
 
@@ -157,16 +159,17 @@ Agents can inspect Railway **without** redeploying by using the Railway CLI and 
 | Need | How |
 |------|-----|
 | Auth | Set Cursor secret `RAILWAY_TOKEN` (same Project Token as Actions) at [Cloud Agents → Secrets](https://cursor.com/dashboard/cloud-agents) |
-| Service target | Pass `--service <uuid>` (dev/prod IDs above) |
+| Service target | `npx -y @railway/cli@latest service list`, then `--service <service-id>`. The id is `service_id` in the deploy workflow. |
 | Skill | `.cursor/skills/railway-debug/SKILL.md` |
 | Local/IDE MCP | `.cursor/mcp.json` → `railway` stdio server (`npx @railway/cli mcp`) reads `RAILWAY_TOKEN` |
 
 Useful read-only commands:
 
 ```bash
-npx -y @railway/cli@latest logs --service b82e07e5-9532-43f3-b15a-797403b7fc92 -n 200
-npx -y @railway/cli@latest deployment list --service b82e07e5-9532-43f3-b15a-797403b7fc92 --json
-npx -y @railway/cli@latest ssh --service b82e07e5-9532-43f3-b15a-797403b7fc92 -- sh -c 'wget -qO- "http://127.0.0.1:${NGINX_PORT:-8080}/health"'
+npx -y @railway/cli@latest service list
+npx -y @railway/cli@latest logs --service <service-id> -n 200
+npx -y @railway/cli@latest deployment list --service <service-id> --json
+npx -y @railway/cli@latest ssh --service <service-id> -- sh -c 'wget -qO- "http://127.0.0.1:${NGINX_PORT:-8080}/health"'
 ```
 
 Notes:
