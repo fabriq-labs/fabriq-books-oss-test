@@ -11,23 +11,27 @@ Start at [docs/README.md](./docs/README.md). A new model, its table, its view, a
 | Database setup | `cd backend && npm run setup:kernel` |
 | Login | `admin@example.com` / `admin123` |
 
-Do not run `prisma db push` or `prisma migrate`. New databases are created by `npm run setup:kernel`, which applies generated schema SQL and seeds `org_system`. After `organizations` exists, apply later tables with the SQL diff in `docs/kernel/adding-a-model.md`.
+Do not run `prisma db push`, `prisma migrate`, or other DDL. New databases are created by `npm run setup:kernel`, which applies generated schema SQL and seeds `org_system`. After `organizations` exists, apply later tables with the SQL diff in `docs/kernel/adding-a-model.md`.
 
-## Cursor Cloud specific instructions
+Tool-specific folders (`.cursor/`, `.claude/`) stay on the machine that uses them. They are gitignored. Instructions for every coding agent live in this file.
 
-### Build an app and deploy it
+## Database
+
+Investigate with `SELECT` only. Read `DATABASE_URL` from `backend/.env` and pass it to `psql`. Do not print the URL, and do not commit `.env`.
+
+Quote `"user"`. Filter private rows by `org_id`. Shareable rows (`role`, `workflow_flow`, `workflow_state`, `workflow_action`, `view`, `permission`, `role_view`, `prompt_template`, `currency`) are visible for the caller org or `org_system`. `org` has no `org_id`. The contract is [docs/kernel/tenancy.md](./docs/kernel/tenancy.md).
+
+## Deploy
 
 Given a spec, add the domain with [docs/kernel/adding-a-model.md](./docs/kernel/adding-a-model.md) and [docs/kernel/BUILDING_A_DOMAIN.md](./docs/kernel/BUILDING_A_DOMAIN.md).
 
-Deploy that app as a **new** Railway service with [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). `RAILWAY_TOKEN` in the repo-root `.env` or `backend/.env` is a project token. Load it into the environment. Never print it or commit it. `railway add` creates the service in that token's project. `railway up` builds the root `Dockerfile`.
+Deploy that app as a new Railway service with [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). `RAILWAY_TOKEN` in the repo-root `.env` or `backend/.env` is a project token. Load it into the environment. Never print it or commit it. `railway add` creates the service in that token's project. `railway up` builds the root `Dockerfile`.
 
-### Logs
-
-To inspect a service that is already deployed, follow [`.cursor/skills/railway-debug/SKILL.md`](.cursor/skills/railway-debug/SKILL.md). List services, then pass the name or id from that list:
+To inspect a service that is already deployed, list services, then pass the name or id from that list:
 
 ```bash
 npx -y @railway/cli@latest service list
 npx -y @railway/cli@latest logs --service <service-id> -n 200
 ```
 
-Leave service ids out of this file. Do not redeploy or restart an existing production service unless the user explicitly asks.
+Leave service ids out of this file. Do not redeploy or restart an existing production service unless the user explicitly asks. `railway variable list` prints secret values. Do not write that output into logs, docs, or the repo.

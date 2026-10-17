@@ -28,7 +28,10 @@ node_modules/
 .idea/
 *.swp
 *.swo
-.cursor/mcp.json
+
+# Local agent tool config. Shared instructions are AGENTS.md.
+.cursor/
+.claude/
 
 # OS files
 .DS_Store
@@ -49,10 +52,6 @@ __pycache__/
 *$py.class
 .venv/
 venv/
-
-# User-specific IDE/AI folders
-
-.cursor/mcp.json
 
 trash/
 gitignore/

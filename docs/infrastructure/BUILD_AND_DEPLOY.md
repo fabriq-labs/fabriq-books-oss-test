@@ -128,7 +128,7 @@ Open `https://<that-host>/health`, then the same host in a browser. Login is `ad
 
 Changing a variable redeploys the service. Pass `--skip-deploys` when you are setting several, then `railway up` or `railway redeploy --service "$APP" --yes` once.
 
-To debug a service that is already deployed, use [`.cursor/skills/railway-debug/SKILL.md`](../../.cursor/skills/railway-debug/SKILL.md). Read the service name from `railway service list`. Leave service ids out of docs.
+To debug a service that is already deployed, read its name from `railway service list` and follow the log commands in [../../AGENTS.md](../../AGENTS.md). Leave service ids out of docs.
 
 ## GitHub Actions
 
