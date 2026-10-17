@@ -200,7 +200,7 @@ Check health:
 curl -sS http://127.0.0.1:8080/health
 ```
 
-Default login (demo seed): `admin@example.com` / `admin123` (see the repo [CLAUDE.md](../../CLAUDE.md)).
+Default login: `admin@example.com` / `admin123` (see the repo [AGENTS.md](../../AGENTS.md)).
 
 ---
 

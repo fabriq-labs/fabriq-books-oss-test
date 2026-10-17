@@ -5,7 +5,7 @@ _Exported on 2/23/2026 at 10:00:20 GMT+5:30 from Cursor (2.5.20)_
 
 **User**
 
-@fabriq (Workspace Config)/docs/BUSINESS_DOMAIN.md @fabriq (Workspace Config)/docs/CLAUDE.md 
+@fabriq (Workspace Config)/AGENTS.md 
 
 I want to review the invoice PO matching feature in this app.  Review the frontend flows, @backend/prisma/schema prisma schemas for purchase order and invoice.  There is upload pdf button in the invoice list view which triggers the whole process. 
 
