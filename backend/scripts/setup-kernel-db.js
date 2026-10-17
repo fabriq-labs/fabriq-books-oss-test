@@ -53,6 +53,13 @@ function main() {
     console.log(`Database ${dbName} already exists`);
   }
 
+  console.log('Validating Prisma schema');
+  execSync('npx prisma validate', {
+    stdio: 'inherit',
+    cwd: backendRoot,
+    env: process.env,
+  });
+
   const hasOrg = execSync(
     `psql "${databaseUrl}" -tAc "SELECT to_regclass('public.organizations') IS NOT NULL"`,
     { cwd: backendRoot, env: process.env }
@@ -71,6 +78,13 @@ function main() {
   } else {
     console.log('organizations table exists; leaving the schema in place');
   }
+
+  console.log('Generating Prisma client');
+  execSync('npx prisma generate', {
+    stdio: 'inherit',
+    cwd: backendRoot,
+    env: process.env,
+  });
 
   console.log('Seeding kernel org, admin, and views');
   execSync('npx ts-node --transpile-only src/utils/setup/seedKernel.ts', {

@@ -26,6 +26,12 @@ Views the seed inserts, all on `org_system`, each with a `data_graph`, a `*` wri
 | `view_kernel_prompt` | `prompt_template_view` | `prompt_template` |
 | `view_kernel_currency` | `currency_view` | `currency` |
 | `view_kernel_flow` | `workflow_flow_view` | `workflow_flow` |
+| `view_kernel_llm_trace` | `llm_trace_view` | `llm_trace` |
+| `view_kernel_llm_trace_step` | `llm_trace_step_view` | `llm_trace_step` |
+| `view_kernel_workflow_instance` | `workflow_instance_view` | `workflow_instance` |
+| `view_kernel_chat_thread` | `chat_thread_view` | `chat_thread` |
+| `view_kernel_import_run` | `import_run_view` | `import_run` |
+| `view_kernel_agent_tools` | `agent_model_tool_config_view` | `agent_model_tool_config` |
 
 Login is `admin@example.com` / `admin123`. That user is a platform admin because the role name contains `super admin`. Calls below assume that session.
 
