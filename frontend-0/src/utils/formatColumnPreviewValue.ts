@@ -66,9 +66,13 @@ export function formatColumnPreviewValue(
   if (meta.select && datatype === "table") {
     const raw = record[key];
     if (!raw || typeof raw !== "object") return null;
-    const displayField = Object.keys(meta.select).find(
-      (field) => meta.select[field] === "update",
-    );
+    const select = meta.select as Record<string, unknown>;
+    const displayField =
+      Object.keys(select).find((field) => select[field] === "update") ||
+      (typeof select.name === "string" ? "name" : undefined) ||
+      Object.keys(select).find(
+        (field) => field !== "id" && typeof select[field] === "string",
+      );
     if (!displayField) return null;
     const v = raw[displayField];
     return v != null && v !== "" ? truncate(String(v)) : null;
