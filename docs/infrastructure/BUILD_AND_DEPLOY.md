@@ -129,3 +129,16 @@ Open `https://<that-host>/health`, then the same host in a browser. Login is `ad
 Changing a variable redeploys the service. Pass `--skip-deploys` when you are setting several, then `railway up` or `railway redeploy --service "$APP" --yes` once.
 
 To debug a service that is already deployed, use [`.cursor/skills/railway-debug/SKILL.md`](../../.cursor/skills/railway-debug/SKILL.md). Read the service name from `railway service list`. Leave service ids out of docs.
+
+## GitHub Actions
+
+`.github/workflows/deploy-railway.yml` is the only workflow. Run it from the `prod` branch: Actions → **Deploy (Railway)**.
+
+It builds this Dockerfile, pushes `ghcr.io/<owner>/<repo>:prod-latest` (and a timestamp tag), then runs `railway redeploy --from-source`. The Railway service is already a Docker Image source pointed at that tag, with registry credentials that can read packages.
+
+Repository secrets:
+
+| Secret | Value |
+|---|---|
+| `RAILWAY_TOKEN` | Railway project token |
+| `RAILWAY_SERVICE_ID` | Service to redeploy |
