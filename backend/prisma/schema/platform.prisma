@@ -20,6 +20,7 @@ model currency {
   created_at     DateTime @default(now())
   modified_at    DateTime @updatedAt
   orgs           org[]
+  accounts       account[]
 
   @@map("currency")
 }

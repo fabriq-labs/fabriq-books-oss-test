@@ -18,6 +18,13 @@ import {
 import { NotFoundError } from '../../tenancy/errors';
 import { rejectUnknownWriteFields, unknownWriteFields, unknownWriteFieldsMessage } from './unknownWriteFields';
 
+/** Stubs in this slice have id and org_id and no created_at. Sort those by id. */
+function defaultOrderBy(modelName: string): Array<Record<string, 'asc' | 'desc'>> {
+  const model = Prisma.dmmf.datamodel.models.find((item) => item.name === modelName);
+  const hasCreatedAt = model?.fields.some((field) => field.name === 'created_at') ?? false;
+  return hasCreatedAt ? [{ created_at: 'desc' }] : [{ id: 'desc' }];
+}
+
 export class DataAccessLayer {
   private static instance: DataAccessLayer;
   private prisma: PrismaClient;
@@ -859,7 +866,7 @@ export class DataAccessLayer {
 
       // Transform orderBy from { field: string, direction: string } to Prisma format,
       // then append a unique id tiebreaker so OFFSET pagination is stable.
-      let orderBy = filteredOptions.orderBy || [{ created_at: "desc" }];
+      let orderBy = filteredOptions.orderBy || defaultOrderBy(modelName);
       if (orderBy && !Array.isArray(orderBy) && orderBy.field && orderBy.direction) {
         orderBy = { [orderBy.field]: orderBy.direction };
       }

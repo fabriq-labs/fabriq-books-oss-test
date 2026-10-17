@@ -3,6 +3,7 @@ import { AuthContext } from '../../auth/types';
 import { DataAccessResult } from '../types';
 import logger from '../../utils/logger';
 import { MODELS_WITHOUT_ORG, SHAREABLE_MODELS, modelTenancy } from '../../tenancy/orgScope';
+import { DOMAIN_SQL_TABLES } from '../../../lib/domain';
 
 const KNOWN_TABLES = new Set([
   ...MODELS_WITHOUT_ORG,
@@ -23,6 +24,7 @@ const KNOWN_TABLES = new Set([
   'agent_message',
   'pending_action',
   'chat_thread',
+  ...DOMAIN_SQL_TABLES.map((table) => table.name),
 ]);
 
 const FORBIDDEN = /\b(drop|delete|truncate|alter|insert|update|grant|revoke|copy)\b/i;

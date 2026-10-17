@@ -1,6 +1,342 @@
-// Domain models for this application.
-// See docs/kernel/BUILDING_A_DOMAIN.md.
-//
-// Add models here. Every model carries org_id.
-// A relation to user, org, or workflow_instance needs the matching field
-// on that kernel model in metadata.prisma.
+// General ledger. Account is the chart. Posting is one transaction with a
+// debit account and a credit account. Models that account or posting point at,
+// and that are not part of this slice, are stubs: id, org_id, and the foreign
+// keys that keep the relation. The real module replaces the stub later.
+
+enum account_classification {
+  asset
+  liability
+  equity
+  income
+  expense
+}
+
+enum income_type {
+  dividend
+  interest
+  capital_gain
+  rental_income
+  royalty
+  other_investment_income
+}
+
+enum income_source {
+  stock
+  bond
+  mutual_fund
+  etf
+  deposit
+  real_estate
+  other
+}
+
+enum reconciliation_status {
+  unmatched
+  suggested
+  matched
+  confirmed
+}
+
+enum posting_status {
+  active
+  reversed
+}
+
+model account {
+  id                String                  @id @default(dbgenerated("'acco_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  name              String?
+  code              String?
+  account_number    String?
+  classification    account_classification?
+  account_types     String[]
+  sub_type          String?
+  frequency         String?
+  balance           Decimal?                @db.Decimal(19, 4)
+  credit_limit      Decimal?                @db.Decimal(19, 4)
+  currency_id       String?
+  currency          currency?               @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  is_active         Boolean                 @default(true)
+  status            String?
+  parent_account_id String?
+  parent_account    account?                @relation("account_parent", fields: [parent_account_id], references: [id], onDelete: Restrict)
+  child_accounts    account[]               @relation("account_parent")
+  hq_account_id     String?
+  hq_account        account?                @relation("account_hq", fields: [hq_account_id], references: [id], onDelete: Restrict)
+  hq_accounts       account[]               @relation("account_hq")
+  entity_id         String?
+  entity            entity?                 @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  ext_connection_id String?                 @db.VarChar(50)
+  ext_connection    ext_connection?         @relation(fields: [ext_connection_id], references: [id], onDelete: SetNull)
+  ext_account_id    String?
+  extraction_notes  String?                 @db.Text
+  import_id         String?
+  last_sync_at      DateTime?
+  source_system_id  String?
+  source_record_id  String?
+  source_updated_at DateTime?               @default(now())
+  ingest_batch_id   String?
+  assigned_to       String?
+  created_by        String?
+  modified_by       String?
+  created_at        DateTime                @default(now())
+  modified_at       DateTime                @updatedAt
+
+  debit_postings         posting[]              @relation("posting_debit_account")
+  credit_postings        posting[]              @relation("posting_credit_account")
+  trades                 trade[]                @relation("trade_account")
+  target_trades          trade[]                @relation("trade_target_account")
+  holdings               holding[]
+  payment_receipts       payment_receipt[]
+  credit_notes           credit_note[]
+  budget_periods         budget_period[]
+  general_ledgers        general_ledger[]
+  purchase_requisitions  purchase_requisition[]
+  purchase_orders        purchase_order[]
+  sales_item_masters     item_master[]          @relation("item_master_sales_account")
+  purchase_item_masters  item_master[]          @relation("item_master_purchase_account")
+  project_masters        project_master[]
+  invoices               invoice[]
+
+  @@unique([org_id, code])
+  @@unique([source_record_id, source_system_id, org_id])
+  @@index([org_id, parent_account_id])
+  @@index([org_id, classification])
+  @@index([currency_id])
+  @@index([entity_id])
+  @@index([ext_connection_id])
+  @@index([source_system_id, source_record_id])
+  @@index([source_updated_at])
+  @@map("account")
+}
+
+model posting {
+  id                    String                  @id @default(dbgenerated("'post_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                String
+  debit_account_id      String?
+  credit_account_id     String?
+  debit_account         account?                @relation("posting_debit_account", fields: [debit_account_id], references: [id], onDelete: Restrict)
+  credit_account        account?                @relation("posting_credit_account", fields: [credit_account_id], references: [id], onDelete: Restrict)
+  name                  String?
+  account_name          String?
+  description           String?
+  notes                 String?
+  category_name         String?
+  value_date            DateTime?
+  posting_date          DateTime?
+  amount                Decimal?                @db.Decimal(19, 4)
+  kind                  String?
+  status                posting_status          @default(active)
+  reversed_at           DateTime?
+  reverses_id           String?
+  reverses              posting?                @relation("posting_reversal", fields: [reverses_id], references: [id], onDelete: SetNull)
+  reversals             posting[]               @relation("posting_reversal")
+  entity_id             String?
+  entity                entity?                 @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  invoice_id            String?
+  invoice               invoice?                @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  trade_id              String?                 @unique
+  trade                 trade?                  @relation("posting_trade", fields: [trade_id], references: [id], onDelete: SetNull)
+  holding_id            String?
+  holding               holding?                @relation(fields: [holding_id], references: [id], onDelete: SetNull)
+  payment_receipt_id    String?                 @unique
+  payment_receipt       payment_receipt?        @relation("posting_payment_receipt", fields: [payment_receipt_id], references: [id], onDelete: SetNull)
+  income_type           income_type?
+  income_source         income_source?
+  ai_category_score     Decimal?                @db.Decimal(5, 4)
+  ai_categorized_at     DateTime?
+  merchant_key          String?                 @db.VarChar(255)
+  merchant_key_provider String?                 @db.VarChar(32)
+  reconciliation_status reconciliation_status?
+  matched_reference     String?
+  ext_transaction       ext_transaction?
+  assigned_to           String?
+  created_by            String?
+  modified_by           String?
+  created_at            DateTime                @default(now())
+  modified_at           DateTime                @updatedAt
+
+  @@index([org_id, value_date, id])
+  @@index([org_id, posting_date, id])
+  @@index([org_id, debit_account_id, value_date])
+  @@index([org_id, credit_account_id, value_date])
+  @@index([debit_account_id])
+  @@index([credit_account_id])
+  @@index([entity_id])
+  @@index([invoice_id])
+  @@index([holding_id])
+  @@index([reverses_id])
+  @@index([org_id, merchant_key, modified_at(sort: Desc)])
+  @@map("posting")
+}
+
+model entity {
+  id       String    @id @default(dbgenerated("'ent_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id   String
+  accounts account[]
+  postings posting[]
+
+  @@index([org_id])
+  @@map("entity")
+}
+
+model ext_connection {
+  id               String            @id @default(dbgenerated("'extc_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id           String
+  accounts         account[]
+  ext_transactions ext_transaction[]
+
+  @@index([org_id])
+  @@map("ext_connection")
+}
+
+model ext_transaction {
+  id                String         @id @default(dbgenerated("'extt_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  ext_connection_id String         @db.VarChar(50)
+  ext_connection    ext_connection @relation(fields: [ext_connection_id], references: [id], onDelete: Cascade)
+  posting_id        String?        @unique @db.VarChar(50)
+  posting           posting?       @relation(fields: [posting_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([ext_connection_id])
+  @@map("ext_transaction")
+}
+
+model invoice {
+  id               String            @id @default(dbgenerated("'inv_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id           String
+  account_id       String?
+  account          account?          @relation(fields: [account_id], references: [id], onDelete: SetNull)
+  postings         posting[]
+  payment_receipts payment_receipt[]
+  credit_notes     credit_note[]
+
+  @@index([org_id])
+  @@index([account_id])
+  @@map("invoice")
+}
+
+model payment_receipt {
+  id         String   @id @default(dbgenerated("'payr_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id     String
+  account_id String?
+  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+  invoice_id String?
+  invoice    invoice? @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  posting    posting? @relation("posting_payment_receipt")
+
+  @@index([org_id])
+  @@index([account_id])
+  @@index([invoice_id])
+  @@map("payment_receipt")
+}
+
+model credit_note {
+  id         String   @id @default(dbgenerated("'cn_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id     String
+  account_id String?
+  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+  invoice_id String?
+  invoice    invoice? @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([account_id])
+  @@map("credit_note")
+}
+
+model trade {
+  id                String   @id @default(dbgenerated("'trad_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  account_id        String?
+  account           account? @relation("trade_account", fields: [account_id], references: [id], onDelete: SetNull)
+  target_account_id String?
+  target_account    account? @relation("trade_target_account", fields: [target_account_id], references: [id], onDelete: SetNull)
+  posting           posting? @relation("posting_trade")
+
+  @@index([org_id])
+  @@index([account_id])
+  @@index([target_account_id])
+  @@map("trade")
+}
+
+model holding {
+  id         String    @id @default(dbgenerated("'hold_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id     String
+  account_id String
+  account    account   @relation(fields: [account_id], references: [id], onDelete: Restrict)
+  postings   posting[]
+
+  @@index([org_id])
+  @@index([account_id])
+  @@map("holding")
+}
+
+model budget_period {
+  id         String   @id @default(dbgenerated("'bupe_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id     String
+  account_id String?
+  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([account_id])
+  @@map("budget_period")
+}
+
+model general_ledger {
+  id         String   @id @default(dbgenerated("'gl_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id     String
+  account_id String?
+  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([account_id])
+  @@map("general_ledger")
+}
+
+model purchase_requisition {
+  id         String   @id @default(dbgenerated("'preq_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id     String
+  account_id String?
+  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([account_id])
+  @@map("purchase_requisition")
+}
+
+model purchase_order {
+  id         String   @id @default(dbgenerated("'po_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id     String
+  account_id String?
+  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([account_id])
+  @@map("purchase_order")
+}
+
+model item_master {
+  id                  String   @id @default(dbgenerated("'item_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id              String
+  sales_account_id    String?
+  sales_account       account? @relation("item_master_sales_account", fields: [sales_account_id], references: [id], onDelete: SetNull)
+  purchase_account_id String?
+  purchase_account    account? @relation("item_master_purchase_account", fields: [purchase_account_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([sales_account_id])
+  @@index([purchase_account_id])
+  @@map("item_master")
+}
+
+model project_master {
+  id         String   @id @default(dbgenerated("'proj_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id     String
+  account_id String?
+  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+
+  @@index([org_id])
+  @@index([account_id])
+  @@map("project_master")
+}
