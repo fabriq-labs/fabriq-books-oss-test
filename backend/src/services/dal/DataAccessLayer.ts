@@ -16,6 +16,7 @@ import {
   writeOrgScope,
 } from '../../tenancy/orgScope';
 import { NotFoundError } from '../../tenancy/errors';
+import { omitUnknownWriteFields } from './omitUnknownWriteFields';
 
 export class DataAccessLayer {
   private static instance: DataAccessLayer;
@@ -455,6 +456,7 @@ export class DataAccessLayer {
       // Filter input data based on permissions
       const filteredData = PermissionService.filterFieldsByPermission(data, permissions);
       this.applyWriteScopeDefaults(modelName, filteredData, context);
+      omitUnknownWriteFields(modelName, filteredData);
 
       const createArgs = { data: filteredData, ...options };
 
@@ -507,6 +509,7 @@ export class DataAccessLayer {
       const filteredData = PermissionService.filterFieldsByPermission(data, permissions);
       filteredData.modified_by = context.user?.id;
       applyOrgOnWrite(modelName, filteredData, context.user!.org_id, !!context.isPlatformAdmin, false);
+      omitUnknownWriteFields(modelName, filteredData);
 
       const scopedWhere = await this.scopedUniqueWhere(modelName, { id }, context, 'write');
       if (!scopedWhere) {
@@ -580,6 +583,7 @@ export class DataAccessLayer {
       const filteredData = PermissionService.filterFieldsByPermission(data, childPermissions);
       filteredData.modified_by = context.user?.id;
       applyOrgOnWrite(relationMetadata.relatedModel, filteredData, context.user!.org_id, !!context.isPlatformAdmin, false);
+      omitUnknownWriteFields(relationMetadata.relatedModel, filteredData);
       const model = this.getModel(modelName);
       if (!model) {
         logger.error('Model not found', { model: modelName });
@@ -676,6 +680,7 @@ export class DataAccessLayer {
       if (!model) {
         throw new Error(`Model ${parentModelName} not found`);
       }
+      const childModel = this.getRelationMetadata(parentModelName, childRelationName)?.relatedModel;
       // Add created_by and modified_by to all children
       const childrenWithUserInfo = children.map(child => {
         const row: Record<string, unknown> = {
@@ -684,6 +689,7 @@ export class DataAccessLayer {
           modified_by: context.user?.id,
         };
         applyOrgOnWrite(parentModelName, row, context.user!.org_id, !!context.isPlatformAdmin, true);
+        if (childModel) omitUnknownWriteFields(childModel, row);
         return row;
       });
       await this.assertParentWritable(parentModelName, parentId, context, tx);
@@ -933,6 +939,7 @@ export class DataAccessLayer {
       filteredData = data.map((item) => {
         const filtered = PermissionService.filterFieldsByPermission(item, permissions);
         this.applyWriteScopeDefaults(modelName, filtered, context);
+        omitUnknownWriteFields(modelName, filtered);
         return filtered;
       });
 
@@ -1005,6 +1012,7 @@ export class DataAccessLayer {
         ...filteredUpdate,
         modified_by: context.user?.id,
       };
+      omitUnknownWriteFields(modelName, updateData);
       // Build query options
       const queryOptions: any = {
         where: { id: { in: payload.ids } }
