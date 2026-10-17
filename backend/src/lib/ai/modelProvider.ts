@@ -44,8 +44,11 @@ function ensureGCPCredentials(): void {
   if (_credsDone) return;
   _credsDone = true;
 
+  const existing = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (existing && fs.existsSync(existing)) return;
+
   const b64 = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON_BASE64;
-  if (!b64 || process.env.GOOGLE_APPLICATION_CREDENTIALS) return;
+  if (!b64) return;
 
   try {
     const json = Buffer.from(b64, 'base64').toString();

@@ -18,7 +18,9 @@ export class ExtractorRegistry {
   }
 
   private initializeExtractors(): void {
-    // Domain extractors register themselves from backend/src/domain.
+    // Domain extractors live in backend/lib. The registry only receives them.
+    const { registerGlExtractors } = require('../../../lib/gl/register') as typeof import('../../../lib/gl/register');
+    registerGlExtractors(this);
   }
 
   private initializeDocumentTypes(): void {

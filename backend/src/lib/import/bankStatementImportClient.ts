@@ -1,24 +1,12 @@
 import axios, { AxiosInstance } from 'axios';
+import { DOMAIN_IMPORT_FIELD_KEYS } from '../../../lib/domain';
 
 /** Posting fields the bank-statement import script may send (identity CSV→model mapping). */
-export const POSTING_BANK_IMPORT_FIELD_KEYS = new Set([
-  'name',
-  'description',
-  'value_date',
-  'posting_date',
-  'amount',
-  'account_id',
-  'credit_account_id',
-  'legal_entity_id',
-  'notes',
-  'status',
-  'posting_type',
-  'reconciliation_status',
-]);
+export const POSTING_BANK_IMPORT_FIELD_KEYS = new Set<string>(DOMAIN_IMPORT_FIELD_KEYS);
 
 /**
  * Build upload `mapping` for posting imports: union of field keys across all rows.
- * Required because debit lines set `credit_account_id` and credit lines set `account_id`;
+ * Required because debit lines set `credit_account_id` and credit lines set `debit_account_id`;
  * using only the first row omits keys needed for later rows (UploadService drops unmapped keys).
  */
 export function buildPostingImportFieldMapping(

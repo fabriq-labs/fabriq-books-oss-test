@@ -25,4 +25,6 @@ export { ImportExtensionRegistry } from './registry';
  * Register domain import extensions from backend/src/domain when a domain adds them.
  */
 export function initializeImportExtensions(): void {
+  const { registerGlImportExtension } = require('../../../lib/gl/register') as typeof import('../../../lib/gl/register');
+  registerGlImportExtension();
 }

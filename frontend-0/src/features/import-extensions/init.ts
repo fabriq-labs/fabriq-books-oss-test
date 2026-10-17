@@ -5,9 +5,12 @@
  * Call initializeImportExtensions() once at application startup.
  */
 
+import { postingImportExtension } from '@/domain/gl/postingImportExtension';
+import { importExtensionRegistry } from './registry';
+
 /**
- * Domain import extensions register here. The kernel ships with none.
+ * Domain import extensions register here. The kernel ships with none of its own.
  */
 export function initializeImportExtensions(): void {
-  // Domain code calls importExtensionRegistry.register(...) from this function.
+  importExtensionRegistry.register(postingImportExtension);
 }
