@@ -34,5 +34,6 @@ Follow [tenancy.md](./tenancy.md) and [examples.md](./examples.md).
 - Put `org_id` on the model. Match the Prisma nullability you intend. Several kernel metadata models still use `String?`. `currency` and `workflow_instance` use a required `String`.
 - Shared defaults use `org_system`. A tenant row uses the caller org.
 - A Prisma relation has two sides. The existing example is `org.currency` and `currency.orgs`.
-- Do not run `prisma db push`. Add the table and its foreign keys through setup, then run `npx prisma generate`.
+- Do not run `prisma db push`. Apply new tables with the SQL diff in [adding-a-model.md](./adding-a-model.md), then run `npx prisma generate`. `npm run setup:kernel` applies the full schema only when `organizations` is missing.
 - The generic API is `/api/{model}/view/{viewId}`, not a bare `/api/{model}`.
+- The list is `/master/app/{model}` when the view is named `{model}_view`. Create and edit forms are routes you add. See [adding-a-model.md](./adding-a-model.md).

@@ -20,7 +20,30 @@ A **role** does not grant a model by itself. `role_view` links a role to a view.
 
 `role.name` is globally unique. See [tenancy.md](./tenancy.md).
 
-`data_graph` keys are field names. Each value is a config object. Properties the list and forms read include `displayName`, `permission` (`read` or `update`), `required`, `isColumnShow`, `orderNo`, and `datatype` or `dataType`. Relation dropdowns use `tableProps.selectProps` (`instanceType`, `instanceKey`, `instanceLabel`). The seeded kernel views do not have to set `data_graph`. The Master page still lists the model through the view name.
+`data_graph` is a JSON object on `view`. Keys are field names. The backend turns it into the Prisma `select` (`LegacyDataGraphParser`: a key with `type: "table"` and `select` becomes a relation select; every other key is a scalar). The same object comes back as `metaData` and drives Master columns. Create and edit forms are not generated from it. See [adding-a-model.md](./adding-a-model.md).
+
+| Property | Use |
+|---|---|
+| `displayName` | Column header and form label. Master builds a column from keys that have it. |
+| `permission` | `read` or `update`. Field grants still come from `permission` rows. |
+| `required` | Form validation hint. |
+| `isColumnShow` | `true` shows the column. |
+| `orderNo` | Column order. Lower first. |
+| `datatype` or `dataType` | `string`, `boolean`, `int`, `date`, `datetime`. Relations use `table`. |
+| `tableProps.columnType` | List cell: `text`, `select`, `date`, `checkbox`. |
+| `tableProps.selectProps` | Dropdown: `instanceType` (model to search), `instanceKey` (usually `id`), `instanceLabel` (label field), `instanceSourceKey` (the foreign key on this model). Set `relationName` when the Prisma relation name is not the foreign key with `_id` removed. |
+| `searchProps` | `{ isSearch: true, operation: "contains" }` marks a search field. |
+| `listProps` | `{ type: "badge" }` renders the cell as a badge. |
+
+A relation the API should return:
+
+```json
+"assignee": { "type": "table", "select": { "id": "read", "name": "read" }, "isColumnShow": false }
+```
+
+`select` values are `read` or `update`. Both become `true` in the Prisma select.
+
+The seeded kernel views omit `data_graph`. Master still lists those models. Columns appear once `data_graph` has `displayName` and `isColumnShow`.
 
 ## Request path
 

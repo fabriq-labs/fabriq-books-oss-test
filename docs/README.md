@@ -27,7 +27,8 @@ Do not run `prisma db push` or `prisma migrate`. Setup applies generated schema 
 
 | Document | What it teaches |
 |---|---|
-| [kernel/metadata.md](./kernel/metadata.md) | How a view, a permission, and a role produce an API and a screen. Request path from HTTP to the data access layer. |
+| [kernel/metadata.md](./kernel/metadata.md) | How a view, a permission, and a role produce an API and a list. Request path from HTTP to the data access layer. `data_graph` properties. |
+| [kernel/adding-a-model.md](./kernel/adding-a-model.md) | Add a model, apply its table without `db push`, seed its view and permission, and add the list route and form routes. |
 | [kernel/tenancy.md](./kernel/tenancy.md) | Org scope, shareable and private reads, platform-admin writes, and the row-level security sketch to review. |
 | [kernel/examples.md](./kernel/examples.md) | Worked steps on tables and routes that exist: model, view, permission, role, workflow, instance. |
 | [kernel/workflows.md](./kernel/workflows.md) | States, actions, assignment, history, and who may write a definition. |
