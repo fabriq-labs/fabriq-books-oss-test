@@ -53,7 +53,9 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/kernel-diff.sql
 npx prisma generate
 ```
 
-Review `/tmp/kernel-diff.sql` before applying it. The diff creates the table and the foreign keys implied by `@relation`. Restart the backend after `prisma generate` so the model registry picks up the new model.
+Review `/tmp/kernel-diff.sql` before applying it. The diff creates the new table and the foreign keys implied by `@relation`. It also emits `ALTER TABLE ... ALTER COLUMN id SET DEFAULT` for kernel models whose ids are `dbgenerated`. Those statements match the existing schema. Apply the file with `ON_ERROR_STOP`. A failure partway through still leaves earlier statements committed, so read the psql error before running the file again.
+
+`npx prisma validate` should pass before the diff. Restart the backend process after `prisma generate`. A process that was already running keeps the old Prisma client and returns "unknown model" for the new table.
 
 A brand-new database still uses `npm run setup:kernel`, which runs this diff from an empty schema and then seeds `org_system`.
 
@@ -107,7 +109,15 @@ A platform admin may set `org_id` to `org_system` on a shareable model. The view
 
 `permission` is unique on `(view_id, field_name)`. `access` is `read`, `write`, or `none`.
 
-There is no seeded view for `role_view`, so the generic API cannot insert the link until that view exists. Insert the link the same way the kernel seed does:
+Write the view, permission, and `role_view` from an idempotent script, the way `backend/src/utils/setup/seedKernel.ts` writes the kernel views. `POST /api/view/view/view` works for a one-off, and calling it twice inserts a second view: `view.name` is not unique. The script should `findFirst` on `name`, `model_name`, and `org_id`, then update `data_graph` in place.
+
+Run it from `backend/` so Prisma sees `DATABASE_URL`:
+
+```bash
+npx ts-node --transpile-only -r dotenv/config src/utils/setup/seedNote.ts
+```
+
+There is no seeded view for `role_view`, so the generic API cannot insert the link until that view exists. The script writes the link the same way the kernel seed does:
 
 ```sql
 INSERT INTO role_view (id, role_id, view_id, org_id)
@@ -121,9 +131,31 @@ VALUES (
 
 `role_view` is unique on `(role_id, view_id)`. The role form at `/settings/roles` is the screen that attaches views when you are not using SQL.
 
-The list API is then `GET /api/note/view/note_view`. Create is `POST /api/note/view/note_view`. Search is `POST /api/note/view/note_view/search`. The caller org is stamped on create. A private model returns only that org's rows.
+The list API is then `GET /api/note/view/note_view`. Create is `POST /api/note/view/note_view`. Search is `POST /api/note/view/note_view/search`. Login for a manual check is `POST /api/auth/login` with `admin@example.com` / `admin123`. The response is `{ user, token }`. Send `Authorization: Bearer` on the next call.
 
-`data_graph` keys are field names. List columns are the keys with `displayName` and `isColumnShow`. Relation columns need `type: "table"` plus `select` on the relation, and `tableProps.columnType: "select"` plus `selectProps` on the foreign key. Properties are listed in [metadata.md](./metadata.md).
+The caller org is stamped on create. Omit `org_id` from the body. A platform admin who sends `org_system` stores the row on the system org, and the tenant list will not show it. A private model returns only the caller org's rows. `org_id` is absent from the JSON unless `data_graph` selects it. The column is still set; read it from the table if you need to confirm.
+
+`data_graph` keys are field names. List columns are the keys with `displayName` and `isColumnShow`. A relation column needs both of these or the header appears and the cell is blank:
+
+```json
+"assignee": { "type": "table", "select": { "id": "read", "name": "read" }, "isColumnShow": false },
+"assignee_id": {
+  "displayName": "Assignee",
+  "datatype": "string",
+  "isColumnShow": true,
+  "tableProps": {
+    "columnType": "select",
+    "selectProps": {
+      "instanceType": "user",
+      "instanceKey": "id",
+      "instanceLabel": "name",
+      "instanceSourceKey": "assignee_id"
+    }
+  }
+}
+```
+
+`instanceType` is searched through the view `{instanceType}_view`. `user_view` already exists. A parent model you add, such as a list that a child points at, needs its view seeded before the dropdown or the list cell can show a name. Properties are listed in [metadata.md](./metadata.md).
 
 ## 4. List
 
@@ -164,8 +196,36 @@ const onSubmit = async (data) => {
 };
 ```
 
-Put the component under `frontend-0/src/domain/` or `frontend-0/src/components/forms/`. Fields you show must be allowed by the view permission. Do not send `id`, `org_id`, `created_at`, `created_by`, `modified_at`, or `modified_by`. The data access layer stamps those.
+Register both routes. Master sends the view **name** (`note_view`), not the view id. Put the component under `frontend-0/src/domain/` or `frontend-0/src/components/forms/`. `viewAPI` returns `{ success, data, metaData }`. Read `res.data`.
 
-Relation pickers use `SearchDropDown` (`frontend-0/src/components/search_dropdown/`). `instanceType` is the related model. The related model needs its own `{model}_view` before the dropdown search succeeds.
+Do not send `id`, `org_id`, `created_at`, `created_by`, `modified_at`, or `modified_by`. The data access layer stamps those. Optional strings, dates, and foreign keys must be `null` when empty. `""` fails Prisma validation on `DateTime?` and on an optional relation id. A date input value `2026-10-17` is sent as `2026-10-17T00:00:00.000Z`. A checkbox `onCheckedChange` must store a boolean. The indeterminate state is not a boolean.
+
+`SearchDropDown` (`frontend-0/src/components/search_dropdown/dropdown.tsx`) calls `onSelectItem(instanceSourceKey, instanceKey, record)`. The id is `record[instanceKey]`. Pass `instanceValue` as the related object from `getById` (`row.assignee`), not the raw id, or the closed dropdown shows a blank instead of the name. Pass `placeholder` when the default `Select a {model}` text is too terse. The related model needs its `{model}_view` before the search returns rows.
+
+```tsx
+<SearchDropDown
+  instanceType="user"
+  instanceSourceKey="assignee_id"
+  instanceKey="id"
+  instanceLabel="name"
+  searchParams="name"
+  placeholder="Select a user"
+  instanceValue={assignee}
+  onSelectItem={(_source, key, record) => form.setValue("assignee_id", record?.[key] || "")}
+  onClear={() => form.setValue("assignee_id", "")}
+/>
+```
+
+After a successful save, navigate to `/master/app/note`.
+
+## Checklist
+
+- `npx prisma validate` passes, and both sides of every new relation are in the schema.
+- `/tmp/kernel-diff.sql` has been read and applied. The new table is in the database.
+- The backend was restarted after `prisma generate`.
+- The seed script is idempotent and has been run. `GET /api/note/view/note_view` returns 200 for `admin@example.com`.
+- `POST` without `org_id` stores `org_kernel` for that user.
+- `/master/app/note` shows the `data_graph` columns, including relation labels.
+- `/note/view/note_view` creates a row and `/note/{id}/view/note_view` loads it.
 
 Workflow detail screens use `/{model}/{id}/state/{stateId}` and `/{model}/state/{stateId}`. Add those routes when the model is in `DOMAIN_WORKFLOW_MODELS`. Starting an instance is described in [workflows.md](./workflows.md): `POST /api/workflow/instances` currently treats `flow_id` as the flow's `model_name`.
