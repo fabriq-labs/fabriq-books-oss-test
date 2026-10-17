@@ -12,7 +12,7 @@ Code:
 
 ## Views, permissions, roles
 
-A **view** is one lens on one model. `view.model_name` is the Prisma model. `view.name` is the name the UI passes, such as `currency_view`. `view.data_graph` is optional JSON that selects fields and relations and tells the Master list which columns to show.
+A **view** is one lens on one model. `view.model_name` is the Prisma model. `view.name` is the name the UI passes, such as `currency_view`. `view.data_graph` is required JSON. It selects fields and relations and tells the Master list which columns to show.
 
 A **permission** row belongs to one view. `field_name` plus `access` (`read`, `write`, or `none`). `field_name` `*` is a wildcard. The kernel seed writes one `*` permission with `access` `write` on each seeded view.
 
@@ -43,7 +43,7 @@ A relation the API should return:
 
 `select` values are `read` or `update`. Both become `true` in the Prisma select.
 
-The seeded kernel views omit `data_graph`. Master still lists those models. Columns appear once `data_graph` has `displayName` and `isColumnShow`.
+`seedKernel.ts` writes a `data_graph` for each shell view. Columns appear for keys that have `displayName` and `isColumnShow`.
 
 ## Request path
 

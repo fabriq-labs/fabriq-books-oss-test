@@ -72,7 +72,7 @@ model view {
   org_id          String?
   role_views      role_view[]       @relation("ViewToRoleView")
   permissions     permission[]      @relation("ViewToPermission")
-  data_graph      Json? // default data graph to be returned
+  data_graph      Json // fields and columns this view returns
   prompt_template prompt_template[]
 
   @@map("view")

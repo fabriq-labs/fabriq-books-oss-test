@@ -148,7 +148,14 @@ export async function main(
                 name: viewData.name,
                 model_name: viewData.model_name,
                 description: viewData.description || null,
-                data_graph: viewData.data_graph || null,
+                data_graph: viewData.data_graph ?? {
+                  id: {
+                    dataType: 'string',
+                    permission: 'read',
+                    displayName: 'ID',
+                    isColumnShow: true,
+                  },
+                },
                 org_id: viewData.org_id || null,
                 created_by: viewData.created_by || null,
                 modified_by: viewData.modified_by || null,
