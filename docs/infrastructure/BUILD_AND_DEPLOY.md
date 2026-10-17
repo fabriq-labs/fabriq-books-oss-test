@@ -1,257 +1,131 @@
-# Fabriq — Build and deploy (monorepo + GHCR)
+# Build and deploy
 
-One **Dockerfile** at the repo root builds **backend/** and **frontend-1/** from the same Git tree (no clone token). CI pushes images to **GitHub Container Registry (GHCR)** via [`.github/workflows/docker-ghcr.yml`](../../.github/workflows/docker-ghcr.yml).
+One image serves the UI and the API. Build the app in this repo, then deploy that image as a new service in the Railway project your token already belongs to.
 
----
+Build the domain first. A model, its table, its view, and its form are in [../kernel/adding-a-model.md](../kernel/adding-a-model.md). Where domain files go is in [../kernel/BUILDING_A_DOMAIN.md](../kernel/BUILDING_A_DOMAIN.md).
 
-## 1. Repo layout
+## The image
 
-| Path | Role |
-|------|------|
-| **Root** | Dockerfile, nginx, start scripts, compose samples, docs |
-| **backend/** | Node/Express API, Prisma, workflows, agent |
-| **frontend-1/** | React/Vite app |
+The root `Dockerfile` is the build. Context is the repo root. It copies `backend/` and `frontend-0/`.
 
-```
-.
-├── Dockerfile
-├── docker-compose.yml              # Sample: embedded Postgres
-├── docker-compose.external-pg.yml  # Sample: external DATABASE_URL
-├── nginx.conf
-├── start.sh
-├── start-with-pg.sh
-├── start-external.sh
-├── .dockerignore
-├── docker-build-info.js
-├── .github/workflows/docker-ghcr.yml
-├── backend/
-├── frontend-1/
-└── docs/
-```
+| Stage | What it does |
+|---|---|
+| `frontend-builder` | `npm ci` and `npm run build` in `frontend-0`. `VITE_API_BASE_URL=""` so the browser calls `/api` on the same host. |
+| `backend-builder` | `npm ci`, `npm run build`, and `prisma generate` for Alpine (`linux-musl-openssl-3.0.x`). Dependencies stay in the image. |
+| `sync-service-builder` | Python venv for `backend/integrations`. The image build copies that tree. |
+| `runtime-deps` | `nginx:alpine` plus Node `24.14.1` copied from the official image. |
+| final | Backend at `/app/backend`. Frontend `dist` at `/usr/share/nginx/html`. `/app/build-info.json` records the commit when build-args are passed. |
 
----
+`nginx.conf` listens on `PORT` (default `8080`):
 
-## 2. Image behaviour
+- `/api/` and `/graphql` proxy to `127.0.0.1:4000`
+- `/health` proxies to `127.0.0.1:4000/api/health`
+- every other path is the SPA
 
-Runtime mode is chosen by **USE_EMBEDDED_PG**:
+`/start.sh` picks the database mode:
 
-| Mode | USE_EMBEDDED_PG | At runtime |
-|------|-----------------|------------|
-| **Embedded PG** | `true` or `1` | Postgres + backend + nginx (data in volume) |
-| **External PG** | unset / `false` | Backend + nginx; set **DATABASE_URL** |
+- `USE_EMBEDDED_PG=true` starts Postgres inside the container (`start-with-pg.sh`)
+- otherwise `start-external.sh` runs. It requires `DATABASE_URL` and `JWT_SECRET`. Nginx uses `PORT`. The API listens on `4000` inside the container.
 
-### Build metadata
+`INTEGRATION_SYNC_ENABLED=false` skips the Python process on `8081`. Leave it false for a kernel app.
 
-The image includes **`/app/build-info.json`** (and **`/usr/share/nginx/html/build-info.json`**) with monorepo **commit**, **ref**, message, dates, Docker build time, and image tag. OCI labels include `fabriq.source.ref`, `fabriq.image.tag`, etc.
+`railway.toml` tells Railway to build this Dockerfile and to wait on `GET /health`.
 
----
-
-## 3. Local: `docker build`
-
-From the repo root (with `backend/` and `frontend-1/` present):
+Local image:
 
 ```bash
-docker build -t fabriq:latest .
+docker build -t kernel:local .
 ```
 
-Optional metadata (otherwise defaults to `unknown` / empty in `build-info.json`):
+## Railway: new service
+
+The token is a Railway **project token**. Put it in the repo-root `.env` or `backend/.env` as `RAILWAY_TOKEN`. Both files are gitignored. Load it into the shell. Never print it, and never commit it.
 
 ```bash
-docker build \
-  --build-arg SOURCE_REF=$(git branch --show-current) \
-  --build-arg SOURCE_COMMIT=$(git rev-parse HEAD) \
-  --build-arg SOURCE_COMMIT_DATE=$(git log -1 --format=%cI) \
-  --build-arg SOURCE_COMMIT_MESSAGE_B64=$(git log -1 --format=%B | base64 -w0 2>/dev/null || git log -1 --format=%B | base64) \
-  --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --build-arg IMAGE_TAG=local \
-  -t fabriq:latest .
+if [ -f .env ]; then
+  RAILWAY_TOKEN="$(grep -E '^RAILWAY_TOKEN=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+fi
+if [ -z "${RAILWAY_TOKEN:-}" ] && [ -f backend/.env ]; then
+  RAILWAY_TOKEN="$(grep -E '^RAILWAY_TOKEN=' backend/.env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+fi
+export RAILWAY_TOKEN
+test -n "$RAILWAY_TOKEN"
 ```
 
-On macOS, if `base64` has no `-w0`, use `base64 | tr -d '\n'`.
+A project token acts inside one project and one environment. `railway service list` shows that project. `railway up --new` creates a different project and needs an account token. Add a service here, then upload this repo to it.
 
----
+CLI is `npx -y @railway/cli@latest`. Commands below use that as `railway`.
 
-## 4. Local: Docker Compose (samples)
-
-**Embedded Postgres**
+1. Pick a short service name from the spec, lowercase, no spaces. Confirm it is absent:
 
 ```bash
-docker compose build && docker compose up -d
+railway service list --json
 ```
 
-**External Postgres** — put `DATABASE_URL` and `JWT_SECRET` in `.env`, then:
+2. Create the app service and a Postgres service. Read `name` from each JSON object. The database service deploys on its own.
 
 ```bash
-docker compose -f docker-compose.external-pg.yml build
-docker compose -f docker-compose.external-pg.yml up -d
+railway add --service "$APP" --json
+railway add --database postgres --json
 ```
 
-App: **http://localhost:8080** (default). Default login: `admin@example.com` / `admin123`.
-
----
-
-## 5. GitHub Actions → GHCR
-
-Workflow: **Docker build and push (GHCR)**.
-
-**Triggers:** push to **`main`**, tags **`v*`**, or **workflow_dispatch** (optional “no cache”).
-
-**Registry login:** `GITHUB_TOKEN` (packages write). **No** separate PAT is required for the Docker build context.
-
-**Image:** `ghcr.io/<owner-lowercase>/<repo-lowercase>:<tag>` (human-readable tag includes branch/ref + timestamp). Find packages under the repository on GitHub.
-
-**Build cache (code-only speed):** Layer cache is shared across branches via a fixed GHA scope (`fabriq-docker`) plus a GHCR `:buildcache` image. The Dockerfile keeps heavy `apk`/Node runtime deps in a `runtime-deps` stage **without** per-build `BUILD_TIME`/`IMAGE_TAG` labels, so code-only changes should hit `CACHED` for `npm ci`/`apk` and only rebuild compile + final app copy. First build (or `no_cache`) is still a full ~8–12 minute cold build.
-
-**Tags pushed per build:**
-- `<branch>-<UTC timestamp>` — unique, immutable tag for this build (e.g. `demo-20260615-180530`); used for rollback/traceability
-- `<branch>-latest` — stable tag that always points at the most recent build for that branch (e.g. `demo-latest`); use this for Railway's "Automatically update to latest tag" or any other tag-polling deploy
-- `buildcache` — BuildKit cache image (not a runnable app); used only by CI
-This workflow does **not** deploy to any cloud by itself. Pull the image from GHCR on your host (Railway, Fly, raw VM, Cloud Run with GHCR auth, etc.) and set runtime env vars there.
-
-### Build + deploy to Railway
-
-Reusable core: **Build and deploy (Railway)** (`.github/workflows/deploy-railway.yml`)
-— `workflow_call` only. Thin callers pass the Railway **service UUID** and share
-one secret (`RAILWAY_TOKEN`):
-
-| Caller | Branch to run from | Expected image tag |
-|--------|--------------------|--------------------|
-| `deploy-dev.yml` → **Deploy (dev)** | `dev` | `…:dev-latest` |
-| `deploy-prod.yml` → **Deploy (prod)** | `prod` | `…:prod-latest` |
-
-Each caller passes its Railway service id as `service_id`. Read it from that workflow. Do not copy it into docs.
-
-Flow:
-
-1. Caller validates the branch name, then calls `deploy-railway.yml`.
-2. `docker-ghcr.yml` builds/pushes `<branch>-latest` (and a timestamp tag).
-3. `railway redeploy --from-source` re-pulls that tag. CI does **not** change
-   the image URL on the Railway service.
-
-#### One-time Railway service setup
-
-For each env service:
-
-1. Source = **Docker Image** (not GitHub Repo).
-2. Image =
-   - Dev: `ghcr.io/fabriq-labs/fabriq-ws-setup:dev-latest`
-   - Prod: `ghcr.io/fabriq-labs/fabriq-ws-setup:prod-latest`
-3. **Registry Credentials** = GitHub PAT with `read:packages`.
-4. First successful **Deploy (dev)** / **Deploy (prod)** creates the tag and
-   redeploys.
-
-#### GitHub Actions secrets
-
-**Settings → Secrets and variables → Actions**:
-
-| Secret | Where to get it | Notes |
-|--------|-----------------|--------|
-| `RAILWAY_TOKEN` | Railway → project → **Settings → Tokens** → **Project Token** for the shared environment | One token for both callers. Must see both service UUIDs. |
-
-Service IDs live in the caller workflow YAML (not secrets). Remove obsolete
-`RAILWAY_SERVICE_ID` / `RAILWAY_PROJECT_ID` / `RAILWAY_ENVIRONMENT_ID` if present.
-
-#### Cursor / cloud-agent access (logs + debug)
-
-Agents can inspect Railway **without** redeploying by using the Railway CLI and a
-**project token**. This is the supported path for Cursor Cloud Agents:
-
-| Need | How |
-|------|-----|
-| Auth | Set Cursor secret `RAILWAY_TOKEN` (same Project Token as Actions) at [Cloud Agents → Secrets](https://cursor.com/dashboard/cloud-agents) |
-| Service target | `npx -y @railway/cli@latest service list`, then `--service <service-id>`. The id is `service_id` in the deploy workflow. |
-| Skill | `.cursor/skills/railway-debug/SKILL.md` |
-| Local/IDE MCP | `.cursor/mcp.json` → `railway` stdio server (`npx @railway/cli mcp`) reads `RAILWAY_TOKEN` |
-
-Useful read-only commands:
+3. Point the app at that database. Set `APP` and `DB` to the `name` fields from the JSON above. The backslash leaves `${{` for Railway to resolve. `--skip-deploys` waits until the source upload.
 
 ```bash
-npx -y @railway/cli@latest service list
-npx -y @railway/cli@latest logs --service <service-id> -n 200
-npx -y @railway/cli@latest deployment list --service <service-id> --json
-npx -y @railway/cli@latest ssh --service <service-id> -- sh -c 'wget -qO- "http://127.0.0.1:${NGINX_PORT:-8080}/health"'
+APP=my-app
+DB=Postgres
+railway variable set \
+  "DATABASE_URL=\${{${DB}.DATABASE_URL}}" \
+  "USE_EMBEDDED_PG=false" \
+  "AUTH_PROVIDER=local" \
+  "NODE_ENV=production" \
+  "INTEGRATION_SYNC_ENABLED=false" \
+  --service "$APP" \
+  --skip-deploys \
+  --json
 ```
 
-Notes:
-
-- Railway’s **remote** MCP (`https://mcp.railway.com`) uses **OAuth** and does **not**
-  accept project tokens — fine for interactive IDE login, not for headless cloud agents.
-- Do not commit tokens. Prefer shell + Cursor Secrets for cloud agents; configure the
-  dashboard MCP `env` with the literal token only if you want stdio MCP on cloud.
-
-#### Run a deploy
-
-1. Open **Actions**.
-2. Select **Deploy (dev)** or **Deploy (prod)**.
-3. Choose branch **`dev`** or **`prod`** respectively → **Run workflow**.
-
-Alternative (no CI redeploy): Railway **Image Auto Updates** on the same
-`<branch>-latest` tag (can lag by hours / maintenance window).
-
----
-
-## 6. Railway / other hosts (build from Git)
-
-Connect the **monorepo** and use the root **Dockerfile**. Do **not** set `GH_TOKEN` for cloning. Optional build-time args: same as §3 if the platform supports passing build-args.
-
----
-
-## 7. Database setup (external Postgres)
-
-Once per environment (empty database):
+Set `JWT_SECRET` from stdin:
 
 ```bash
-cd backend
-DATABASE_URL="postgresql://..." npx prisma db push
-DATABASE_URL="postgresql://..." node setup-db.js --demo-data=indian-demo --skip-tests
+openssl rand -base64 32 | railway variable set JWT_SECRET --stdin --service "$APP" --skip-deploys --json
 ```
 
----
+`railway variable list --json` and `--kv` print secret values. Do not write that output into logs, docs, or the repo.
 
-## 8. Environment variables (runtime)
-
-### Frontend
-
-Baked at **image build** time: `VITE_API_BASE_URL=""`, `VITE_ENABLE_AI="true"` (see Dockerfile).
-
-### Backend
-
-Typical variables (Cloud / compose / `docker run`):
-
-| Variable | Required | Notes |
-|----------|----------|--------|
-| `DATABASE_URL` | Yes (external PG mode) | PostgreSQL connection string |
-| `JWT_SECRET` | Yes | Long random secret |
-| `NODE_ENV` | No | `production` / `development` |
-| `AUTH_PROVIDER` | No | Default `local` |
-| `PORT` | No | Nginx listens here (e.g. Railway sets `PORT`) |
-
-See backend `.env` / deployment guides for AI (`GOOGLE_*`, `LLM_MODEL`), GCS, SMTP, ERP encryption, etc.
-
-### Docker build-args (optional)
-
-| Arg | Default | Purpose |
-|-----|---------|---------|
-| `SOURCE_REF` | `unknown` | Branch or tag name (labels + build-info) |
-| `SOURCE_COMMIT` | `unknown` | Git SHA |
-| `SOURCE_COMMIT_MESSAGE` | empty | Plain commit message (or use B64 below) |
-| `SOURCE_COMMIT_MESSAGE_B64` | empty | Base64 UTF-8 message (CI uses this) |
-| `SOURCE_COMMIT_DATE` | empty | ISO commit timestamp |
-| `BUILD_TIME` | build clock | OCI `created` |
-| `IMAGE_TAG` | `unknown` | Human-readable tag in build-info |
-| `CACHEBUST` | `1` | Change to invalidate cached layers |
-
----
-
-## 9. Quick reference
+4. From the repo root, upload this tree and build the Dockerfile on Railway. `railway up` follows `.gitignore`.
 
 ```bash
-# Local image
-docker build -t fabriq:latest .
-
-# Embedded PG
-docker compose up -d
-
-# Inspect build metadata in a running container
-docker compose exec app cat /app/build-info.json
+railway up --service "$APP" --detach --yes
 ```
+
+5. Poll until the newest deployment finishes:
+
+```bash
+railway deployment list --service "$APP" --limit 5 --json
+```
+
+While it is building or deploying, wait and list again. On failure:
+
+```bash
+railway logs --service "$APP" --build -n 200
+railway logs --service "$APP" -n 200
+```
+
+6. Apply the schema once, after the deployment is up. `npm run setup:kernel` creates the application database when needed, applies SQL from `prisma/schema` when `organizations` is missing, and seeds `org_system`, the kernel tenant, Super Admin, and USD. It does not use `prisma db push`. If `organizations` already exists, it leaves the schema alone. Later tables use the SQL diff in [../kernel/adding-a-model.md](../kernel/adding-a-model.md).
+
+```bash
+railway ssh --service "$APP" -- sh -c 'cd /app/backend && npm run setup:kernel'
+```
+
+7. Give the service a public URL. `railway up` does not create one.
+
+```bash
+railway domain --service "$APP" --json
+```
+
+Open `https://<that-host>/health`, then the same host in a browser. Login is `admin@example.com` / `admin123`.
+
+Changing a variable redeploys the service. Pass `--skip-deploys` when you are setting several, then `railway up` or `railway redeploy --service "$APP" --yes` once.
+
+To debug a service that is already deployed, use [`.cursor/skills/railway-debug/SKILL.md`](../../.cursor/skills/railway-debug/SKILL.md). Read the service name from `railway service list`. Leave service ids out of docs.

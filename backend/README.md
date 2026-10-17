@@ -33,7 +33,7 @@ cd backend && npm run dev
 cd backend
 npm install
 
-# Create backend/.env with DATABASE_URL, JWT_SECRET (see docs/infrastructure/DEPLOYMENT.md)
+# Create backend/.env with DATABASE_URL, JWT_SECRET (see docs/infrastructure/BUILD_AND_DEPLOY.md)
 
 # Schema + metadata + workflows + demo data
 node setup-db.js --demo-data=indian-demo --skip-tests
@@ -43,7 +43,7 @@ npm run dev
 
 Default login (after demo setup): `admin@example.com` / `admin123`
 
-> Uses **`prisma db push`** (not migrations). `setup-db.js` syncs schema, generates the client, and loads metadata. See [docs/infrastructure/DEPLOYMENT.md](../docs/infrastructure/DEPLOYMENT.md).
+> Kernel setup is `npm run setup:kernel`. See [docs/infrastructure/BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md).
 
 ---
 
@@ -122,7 +122,7 @@ Database: `npx prisma db push`, `npx prisma generate`, `npx prisma studio`
 |------|----------|
 | Add models, APIs, services | [docs/kernel/metadata.md](../docs/kernel/metadata.md) |
 | System architecture | [docs/README.md](../docs/README.md) |
-| Deploy / env | [docs/infrastructure/DEPLOYMENT.md](../docs/infrastructure/DEPLOYMENT.md) |
+| Deploy / env | [docs/infrastructure/BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md) |
 | Seed data only, remove org, CLI flags | [README-setup-db.md](README-setup-db.md) |
 | Auth providers | [docs/kernel/auth.md](../docs/kernel/auth.md) |
 | Full docs index | [docs/README.md](../docs/README.md) |
@@ -138,4 +138,4 @@ JWT_SECRET="your-secret-key"
 
 Optional: `GOOGLE_CLOUD_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS_JSON_BASE64` (agent + PDF extraction), `AUTH_PROVIDER=local|clerk`, `BACKEND_PORT=4000`.
 
-See [docs/infrastructure/DEPLOYMENT.md](../docs/infrastructure/DEPLOYMENT.md).
+See [docs/infrastructure/BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md).

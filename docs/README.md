@@ -40,17 +40,9 @@ Do not run `prisma db push` or `prisma migrate`. Setup applies generated schema 
 
 ## Infrastructure
 
-Build, deploy, and host notes. These are not part of the kernel contract.
-
 | Document | What it covers |
 |---|---|
-| [infrastructure/DEPLOYMENT.md](./infrastructure/DEPLOYMENT.md) | Environment, setup, and deployment |
-| [infrastructure/BUILD_AND_DEPLOY.md](./infrastructure/BUILD_AND_DEPLOY.md) | Root Dockerfile, GHCR, and the image workflow |
-| [infrastructure/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./infrastructure/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md) | Railway image and Vertex credentials |
-| [infrastructure/UBUNTU_DOCKER_COMPOSE_SETUP.md](./infrastructure/UBUNTU_DOCKER_COMPOSE_SETUP.md) | Docker Compose on Ubuntu |
-| [infrastructure/VM_REMOTE_DEV.md](./infrastructure/VM_REMOTE_DEV.md) | Remote VM development |
-| [infrastructure/WORKTREE_CLOUD_AGENT_SETUP.md](./infrastructure/WORKTREE_CLOUD_AGENT_SETUP.md) | Cloud agent worktrees |
-| [infrastructure/AGENT_PROMPT_CLOUD_VM.md](./infrastructure/AGENT_PROMPT_CLOUD_VM.md) | Prompt for an agent on the cloud VM |
+| [infrastructure/BUILD_AND_DEPLOY.md](./infrastructure/BUILD_AND_DEPLOY.md) | The single image, and a new Railway service from `RAILWAY_TOKEN` |
 
 ## Security
 

@@ -38,7 +38,7 @@ This repository ships the full stack in one place:
 
    ```bash
    cd backend
-   # Configure .env — see docs/infrastructure/DEPLOYMENT.md
+   # Configure .env — see docs/infrastructure/BUILD_AND_DEPLOY.md
    node setup-db.js --demo-data=indian-demo --skip-tests
    ```
 
@@ -81,4 +81,4 @@ fabriq/
 | Anyone | [docs/README.md](docs/README.md) — kernel index |
 | Backend | [backend/README.md](backend/README.md) → [docs/kernel/metadata.md](docs/kernel/metadata.md) |
 | Frontend | [docs/kernel/frontend.md](docs/kernel/frontend.md) |
-| Deploy / ops | [docs/infrastructure/DEPLOYMENT.md](docs/infrastructure/DEPLOYMENT.md), [docs/infrastructure/BUILD_AND_DEPLOY.md](docs/infrastructure/BUILD_AND_DEPLOY.md) |
+| Deploy / ops | [docs/infrastructure/BUILD_AND_DEPLOY.md](docs/infrastructure/BUILD_AND_DEPLOY.md) |

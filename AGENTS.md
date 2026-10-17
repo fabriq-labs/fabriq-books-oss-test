@@ -15,21 +15,19 @@ Do not run `prisma db push` or `prisma migrate`. New databases are created by `n
 
 ## Cursor Cloud specific instructions
 
-### Railway deploy debug (logs)
+### Build an app and deploy it
 
-This monorepo deploys via root `Dockerfile` → GHCR → Railway Docker Image services.
+Given a spec, add the domain with [docs/kernel/adding-a-model.md](./docs/kernel/adding-a-model.md) and [docs/kernel/BUILDING_A_DOMAIN.md](./docs/kernel/BUILDING_A_DOMAIN.md).
 
-To fetch live logs and debug a deployed service:
+Deploy that app as a **new** Railway service with [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). `RAILWAY_TOKEN` in the repo-root `.env` or `backend/.env` is a project token. Load it into the environment. Never print it or commit it. `railway add` creates the service in that token's project. `railway up` builds the root `Dockerfile`.
 
-1. Ensure Cursor secret `RAILWAY_TOKEN` is set (Railway project token).
-2. Follow [`.cursor/skills/railway-debug/SKILL.md`](.cursor/skills/railway-debug/SKILL.md).
-3. List services, then pass the id you need. Prefer non-streaming commands:
+### Logs
+
+To inspect a service that is already deployed, follow [`.cursor/skills/railway-debug/SKILL.md`](.cursor/skills/railway-debug/SKILL.md). List services, then pass the name or id from that list:
 
 ```bash
 npx -y @railway/cli@latest service list
 npx -y @railway/cli@latest logs --service <service-id> -n 200
 ```
 
-The deploy workflows pass that id as `service_id`. Do not copy service ids into this file.
-
-Do not redeploy or restart prod unless the user explicitly asks. Never commit or echo the token.
+Leave service ids out of this file. Do not redeploy or restart an existing production service unless the user explicitly asks.

@@ -37,3 +37,5 @@ Follow [tenancy.md](./tenancy.md) and [examples.md](./examples.md).
 - Do not run `prisma db push`. Apply new tables with the SQL diff in [adding-a-model.md](./adding-a-model.md), then run `npx prisma generate`. `npm run setup:kernel` applies the full schema only when `organizations` is missing.
 - The generic API is `/api/{model}/view/{viewId}`, not a bare `/api/{model}`.
 - The list is `/master/app/{model}` when the view is named `{model}_view`. Create and edit forms are routes you add. See [adding-a-model.md](./adding-a-model.md).
+
+Deploy the finished app with [../infrastructure/BUILD_AND_DEPLOY.md](../infrastructure/BUILD_AND_DEPLOY.md). That builds one image from the root `Dockerfile` and creates a new Railway service in the project that `RAILWAY_TOKEN` belongs to.

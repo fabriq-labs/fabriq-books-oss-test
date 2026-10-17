@@ -1,7 +1,7 @@
 # Single container: nginx + Node + Python sync. Database is external only (DATABASE_URL in backend/.env).
 # Do not set USE_EMBEDDED_PG=true — that starts Postgres inside the image. For embedded PG, use docker-compose.embedded-pg.yml.
 # Sample: embedded PostgreSQL — frontend + backend + nginx + Postgres in one container.
-# Monorepo: build context includes backend/ and frontend-1/. See docs/BUILD_AND_DEPLOY.md.
+# Monorepo: build context includes backend/ and frontend-0/. See docs/infrastructure/BUILD_AND_DEPLOY.md.
 #
 # Optional build-args (for /app/build-info.json): SOURCE_REF, SOURCE_COMMIT, SOURCE_COMMIT_DATE,
 # SOURCE_COMMIT_MESSAGE, CACHEBUST — e.g. SOURCE_COMMIT=$(git rev-parse HEAD) docker compose build
