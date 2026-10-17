@@ -95,6 +95,10 @@ export function mapServiceMessageToApiError(message: string | undefined | null):
     );
   }
 
+  if (raw.startsWith('Unknown field')) {
+    return new ValidationError(raw, { originalError: raw });
+  }
+
   if (raw === 'Record not found') {
     return new NotFoundError(
       'No matching record was found. It may have been deleted, or the ID in the URL may be incorrect.',
