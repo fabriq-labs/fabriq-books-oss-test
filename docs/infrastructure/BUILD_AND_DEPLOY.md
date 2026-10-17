@@ -26,7 +26,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 - `USE_EMBEDDED_PG=true` starts Postgres inside the container (`start-with-pg.sh`)
 - otherwise `start-external.sh` runs. It requires `DATABASE_URL` and `JWT_SECRET`. Nginx uses `PORT`. The API listens on `4000` inside the container.
 
-The image listens on `8080` only. `backend/integrations` is excluded from the build context.
+The image listens on `8080` only.
 
 `railway.toml` tells Railway to build this Dockerfile and to wait on `GET /health`.
 

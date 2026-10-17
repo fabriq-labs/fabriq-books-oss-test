@@ -25,7 +25,6 @@ build
 /docs/
 /scripts/
 /setup/
-backend/integrations
 
 # Logs
 *.log
