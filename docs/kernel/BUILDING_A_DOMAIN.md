@@ -2,8 +2,6 @@
 
 This file says where a domain's files go. Behavior of the engine is in [../README.md](../README.md). The todo models already in this tree are the example to copy. They are not a second framework.
 
-The kernel calls these files. Product behavior stays inside them.
-
 | Path | What goes here |
 |---|---|
 | `backend/prisma/schema/domain.prisma` | Domain models. Every model has `org_id`. |
