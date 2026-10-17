@@ -43,8 +43,7 @@ export interface User {
 
   department?: {
     id: string;
-    dept_name: string;
-    location?: string | null;
+    name: string;
   } | null;
 }
 

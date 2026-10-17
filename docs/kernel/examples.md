@@ -15,11 +15,12 @@ Seeded rows:
 
 Both orgs set `basecurrency_id` to `curr_kernel_usd`. `attachment` is platform storage and has no seed row.
 
-Views the seed inserts, all on `org_system`, each with a `data_graph`, a `*` write permission, and a `role_view` to Super Admin. The currency graph shows Code, Name, and Symbol. User shows Name, Email, Manager, and Roles. Role shows Name and Views. The view model shows Name and Model Name. Permission shows Access, View, and Name. Prompt template shows Context, Version, Priority, Is Default, and Prompt Type. Workflow shows Name, Model, Description, and Active.
+Views the seed inserts, all on `org_system`, each with a `data_graph`, a `*` write permission, and a `role_view` to Super Admin. The currency graph shows Code, Name, and Symbol. User shows Name, Email, Manager, Department, and Roles. Department shows Name. Role shows Name and Views. The view model shows Name and Model Name. Permission shows Access, View, and Name. Prompt template shows Context, Version, Priority, Is Default, and Prompt Type. Workflow shows Name, Model, Description, and Active.
 
 | View id | `name` | `model_name` |
 |---|---|---|
 | `view_kernel_user` | `user_view` | `user` |
+| `view_kernel_department` | `department_view` | `department` |
 | `view_kernel_role` | `role_view` | `role` |
 | `view_kernel_view` | `view` | `view` |
 | `view_kernel_permission` | `permission_view` | `permission` |

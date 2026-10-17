@@ -177,7 +177,7 @@ Master loads rows with `viewAPI.getAll` and `viewAPI.search` from `frontend-0/sr
 
 ## 5. Form
 
-Those two URLs are not generated from the view. `frontend-0/src/App.tsx` has form routes for kernel models only (user, role, view, permission, prompt template, LLM trace). A new model 404s until you add routes and a component.
+Those two URLs are not generated from the view. `frontend-0/src/App.tsx` has form routes for kernel models only (user, department, role, view, permission, prompt template, LLM trace). A new model 404s until you add routes and a component.
 
 ```tsx
 <Route path="note/:id/view/:viewId" element={<NoteForm />} />

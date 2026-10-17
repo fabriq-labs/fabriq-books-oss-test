@@ -38,6 +38,7 @@ const routeTitles: Record<string, string> = {
     '/master/others/currency': 'Currency',
     '/master/others/tax-master': 'Tax Master',
     '/settings/tenant-onboarding': 'Tenant Onboarding',
+    '/settings/departments': 'Departments',
 };
 
 // Helper function to get title from route

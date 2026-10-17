@@ -76,6 +76,30 @@ const VIEWS: Array<{
           },
         },
       },
+      department: {
+        type: 'table',
+        datatype: 'table',
+        displayName: 'Department',
+        isColumnShow: true,
+        select: { id: 'read', name: 'read' },
+      },
+      department_id: {
+        dataType: 'string',
+        permission: 'update',
+        tableProps: {
+          columnType: 'select',
+          defaultValue: '',
+          selectProps: {
+            type: 'department',
+            limit: '10',
+            instanceKey: 'id',
+            instanceType: 'department',
+            searchParams: 'name',
+            instanceLabel: 'name',
+            instanceSourceKey: 'department_id',
+          },
+        },
+      },
       role_users: {
         type: 'table',
         displayName: 'Roles',
@@ -85,6 +109,22 @@ const VIEWS: Array<{
           role: { type: 'table', select: { id: 'read', name: 'read' } },
         },
         listProps: { key: 'id', type: 'badge', label: 'role.name' },
+      },
+    },
+  },
+  {
+    id: 'view_kernel_department',
+    name: 'department_view',
+    model: 'department',
+    description: 'Departments',
+    data_graph: {
+      id: { dataType: 'string', permission: 'read' },
+      name: {
+        displayName: 'Name',
+        required: true,
+        permission: 'update',
+        isColumnShow: true,
+        tableProps: { width: '250', columnType: 'text', defaultValue: '' },
       },
     },
   },

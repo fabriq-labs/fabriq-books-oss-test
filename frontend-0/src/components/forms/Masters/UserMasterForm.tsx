@@ -33,6 +33,7 @@ const userMasterSchema = z.object({
     name: z.string().optional(),
     email: z.string().email({ message: 'Valid email is required' }),
     manager_id: z.string().nullable().optional(),
+    department_id: z.string().nullable().optional(),
 });
 
 type UserMasterValues = z.infer<typeof userMasterSchema>;
@@ -78,6 +79,7 @@ export const UserMasterForm: React.FC<UserMasterFormProps> = () => {
             name: '',
             email: '',
             manager_id: undefined,
+            department_id: undefined,
         },
     });
 
@@ -111,6 +113,7 @@ export const UserMasterForm: React.FC<UserMasterFormProps> = () => {
                     name: res.data.name || '',
                     email: res.data.email || '',
                     manager_id: res.data.manager_id || undefined,
+                    department_id: res.data.department_id || undefined,
                 });
 
                 // Set selected roles if they exist - extract from role_users array
@@ -230,6 +233,7 @@ export const UserMasterForm: React.FC<UserMasterFormProps> = () => {
             const submissionData = {
                 ...data,
                 manager_id: data.manager_id === '' || !data.manager_id ? null : data.manager_id,
+                department_id: data.department_id === '' || !data.department_id ? null : data.department_id,
             };
 
             if (!id) {
@@ -401,6 +405,31 @@ export const UserMasterForm: React.FC<UserMasterFormProps> = () => {
                                             )}
                                         />
 
+                                        <FormField
+                                            control={form.control}
+                                            name="department_id"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Department</FormLabel>
+                                                    <FormControl>
+                                                        <SearchDropDown
+                                                            instanceType="department"
+                                                            instanceKey="id"
+                                                            instanceSourceKey="department_id"
+                                                            instanceLabel="name"
+                                                            instanceValue={initialValues?.department}
+                                                            onSelectItem={handleSelectChange}
+                                                            onClear={handleSelectClear}
+                                                            limit={10}
+                                                            searchParams=""
+                                                            type="department"
+                                                            isShowSearch={true}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
                                     </div>
 
                                     <FormItem>
