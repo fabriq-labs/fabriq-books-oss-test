@@ -6,6 +6,44 @@ Follow [tenancy.md](./tenancy.md) and [examples.md](./examples.md). Put product 
 
 Do not run `prisma db push` or `prisma migrate`.
 
+## Names
+
+Model names, field names, and relation names are `snake_case`. The API JSON uses those names. A TypeScript variable in the UI can be camelCase. The Prisma field stays `department_id`.
+
+| Kind | Pattern | Example |
+|---|---|---|
+| Model | singular `snake_case` | `workflow_flow`, `department` |
+| Table | `@@map` equal to the model name | `@@map("department")` |
+| Column | same as the field, unless `@map` | `user.external_id` is stored as `auth_id` |
+| Id | `'prefix_' \|\| gen_random_uuid()` | `dept_`, `curr_`, `user_` |
+| Foreign key | `{relation}_id` next to the relation field | `department_id` and `department` |
+| Audit | `created_at`, `modified_at`, `created_by`, `modified_by` | on every new model |
+| Org | `org_id` | required `String` on a new model |
+
+`org` is the exception for the table name: the model is `org` and `@@map("organizations")`.
+
+A relation has two sides. When two models link more than once, name the relation (`@relation("UserDepartment")`). A books-style camelCase relation such as `itemMasters` does not belong on a kernel model.
+
+## What changed in metadata and platform
+
+`metadata.prisma` keeps identity, access, and workflow: `org`, `user`, `department`, `role`, `view`, `permission`, `role_view`, `role_user`, `workflow_flow`, `workflow_state`, `workflow_action`, `workflow_instance`, `workflow_history`, `comment`, `prompt_template`, `base_model`.
+
+Compared with `prod`:
+
+- `user` keeps `manager_id` and `department_id`. Purchase-requisition and employee relations are gone.
+- `department` lives here. Columns are `name`, `org_id`, and the audit fields. It does not require a legal entity or a business unit.
+- `role` has no employee relation.
+- `view.data_graph` is required.
+- `workflow_instance` has no back-relation to a product document.
+- `source_system` is not a kernel model.
+
+`platform.prisma` is storage the kernel uses with no product installed.
+
+- `currency` moved here from the books schema. Columns are `code`, `name`, `symbol`, `decimal_places`, `is_active`, `org_id`, and the audit fields, plus `orgs`. Invoice, supplier, customer, item, account, holding, and exchange-rate relations are gone. The seed is one USD row on `org_system`.
+- `attachment` is the upload row: `path`, `instance_id`, `type_name`, `name`, `org_id`. No seed row.
+
+Product models go in `domain.prisma`. That file is empty on this branch. Do not add a catalog to `platform.prisma` or `metadata.prisma`.
+
 ## 1. Model
 
 Every model has `org_id`. Use a required `String` unless you are matching an older kernel column that is still `String?`. Audit fields are `created_at`, `modified_at`, `created_by`, `modified_by`. Ids use a prefixed `dbgenerated` default.

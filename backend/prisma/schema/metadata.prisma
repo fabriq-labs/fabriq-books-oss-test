@@ -155,7 +155,7 @@ model base_model {
 model workflow_flow {
   id          String              @id @default(dbgenerated("'flow_' || gen_random_uuid()"))
   name        String              @unique
-  model_name  String // domain model this flow applies to, e.g. "todo"
+  model_name  String // domain model this flow applies to
   description String?
   is_active   Boolean             @default(true)
   created_by  String?
