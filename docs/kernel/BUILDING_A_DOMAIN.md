@@ -4,7 +4,7 @@ This file says where a domain's files go. Behavior of the engine is in [../READM
 
 | Path | What goes here |
 |---|---|
-| `backend/prisma/schema/domain.prisma` | Domain models. Every model has `org_id`. |
+| `backend/prisma/schema/domain.prisma` | Domain models. Every model has `org_id`. Names are `snake_case`. See [adding-a-model.md](./adding-a-model.md). |
 | `backend/src/utils/setup/seed<Domain>.ts` | Idempotent view, permission, and `role_view` rows. `data_graph` is required. Copy `seedKernel.ts`. |
 | `frontend-0/src/domain/navigation.ts` | Sidebar entries. Paths are `/master/app/{model}` when the view is `{model}_view`. |
 | `frontend-0/src/domain/` and `frontend-0/src/App.tsx` | Form components and both routes `/{model}/view/:viewId` and `/{model}/:id/view/:viewId`. |
