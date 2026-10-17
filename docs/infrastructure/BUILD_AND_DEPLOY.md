@@ -12,8 +12,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 |---|---|
 | `frontend-builder` | `npm ci` and `npm run build` in `frontend-0`. `VITE_API_BASE_URL=""` so the browser calls `/api` on the same host. |
 | `backend-builder` | `npm ci`, `npm run build`, and `prisma generate` for Alpine (`linux-musl-openssl-3.0.x`). Dependencies stay in the image. |
-| `sync-service-builder` | Python venv for `backend/integrations`. The image build copies that tree. |
-| `runtime-deps` | `nginx:alpine` plus Node `24.14.1` copied from the official image. |
+| `runtime-deps` | `nginx:alpine` plus Node `24.14.1` copied from the official image. `psql` is included so `setup:kernel` can run inside the container. |
 | final | Backend at `/app/backend`. Frontend `dist` at `/usr/share/nginx/html`. `/app/build-info.json` records the commit when build-args are passed. |
 
 `nginx.conf` listens on `PORT` (default `8080`):
@@ -27,7 +26,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 - `USE_EMBEDDED_PG=true` starts Postgres inside the container (`start-with-pg.sh`)
 - otherwise `start-external.sh` runs. It requires `DATABASE_URL` and `JWT_SECRET`. Nginx uses `PORT`. The API listens on `4000` inside the container.
 
-`INTEGRATION_SYNC_ENABLED=false` skips the Python process on `8081`. Leave it false for a kernel app.
+The image listens on `8080` only. `backend/integrations` is excluded from the build context.
 
 `railway.toml` tells Railway to build this Dockerfile and to wait on `GET /health`.
 
@@ -79,7 +78,6 @@ railway variable set \
   "USE_EMBEDDED_PG=false" \
   "AUTH_PROVIDER=local" \
   "NODE_ENV=production" \
-  "INTEGRATION_SYNC_ENABLED=false" \
   --service "$APP" \
   --skip-deploys \
   --json

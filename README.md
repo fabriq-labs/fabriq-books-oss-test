@@ -66,7 +66,7 @@ fabriq/
 ├── package.json          # Root scripts (concurrently: backend + frontend dev)
 ├── Dockerfile
 ├── docker-compose.yml
-├── docker-compose.external-pg.yml
+├── docker-compose.embedded-pg.yml
 ├── backend/              # → backend/README.md
 ├── frontend-1/
 └── docs/                 # → docs/README.md

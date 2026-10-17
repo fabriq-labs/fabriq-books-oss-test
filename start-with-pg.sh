@@ -28,10 +28,9 @@ if [ ! -f "$PGDATA/PG_VERSION" ]; then
     su-exec postgres psql -h "$PGDATA" -p 5432 -c "CREATE USER fabriq WITH PASSWORD 'fabriq' SUPERUSER;"
     su-exec postgres psql -h "$PGDATA" -p 5432 -c "CREATE DATABASE fabriq_db OWNER fabriq;"
 
-    echo "Running database setup..."
+    echo "Running kernel database setup..."
     cd /app/backend
-    DATABASE_URL="${DATABASE_URL}" npx prisma db push
-    DATABASE_URL="${DATABASE_URL}" node setup-db.js --demo-data=indian-demo --skip-tests
+    DATABASE_URL="${DATABASE_URL}" npm run setup:kernel
     cd /app
 else
     echo "Starting existing PostgreSQL..."
@@ -44,13 +43,6 @@ fi
 
 # ── Nginx ───────────────────────────────────────────────────────
 envsubst '${NGINX_PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
-
-# ── Python integration sync (POST /sync on port 8081); Node reads INTEGRATION_SYNC_URL
-export INTEGRATION_SYNC_PORT="${INTEGRATION_SYNC_PORT:-8081}"
-if [ "${INTEGRATION_SYNC_ENABLED}" != "false" ]; then
-  export INTEGRATION_SYNC_URL="${INTEGRATION_SYNC_URL:-http://127.0.0.1:${INTEGRATION_SYNC_PORT}}"
-fi
-sh /start-sync-service.sh
 
 # ── Backend ─────────────────────────────────────────────────────
 echo "Starting backend on port ${BACKEND_PORT} (with auto-restart)..."
