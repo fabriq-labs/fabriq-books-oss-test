@@ -39,6 +39,8 @@ const routeTitles: Record<string, string> = {
     '/master/others/tax-master': 'Tax Master',
     '/settings/tenant-onboarding': 'Tenant Onboarding',
     '/settings/departments': 'Departments',
+    '/accounting/accounts': 'Chart of Accounts',
+    '/accounting/transactions': 'Transactions',
 };
 
 // Helper function to get title from route
@@ -74,6 +76,7 @@ const getTitleFromRoute = (pathname: string, isBuyer: boolean): string => {
             'user_roles': 'User Roles',
             'cost_center': 'Cost Center',
             'account': 'Account',
+            'posting': 'Transaction',
             'general_ledger': 'General Ledger',
             'budget_period': 'Budget Period',
             'budget_line': 'Budget Line',

@@ -47,6 +47,18 @@ const SOURCES: Array<{
     sampleOf: (row) => String(row.code || row.name || ""),
   },
   {
+    label: "Chart of Accounts",
+    to: "/accounting/accounts",
+    load: () => viewAPI.getAll("account", "account_view", 1, 100),
+    sampleOf: (row) => String(row.name || row.code || ""),
+  },
+  {
+    label: "Transactions",
+    to: "/accounting/transactions",
+    load: () => viewAPI.getAll("posting", "posting_view", 1, 100),
+    sampleOf: (row) => String(row.description || row.name || ""),
+  },
+  {
     label: "Workflows",
     to: "/settings/workflows",
     load: () => workflowManagementAPI.getFlows(),
@@ -74,13 +86,22 @@ export function DomainHome() {
   useEffect(() => {
     let cancelled = false;
     Promise.all(SOURCES.map(async (source) => {
-      const rows = rowsOf(await source.load());
-      return {
-        label: source.label,
-        to: source.to,
-        count: rows.length,
-        sample: rows[0] ? source.sampleOf(rows[0]) : "None yet",
-      };
+      try {
+        const rows = rowsOf(await source.load());
+        return {
+          label: source.label,
+          to: source.to,
+          count: rows.length,
+          sample: rows[0] ? source.sampleOf(rows[0]) : "None yet",
+        };
+      } catch (err) {
+        return {
+          label: source.label,
+          to: source.to,
+          count: 0,
+          sample: err instanceof Error ? err.message : "Could not load",
+        };
+      }
     }))
       .then((loaded) => { if (!cancelled) setCards(loaded); })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Could not load the dashboard"); });
@@ -91,7 +112,7 @@ export function DomainHome() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Kernel metadata for this organization.</p>
+        <p className="text-sm text-muted-foreground">Chart of accounts, transactions, and organization setup.</p>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -39,6 +39,7 @@ import {
     type MessagePart
 } from './chatUtils';
 import { useUserData } from '@/hooks/useUserData';
+import { useEntity } from '@/contexts/EntityContext';
 import Cookies from 'js-cookie';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -84,6 +85,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({
     const { pageContext, messagesAi, setMessagesAi, clearMessages, chatSessionId } = useChatContext();
     const prevChatSessionId = useRef<number | null>(null);
     const { getBaseCurrencyCode, getUserInitials, user } = useUserData();
+    const { currentEntityId, currentEntity } = useEntity();
     const chatContext = useMemo(() => pageContext, [pageContext]);
     const chatContextRef = useRef(chatContext);
     useEffect(() => {

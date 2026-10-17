@@ -42,6 +42,7 @@ const FIELD_DISPLAY_NAMES: Record<string, string> = {
     base_currency_id: "Base Currency",
     item_id: "Item",
     account_id_or_credit_account_id: "Account (debit or credit)",
+    debit_account_id_or_credit_account_id: "Account (debit or credit)",
     status: "Status",
     description: "Description",
     notes: "Notes",

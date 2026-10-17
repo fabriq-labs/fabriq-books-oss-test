@@ -11,6 +11,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 import SignInPage from "./pages/sign-in";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { EntityProvider } from "./contexts/EntityContext";
 import { ToolProvider } from '@/contexts/ToolContext';
 import { UserMasterForm } from "./components/forms/Masters/UserMasterForm";
 import { DepartmentForm } from "./components/forms/Masters/DepartmentForm";
@@ -35,6 +36,10 @@ import { InboxPage } from "./pages/workbench/InboxPage";
 import { GoalSetter } from "./components/workbench/GoalSetter";
 import DomainMaster from "./domain/DomainMaster";
 import { DomainHome } from "./domain/home";
+import AccountList from "./domain/gl/AccountList";
+import Transactions from "./domain/gl/Transactions";
+import { AccountForm } from "./domain/gl/AccountForm";
+import { PostingForm } from "./domain/gl/PostingForm";
 import ProtectedRouteWithLoading from "./components/layout/ProtectedRouteWithLoading";
 
 const queryClient = new QueryClient();
@@ -71,6 +76,7 @@ const AppRoutes: React.FC = () => {
       }}
     >
       <AuthProvider>
+        <EntityProvider>
         <ChatAuthSync />
         <div className="font-lato">
           <Routes>
@@ -86,6 +92,13 @@ const AppRoutes: React.FC = () => {
               <Route index element={<DomainHome />} />
 
               <Route path="master/:category/:model" element={<DomainMaster />} />
+
+              <Route path="accounting/accounts" element={<AccountList />} />
+              <Route path="accounting/transactions" element={<Transactions />} />
+              <Route path="account/:id/view/:viewId" element={<AccountForm />} />
+              <Route path="account/view/:viewId" element={<AccountForm />} />
+              <Route path="posting/:id/view/:viewId" element={<PostingForm />} />
+              <Route path="posting/view/:viewId" element={<PostingForm />} />
 
               <Route path="settings/users" element={<Master type="user" view="user_view" displayName="Users" />} />
               <Route path="accounting/currency" element={
@@ -147,6 +160,7 @@ const AppRoutes: React.FC = () => {
             </Route>
           </Routes>
         </div>
+        </EntityProvider>
       </AuthProvider>
     </BrowserRouter>
   );

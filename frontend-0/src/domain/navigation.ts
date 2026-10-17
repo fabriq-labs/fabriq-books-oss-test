@@ -12,4 +12,12 @@ export interface DomainNavGroup {
  * Sidebar entries for this application.
  * A product list might add { label: 'Notes', path: '/master/app/note' }.
  */
-export const domainNavigation: DomainNavGroup[] = [];
+export const domainNavigation: DomainNavGroup[] = [
+  {
+    label: 'Accounting',
+    items: [
+      { label: 'Chart of Accounts', path: '/accounting/accounts' },
+      { label: 'Transactions', path: '/accounting/transactions' },
+    ],
+  },
+];
