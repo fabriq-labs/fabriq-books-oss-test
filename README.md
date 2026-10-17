@@ -8,7 +8,7 @@ This repository ships the full stack in one place:
 |---------|------|------|
 | **API server** | [`backend/`](backend/) | Express, Prisma, workflows, agent, MCP |
 | **Web app** | [`frontend-1/`](frontend-1/) | React/Vite UI (multi-brand) |
-| **Docs & deploy** | [`docs/`](docs/), Dockerfile, compose | Architecture, setup, CI/CD |
+| **Docs & deploy** | [`docs/`](docs/), Dockerfile | Architecture, setup, CI/CD |
 
 **Agentic FinOps** (reconciliation, AR, demo roadmap): see [docs/positioning/](docs/positioning/). **Product domain:** [docs/BUSINESS_DOMAIN.md](docs/BUSINESS_DOMAIN.md). **Roadmap:** [docs/roadmap.md](docs/roadmap.md).
 
@@ -65,8 +65,6 @@ fabriq/
 ├── fabriq.code-workspace
 ├── package.json          # Root scripts (concurrently: backend + frontend dev)
 ├── Dockerfile
-├── docker-compose.yml
-├── docker-compose.embedded-pg.yml
 ├── backend/              # → backend/README.md
 ├── frontend-1/
 └── docs/                 # → docs/README.md
