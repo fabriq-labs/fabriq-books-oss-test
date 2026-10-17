@@ -23,7 +23,7 @@ Application tenancy is in the data access layer, auth middleware, workflow engin
 
 Do not run `prisma db push` or `prisma migrate`. Setup applies generated schema SQL and seeds `org_system`. Each seeded view includes a `data_graph`. That JSON is the Prisma `select` and the Master columns. Read [kernel/metadata.md](./kernel/metadata.md) before writing one.
 
-To add a model, follow this order: [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md), [kernel/adding-a-model.md](./kernel/adding-a-model.md), [kernel/metadata.md](./kernel/metadata.md), [kernel/frontend.md](./kernel/frontend.md), [kernel/tenancy.md](./kernel/tenancy.md). Restart the backend after `prisma generate`. `setup:kernel` seeds the shell only. A domain seed, such as `backend/src/utils/setup/seedTodo.ts`, is a second command.
+To add a model, follow this order: [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md), [kernel/adding-a-model.md](./kernel/adding-a-model.md), [kernel/metadata.md](./kernel/metadata.md), [kernel/frontend.md](./kernel/frontend.md), [kernel/tenancy.md](./kernel/tenancy.md). Restart the backend after `prisma generate`. `setup:kernel` seeds the shell only. A domain seed is a second command. This branch does not include one.
 
 ## Kernel
 

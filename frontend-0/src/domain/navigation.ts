@@ -10,6 +10,6 @@ export interface DomainNavGroup {
 
 /**
  * Sidebar entries for this application.
- * A todo list might add { label: 'Todos', path: '/master/app/todo' }.
+ * A product list might add { label: 'Notes', path: '/master/app/note' }.
  */
 export const domainNavigation: DomainNavGroup[] = [];

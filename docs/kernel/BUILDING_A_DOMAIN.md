@@ -1,6 +1,6 @@
 # Building a domain on the kernel
 
-This file says where a domain's files go. Behavior of the engine is in [../README.md](../README.md). The todo models already in this tree are the example to copy. They are not a second framework.
+This file says where a domain's files go. Behavior of the engine is in [../README.md](../README.md). This branch has no product models. Copy `seedKernel.ts` for the view seed.
 
 | Path | What goes here |
 |---|---|
@@ -19,7 +19,7 @@ A list appears when four things exist: the table, a view named `{model}_view` wh
 
 `backend/prisma/metadata/views/` is a JSON catalog from the books setup. `setup:kernel` does not load it. Do not sync the whole folder into this database.
 
-This tree already has one domain: `todo_list` and `todo` in `domain.prisma`, metadata in `seedTodo.ts`, sidebar entries in `navigation.ts`, and forms in `frontend-0/src/domain/`. Copy that shape for the next model. `seedTodo.ts` is a second command after `setup:kernel`. The kernel seed does not insert those rows.
+`domain.prisma` and `domainNavigation` are empty on this branch. A domain seed is a second command after `setup:kernel`. The kernel seed does not insert those rows.
 
 ## Platform models
 

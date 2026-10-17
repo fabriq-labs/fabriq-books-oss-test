@@ -14,13 +14,14 @@ The kernel UI is `frontend-0`. Dev server port is 5174 (`frontend-0/vite.config.
 
 ## Navigation
 
-`frontend-0/src/components/layout/sidebar/SidebarNavigation.tsx` renders three kernel items, then `domainNavigation` from `frontend-0/src/domain/navigation.ts`. Add a group there for each product list. On this tree that export is the todo lists and todos.
+`frontend-0/src/components/layout/sidebar/SidebarNavigation.tsx` renders three kernel items, then `domainNavigation` from `frontend-0/src/domain/navigation.ts`. Add a group there for each product list. On this branch `domainNavigation` is an empty array.
 
 Super Admin routes, each wrapped in `SuperAdminGuard`:
 
 | Label | Path |
 |---|---|
 | Users | `/settings/users` |
+| Departments | `/settings/departments` |
 | Roles | `/settings/roles` |
 | Workflows | `/settings/workflows` |
 | Views | `/settings/views` |

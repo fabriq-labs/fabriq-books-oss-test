@@ -110,7 +110,7 @@ railway logs --service "$APP" --build -n 200
 railway logs --service "$APP" -n 200
 ```
 
-6. Apply the schema once, after the deployment is up. `npm run setup:kernel` creates the application database when needed, applies SQL from `prisma/schema` when `organizations` is missing, and seeds `org_system`, the kernel tenant, Super Admin, USD, and the shell views. Each of those views has a `data_graph`. It does not use `prisma db push`. If `organizations` already exists, it leaves the schema alone and re-runs that seed. Later tables use the SQL diff in [../kernel/adding-a-model.md](../kernel/adding-a-model.md). A domain seed is a second command. On this tree that is `npx ts-node --transpile-only -r dotenv/config src/utils/setup/seedTodo.ts` from `/app/backend`, after the todo tables exist.
+6. Apply the schema once, after the deployment is up. `npm run setup:kernel` creates the application database when needed, applies SQL from `prisma/schema` when `organizations` is missing, and seeds `org_system`, the kernel tenant, Super Admin, USD, and the shell views. Each of those views has a `data_graph`. It does not use `prisma db push`. If `organizations` already exists, it leaves the schema alone and re-runs that seed. Later tables use the SQL diff in [../kernel/adding-a-model.md](../kernel/adding-a-model.md). A domain seed is a second command from `/app/backend`, after that domain's tables exist. This branch does not include one.
 
 ```bash
 railway ssh --service "$APP" -- sh -c 'cd /app/backend && npm run setup:kernel'

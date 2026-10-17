@@ -23,7 +23,7 @@ npm run dev
 
 `setup:kernel` applies schema SQL when `organizations` is missing, then seeds `org_system` and the shell views. Each view has a `data_graph`. It does not use `prisma db push`. When `organizations` already exists it only re-seeds. A new table uses the SQL diff in [docs/kernel/adding-a-model.md](../docs/kernel/adding-a-model.md). Restart this process after `prisma generate`. Routes are registered only at startup.
 
-A domain seed is a second command. On this tree that is `npx ts-node --transpile-only -r dotenv/config src/utils/setup/seedTodo.ts`.
+A domain seed is a second command, run from `backend/` after `setup:kernel`. This branch does not include one.
 
 Do not run `npm run sync-metadata` against this database. `backend/prisma/metadata/views/` is a JSON catalog for models that are not in this schema. `setup:kernel` does not load it.
 

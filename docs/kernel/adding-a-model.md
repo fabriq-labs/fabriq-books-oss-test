@@ -109,7 +109,7 @@ A platform admin may set `org_id` to `org_system` on a shareable model. The view
 
 `permission` is unique on `(view_id, field_name)`. `access` is `read`, `write`, or `none`.
 
-`data_graph` is required. Include every column you want on the list (`displayName` and `isColumnShow: true`) and every relation the row should return (`type: "table"` plus `select`). Copy the shape in `seedKernel.ts`. A domain seed already in this tree is `backend/src/utils/setup/seedTodo.ts`.
+`data_graph` is required. Include every column you want on the list (`displayName` and `isColumnShow: true`) and every relation the row should return (`type: "table"` plus `select`). Copy the shape in `seedKernel.ts`. Put the domain rows in `backend/src/utils/setup/seed<Domain>.ts` and run that script after `setup:kernel`.
 
 Write the view, permission, and `role_view` from an idempotent script. `POST /api/view/view/view` works for a one-off, and calling it twice inserts a second view: `view.name` is not unique. The script should `findFirst` on `name`, `model_name`, and `org_id`, then update `data_graph` in place.
 
