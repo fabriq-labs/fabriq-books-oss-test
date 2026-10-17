@@ -1,141 +1,51 @@
-# Fabriq API Server
+# Fabriq API
 
-TypeScript/Express backend for the [Fabriq Books](../README.md) monorepo. It provides a **metadata-driven API**: Prisma models drive auto-generated REST (and GraphQL) endpoints, with view-based RBAC, workflow engine, AI agent, document import, and ERP integrations.
+Express and Prisma backend for the metadata framework. A Prisma model gets one set of view-scoped routes. A view's `data_graph` is the Prisma `select` and the list columns. Permissions and `role_view` decide who can read or write.
 
-**Deep development guide:** [docs/kernel/metadata.md](../docs/kernel/metadata.md) — this file is a quick entry point, not a duplicate of that guide.
+The guide for adding a model is [docs/kernel/adding-a-model.md](../docs/kernel/adding-a-model.md). Where domain files go is [docs/kernel/BUILDING_A_DOMAIN.md](../docs/kernel/BUILDING_A_DOMAIN.md). How a graph becomes a select is [docs/kernel/metadata.md](../docs/kernel/metadata.md).
 
----
+| | |
+|---|---|
+| API | this package, port 4000 |
+| UI | `frontend-0/`, port 5174 |
+| Setup | `npm run setup:kernel` |
+| Login | `admin@example.com` / `admin123` |
 
-## Monorepo context
-
-| Package | Path | Dev port |
-|---------|------|----------|
-| API (this package) | `backend/` | **4000** |
-| UI | `frontend-1/` | **5173** |
-
-From the repo root, run API + UI together:
-
-```bash
-npm run dev
-```
-
-To run only the API:
-
-```bash
-cd backend && npm run dev
-```
-
----
-
-## Quick start
+From the repo root, `npm run dev` starts the API and `frontend-0`.
 
 ```bash
 cd backend
 npm install
-
-# Create backend/.env with DATABASE_URL, JWT_SECRET (see docs/infrastructure/BUILD_AND_DEPLOY.md)
-
-# Schema + metadata + workflows + demo data
-node setup-db.js --demo-data=indian-demo --skip-tests
-
+# DATABASE_URL and JWT_SECRET in backend/.env
+npm run setup:kernel
 npm run dev
 ```
 
-Default login (after demo setup): `admin@example.com` / `admin123`
+`setup:kernel` applies schema SQL when `organizations` is missing, then seeds `org_system` and the shell views. Each view has a `data_graph`. It does not use `prisma db push`. When `organizations` already exists it only re-seeds. A new table uses the SQL diff in [docs/kernel/adding-a-model.md](../docs/kernel/adding-a-model.md). Restart this process after `prisma generate`. Routes are registered only at startup.
 
-> Kernel setup is `npm run setup:kernel`. See [docs/infrastructure/BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md).
+A domain seed is a second command. On this tree that is `npx ts-node --transpile-only -r dotenv/config src/utils/setup/seedTodo.ts`.
 
----
+Do not run `npm run sync-metadata` against this database. `backend/prisma/metadata/views/` is a JSON catalog for models that are not in this schema. `setup:kernel` does not load it.
 
-## Request flow
-
-```
-HTTP request
-  → auth middleware (JWT / Clerk / etc.)
-  → route handler (REST, workflow, agent, …)
-  → ModelService + PermissionService (view + field access)
-  → DataAccessLayer (org_id isolation)
-  → Prisma → PostgreSQL
-```
-
-Every business-data path goes through a **View** (`model_name`, `data_graph`, field permissions). Do not bypass views for app CRUD.
-
----
-
-## What lives in this package
+## Request path
 
 ```
-backend/
-├── src/
-│   ├── index.ts              # Express + Apollo + route wiring
-│   ├── auth/                 # JWT + provider adapters
-│   ├── rest/                 # Auto-generated CRUD + search
-│   ├── schema/               # GraphQL schema builder
-│   ├── workflow-engine/      # Approval state machines
-│   ├── agent/                # LLM agent, tools, Slack
-│   ├── mcp/                  # MCP HTTP endpoint
-│   ├── services/             # ModelService, DAL, permissions, uploads
-│   └── lib/                  # Prisma, LLM, extractors, import extensions
-├── prisma/schema/            # Multi-file Prisma models
-├── prisma/metadata/views/    # View JSON definitions
-├── setup-db.js               # Full DB bootstrap (see README-setup-db.md)
-└── scripts/                  # Tokens, types, utilities
+HTTP /api/{model}/view/{viewId}
+  → auth
+  → RestService
+  → PermissionService
+  → ModelService (data_graph → Prisma select)
+  → DataAccessLayer (org scope)
+  → Prisma
 ```
 
----
+There is no `/api/{model}` route without a view. Search is `POST /api/{model}/view/{viewId}/search`.
 
-## API surface (where to read more)
-
-| Area | Entry | Documentation |
-|------|--------|----------------|
-| **CRUD (app path)** | `/api/{model}/view/{viewId}` (+ `/search`) | [docs/kernel/metadata.md](../docs/kernel/metadata.md) |
-| **Workflows** | `/api/workflow/*` | [docs/kernel/workflows.md](../docs/kernel/workflows.md) |
-| **AI agent** | `/api/agent/*` | [docs/kernel/agent/](../docs/kernel/agent/) |
-| **GraphQL** | `/graphql` | Secondary to REST; schema from Prisma via `SchemaBuilder` |
-| **MCP** | `/api/mcp` | [docs/kernel/agent/MCP.md](../docs/kernel/agent/MCP.md) |
-| **Auth** | `/api/auth/*` | [docs/kernel/auth.md](../docs/kernel/auth.md) |
-
-GraphQL supports introspection and nested reads; the **React app uses view-scoped REST**. Use GraphQL when you need ad hoc nested queries outside the view/datagraph path.
-
----
-
-## npm scripts
-
-| Script | Purpose |
-|--------|---------|
-| `npm run dev` | Dev server with hot reload (port 4000) |
-| `npm run build` | Compile to `dist/` |
-| `npm start` | Run production build |
-| `npm test` | Jest tests |
-| `npm run sync-metadata` | Push local view/metadata JSON → database |
-| `npm run pull-metadata` | Pull database → local metadata files |
-| `npm run apply-views` | Apply SQL database views |
-| `npm run generate-types` | Generate TypeScript types from schema |
-
-Database: `npx prisma db push`, `npx prisma generate`, `npx prisma studio`
-
----
-
-## Documentation
-
-| Task | Document |
-|------|----------|
-| Add models, APIs, services | [docs/kernel/metadata.md](../docs/kernel/metadata.md) |
-| System architecture | [docs/README.md](../docs/README.md) |
-| Deploy / env | [docs/infrastructure/BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md) |
-| Seed data only, remove org, CLI flags | [README-setup-db.md](README-setup-db.md) |
-| Auth providers | [docs/kernel/auth.md](../docs/kernel/auth.md) |
-| Full docs index | [docs/README.md](../docs/README.md) |
-
----
-
-## Environment (minimum)
-
-```bash
-DATABASE_URL="postgresql://user:pass@localhost:5432/fabriq"
-JWT_SECRET="your-secret-key"
-```
-
-Optional: `GOOGLE_CLOUD_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS_JSON_BASE64` (agent + PDF extraction), `AUTH_PROVIDER=local|clerk`, `BACKEND_PORT=4000`.
-
-See [docs/infrastructure/BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md).
+| Area | Entry | Document |
+|---|---|---|
+| CRUD | `/api/{model}/view/{viewId}` | [docs/kernel/metadata.md](../docs/kernel/metadata.md) |
+| Add a model | domain schema, seed, form | [docs/kernel/adding-a-model.md](../docs/kernel/adding-a-model.md) |
+| Workflows | `/api/workflow/*` | [docs/kernel/workflows.md](../docs/kernel/workflows.md) |
+| Agent | `/api/agent/*` | [docs/kernel/agent/](../docs/kernel/agent/) |
+| Auth | `/api/auth/*` | [docs/kernel/auth.md](../docs/kernel/auth.md) |
+| Deploy | root `Dockerfile` | [docs/infrastructure/BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md) |

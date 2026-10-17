@@ -20,7 +20,9 @@ A **role** does not grant a model by itself. `role_view` links a role to a view.
 
 `role.name` is globally unique. See [tenancy.md](./tenancy.md).
 
-`data_graph` is a JSON object on `view`. Keys are field names. The backend turns it into the Prisma `select` (`LegacyDataGraphParser`: a key with `type: "table"` and `select` becomes a relation select; every other key is a scalar). The same object comes back as `metaData` and drives Master columns. Create and edit forms are not generated from it. See [adding-a-model.md](./adding-a-model.md).
+`data_graph` is a required JSON object on `view`. The column is `NOT NULL`. A create that omits it fails. Keys are field names. `ModelService.getSelectFromView` turns the object into the Prisma `select` that `DataAccessLayer.search` passes to `findMany`. `LegacyDataGraphParser` does that conversion: a key with `type: "table"` and `select` becomes a nested select; every other key is selected as a scalar (`true`). A relation key that is missing `type: "table"` is selected as `true`, and Prisma rejects the query.
+
+The search response `metaData` is that same `data_graph`. Master does not invent columns from the row. `generateColumns` skips a key with no `displayName`. A normal column is shown only when `isColumnShow` is `true`. A `listProps` badge is shown when `isColumnShow` is not `false`. Create and edit forms are not generated from the graph. See [adding-a-model.md](./adding-a-model.md).
 
 | Property | Use |
 |---|---|
@@ -43,7 +45,9 @@ A relation the API should return:
 
 `select` values are `read` or `update`. Both become `true` in the Prisma select.
 
-`seedKernel.ts` writes a `data_graph` for each shell view. Columns appear for keys that have `displayName` and `isColumnShow`.
+`backend/src/utils/setup/seedKernel.ts` writes a `data_graph` for each shell view. Those graphs were copied from the matching files in `backend/prisma/metadata/views/` (the catalog `setup-db.js` on the books branch loads). Fields that are not on the kernel models were left out. `setup:kernel` does not load that folder. Most of those JSON files name models that are not in this schema. Do not sync the whole catalog into this database.
+
+Routes are registered once, when the process starts, by parsing `backend/prisma/schema/`. After a model is added, restart the backend. Until then `GET /api/models` can list the model while `/api/{model}/view/...` returns 404.
 
 ## Request path
 

@@ -2,7 +2,9 @@
 
 Metadata-driven CRUD, workflows, and the agent runtime. The app UI is `frontend-0`.
 
-Start at [docs/README.md](./docs/README.md). A new model, its table, its view, and its form are in [docs/kernel/adding-a-model.md](./docs/kernel/adding-a-model.md).
+Start at [docs/README.md](./docs/README.md). A new model, its table, its view, and its form are in [docs/kernel/adding-a-model.md](./docs/kernel/adding-a-model.md). Where those files go is [docs/kernel/BUILDING_A_DOMAIN.md](./docs/kernel/BUILDING_A_DOMAIN.md).
+
+`view.data_graph` is required. It is both the Prisma `select` and the list columns (`displayName` plus `isColumnShow`). A relation key needs `type: "table"` and `select`. The kernel seed writes these graphs. Do not sync `backend/prisma/metadata/views/` into this database. Restart the backend after adding a model. Routes are registered only at process start.
 
 | | |
 |---|---|

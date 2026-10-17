@@ -31,7 +31,7 @@ API: http://localhost:4000 · UI: http://localhost:5174 · Login: `admin@example
 
 1. Add models in `backend/prisma/schema/domain.prisma`. Every model has `org_id`.
 2. Register tables, workflow models, and hooks in `backend/lib/domain.ts`.
-3. Seed a view, a permission, and a `role_view` row. The list and the API appear from that metadata.
+3. Seed a view, a permission, and a `role_view` row. The view's `data_graph` is required. It selects the columns Prisma loads and the headers the list shows (`displayName` and `isColumnShow`). Restart the API after the model is added.
 4. Add sidebar entries in `frontend-0/src/domain/navigation.ts` and the home page in `frontend-0/src/domain/home.tsx`.
 5. Add create and edit form routes. Forms are not generated.
 

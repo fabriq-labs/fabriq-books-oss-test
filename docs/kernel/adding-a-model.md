@@ -53,9 +53,9 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/kernel-diff.sql
 npx prisma generate
 ```
 
-Review `/tmp/kernel-diff.sql` before applying it. The diff creates the new table and the foreign keys implied by `@relation`. It also emits `ALTER TABLE ... ALTER COLUMN id SET DEFAULT` for kernel models whose ids are `dbgenerated`. Those statements match the existing schema. Apply the file with `ON_ERROR_STOP`. A failure partway through still leaves earlier statements committed, so read the psql error before running the file again.
+Review `/tmp/kernel-diff.sql` before applying it. The diff creates the new table and the foreign keys implied by `@relation`. It also emits `ALTER TABLE ... ALTER COLUMN id SET DEFAULT` for kernel models whose ids are `dbgenerated`. Those statements repeat the existing defaults. A nullability change, such as `view.data_graph SET NOT NULL`, fails while any row is still null. Fill those rows first, then apply that statement. Apply the file with `ON_ERROR_STOP`. A failure partway through still leaves earlier statements committed, so read the psql error before running the file again.
 
-`npx prisma validate` should pass before the diff. Restart the backend process after `prisma generate`. A process that was already running keeps the old Prisma client and returns "unknown model" for the new table.
+`npx prisma validate` should pass before the diff. Restart the backend process after `prisma generate`. Routes are registered once at startup from the schema files. A process that was already running keeps the old Prisma client, and `/api/{model}/view/...` stays 404 even when `GET /api/models` already lists the new model.
 
 A brand-new database still uses `npm run setup:kernel`, which runs this diff from an empty schema and then seeds `org_system`.
 
@@ -109,7 +109,9 @@ A platform admin may set `org_id` to `org_system` on a shareable model. The view
 
 `permission` is unique on `(view_id, field_name)`. `access` is `read`, `write`, or `none`.
 
-Write the view, permission, and `role_view` from an idempotent script, the way `backend/src/utils/setup/seedKernel.ts` writes the kernel views. `POST /api/view/view/view` works for a one-off, and calling it twice inserts a second view: `view.name` is not unique. The script should `findFirst` on `name`, `model_name`, and `org_id`, then update `data_graph` in place.
+`data_graph` is required. Include every column you want on the list (`displayName` and `isColumnShow: true`) and every relation the row should return (`type: "table"` plus `select`). Copy the shape in `seedKernel.ts`. A domain seed already in this tree is `backend/src/utils/setup/seedTodo.ts`.
+
+Write the view, permission, and `role_view` from an idempotent script. `POST /api/view/view/view` works for a one-off, and calling it twice inserts a second view: `view.name` is not unique. The script should `findFirst` on `name`, `model_name`, and `org_id`, then update `data_graph` in place.
 
 Run it from `backend/` so Prisma sees `DATABASE_URL`:
 
@@ -117,16 +119,19 @@ Run it from `backend/` so Prisma sees `DATABASE_URL`:
 npx ts-node --transpile-only -r dotenv/config src/utils/setup/seedNote.ts
 ```
 
-There is no seeded view for `role_view`, so the generic API cannot insert the link until that view exists. The script writes the link the same way the kernel seed does:
+The view named `role_view` is the role list (`model_name` `role`). The join table `role_view` has no view of its own, so there is no `/api/role_view/view/...` route. The script writes the link with Prisma, the same way `seedKernel.ts` does:
 
-```sql
-INSERT INTO role_view (id, role_id, view_id, org_id)
-VALUES (
-  'rovi_note',
-  'role_kernel_super_admin',
-  '{viewId}',
-  'org_system'
-);
+```ts
+await prisma.role_view.upsert({
+  where: { id: 'rovi_note' },
+  update: { role_id: 'role_kernel_super_admin', view_id: viewId, org_id: 'org_system' },
+  create: {
+    id: 'rovi_note',
+    role_id: 'role_kernel_super_admin',
+    view_id: viewId,
+    org_id: 'org_system',
+  },
+});
 ```
 
 `role_view` is unique on `(role_id, view_id)`. The role form at `/settings/roles` is the screen that attaches views when you are not using SQL.
@@ -135,7 +140,7 @@ The list API is then `GET /api/note/view/note_view`. Create is `POST /api/note/v
 
 The caller org is stamped on create. Omit `org_id` from the body. A platform admin who sends `org_system` stores the row on the system org, and the tenant list will not show it. A private model returns only the caller org's rows. `org_id` is absent from the JSON unless `data_graph` selects it. The column is still set; read it from the table if you need to confirm.
 
-`data_graph` keys are field names. List columns are the keys with `displayName` and `isColumnShow`. A relation column needs both of these or the header appears and the cell is blank:
+`data_graph` keys are field names on the Prisma model. A key that is not a field makes the select fail. List columns are the keys with `displayName` and `isColumnShow: true`. A relation the API should load uses `type: "table"` and `select`. Put the visible dropdown on the foreign-key key, and keep the relation key if the cell should show the related label:
 
 ```json
 "assignee": { "type": "table", "select": { "id": "read", "name": "read" }, "isColumnShow": false },
