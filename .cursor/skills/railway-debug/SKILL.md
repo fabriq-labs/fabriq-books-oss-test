@@ -6,7 +6,7 @@ license: Project-specific skill for Fabriq Books application
 
 # Railway service debug (logs + runtime)
 
-This skill lets the agent debug the **already-deployed** Fabriq Docker image on Railway (root `Dockerfile` → GHCR → Railway Docker Image services).
+This skill debugs a service already deployed from the root `Dockerfile`. Creating a new service is [docs/infrastructure/BUILD_AND_DEPLOY.md](../../docs/infrastructure/BUILD_AND_DEPLOY.md).
 
 ## Prerequisites
 
@@ -24,50 +24,43 @@ npx -y @railway/cli@latest whoami
 npx -y @railway/cli@latest service list
 ```
 
-## Known services
+## Which service
 
-| Env | Branch / image tag | Service UUID | Workflow |
-|-----|--------------------|--------------|----------|
-| **dev** | `dev` / `:dev-latest` | `b82e07e5-9532-43f3-b15a-797403b7fc92` | `.github/workflows/deploy-dev.yml` |
-| **prod** | `prod` / `:prod-latest` | `36f474f5-fc9f-4ab7-866b-61800eb3c318` | `.github/workflows/deploy-prod.yml` |
+`railway service list` is the list for this token's project. A new app is created with [docs/infrastructure/BUILD_AND_DEPLOY.md](../../docs/infrastructure/BUILD_AND_DEPLOY.md). Do not copy service ids into this skill. When the user names an existing production service, read logs first and avoid redeploy or restart unless they ask.
 
-Default to **dev** unless the user asks for prod. Be extra careful with prod (read logs first; avoid redeploy/restart unless explicitly requested).
-
-Image: `ghcr.io/fabriq-labs/fabriq-ws-setup:<branch>-latest`  
-Container exposes **8080** (nginx/app) and **8081** (Python integration sync). Health: `GET /health`.
+The image is the root `Dockerfile`: nginx serves `frontend-0` and proxies `/api` to Node. Health: `GET /health`. Python sync listens on **8081** only when `INTEGRATION_SYNC_ENABLED` is not `false`.
 
 ## Standard debug workflow
 
 ### 1. Recent deploy / runtime logs
 
 ```bash
+# Set SERVICE_ID from `railway service list`.
 # Last N deploy/runtime lines (recommended for agents)
 npx -y @railway/cli@latest logs \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -n 200
 
 # Build logs for latest deployment
 npx -y @railway/cli@latest logs \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   --build -n 200
 
 # JSON (easier to parse)
 npx -y @railway/cli@latest logs \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -n 100 --json
 ```
-
-Replace the service UUID with prod when needed.
 
 ### 2. Deployment status
 
 ```bash
 npx -y @railway/cli@latest deployment list \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   --json
 npx -y @railway/cli@latest status
 npx -y @railway/cli@latest metrics \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92
+  --service "$SERVICE_ID"
 ```
 
 ### 3. In-container checks (non-interactive)
@@ -76,17 +69,12 @@ npx -y @railway/cli@latest metrics \
 # One-shot remote command (prefer this over interactive ssh)
 # Hit the nginx health endpoint on the app port and the sync-service /health on 8081.
 npx -y @railway/cli@latest ssh \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -- sh -c 'wget -qO- "http://127.0.0.1:${NGINX_PORT:-8080}/health"'
 
 npx -y @railway/cli@latest ssh \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
+  --service "$SERVICE_ID" \
   -- sh -c 'wget -qO- "http://127.0.0.1:8081/health"'
-
-# GCS / Vertex diagnostics already in the image
-npx -y @railway/cli@latest ssh \
-  --service b82e07e5-9532-43f3-b15a-797403b7fc92 \
-  -- sh /app/backend/scripts/railway-gcs-diagnose.sh
 ```
 
 Avoid long interactive `railway ssh` / streaming `railway logs` sessions unless the user is watching.
@@ -97,16 +85,14 @@ Avoid long interactive `railway ssh` / streaming `railway logs` sessions unless 
 |---------|----------------|
 | Container crash / OOM | deploy logs, `railway metrics` |
 | App boot / Prisma / nginx | deploy logs around Node start; `/app/build-info.json` via ssh |
-| Sync button / Zoho / Xero failures | logs mentioning port **8081**, `INTEGRATION_SYNC_URL`, uvicorn |
-| Gemini / Vertex / GCS auth | run `railway-gcs-diagnose.sh`; see `docs/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md` |
-| Wrong image / stale code | compare `SOURCE_COMMIT` / `build-info.json` vs expected GHCR tag |
+| Sync process on 8081 | logs mentioning `INTEGRATION_SYNC_URL` or uvicorn. Kernel deploys set `INTEGRATION_SYNC_ENABLED=false`. |
+| Wrong build | `railway ssh` and `cat /app/build-info.json` |
 
 ## Safety rules
 
 - **Read-only by default**: logs, status, metrics, healthchecks, diagnose scripts.
 - Do **not** `redeploy`, `restart`, `down`, or change variables unless the user explicitly asks.
-- Prefer **dev** service for experiments.
-- Never print or commit `RAILWAY_TOKEN` / other secrets from `railway variable list`.
+- Never print or commit `RAILWAY_TOKEN` or other secrets from `railway variable list`.
 
 ## MCP alternative
 
