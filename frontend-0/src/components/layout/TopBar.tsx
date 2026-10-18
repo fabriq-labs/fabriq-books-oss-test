@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarLogo } from "./sidebar/SidebarLogo";
 import { MyProfileModal } from "./MyProfileModal";
+import { EntitySwitcher } from "./EntitySwitcher";
 
 interface TopBarProps {
   title: string;
@@ -74,6 +75,7 @@ const TopBar: React.FC<TopBarProps> = ({ title, toggleSidebar }) => {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        <EntitySwitcher />
         {isChatEnabled && (
           <Button
             variant="ghost"

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import Master from "@/pages/Master";
+import { useEntity } from "@/contexts/EntityContext";
 import { keepPostingFields } from "./postingImportExtension";
 
 function toNumber(value: unknown): number {
@@ -108,11 +109,18 @@ export function transformPostingCSVData(formattedData: any, relationId: any): an
 
 export default function Transactions() {
   const [searchParams] = useSearchParams();
+  const { currentEntityId } = useEntity();
   const urlAccountId = searchParams.get("account_id");
   const urlFromDate = searchParams.get("from_date");
   const urlToDate = searchParams.get("to_date");
 
-  const defaultFilters = useMemo(() => ({ kind: { neq: "duplicate" } }), []);
+  const defaultFilters = useMemo(
+    () => ({
+      kind: { neq: "duplicate" },
+      ...(currentEntityId ? { entity_id: currentEntityId } : {}),
+    }),
+    [currentEntityId]
+  );
 
   const presetFilters = useMemo(() => {
     const preset: Record<string, unknown> = {};
@@ -130,6 +138,7 @@ export default function Transactions() {
 
   return (
     <Master
+      key={`${currentEntityId ?? "all"}-${urlAccountId ?? ""}-${urlFromDate ?? ""}`}
       type="posting"
       view="posting_view"
       displayName="Transactions"

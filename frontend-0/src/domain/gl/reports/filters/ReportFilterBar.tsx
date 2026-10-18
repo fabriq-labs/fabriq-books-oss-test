@@ -8,7 +8,6 @@ import {
   type FinancialYearOption,
   type MonthOption,
 } from './financialYear';
-import { EntityMultiSelect, type ReportEntity } from './EntityMultiSelect';
 import { ReportAdvancedField, ReportAdvancedFilters, ReportAdvancedSummaryChip } from './ReportAdvancedFilters';
 
 export type ReportCurrency = {
@@ -17,15 +16,6 @@ export type ReportCurrency = {
   name?: string;
 };
 
-function entityChip(entities: ReportEntity[], selectedIds: string[]): string {
-  if (selectedIds.length === 0) return 'All entities';
-  if (selectedIds.length === 1) {
-    const entity = entities.find((item) => item.id === selectedIds[0]);
-    return entity?.legal_name || entity?.name || '1 entity';
-  }
-  return `${selectedIds.length} entities`;
-}
-
 export function ReportFilterBar({
   title,
   reportCurrency,
@@ -33,9 +23,7 @@ export function ReportFilterBar({
   onFinancialYearChange,
   month,
   onMonthChange,
-  entities,
-  entityIds,
-  onEntityIdsChange,
+  entityLabel,
   currencies,
   currencyId,
   onCurrencyIdChange,
@@ -49,9 +37,7 @@ export function ReportFilterBar({
   onFinancialYearChange: (option: FinancialYearOption) => void;
   month: MonthOption | null;
   onMonthChange: (month: MonthOption | null) => void;
-  entities: ReportEntity[];
-  entityIds: string[];
-  onEntityIdsChange: (ids: string[]) => void;
+  entityLabel: string;
   currencies: ReportCurrency[];
   currencyId: string;
   onCurrencyIdChange: (id: string) => void;
@@ -127,21 +113,18 @@ export function ReportFilterBar({
       <ReportAdvancedFilters
         summary={
           <>
-            <ReportAdvancedSummaryChip>{entityChip(entities, entityIds)}</ReportAdvancedSummaryChip>
+            <ReportAdvancedSummaryChip>{entityLabel}</ReportAdvancedSummaryChip>
             <ReportAdvancedSummaryChip>{currencyChip}</ReportAdvancedSummaryChip>
           </>
         }
       >
         <ReportAdvancedField
           label="Legal entity"
-          hint="None selected includes every posting, including those with no entity."
+          hint="Chosen in the top bar. All Entities includes every posting, including those with no entity."
         >
-          <EntityMultiSelect
-            entities={entities}
-            selectedIds={entityIds}
-            onChange={onEntityIdsChange}
-            className="w-full justify-between"
-          />
+          <div className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-2.5 text-sm text-slate-700">
+            {entityLabel}
+          </div>
         </ReportAdvancedField>
         <ReportAdvancedField
           label="Currency"

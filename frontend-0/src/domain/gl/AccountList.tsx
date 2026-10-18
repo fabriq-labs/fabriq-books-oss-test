@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import Master from "@/pages/Master";
+import { useEntity } from "@/contexts/EntityContext";
 
 function splitAccountTypes(formattedData: any) {
   if (!formattedData?.data || !Array.isArray(formattedData.data)) return formattedData;
@@ -22,11 +24,19 @@ function splitAccountTypes(formattedData: any) {
 }
 
 export default function AccountList() {
+  const { currentEntityId } = useEntity();
+  const defaultFilters = useMemo(
+    () => (currentEntityId ? { entity_id: currentEntityId } : {}),
+    [currentEntityId]
+  );
+
   return (
     <Master
+      key={currentEntityId ?? "all"}
       type="account"
       view="account_view"
       displayName="Chart of Accounts"
+      defaultFilters={defaultFilters}
       duplicateActionConfig={{
         enabled: true,
         queryParam: "duplicateOf",
