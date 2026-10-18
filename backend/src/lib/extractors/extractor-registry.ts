@@ -1,3 +1,4 @@
+import { registerDomainExtractors } from '../../../lib/domain';
 import { DocumentExtractor, DocumentType } from './types';
 
 export class ExtractorRegistry {
@@ -6,8 +7,7 @@ export class ExtractorRegistry {
   private documentTypes: Map<string, DocumentType> = new Map();
 
   private constructor() {
-    this.initializeExtractors();
-    this.initializeDocumentTypes();
+    registerDomainExtractors(this);
   }
 
   public static getInstance(): ExtractorRegistry {
@@ -15,49 +15,6 @@ export class ExtractorRegistry {
       ExtractorRegistry.instance = new ExtractorRegistry();
     }
     return ExtractorRegistry.instance;
-  }
-
-  private initializeExtractors(): void {
-    // Domain extractors live in backend/lib. The registry only receives them.
-    const { registerGlExtractors } = require('../../../lib/gl/register') as typeof import('../../../lib/gl/register');
-    registerGlExtractors(this);
-  }
-
-  private initializeDocumentTypes(): void {
-    // Note: bank_statement_categorized is now handled by ImportExtensionRegistry
-    // See: lib/import-extensions/posting/
-    const documentTypes: DocumentType[] = [
-      {
-        id: 'bank_statement',
-        name: 'Bank Statement',
-        description: 'Bank and credit card statements',
-        extractorClass: 'BankStatementExtractor',
-        config: {
-          name: 'Bank Statement Extractor',
-          supportedTypes: ['bank_statement', 'account_statement', 'credit_card_statement'],
-          prompt: 'Extract bank statement information',
-          schema: {},
-          confidenceThreshold: 90
-        }
-      },
-      {
-        id: 'invoice',
-        name: 'Invoice',
-        description: 'Purchase invoices, bills, and vendor invoices',
-        extractorClass: 'InvoiceExtractor',
-        config: {
-          name: 'Invoice Extractor',
-          supportedTypes: ['invoice', 'bill', 'vendor_invoice', 'supplier_invoice', 'purchase_invoice'],
-          prompt: 'Extract invoice information including header and line items',
-          schema: {},
-          confidenceThreshold: 85
-        }
-      }
-    ];
-
-    documentTypes.forEach(docType => {
-      this.documentTypes.set(docType.id, docType);
-    });
   }
 
   public getExtractor(documentType: string): DocumentExtractor | null {

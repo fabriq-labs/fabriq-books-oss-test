@@ -1,7 +1,22 @@
 /**
  * Domain registration. The kernel reads these exports.
  * The shell leaves them empty. A domain fills this file.
+ *
+ * A todo app and the ledger use the same function names.
+ * Replace the bodies. Do not add a product import under backend/src.
  */
+import { Router } from 'express';
+import {
+  registerGlAgentRoutes,
+  registerGlExtractors,
+  registerGlImportExtension,
+} from './gl/register';
+
+/** Host passed by the kernel extractor registry. */
+export type DomainExtractorHost = {
+  registerExtractor(documentType: string, extractor: any): void;
+  registerDocumentType(documentType: any): void;
+};
 
 export type DomainSqlTable = {
   name: string;
@@ -114,3 +129,18 @@ export function registerDomainBuilders(
   _actionRegistry: { register: (builder: any) => void },
   _reportRegistry: { register: (formatter: any) => void }
 ) {}
+
+/** Model import behavior. The kernel calls this at startup. */
+export function registerDomainImportExtensions(): void {
+  registerGlImportExtension();
+}
+
+/** Document extractors and the document-type catalog. */
+export function registerDomainExtractors(registry: DomainExtractorHost): void {
+  registerGlExtractors(registry as Parameters<typeof registerGlExtractors>[0]);
+}
+
+/** Extra routes on the agent router, mounted under /api/agent. */
+export function registerDomainAgentRoutes(router: Router): void {
+  registerGlAgentRoutes(router);
+}

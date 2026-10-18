@@ -18,13 +18,12 @@
  * ```
  */
 
+import { registerDomainImportExtensions } from '../../../lib/domain';
+
 export * from './types';
 export { ImportExtensionRegistry } from './registry';
 
-/**
- * Register domain import extensions from backend/src/domain when a domain adds them.
- */
+/** Ask the domain to register its import extensions. The kernel has none of its own. */
 export function initializeImportExtensions(): void {
-  const { registerGlImportExtension } = require('../../../lib/gl/register') as typeof import('../../../lib/gl/register');
-  registerGlImportExtension();
+  registerDomainImportExtensions();
 }
