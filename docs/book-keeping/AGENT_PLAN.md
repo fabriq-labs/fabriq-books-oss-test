@@ -67,56 +67,77 @@ Use these. Do not reintroduce the prod name.
 
 `general_ledger` is the old chart stub. Do not fill it in. The chart is `account`.
 
-## Module 1 — Reports and opening balances
+## Module 1 — Reports, entities, and exchange rates
 
-**Goal.** Trial balance, income statement, balance sheet, cash flow, and posting list for one org, plus an opening-balance screen that writes `kind = opening` postings.
+**Goal.** Trial balance, income statement, balance sheet, cash flow, and posting list for an org that has more than one legal entity. Amounts in an account currency convert into the org reporting currency. Opening balances write `kind = opening` postings.
 
 **Read first.**
 
-- `prod:backend/src/lib/reports/perfin.ts` functions `getTrialBalance`, `getIncomeStatement`, `getCashFlowStatement`, `getClassificationBreakdown`
+- `prod:backend/src/lib/reports/perfin.ts` functions `getTrialBalance`, `getIncomeStatement`, `getCashFlowStatement`, `getClassificationBreakdown`. Study `org_base`, `period_avg_rates`, `opening_close_rates`, and the `legalEntityIds` filter. Rewrite the SQL. Do not paste it.
 - `prod:frontend-1/src/pages/reports/BalanceSheet.tsx`, `IncomeStatement.tsx`, `CashFlow.tsx`, `PostingList.tsx`
 - `prod:frontend-1/src/pages/accounting/OpeningBalances.tsx`
-- `prod:docs/book-keeping/INCOME_STATEMENT_AND_BALANCE_SHEET.md` and `OPENING_BALANCE_AND_BALANCE_SHEET.md`
-- This branch `posting` and `account` in `domain.prisma`
+- `prod:docs/book-keeping/INCOME_STATEMENT_AND_BALANCE_SHEET.md`, `OPENING_BALANCE_AND_BALANCE_SHEET.md`, and the entity section of `BOOKKEEPING_DOMAIN.md`
+- `prod:backend/prisma/schema/zeiv.prisma` model `entity` and `prod:backend/prisma/schema/data.prisma` model `exchange_rate`
+- This branch `account`, `posting`, and the `entity` stub in `domain.prisma`. `org.basecurrency_id` and `org.base_currency` are already on `metadata.prisma`.
 
-**Schema.** No new tables. Reports query `account` and `posting`. Rewrite every prod column from the rename table. Classifications are lowercase (`asset`, `liability`, `equity`, `income`, `expense`). Opening rows are `kind = 'opening'` and stay out of period activity. Skip `account_hierarchy` until a report is wrong without it. A recursive query in the report file is enough.
+**Schema.**
+
+Replace the `entity` stub. Keep the `ent_` id prefix and the `accounts` and `postings` relations. Fields: `name`, `legal_name`, `address`, `city`, `state`, `country`, `postal_code`, `currency_id` (functional currency; prod calls this `basecurrency_id`), `is_headquarters` boolean, required `org_id`. One org has many entities. At most one entity per org has `is_headquarters` true. Enforce that in the write path.
+
+Add `exchange_rate`. Id prefix `exrt_`. Required `org_id`. `from_currency_id`, `to_currency_id`, `effective_date` as a date, `rate` as `Decimal(19, 6)`, `rate_type` enum lowercase `spot`, `closing`, `average`. Unique on `(org_id, from_currency_id, to_currency_id, effective_date, rate_type)`. Prod stores `SPOT`, `CLOSING`, `AVERAGE`. Do not copy the uppercase enum.
+
+`account.entity_id`, `account.currency_id`, `posting.entity_id` already exist. The account form already edits `currency_id`. Add `entity_id` to the account form and the posting form.
+
+**FX rule.** The report currency is `org.basecurrency_id`. A caller may pass another `currency.id`. An account whose `currency_id` equals the report currency uses rate 1. Otherwise multiply by the latest `exchange_rate` for that org with `to_currency_id` equal to the report currency:
+
+- Period activity on the income statement and the cash-flow lines uses `rate_type = average` with `effective_date` on or before the period end.
+- Balance-sheet balances and opening balances use `rate_type = closing` with `effective_date` before the period start for the opening column, and on or before the period end for the closing column.
+- Missing rate: leave the row in the source currency, set a `rate_missing` flag, and do not invent 1. The page shows that flag.
+
+**Entity rule.** No `entity_id` query param means every posting in the org, including rows whose entity is null. `entity_id` may be repeated. When it is present, include only postings and accounts for those entities. A null entity does not match a filter. Combined multi-entity is the unfiltered report, after FX into the one report currency. Do not build HQ account remapping (`hq_account_id`) in this module.
+
+**Reports.** Query `account` and `posting`. Rewrite every prod column from the rename table. Classifications are lowercase. Opening rows are `kind = 'opening'` and stay out of period activity. Skip `account_hierarchy` until a report is wrong without it. A recursive query in the report file is enough.
 
 **Code.**
 
 - `backend/lib/gl/reports.ts` with one function per report. Org id comes from the caller. No SQL string from the client.
-- Mount read routes from `registerDomainAgentRoutes` or a small domain router registered in `domain.ts`. Suggested paths, under `/api`: `GET /gl/reports/trial-balance`, `income-statement`, `balance-sheet`, `cash-flow`, `posting-list`. Query params: `from`, `to`, optional `entity_id`.
-- `frontend-0/src/domain/gl/reports/` pages. Add a Reports group in `frontend-0/src/domain/navigation.ts`. Paths: `/reports/trial-balance`, `/reports/income-statement`, `/reports/balance-sheet`, `/reports/cash-flow`, `/reports/posting-list`.
-- Opening balances: `frontend-0/src/domain/gl/OpeningBalances.tsx` at `/accounting/opening-balances`. Saving creates paired postings with `kind = opening`. Debit and credit totals match.
+- Mount read routes from a domain router registered in `domain.ts`. Paths under `/api`: `GET /gl/reports/trial-balance`, `income-statement`, `balance-sheet`, `cash-flow`, `posting-list`. Query params: `from`, `to`, optional repeated `entity_id`, optional `currency_id`.
+- `frontend-0/src/domain/gl/reports/` pages. Reports group in `navigation.ts`. Paths: `/reports/trial-balance`, `/reports/income-statement`, `/reports/balance-sheet`, `/reports/cash-flow`, `/reports/posting-list`. Each page has an entity multi-select and shows the report currency.
+- Opening balances: `frontend-0/src/domain/gl/OpeningBalances.tsx` at `/accounting/opening-balances`. Saving creates paired postings with `kind = opening` and the selected `entity_id`. Debit and credit totals match in the account currency.
+- Entity screen: `frontend-0/src/domain/gl/EntityForm.tsx` and a list at `/masters/entity`, view `entity_view`. Seed it from `npm run seed:gl` or a `seed:entities` script. Do not port the 22 KB prod `OrganizationForm.tsx`.
+- Exchange rates: Master list `/accounting/exchange-rates`, view `exchange_rate_view`, form routes `exchange_rate/view/:viewId` and `exchange_rate/:id/view/:viewId`.
 
 **Acceptance.**
 
-- A known posting on Operating Cash and Rent Expense appears on the trial balance with debit and credit equal.
+- A posting on Operating Cash and Rent Expense in the org currency appears on the trial balance with debit and credit equal.
 - An `opening` posting shows in the opening column and not in the period column.
 - Income statement shows income and expense only.
+- Two entities in one org. A posting on entity A does not appear when the report is filtered to entity B. The unfiltered report includes both, in the org reporting currency.
+- An account in a second currency with a `closing` rate of 2 contributes twice its balance to the balance sheet. With no rate row, the page shows the missing-rate flag and does not treat the rate as 1.
 - Backend `tsc --noEmit` is clean. Pages render while logged in as `admin@example.com`.
 
-**Out of scope.** Monthly trial balance, personal-income report, net-worth ratios, multi-entity consolidation, FX conversion. `exchange_rate` waits until a report needs a second currency.
+**Out of scope.** Monthly trial balance, personal-income report, net-worth ratios, HQ account-to-account consolidation, translation to a presentation currency that is not the org base unless the caller passed `currency_id`.
 
-## Module 2 — Entity, customer, supplier, item
+## Module 2 — Customer, supplier, item
 
-**Goal.** Replace the `entity` and `item_master` stubs. Add `customer`, `supplier`, `uom`, and `payment_terms`. Lists and forms. No invoices yet.
+**Goal.** Add `customer`, `supplier`, `uom`, and `payment_terms`. Replace the `item_master` stub. Lists and forms. No invoices yet. The legal entity already exists from module 1. Do not replace `entity` again.
 
 **Read first.**
 
-- `prod:backend/prisma/schema/zeiv.prisma` models `entity`, `customers`, `supplier`, `item_master`, `uom`, `payment_terms`
-- Forms: `OrganizationForm.tsx`, `CustomersForm.tsx`, `SupplierForm.tsx`, `ItemMasterForm.tsx`, `UOMForm.tsx`, `PaymentTermsForm.tsx` under `prod:frontend-1/src/components/forms/Masters/`
+- `prod:backend/prisma/schema/zeiv.prisma` models `customers`, `supplier`, `item_master`, `uom`, `payment_terms`
+- Forms: `CustomersForm.tsx`, `SupplierForm.tsx`, `ItemMasterForm.tsx`, `UOMForm.tsx`, `PaymentTermsForm.tsx` under `prod:frontend-1/src/components/forms/Masters/`
 
-**Schema.** Keep stub id prefixes (`ent_`, `item_`). New prefixes: `cust_`, `supp_`, `uom_`, `payt_`. Required `org_id` on all of them. `entity` fields for this slice: `name`, `legal_name`, `currency_id`, `is_headquarters` (boolean, not the prod string), `org_id`. Customer and supplier: `name`, address lines, `email`, `phone`, `currency_id`, `payment_terms_id`, `is_active`. Item: `name`, `code`, `description`, `sales_account_id`, `purchase_account_id`, `uom_id`, `unit_price` as `Decimal(19, 4)`. Drop prod sync columns (`ingest_batch_id`, default source-system id).
+**Schema.** Keep the `item_` id prefix. New prefixes: `cust_`, `supp_`, `uom_`, `payt_`. Required `org_id` on all of them. Customer and supplier: `name`, address lines, `email`, `phone`, `currency_id`, `payment_terms_id`, `entity_id` optional, `is_active`. Item: `name`, `code`, `description`, `sales_account_id`, `purchase_account_id`, `uom_id`, `unit_price` as `Decimal(19, 4)`. Drop prod sync columns (`ingest_batch_id`, default source-system id).
 
 `item_master.code` is unique per org, not globally. Prod’s global `@unique` on `item_code` is not copied.
 
 **Code.**
 
-- `backend/src/utils/setup/seedParties.ts` and `npm run seed:parties`. Views: `entity_view`, `customer_view`, `supplier_view`, `item_master_view`, `uom_view`, `payment_terms_view`.
-- Forms in `frontend-0/src/domain/parties/`. Routes in `routes.tsx`: `/masters/entity`, `/sales/customers`, `/purchases/suppliers`, `/masters/items`, `/masters/uom`, `/accounting/payment-terms`, plus `/{model}/view/:viewId` and `/{model}/:id/view/:viewId`.
+- `backend/src/utils/setup/seedParties.ts` and `npm run seed:parties`. Views: `customer_view`, `supplier_view`, `item_master_view`, `uom_view`, `payment_terms_view`. `entity_view` already exists from module 1.
+- Forms in `frontend-0/src/domain/parties/`. Routes in `routes.tsx`: `/sales/customers`, `/purchases/suppliers`, `/masters/items`, `/masters/uom`, `/accounting/payment-terms`, plus `/{model}/view/:viewId` and `/{model}/:id/view/:viewId`. `/masters/entity` stays the module 1 screen.
 - Sidebar groups: Organization, Sales, Purchases. Sales and Purchases only show the party or item screens until module 3 and 4.
 
-**Acceptance.** Create one entity, one customer, one supplier, one item whose sales account is an income account. Reload the lists. `item_master` still has `sales_account_id` and `purchase_account_id`.
+**Acceptance.** Create one customer, one supplier, and one item whose sales account is an income account. Attach the customer to an entity from module 1. Reload the lists. `item_master` still has `sales_account_id` and `purchase_account_id`.
 
 **Out of scope.** Item categories, locations, business units, cost centers, projects, shipping terms, tax fields on the item. `project_master` stays a stub.
 

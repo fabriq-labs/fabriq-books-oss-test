@@ -49,8 +49,8 @@ Sales, purchases, and investing all post into `account` and `posting`. Reports c
 
 ```
 ledger (done)
-  → reports and opening balances
-  → parties, items, entity
+  → reports, legal entities, exchange rates
+  → customers, suppliers, items
   → sales
   → purchases
   → investing
@@ -58,30 +58,32 @@ ledger (done)
 
 Tax rates, bank feeds, and ERP sync are called out inside the module that needs them. They are not a separate first slice.
 
-### 1. Reports and opening balances
+### 1. Reports, legal entities, and exchange rates
 
-Prod reference: `docs/book-keeping/INCOME_STATEMENT_AND_BALANCE_SHEET.md`, `OPENING_BALANCE_AND_BALANCE_SHEET.md`.
+Prod reference: `docs/book-keeping/INCOME_STATEMENT_AND_BALANCE_SHEET.md`, `OPENING_BALANCE_AND_BALANCE_SHEET.md`, and the entity section of `BOOKKEEPING_DOMAIN.md`. The task steps are [AGENT_PLAN.md](./AGENT_PLAN.md).
 
 | Bring across | Leave for later |
 |---|---|
-| Trial balance, income statement, balance sheet, cash flow, posting list | Monthly trial-balance materialised view |
-| Opening postings (`kind = opening`), excluded from period activity | Multi-entity consolidation and HQ account mapping |
-| `exchange_rate` when a report converts currency | |
+| Trial balance, income statement, balance sheet, cash flow, posting list | Monthly trial balance |
+| Opening postings (`kind = opening`), excluded from period activity | Personal-income report and net-worth ratios |
+| `entity` for real, many entities per org, reports filtered to one or more | HQ account remapping (`hq_account_id`) |
+| `exchange_rate` and conversion into `org.basecurrency_id` | |
 
-Reports read `account` and `posting`. They do not add a product import to kernel files. SQL lives in `backend/lib/gl/`. Screens are domain routes under Reports.
+`average` rates convert period activity. `closing` rates convert balance-sheet and opening amounts. A missing rate is flagged. It is not treated as 1.
 
-### 2. Parties, items, and the legal entity
+### 2. Customers, suppliers, and items
 
-Prod schema: `backend/prisma/schema/zeiv.prisma` (`entity`, `customers`, `supplier`, `item_master`, `uom`, `payment_terms`).
+Prod schema: `backend/prisma/schema/zeiv.prisma` (`customers`, `supplier`, `item_master`, `uom`, `payment_terms`).
 
-Replace the `entity` and `item_master` stubs. Add `customer` (prod table is `customers`), `supplier`, `uom`, and `payment_terms`.
+The legal entity is module 1. This module replaces the `item_master` stub and adds `customer` (prod table is `customers`), `supplier`, `uom`, and `payment_terms`.
 
 | Screen | Prod path |
 |---|---|
-| Legal entity | `/masters/entity` |
 | Customers | `/sales/customers` |
 | Suppliers | `/purchases/suppliers` |
 | Item master | `/masters/items` |
+
+Legal entity stays the module 1 screen at `/masters/entity`.
 
 First slice fields: name, address, email, phone, `currency_id`, `payment_terms_id`, status, `org_id`. Item: name, code, `sales_account_id`, `purchase_account_id`, `uom_id`, price. Drop prod-only columns that exist for ERP sync (`ingest_batch_id`, default `source_system_id`) until a connector is in scope.
 
