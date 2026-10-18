@@ -1,11 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { fetchAPI } from '@/api/apiClient';
 import { viewAPI } from '@/api/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-
-type EntityOption = { id: string; name?: string };
-type CurrencyOption = { id: string; code?: string };
+import { ReportFilterBar, type ReportCurrency } from './filters/ReportFilterBar';
+import { getCurrentFYOption, type FinancialYearOption, type MonthOption } from './filters/financialYear';
+import type { ReportEntity } from './filters/EntityMultiSelect';
 
 export type ReportEnvelope = {
   report_currency: string | null;
@@ -17,11 +15,6 @@ export type ReportEnvelope = {
   totals?: Record<string, number>;
   summary?: Record<string, unknown>;
 };
-
-function yearBounds() {
-  const year = new Date().getFullYear();
-  return { from: `${year}-01-01`, to: `${year}-12-31` };
-}
 
 function rowsOf(payload: unknown): any[] {
   if (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data)) {
@@ -51,33 +44,43 @@ export function ReportFrame({
   path: string;
   children: (report: ReportEnvelope | null) => ReactNode;
 }) {
-  const bounds = yearBounds();
-  const [from, setFrom] = useState(bounds.from);
-  const [to, setTo] = useState(bounds.to);
+  const initialYear = getCurrentFYOption();
+  const [financialYear, setFinancialYear] = useState<FinancialYearOption>(initialYear);
+  const [month, setMonth] = useState<MonthOption | null>(null);
   const [entityIds, setEntityIds] = useState<string[]>([]);
   const [currencyId, setCurrencyId] = useState('');
-  const [entities, setEntities] = useState<EntityOption[]>([]);
-  const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
+  const [entities, setEntities] = useState<ReportEntity[]>([]);
+  const [currencies, setCurrencies] = useState<ReportCurrency[]>([]);
   const [report, setReport] = useState<ReportEnvelope | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [appliedKey, setAppliedKey] = useState('');
+
+  const from = month?.from_date ?? financialYear.from_date;
+  const to = month?.to_date ?? financialYear.to_date;
+  const filterKey = useMemo(
+    () => `${from}|${to}|${entityIds.join(',')}|${currencyId}`,
+    [from, to, entityIds, currencyId]
+  );
 
   useEffect(() => {
     viewAPI.getAll('entity', 'entity_view', 1, 200).then((res) => setEntities(rowsOf(res))).catch(() => setEntities([]));
     viewAPI.getAll('currency', 'currency_view', 1, 200).then((res) => setCurrencies(rowsOf(res))).catch(() => setCurrencies([]));
   }, []);
 
-  const load = async (nextFrom = from, nextTo = to, nextEntities = entityIds, nextCurrency = currencyId) => {
+  const load = async (key = filterKey) => {
+    const [nextFrom, nextTo, entityPart, nextCurrency] = key.split('|');
     setLoading(true);
     setError('');
     const params = new URLSearchParams();
     params.set('from', nextFrom);
     params.set('to', nextTo);
     if (nextCurrency) params.set('currency_id', nextCurrency);
-    for (const id of nextEntities) params.append('entity_id', id);
+    for (const id of entityPart.split(',').filter(Boolean)) params.append('entity_id', id);
     try {
       const result = await fetchAPI<{ success: boolean; data: ReportEnvelope }>(`/api/gl/reports/${path}?${params}`);
       setReport(result.data);
+      setAppliedKey(key);
     } catch (err: any) {
       setReport(null);
       setError(err.message || 'Report failed');
@@ -87,8 +90,9 @@ export function ReportFrame({
   };
 
   useEffect(() => {
-    void load();
-    // Load once on open. Filter changes wait for Run.
+    const key = `${initialYear.from_date}|${initialYear.to_date}||`;
+    void load(key);
+    // Open on the current financial year. Later filter edits wait for Run report.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
@@ -97,58 +101,26 @@ export function ReportFrame({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          <p className="text-sm text-muted-foreground">
-            Report currency: {report?.report_currency || '…'}
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="space-y-1 text-sm">
-          <span className="block text-muted-foreground">From</span>
-          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="w-44" />
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="block text-muted-foreground">To</span>
-          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="w-44" />
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="block text-muted-foreground">Entities</span>
-          <select
-            multiple
-            className="h-24 min-w-56 rounded-md border bg-background px-2 py-1"
-            value={entityIds}
-            onChange={(event) => setEntityIds(Array.from(event.target.selectedOptions).map((option) => option.value))}
-          >
-            {entities.map((entity) => (
-              <option key={entity.id} value={entity.id}>
-                {entity.name || entity.id}
-              </option>
-            ))}
-          </select>
-          <span className="block text-xs text-muted-foreground">None selected includes every posting, including those with no entity.</span>
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="block text-muted-foreground">Currency</span>
-          <select
-            className="h-10 min-w-40 rounded-md border bg-background px-2"
-            value={currencyId}
-            onChange={(event) => setCurrencyId(event.target.value)}
-          >
-            <option value="">Organization currency</option>
-            {currencies.map((currency) => (
-              <option key={currency.id} value={currency.id}>
-                {currency.code || currency.id}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Button type="button" onClick={() => load()} disabled={loading}>
-          {loading ? 'Loading...' : 'Run'}
-        </Button>
-      </div>
+      <ReportFilterBar
+        title={title}
+        reportCurrency={report?.report_currency ?? null}
+        financialYear={financialYear}
+        onFinancialYearChange={(option) => {
+          setFinancialYear(option);
+          setMonth(null);
+        }}
+        month={month}
+        onMonthChange={setMonth}
+        entities={entities}
+        entityIds={entityIds}
+        onEntityIdsChange={setEntityIds}
+        currencies={currencies}
+        currencyId={currencyId}
+        onCurrencyIdChange={setCurrencyId}
+        loading={loading}
+        dirty={appliedKey !== '' && appliedKey !== filterKey}
+        onRun={() => void load()}
+      />
       {error && <p className="text-sm text-destructive">{error}</p>}
       {missing > 0 && (
         <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">

@@ -2,7 +2,7 @@ import { ReportFrame, money, rateCell, type ReportEnvelope } from './ReportFrame
 
 export default function IncomeStatement() {
   return (
-    <ReportFrame title="Income statement" path="income-statement">
+    <ReportFrame title="Income Statement" path="income-statement">
       {(report: ReportEnvelope | null) => (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
