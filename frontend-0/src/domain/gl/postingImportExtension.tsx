@@ -1,11 +1,15 @@
+import { ReactNode } from "react";
 import { importAPI } from "@/api/api";
 import {
   ImportExtension,
+  ImportExtensionState,
   PdfUploadContext,
   PdfUploadOptions,
   PdfUploadResult,
   RelationFilterContext,
+  ToolbarActionProps,
 } from "@/features/import-extensions/types";
+import { CategorizationButton } from "@/domain/gl/CategorizationButton";
 
 const POSTING_FIELDS = new Set([
   "name",
@@ -35,6 +39,27 @@ export const postingImportExtension: ImportExtension = {
 
   canActivate(modelType: string): boolean {
     return modelType === "posting";
+  },
+
+  /**
+   * The mapper draws an AI Category column on the right when this returns a column.
+   * Predictions come from PDF extract-and-categorize or the Categorize button.
+   */
+  getColumns(state: ImportExtensionState) {
+    if (Object.keys(state.categorizations).length === 0) return [];
+    return [
+      {
+        title: "AI Category",
+        key: "ai_category",
+        width: 180,
+        fixed: "right" as const,
+        render: () => null,
+      },
+    ];
+  },
+
+  renderToolbarActions(props: ToolbarActionProps): ReactNode {
+    return <CategorizationButton {...props} />;
   },
 
   async handlePdfUpload(file: File, options: PdfUploadOptions): Promise<PdfUploadResult> {

@@ -36,6 +36,7 @@ import {
   resolveBillUploadMime,
 } from './utils/billUploadMime';
 import type { PlanStep } from './tools/sessionTools';
+import { categorizeImportBatch } from '../../lib/gl/categorizeImportBatch';
 // Removing ai/express import since it appears to be causing issues
 // import { createStreamDataHandler } from 'ai/express';
 
@@ -1156,6 +1157,31 @@ export function createAgentRouter() {
     } catch (error: any) {
       logger.error('Error bulk approving actions:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/agent/erp/categorize-transaction-batch
+   * Predictions for mapped statement rows. Does not write postings.
+   */
+  router.post('/erp/categorize-transaction-batch', authMiddleware, async (req: Request, res) => {
+    try {
+      const user = req.context?.auth?.user;
+      if (!user?.org_id) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+      }
+      const postings = req.body?.postings;
+      if (!Array.isArray(postings) || postings.length === 0) {
+        return res.status(400).json({ success: false, error: 'postings array is required' });
+      }
+      const data = await categorizeImportBatch(user.org_id, user.id, postings);
+      res.json({ success: true, data });
+    } catch (error: any) {
+      logger.error('Import categorization failed', { message: error?.message });
+      res.status(500).json({
+        success: false,
+        error: error?.message || 'Categorization failed',
+      });
     }
   });
 

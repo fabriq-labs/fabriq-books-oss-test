@@ -142,7 +142,17 @@ export class ImportAuditService {
     });
   }
 
-  async markAbandoned(importId: string, reason = 'user_discarded_in_mapper'): Promise<void> {
+  async markAbandoned(
+    importId: string,
+    reason = 'user_discarded_in_mapper',
+    orgId?: string
+  ): Promise<'ok' | 'missing' | 'forbidden'> {
+    const existing = await (prisma as any).import_run.findUnique({
+      where: { id: importId },
+      select: { id: true, org_id: true },
+    });
+    if (!existing) return 'missing';
+    if (orgId && existing.org_id !== orgId) return 'forbidden';
     await (prisma as any).import_run.update({
       where: { id: importId },
       data: {
@@ -151,6 +161,7 @@ export class ImportAuditService {
         discard_reason: reason,
       },
     });
+    return 'ok';
   }
 
   async appendError(importId: string, rowError: Record<string, unknown>): Promise<void> {

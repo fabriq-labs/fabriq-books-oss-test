@@ -145,6 +145,13 @@ export const setupRestRoutes = (router: Router) => {
     await handler(req, res);
   });
 
+  // Import run discard. Register before the model loops so :id is not swallowed.
+  router.post(
+    '/import_run/:id/discard',
+    authMiddleware,
+    restService.discardImportRun.bind(restService)
+  );
+
   // Setup routes for each model which has a view in the path (legacy support)
   models.forEach(model => {
     const basePath = `/${model.toLowerCase()}`;

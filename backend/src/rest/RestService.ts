@@ -713,7 +713,14 @@ export class RestService {
       }
       const importId = req.params.importId || req.params.id;
       const reason = typeof req.body?.reason === 'string' ? req.body.reason : 'user_discarded_in_mapper';
-      await ImportAuditService.getInstance().markAbandoned(importId, reason);
+      const outcome = await ImportAuditService.getInstance().markAbandoned(
+        importId,
+        reason,
+        context.user.org_id
+      );
+      if (outcome === 'forbidden') {
+        throw new NotFoundError('Import run not found');
+      }
       res.json({ success: true, data: { id: importId, status: 'ABANDONED' } });
     } catch (error: unknown) {
       handleRestControllerError(error, req, res, 'discardImportRun', 'Failed to discard import run');
