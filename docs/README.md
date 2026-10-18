@@ -48,6 +48,7 @@ The ledger is the first domain on this branch. Later modules from prod follow [b
 | Document | What it covers |
 |---|---|
 | [book-keeping/KERNEL_PORT.md](./book-keeping/KERNEL_PORT.md) | Ledger-port lessons, and the order for reports, parties, sales, purchases, and investing. |
+| [book-keeping/AGENT_PLAN.md](./book-keeping/AGENT_PLAN.md) | Prod-versus-this-branch plan a coding agent can run one module at a time. |
 
 ## Infrastructure
 

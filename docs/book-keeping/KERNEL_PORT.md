@@ -2,7 +2,7 @@
 
 Prod keeps the long domain references in `docs/book-keeping/` (`BOOKKEEPING_DOMAIN.md`, `INVESTMENTS.md`, the report notes). This file is the porting record for this branch: what the ledger slice taught us, and the order for the next modules.
 
-The kernel rule is [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md). Follow it for every module below.
+The kernel rule is [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md). The module-by-module instructions for a coding agent are [AGENT_PLAN.md](./AGENT_PLAN.md). Follow both for every module below.
 
 ## What the ledger slice taught us
 
