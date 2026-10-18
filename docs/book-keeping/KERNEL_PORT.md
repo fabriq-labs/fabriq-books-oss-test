@@ -71,6 +71,8 @@ Prod reference: `docs/book-keeping/INCOME_STATEMENT_AND_BALANCE_SHEET.md`, `OPEN
 
 `average` rates convert period activity. `closing` rates convert balance-sheet and opening amounts. A missing rate is flagged. It is not treated as 1.
 
+`npm run seed:books-demo` loads a small multi-entity example on top of an India chart: USD and INR, a US headquarters and an India entity, INR→USD average and closing rates, and a few journals. The organization reporting currency stays USD, so the 2026 income statement and balance sheet show the India amounts converted. Run `npm run seed:coa -- india` first. It does not replace the chart.
+
 ### 2. Customers, suppliers, and items
 
 Prod schema: `backend/prisma/schema/zeiv.prisma` (`customers`, `supplier`, `item_master`, `uom`, `payment_terms`).
