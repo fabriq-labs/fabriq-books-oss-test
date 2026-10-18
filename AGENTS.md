@@ -15,6 +15,12 @@ Start at [docs/README.md](./docs/README.md). A new model, its table, its view, a
 
 Do not run `prisma db push`, `prisma migrate`, or other DDL. New databases are created by `npm run setup:kernel`, which applies generated schema SQL and seeds `org_system`. After `organizations` exists, apply later tables with the SQL diff in `docs/kernel/adding-a-model.md`.
 
+## Porting from prod
+
+Kernel files do not import a product folder. They call the hooks in `backend/lib/domain.ts` and `frontend-0/src/domain/`. A feature that still works with no product installed stays in the kernel. Import discard is one. A feature that names product fields or a vendor stays in `backend/lib/<product>/` or `frontend-0/src/domain/<product>/` and is registered from those hooks. A todo app and the ledger use the same hook names.
+
+Follow [docs/kernel/PORTING_A_DOMAIN.md](./docs/kernel/PORTING_A_DOMAIN.md) for every later migration from prod.
+
 Tool-specific folders (`.cursor/`, `.claude/`) stay on the machine that uses them. They are gitignored. Instructions for every coding agent live in this file.
 
 ## Database

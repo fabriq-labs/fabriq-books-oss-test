@@ -11,7 +11,7 @@ This file says where a domain's files go. Behavior of the engine is in [../READM
 | `frontend-0/src/domain/home.tsx` | Home screen rendered at `/` |
 | `backend/lib/domain.ts` | Optional product hooks. A list and a form do not read this file. |
 | `frontend-0/src/domain/register.ts` | Import-screen extensions. The kernel calls `registerDomainImportExtensions`. |
-| `frontend-0/src/domain/routes.tsx` | Product routes. `App.tsx` renders `<DomainRoutes />`. |
+| `frontend-0/src/domain/routes.tsx` | Product routes. `App.tsx` calls `DomainRoutes()`. |
 
 The app UI is `frontend-0` (port 5174). `/` mounts `DomainHome` from `home.tsx`. Keep that export if you replace the page. See [frontend.md](./frontend.md).
 
@@ -19,7 +19,7 @@ A list appears when four things exist: the table, a view named `{model}_view` wh
 
 `backend/lib/domain.ts` is where a workflow model, a post-write hook, or a report handler goes. `DOMAIN_SQL_TABLES` is not read by the analytics gate. That allowlist is `KNOWN_TABLES` in `backend/src/services/analytics/sqlExecutor.ts`. Adding a name only in `domain.ts` does not create an API.
 
-The kernel imports `backend/lib/domain.ts` and `frontend-0/src/domain/register.ts`. It does not import a product folder. A todo app and the ledger keep these function names and replace the bodies:
+The kernel imports `backend/lib/domain.ts` and `frontend-0/src/domain/register.ts`. A todo app and the ledger keep these function names and replace the bodies. The rule for a prod migration is [PORTING_A_DOMAIN.md](./PORTING_A_DOMAIN.md).
 
 | Hook | Kernel call site | Empty body |
 |---|---|---|
@@ -28,7 +28,7 @@ The kernel imports `backend/lib/domain.ts` and `frontend-0/src/domain/register.t
 | `registerDomainAgentRoutes(router)` | End of `createAgentRouter`, paths are under `/api/agent` | Register nothing |
 | `DomainRoutes()` | `App.tsx` renders the fragment it returns | Return `null` |
 
-Put the product classes under `backend/lib/<product>/` and `frontend-0/src/domain/<product>/`. `domain.ts` and `domain/register.ts` are the only files that name that folder.
+Put the product classes under `backend/lib/<product>/` and `frontend-0/src/domain/<product>/`. `domain.ts`, `domain/register.ts`, and `domain/routes.tsx` are the files that import that folder.
 
 `backend/prisma/metadata/views/` is a JSON catalog from the books setup. `setup:kernel` does not load it. Do not sync the whole folder into this database.
 
