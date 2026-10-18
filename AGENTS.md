@@ -19,7 +19,7 @@ Do not run `prisma db push`, `prisma migrate`, or other DDL. New databases are c
 
 Kernel files do not import a product folder. They call the hooks in `backend/lib/domain.ts` and `frontend-0/src/domain/`. A feature that still works with no product installed stays in the kernel. Import discard is one. A feature that names product fields or a vendor stays in `backend/lib/<product>/` or `frontend-0/src/domain/<product>/` and is registered from those hooks. A todo app and the ledger use the same hook names.
 
-Follow [docs/kernel/PORTING_A_DOMAIN.md](./docs/kernel/PORTING_A_DOMAIN.md) for every later migration from prod.
+Follow [docs/kernel/PORTING_A_DOMAIN.md](./docs/kernel/PORTING_A_DOMAIN.md) for every later migration from prod. The books module order, and what the ledger port taught us, is [docs/book-keeping/KERNEL_PORT.md](./docs/book-keeping/KERNEL_PORT.md).
 
 Tool-specific folders (`.cursor/`, `.claude/`) stay on the machine that uses them. They are gitignored. Instructions for every coding agent live in this file.
 

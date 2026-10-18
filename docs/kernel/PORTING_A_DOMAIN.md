@@ -1,6 +1,6 @@
 # Porting a domain onto the kernel
 
-Use this when moving a feature from prod onto the shell. File locations are in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md). This file is the rule for what may live in kernel code.
+Use this when moving a feature from prod onto the shell. File locations are in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md). This file is the rule for what may live in kernel code. The books module order is [../book-keeping/KERNEL_PORT.md](../book-keeping/KERNEL_PORT.md).
 
 The kernel is one shell for every product. A todo app and the ledger call the same functions. The product fills the bodies. Kernel files never name the product folder.
 

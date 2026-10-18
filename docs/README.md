@@ -41,6 +41,14 @@ To add a model, follow this order: [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDI
 | [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md) | Where a future domain's files go. |
 | [kernel/PORTING_A_DOMAIN.md](./kernel/PORTING_A_DOMAIN.md) | What stays in the kernel when a prod feature is ported, and which hooks the product fills. |
 
+## Books
+
+The ledger is the first domain on this branch. Later modules from prod follow [book-keeping/KERNEL_PORT.md](./book-keeping/KERNEL_PORT.md). The kernel rule those modules use is [kernel/PORTING_A_DOMAIN.md](./kernel/PORTING_A_DOMAIN.md).
+
+| Document | What it covers |
+|---|---|
+| [book-keeping/KERNEL_PORT.md](./book-keeping/KERNEL_PORT.md) | Ledger-port lessons, and the order for reports, parties, sales, purchases, and investing. |
+
 ## Infrastructure
 
 | Document | What it covers |
