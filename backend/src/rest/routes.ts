@@ -14,6 +14,7 @@ import multer from 'multer';
 import { AttachmentController } from './AttachmentController';
 import { AxiosError } from 'axios';
 import { customActionRegistry } from './customActionRegistry';
+import { registerDomainRoutes } from '../../lib/domain';
 
 export const setupRestRoutes = (router: Router) => {
   const restService = RestService.getInstance();
@@ -151,6 +152,9 @@ export const setupRestRoutes = (router: Router) => {
     authMiddleware,
     restService.discardImportRun.bind(restService)
   );
+
+  // Domain routes (/api/gl/...) before the generated /:model handlers.
+  registerDomainRoutes(router);
 
   // Setup routes for each model which has a view in the path (legacy support)
   models.forEach(model => {

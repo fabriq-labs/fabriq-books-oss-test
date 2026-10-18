@@ -34,6 +34,7 @@ const schema = z.object({
   reconciliation_status: z.string().optional(),
   debit_account_id: z.string().optional(),
   credit_account_id: z.string().optional(),
+  entity_id: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -52,6 +53,7 @@ const emptyValues: FormValues = {
   reconciliation_status: '',
   debit_account_id: '',
   credit_account_id: '',
+  entity_id: '',
 };
 
 function blank(value: string | undefined): string | null {
@@ -78,6 +80,7 @@ export const PostingForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [debitAccount, setDebitAccount] = useState<Record<string, unknown> | null>(null);
   const [creditAccount, setCreditAccount] = useState<Record<string, unknown> | null>(null);
+  const [entity, setEntity] = useState<Record<string, unknown> | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -107,9 +110,11 @@ export const PostingForm: React.FC = () => {
           reconciliation_status: row.reconciliation_status || '',
           debit_account_id: row.debit_account_id || '',
           credit_account_id: row.credit_account_id || '',
+          entity_id: row.entity_id || '',
         });
         setDebitAccount(row.debit_account ?? null);
         setCreditAccount(row.credit_account ?? null);
+        setEntity(row.entity ?? null);
       })
       .catch(() => {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to load transaction' });
@@ -122,12 +127,14 @@ export const PostingForm: React.FC = () => {
     const item = value.item ?? { id: value[key], name: value.name };
     if (sourceKey === 'debit_account_id') setDebitAccount(item);
     if (sourceKey === 'credit_account_id') setCreditAccount(item);
+    if (sourceKey === 'entity_id') setEntity(item);
   };
 
   const handleSelectClear = (sourceKey: string) => {
     form.setValue(sourceKey as keyof FormValues, '');
     if (sourceKey === 'debit_account_id') setDebitAccount(null);
     if (sourceKey === 'credit_account_id') setCreditAccount(null);
+    if (sourceKey === 'entity_id') setEntity(null);
   };
 
   const handleSubmit = async (data: FormValues) => {
@@ -146,6 +153,7 @@ export const PostingForm: React.FC = () => {
       reconciliation_status: blank(data.reconciliation_status),
       debit_account_id: blank(data.debit_account_id),
       credit_account_id: blank(data.credit_account_id),
+      entity_id: blank(data.entity_id),
     };
     try {
       setIsSubmitting(true);
@@ -298,6 +306,32 @@ export const PostingForm: React.FC = () => {
                             searchParams="name"
                             type="account"
                             isShowSearch={true}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="entity_id"
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>Entity</FormLabel>
+                        <FormControl>
+                          <SearchDropDown
+                            instanceType="entity"
+                            instanceKey="id"
+                            instanceSourceKey="entity_id"
+                            instanceLabel="name"
+                            instanceValue={entity}
+                            onSelectItem={handleSelectChange}
+                            onClear={handleSelectClear}
+                            limit={10}
+                            searchParams="name"
+                            type="entity"
+                            isShowSearch={true}
+                            placeholder="Select an entity"
                           />
                         </FormControl>
                         <FormMessage />

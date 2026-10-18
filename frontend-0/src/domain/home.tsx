@@ -59,6 +59,18 @@ const SOURCES: Array<{
     sampleOf: (row) => String(row.description || row.name || ""),
   },
   {
+    label: "Entities",
+    to: "/masters/entity",
+    load: () => viewAPI.getAll("entity", "entity_view", 1, 100),
+    sampleOf: (row) => String(row.name || row.legal_name || ""),
+  },
+  {
+    label: "Exchange Rates",
+    to: "/accounting/exchange-rates",
+    load: () => viewAPI.getAll("exchange_rate", "exchange_rate_view", 1, 100),
+    sampleOf: (row) => String(row.rate_type || row.rate || ""),
+  },
+  {
     label: "Workflows",
     to: "/settings/workflows",
     load: () => workflowManagementAPI.getFlows(),
@@ -112,7 +124,7 @@ export function DomainHome() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Chart of accounts, transactions, and organization setup.</p>
+        <p className="text-sm text-muted-foreground">Chart of accounts, transactions, entities, and reports.</p>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

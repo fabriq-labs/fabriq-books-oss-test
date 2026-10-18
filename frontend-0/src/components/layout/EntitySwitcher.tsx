@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, Check, ChevronDown, Globe, Search } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { useEntity, type Entity } from '@/contexts/EntityContext';
+import { entityLabel, useEntity, type Entity } from '@/contexts/EntityContext';
 
 const rowClass = cn(
   'flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors',
@@ -23,7 +23,7 @@ export function EntitySwitcher() {
   const filteredEntities = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return entities;
-    return entities.filter((e) => e.legal_name.toLowerCase().includes(q));
+    return entities.filter((e) => entityLabel(e).toLowerCase().includes(q));
   }, [entities, query]);
 
   if (loading) {
@@ -38,7 +38,7 @@ export function EntitySwitcher() {
 
   if (entities.length === 1) {
     const only = entities[0];
-    const name = currentEntity?.legal_name ?? only.legal_name;
+    const name = entityLabel(currentEntity ?? only);
     return (
       <div
         className={cn(
@@ -53,7 +53,7 @@ export function EntitySwitcher() {
     );
   }
 
-  const label = currentEntity?.legal_name ?? 'All Entities';
+  const label = currentEntity ? entityLabel(currentEntity) : 'All Entities';
 
   const handleSelect = (entity: Entity | null) => {
     setCurrentEntity(entity);
@@ -137,7 +137,7 @@ export function EntitySwitcher() {
                     onClick={() => handleSelect(entity)}
                   >
                     <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate">{entity.legal_name}</span>
+                    <span className="min-w-0 flex-1 truncate">{entityLabel(entity)}</span>
                     {currentEntity?.id === entity.id ? (
                       <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                     ) : null}

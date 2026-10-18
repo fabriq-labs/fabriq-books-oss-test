@@ -6,10 +6,12 @@
  * Replace the bodies. Do not add a product import under backend/src.
  */
 import { Router } from 'express';
+import { installEntityWriteGuard } from './gl/entityWrite';
 import {
   registerGlAgentRoutes,
   registerGlExtractors,
   registerGlImportExtension,
+  registerGlRoutes,
 } from './gl/register';
 
 /** Host passed by the kernel extractor registry. */
@@ -49,6 +51,7 @@ export const DOMAIN_SQL_TABLES: readonly DomainSqlTable[] = [
   { name: 'account', tenancy: 'private' },
   { name: 'posting', tenancy: 'private' },
   { name: 'entity', tenancy: 'private' },
+  { name: 'exchange_rate', tenancy: 'private' },
   { name: 'ext_connection', tenancy: 'private' },
   { name: 'ext_transaction', tenancy: 'private' },
   { name: 'invoice', tenancy: 'private' },
@@ -144,3 +147,11 @@ export function registerDomainExtractors(registry: DomainExtractorHost): void {
 export function registerDomainAgentRoutes(router: Router): void {
   registerGlAgentRoutes(router);
 }
+
+/** Product HTTP routes mounted on the main /api router. */
+export function registerDomainRoutes(router: Router): void {
+  installEntityWriteGuard();
+  registerGlRoutes(router);
+}
+
+installEntityWriteGuard();

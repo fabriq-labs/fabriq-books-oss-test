@@ -19,8 +19,11 @@ model currency {
   modified_by    String?
   created_at     DateTime @default(now())
   modified_at    DateTime @updatedAt
-  orgs           org[]
-  accounts       account[]
+  orgs                org[]
+  accounts            account[]
+  entities            entity[]
+  exchange_rates_from exchange_rate[] @relation("exchange_from")
+  exchange_rates_to   exchange_rate[] @relation("exchange_to")
 
   @@map("currency")
 }

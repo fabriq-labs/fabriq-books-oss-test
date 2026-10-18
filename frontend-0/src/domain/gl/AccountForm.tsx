@@ -31,6 +31,7 @@ const schema = z.object({
   is_active: z.boolean(),
   parent_account_id: z.string().optional(),
   currency_id: z.string().optional(),
+  entity_id: z.string().optional(),
   extraction_notes: z.string().optional(),
 });
 
@@ -49,6 +50,7 @@ const emptyValues: FormValues = {
   is_active: true,
   parent_account_id: '',
   currency_id: '',
+  entity_id: '',
   extraction_notes: '',
 };
 
@@ -70,6 +72,7 @@ export const AccountForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [parentAccount, setParentAccount] = useState<Record<string, unknown> | null>(null);
   const [currency, setCurrency] = useState<Record<string, unknown> | null>(null);
+  const [entity, setEntity] = useState<Record<string, unknown> | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -100,10 +103,12 @@ export const AccountForm: React.FC = () => {
           is_active: row.is_active !== false,
           parent_account_id: row.parent_account_id || '',
           currency_id: row.currency_id || '',
+          entity_id: row.entity_id || '',
           extraction_notes: row.extraction_notes || '',
         });
         setParentAccount(row.parent_account ?? null);
         setCurrency(row.currency ?? null);
+        setEntity(row.entity ?? null);
       })
       .catch(() => {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to load account' });
@@ -115,12 +120,14 @@ export const AccountForm: React.FC = () => {
     form.setValue(sourceKey as keyof FormValues, value[key]);
     if (sourceKey === 'parent_account_id') setParentAccount(value.item ?? { id: value[key], name: value.name });
     if (sourceKey === 'currency_id') setCurrency(value.item ?? { id: value[key], code: value.code });
+    if (sourceKey === 'entity_id') setEntity(value.item ?? { id: value[key], name: value.name });
   };
 
   const handleSelectClear = (sourceKey: string) => {
     form.setValue(sourceKey as keyof FormValues, '');
     if (sourceKey === 'parent_account_id') setParentAccount(null);
     if (sourceKey === 'currency_id') setCurrency(null);
+    if (sourceKey === 'entity_id') setEntity(null);
   };
 
   const handleSubmit = async (data: FormValues) => {
@@ -142,6 +149,7 @@ export const AccountForm: React.FC = () => {
       is_active: data.is_active,
       parent_account_id: blank(data.parent_account_id),
       currency_id: blank(data.currency_id),
+      entity_id: blank(data.entity_id),
       extraction_notes: blank(data.extraction_notes),
     };
     try {
@@ -323,6 +331,32 @@ export const AccountForm: React.FC = () => {
                             type="account"
                             isShowSearch={true}
                             excludeIds={id ? [id] : []}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="entity_id"
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>Entity</FormLabel>
+                        <FormControl>
+                          <SearchDropDown
+                            instanceType="entity"
+                            instanceKey="id"
+                            instanceSourceKey="entity_id"
+                            instanceLabel="name"
+                            instanceValue={entity}
+                            onSelectItem={handleSelectChange}
+                            onClear={handleSelectClear}
+                            limit={10}
+                            searchParams="name"
+                            type="entity"
+                            isShowSearch={true}
+                            placeholder="Select an entity"
                           />
                         </FormControl>
                         <FormMessage />

@@ -1,7 +1,8 @@
 // General ledger. Account is the chart. Posting is one transaction with a
-// debit account and a credit account. Models that account or posting point at,
-// and that are not part of this slice, are stubs: id, org_id, and the foreign
-// keys that keep the relation. The real module replaces the stub later.
+// debit account and a credit account. Entity and exchange_rate are the
+// reporting slice. Other models that account or posting point at, and that
+// are not part of this slice, stay stubs: id, org_id, and the foreign keys
+// that keep the relation.
 
 enum account_classification {
   asset
@@ -40,6 +41,12 @@ enum reconciliation_status {
 enum posting_status {
   active
   reversed
+}
+
+enum exchange_rate_type {
+  spot
+  closing
+  average
 }
 
 model account {
@@ -171,13 +178,48 @@ model posting {
 }
 
 model entity {
-  id       String    @id @default(dbgenerated("'ent_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id   String
-  accounts account[]
-  postings posting[]
+  id              String    @id @default(dbgenerated("'ent_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id          String
+  name            String
+  legal_name      String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  postal_code     String?
+  currency_id     String?
+  currency        currency? @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  is_headquarters Boolean   @default(false)
+  created_by      String?
+  modified_by     String?
+  created_at      DateTime  @default(now())
+  modified_at     DateTime  @updatedAt
+  accounts        account[]
+  postings        posting[]
 
   @@index([org_id])
+  @@index([currency_id])
   @@map("entity")
+}
+
+model exchange_rate {
+  id               String             @id @default(dbgenerated("'exrt_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id           String
+  from_currency_id String
+  to_currency_id   String
+  from_currency    currency           @relation("exchange_from", fields: [from_currency_id], references: [id], onDelete: Restrict)
+  to_currency      currency           @relation("exchange_to", fields: [to_currency_id], references: [id], onDelete: Restrict)
+  effective_date   DateTime           @db.Date
+  rate             Decimal            @db.Decimal(19, 6)
+  rate_type        exchange_rate_type @default(spot)
+  created_by       String?
+  modified_by      String?
+  created_at       DateTime           @default(now())
+  modified_at      DateTime           @updatedAt
+
+  @@unique([org_id, from_currency_id, to_currency_id, effective_date, rate_type])
+  @@index([org_id, to_currency_id, rate_type, effective_date])
+  @@map("exchange_rate")
 }
 
 model ext_connection {

@@ -7,6 +7,8 @@ import { categorizeImportBatch } from './categorizeImportBatch';
 import { BankStatementExtractor } from './extractors/bank-statement-extractor';
 import { PostingImportExtension } from './postingImportExtension';
 
+export { registerGlRoutes } from './reportRoutes';
+
 type ExtractorHost = {
   registerExtractor(documentType: string, extractor: DocumentExtractor): void;
   registerDocumentType(documentType: DocumentType): void;

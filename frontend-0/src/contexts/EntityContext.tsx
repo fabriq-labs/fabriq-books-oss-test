@@ -6,8 +6,10 @@ export const CURRENT_ENTITY_STORAGE_KEY = 'fabriq_current_entity_id';
 
 export interface Entity {
   id: string;
-  legal_name: string;
-  /** API uses `"Yes"` / `"No"` strings; booleans may appear from other paths */
+  name?: string;
+  legal_name?: string;
+  is_headquarters?: boolean;
+  /** Older payloads used `"Yes"` / `"No"` strings. */
   is_it_headquartres?: boolean | string;
   is_individual?: boolean;
   financial_year_type?: 'JAN_DEC' | 'APR_MAR' | 'JUL_JUN' | 'OCT_SEP';
@@ -15,8 +17,15 @@ export interface Entity {
   currency?: { id?: string; code?: string };
 }
 
+export function entityLabel(entity: { name?: string | null; legal_name?: string | null }): string {
+  const legal = entity.legal_name?.trim();
+  const name = entity.name?.trim();
+  return legal || name || 'Entity';
+}
+
 /** Matches headquarters flag as returned by entity views and forms */
-export function isEntityHeadquarters(e: Pick<Entity, 'is_it_headquartres'>): boolean {
+export function isEntityHeadquarters(e: Pick<Entity, 'is_it_headquartres' | 'is_headquarters'>): boolean {
+  if (e.is_headquarters === true) return true;
   const v = e.is_it_headquartres as unknown;
   if (v === true || v === 1) return true;
   if (typeof v === 'string') {
@@ -73,6 +82,12 @@ async function fetchEntities(): Promise<Entity[]> {
 
 /** When HQ field is stripped by field permissions, DB-filtered search still returns the row */
 async function fetchHeadquartersEntityId(): Promise<string | null> {
+  const modern = await entitySearch({
+    filters: { is_headquarters: { eq: true } },
+    page: 1,
+    pageSize: 1,
+  });
+  if (modern[0]?.id) return modern[0].id;
   const rows = await entitySearch({
     filters: { is_it_headquartres: { eq: 'Yes' } },
     page: 1,

@@ -21,6 +21,7 @@
     "seed-sql-metadata": "ts-node prisma/seed-sql-metadata.ts",
     "setup:kernel": "node scripts/setup-kernel-db.js",
     "seed:gl": "ts-node --transpile-only src/utils/setup/seedGl.ts",
+    "seed:entities": "ts-node --transpile-only src/utils/setup/seedEntities.ts",
     "seed:coa": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedChart.ts",
     "pull-metadata": "ts-node prisma/pull-metadata.ts",
     "pull": "ts-node prisma/pull-metadata-interactive.ts",
