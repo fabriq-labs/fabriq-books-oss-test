@@ -6,6 +6,39 @@
 
 ---
 
+## Locked product decisions (books)
+
+| Decision | Choice |
+|---|---|
+| Code location | `backend/integrations/` (Python/dbt) + `backend/lib/integrations/` (Node) |
+| Python tooling | **uv** (`pyproject.toml` + `uv.lock` under `backend/integrations/`) |
+| Env | **Repo-root `.env`** for shared runtime (`DATABASE_URL`, `JWT_SECRET`, `ERP_CONFIG_ENCRYPTION_KEY`, …). Same names injected in Docker/Railway. No secrets in the image. |
+| Deploy shape | **Single Docker image** for single-tenant: nginx + Node API + FastAPI sync/dbt on loopback. One Railway service. Split later only if a customer needs isolation/scale. |
+
+### Single-container process model
+
+```
+┌─ one container ─────────────────────────────────────┐
+│  nginx :$PORT  →  static + /api → Node :4000        │
+│  Node  :4000   →  proxy sync → 127.0.0.1:$SYNC_PORT │
+│  uvicorn sync  →  Airbyte (optional) + dbt          │
+│  shared env: DATABASE_URL, ERP_CONFIG_ENCRYPTION_KEY│
+└─────────────────────────────────────────────────────┘
+```
+
+- `start.sh` supervises Node **and** `uv run uvicorn sync_service.main:app` (default `SYNC_PORT=8090`, not published).
+- Sync is never a second billable service for v1 single-tenant.
+- **Image base:** prefer **Debian slim** (or multi-stage venv from slim) for the combined image — Alpine + dbt is fragile (musl wheels; prod already caps `dbt-core<1.12` for that). Do not bake `.env` into the image.
+
+### Config / ops hardening (with uv)
+
+- One `shared/settings.py` (pydantic-settings): fail-fast on missing `DATABASE_URL` / encryption key.
+- One `shared/db.py`: parse `DATABASE_URL` → `DB_*` for dbt `profiles.yml`; shared SSL/`PGSSLMODE`.
+- JSON logs in prod with `org_id` / `connection_id` / `run_id`; never log decrypted configs.
+- Test ladder: unit (encryption, URL parse) → FastAPI `TestClient` with mocked Airbyte/dbt → `dbt test` on fixture datalake → `transform_only` smoke against local kernel DB.
+
+---
+
 ## Parallelism verdict (vs sales frontend)
 
 **Yes — QBO forward sync can start before sales UI**, with a hard gate on schema + connection foundation.
@@ -155,10 +188,10 @@ Railway FastAPI sync_service
 
 **Deliverables**
 
-- Copy/adapt `backend/integrations/{shared,sync_service,quickbooks}` onto books
+- Copy/adapt `backend/integrations/{shared,sync_service,quickbooks}` onto books under **uv**
 - Rewrite normalized models to universal columns (matrix in §B), including: `due_date`, net/tax/total split, HQ `is_headquarters`, scoped `source_system` join
 - Update `run_dbt.py` / dbt tests / first-run checks for `customer` (not `customers`)
-- Docker/Railway notes for sync_service pointing at books schema; keep `prisma_guard` (no public DDL from dbt)
+- Extend **root Dockerfile + `start.sh`** so sync/dbt runs in the same image on loopback; keep `prisma_guard` (no public DDL from dbt)
 - Seed or script: ensure `payment_terms` / currency / HQ entity lookup still works
 
 **Acceptance**
@@ -173,9 +206,10 @@ Railway FastAPI sync_service
 
 **Deliverables**
 
-- Node routes (via `domain.ts`): create/update QBO connection, test connection, trigger sync (proxy to sync_service or in-process)
+- Node routes (via `domain.ts`): create/update QBO connection, test connection, trigger sync (**HTTP to loopback sync_service** in the same container)
 - Minimal admin UI **optional** — API + curl/docs enough for parallel track
 - Persist Airbyte connection id in `extraction_config`
+- Default `SYNC_SERVICE_URL=http://127.0.0.1:8090` (overridable if we ever split)
 
 **Acceptance**
 
@@ -249,13 +283,15 @@ Frontend sales forms are **not** in this list. A thin “Connections” settings
 
 ## G. Review checklist (for you)
 
-- [ ] Agree parallelism: dbt+foundation before UI
-- [ ] Agree posting deferred to Phase 4 (synced rows visible in DB first)
-- [ ] Agree Payment/CreditMemo are Phase 3 (not in first land)
-- [ ] Agree reverse PO sync stays out
-- [ ] Confirm `source_system` lives in domain/integrations schema (not kernel platform) on books
+- [x] Agree parallelism: dbt+foundation before UI
+- [x] Agree posting deferred to Phase 4 (synced rows visible in DB first)
+- [x] Agree Payment/CreditMemo are Phase 3 (not in first land)
+- [x] Agree reverse PO sync stays out
+- [x] Confirm `source_system` lives in domain/integrations schema (not kernel platform) on books
+- [x] **Single Docker** (nginx + Node + sync/dbt) for cheap single-tenant
+- [x] **uv** for Python; **repo-root `.env`** for shared runtime keys
 
-Once approved, implementation should start at **Phase 0** on a branch off the sales-model branch (or merged `fabriq-books` after sales schema lands).
+Implementation continues from **Phase 0 leftovers** (encryption + env example) into **Phase 1** on this branch.
 
 ---
 
