@@ -7,8 +7,6 @@ import { authMiddleware } from '../auth/middleware';
 import prisma from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import logger from '../utils/logger';
-import { main as syncMetadataFromJson } from '../utils/setup/metadata/syncMetadataFromJson';
-import { parseSyncTargets } from '../utils/setup/metadata/syncMetadataTargets';
 import { isSuperAdmin } from '../auth/platformAdmin';
 const adminRouter = Router();
 
@@ -36,7 +34,7 @@ interface OnboardTenantBody {
 }
 
 
-/** Matches `setup-db.js` parseArgs() --demo-data= values. */
+/** Prod demo names. The loader that accepted these values is not in this tree. */
 const DEMO_DATA_OPTIONS = [
   'indian-demo',
   'us-ca-demo',
@@ -48,9 +46,8 @@ const DEMO_DATA_OPTIONS = [
 type DemoDataOption = (typeof DEMO_DATA_OPTIONS)[number];
 
 let demoResetInProgress = false;
-let devOptionsSyncInProgress = false;
 
-/** Pipe setup-db stdout/stderr to the server process stdout (terminal / container logs). */
+/** Pipe a child process stdout/stderr to the server process stdout. */
 function pipeSetupStreamToConsole(
   stream: NodeJS.ReadableStream | null,
   label: 'stdout' | 'stderr'
@@ -275,12 +272,6 @@ adminRouter.post(
         });
       }
 
-      if (devOptionsSyncInProgress) {
-        return res.status(409).json({
-          error: 'Developer options sync is in progress. Wait for it to finish.',
-        });
-      }
-
       const body = req.body as DemoDatabaseResetBody;
       const raw = typeof body?.demoData === 'string' ? body.demoData.trim().toLowerCase() : '';
       if (!raw || !DEMO_DATA_OPTIONS.includes(raw as DemoDataOption)) {
@@ -296,8 +287,8 @@ adminRouter.post(
       const backendRoot = getBackendRootDir();
       const setupScript = path.join(backendRoot, 'setup-db.js');
       if (!fs.existsSync(setupScript)) {
-        logger.error('setup-db.js not found', { setupScript, backendRoot });
-        return res.status(500).json({ error: 'setup-db.js not found on server' });
+        logger.error('prod demo loader is not in this tree', { setupScript, backendRoot });
+        return res.status(410).json({ error: 'The prod demo database loader is not in this tree.' });
       }
 
       const setupArgs = [setupScript, `--demo-data=${demoData}`];
@@ -351,79 +342,11 @@ adminRouter.post(
   }
 );
 
-adminRouter.post(
-  '/dev-options/sync-metadata',
-  authMiddleware,
-  async (req: Request, res: Response) => {
-    try {
-      if (!isDevOptionsApiEnabled()) {
-        return res.status(403).json({
-          error:
-            'Developer options API is disabled. Set ALLOW_DEV_OPTIONS_API=true to enable (required in production).',
-        });
-      }
-
-      const context = (req as any).context?.auth;
-      if (!context?.user?.id) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const isSA = await isSuperAdmin(context.user.id);
-      if (!isSA) {
-        return res.status(403).json({ error: 'Forbidden: Super Admin only' });
-      }
-
-      if (devOptionsSyncInProgress) {
-        return res.status(409).json({
-          error: 'A metadata sync is already running. Wait for it to finish.',
-        });
-      }
-
-      if (demoResetInProgress) {
-        return res.status(409).json({
-          error: 'A demo database reset is in progress. Wait for it to finish.',
-        });
-      }
-
-      let targets;
-      try {
-        targets = parseSyncTargets((req.body as { targets?: unknown } | undefined)?.targets);
-      } catch (parseErr: any) {
-        return res.status(400).json({
-          error: parseErr?.message || 'Select at least one metadata type to sync.',
-        });
-      }
-
-      devOptionsSyncInProgress = true;
-
-      try {
-        const stats = await syncMetadataFromJson({ targets });
-        logger.info('dev-options sync-metadata finished', { stats, targets });
-        return res.status(200).json({
-          success: true,
-          message: `Synced: ${targets.join(', ')}.`,
-          stats,
-        });
-      } catch (err: any) {
-        logger.error('dev-options sync-metadata failed', {
-          error: err?.message,
-          stack: err?.stack,
-        });
-        return res.status(500).json({
-          error: err?.message || 'Metadata sync failed',
-        });
-      } finally {
-        devOptionsSyncInProgress = false;
-      }
-    } catch (err: any) {
-      logger.error('dev-options sync-metadata error', { error: err?.message, stack: err?.stack });
-      devOptionsSyncInProgress = false;
-      return res.status(500).json({
-        error: err?.message || 'Failed to run metadata sync',
-      });
-    }
-  }
-);
+adminRouter.post('/dev-options/sync-metadata', authMiddleware, async (_req: Request, res: Response) => {
+  return res.status(410).json({
+    error: 'The prod metadata JSON catalog was removed. Views are seeded in TypeScript.',
+  });
+});
 
 // ─── Chart of Accounts Setup ──────────────────────────────────────────────────
 

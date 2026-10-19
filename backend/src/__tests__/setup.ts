@@ -1,6 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import { execSync } from 'child_process';
-import { join } from 'path';
 
 const prisma = new PrismaClient({
   datasources: {
@@ -71,23 +69,6 @@ beforeAll(async () => {
   try {
     // Test database schema is already created via db push
     console.log('Test database schema is ready!');
-
-    // Setup Fabriq source system (required for lineage fields)
-    console.log('Setting up Fabriq source system...');
-    try {
-      const databaseUrl = process.env.DATABASE_URL;
-      if (databaseUrl) {
-        const fabriqSourceSystemSqlPath = join(__dirname, '../../prisma/setup-fabriq-source-system.sql');
-        execSync(`psql "${databaseUrl}" -f "${fabriqSourceSystemSqlPath}"`, {
-          stdio: 'ignore',
-          cwd: join(__dirname, '../..'),
-        });
-        console.log('  ✓ Fabriq source system setup complete');
-      }
-    } catch (error) {
-      console.error('  ⚠️  Error setting up Fabriq source system:', error);
-      console.log('     Continuing with seed data setup...');
-    }
 
     // Create seed data for integration tests
     console.log('Creating seed data...');

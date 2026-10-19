@@ -429,7 +429,7 @@ getToolsForModel(modelName: string, auth: AuthContext): any
 
 ```typescript
 // Based on USE_LOCAL_PROMPT environment variable
-USE_LOCAL_PROMPT=true  → Reads from JSON files (prisma/metadata/prompt-templates/)
+USE_LOCAL_PROMPT=true  → Reads prompt files under prisma/metadata/ when that directory exists. This branch does not ship it.
 USE_LOCAL_PROMPT=false → Reads from database (prompt_template table)
 ```
 

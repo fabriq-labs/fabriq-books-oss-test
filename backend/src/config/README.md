@@ -25,7 +25,7 @@ src/
 
 Prompts are stored in two ways based on the `USE_LOCAL_PROMPT` environment variable:
 
-- **JSON Files** (when `USE_LOCAL_PROMPT=true`): Located in `prisma/metadata/prompt-templates/`
+- **JSON files** (when `USE_LOCAL_PROMPT=true`): `prisma/metadata/prompt-templates/`, if that directory is present. This branch does not include it.
   - Template metadata: `view_{view_id}_{prompt_type}.json`
   - Template text: `view_{view_id}_{prompt_type}.txt`
 - **Database** (when `USE_LOCAL_PROMPT=false` or unset): Stored in `prompt_template` table
@@ -100,7 +100,7 @@ const prompt = await promptManager.generateDynamicPrompt(permissions);
 
 ### Environment Configuration
 
-- **`USE_LOCAL_PROMPT=true`**: Reads prompts from JSON files in `prisma/metadata/prompt-templates/`
+- **`USE_LOCAL_PROMPT=true`**: Reads prompt files under `prisma/metadata/prompt-templates/` when that directory exists. This branch does not ship it.
 - **`USE_LOCAL_PROMPT=false` or unset**: Reads prompts from database `prompt_template` table
 
 ### Context-Aware Processing

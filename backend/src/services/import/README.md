@@ -12,7 +12,7 @@ All source files are handled as binary (`multipart/form-data`) and stored throug
 
 ## 1) CSV Upload (Single-pass)
 
-### Frontend (`frontend-1/src/components/import/ImportPannel.tsx`)
+### Frontend (`frontend-0/src/components/import/ImportPannel.tsx`)
 
 1. User maps CSV columns in mapper.
 2. `handleOnServerUpload(...)` builds payload:
@@ -57,9 +57,8 @@ Files:
 ### Pass 1: Parse PDF
 
 Frontend files:
-- `frontend-1/src/components/import/ImportPannel.tsx`
-- `frontend-1/src/features/import-extensions/posting/index.tsx`
-- `frontend-1/src/api/postingApi.ts`
+- `frontend-0/src/components/import/ImportPannel.tsx`
+- `frontend-0/src/features/import-extensions/`
 
 Backend file:
 - `backend/src/rest/RestService.ts` (`parseDocument`)
@@ -75,7 +74,7 @@ Steps:
 ### Pass 2: Mapper Confirm Upload
 
 Frontend file:
-- `frontend-1/src/components/import/ImportPannel.tsx`
+- `frontend-0/src/components/import/ImportPannel.tsx`
 
 Steps:
 
@@ -99,9 +98,8 @@ Steps:
 ### Frontend
 
 Files:
-- `frontend-1/src/components/import/CsvMapper.tsx`
-- `frontend-1/src/components/import/ImportPannel.tsx`
-- `frontend-1/src/api/postingApi.ts`
+- `frontend-0/src/components/import/CsvMapper.tsx`
+- `frontend-0/src/components/import/ImportPannel.tsx`
 
 Steps:
 

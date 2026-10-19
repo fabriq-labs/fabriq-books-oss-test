@@ -2,7 +2,7 @@
   "name": "fabriq-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "Fabriq Financial Suite - Monorepo",
+  "description": "Metadata framework monorepo: API, frontend-0, and domain hooks",
   "scripts": {
     "dev": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",

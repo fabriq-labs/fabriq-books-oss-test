@@ -12,7 +12,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 |---|---|
 | `frontend-builder` | `npm ci` and `npm run build` in `frontend-0`. `VITE_API_BASE_URL=""` so the browser calls `/api` on the same host. |
 | `backend-builder` | `npm ci`, `npm run build`, and `prisma generate` for Alpine (`linux-musl-openssl-3.0.x`). Dependencies stay in the image. |
-| `runtime-deps` | `nginx:alpine` plus Node `24.14.1` copied from the official image. `psql` is included so `setup:kernel` can run inside the container. |
+| `runtime-deps` | `nginx:alpine` plus Node `24.14.1` copied from the official image. The `psql` client is included so `setup:kernel` can run inside the container. PostgreSQL itself is not installed. |
 | final | Backend at `/app/backend`. Frontend `dist` at `/usr/share/nginx/html`. `/app/build-info.json` records the commit when build-args are passed. |
 
 `nginx.conf` listens on `PORT` (default `8080`):
@@ -21,10 +21,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 - `/health` proxies to `127.0.0.1:4000/api/health`
 - every other path is the SPA
 
-`/start.sh` picks the database mode:
-
-- `USE_EMBEDDED_PG=true` starts Postgres inside the container (`start-with-pg.sh`)
-- otherwise `start-external.sh` runs. It requires `DATABASE_URL` and `JWT_SECRET`. Nginx uses `PORT`. The API listens on `4000` inside the container.
+`/start.sh` is the only entrypoint. It requires `DATABASE_URL` and `JWT_SECRET` for an external Postgres. Nginx uses `PORT` (default `8080`). The API listens on `4000` inside the container.
 
 The image listens on `8080` only.
 
@@ -75,7 +72,6 @@ APP=my-app
 DB=Postgres
 railway variable set \
   "DATABASE_URL=\${{${DB}.DATABASE_URL}}" \
-  "USE_EMBEDDED_PG=false" \
   "AUTH_PROVIDER=local" \
   "NODE_ENV=production" \
   --service "$APP" \

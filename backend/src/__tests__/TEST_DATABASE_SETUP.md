@@ -10,7 +10,7 @@ The test suite uses a separate test database defined in `.env.test` file. Based 
 
 **Current Configuration:**
 ```
-DATABASE_URL="postgresql://postgres:lOXHRIVzVQmVHgwwHLUWeHqOtQuECFzr@nozomi.proxy.rlwy.net:39524/railway"
+DATABASE_URL="postgresql://user:password@localhost:5432/kernel_app"
 ```
 
 ### Important: Setting Up Test Database URL
@@ -20,7 +20,7 @@ DATABASE_URL="postgresql://postgres:lOXHRIVzVQmVHgwwHLUWeHqOtQuECFzr@nozomi.prox
 1. **Create or edit `.env.test` file** in the root directory:
    ```bash
    # Edit .env.test
-   DATABASE_URL="postgresql://postgres:password@containers-us-west-xxx.railway.app:5432/railway"
+   DATABASE_URL="postgresql://user:password@localhost:5432/kernel_app"
    ```
 
 2. **For Prisma commands that need to use test database**, temporarily switch:
@@ -218,7 +218,7 @@ The sales order tests verify:
 - `src/lib/actions/__tests__/sales-test-fixtures.ts` - Test fixtures
 
 ### Modified Files
-- `prisma/schema/zeiv.prisma` - Added sales_order_id to invoice
+- Invoice lines live on `prisma/schema/domain.prisma` in this branch. The old `zeiv.prisma` split is not here.
 - `prisma/schema/metadata.prisma` - Added sales_orders to workflow_instance
 - `prisma/schema/schema.prisma` - Imported sales.prisma
 - `src/lib/actions.ts` - Registered sales workflow

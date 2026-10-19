@@ -3,8 +3,6 @@ import logger from '../utils/logger';
 import { AuthContext } from '../auth/types';
 import { ModelService } from '../services/core/ModelService';
 import { FALLBACK_MODEL_NAME } from './toolRegistry';
-import { runSeedAgentModelToolsSql } from '../utils/setup/metadata/seedAgentModelToolsSql';
-import * as path from 'path';
 
 const MODEL_NAME = 'agent_model_tool_config';
 const VIEW_NAME = 'agent_model_tool_config_view';
@@ -191,13 +189,4 @@ export async function upsertModelToolConfig(
   invalidateModelToolCache();
   await warmAgentModelToolCache();
   return result;
-}
-
-/** Apply prisma/seed-agent-model-tools.sql (idempotent upsert). Returns row count after seed. */
-export async function seedDefaultModelToolConfigs(): Promise<number> {
-  const backendRoot = path.resolve(__dirname, '../../..');
-  await runSeedAgentModelToolsSql(backendRoot, prisma);
-  invalidateModelToolCache();
-  await warmAgentModelToolCache();
-  return cacheByModel?.size ?? 0;
 }

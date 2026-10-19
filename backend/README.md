@@ -25,7 +25,7 @@ npm run dev
 
 A domain seed is a second command, run from `backend/` after `setup:kernel`. This branch does not include one.
 
-Do not run `npm run sync-metadata` against this database. `backend/prisma/metadata/views/` is a JSON catalog for models that are not in this schema. `setup:kernel` does not load it.
+`setup:kernel` writes view graphs from `src/utils/setup/seedKernel.ts`. It does not load a JSON view catalog.
 
 ## Request path
 

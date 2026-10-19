@@ -17,7 +17,7 @@ A list appears when four things exist: the table, a view named `{model}_view` wh
 
 `backend/lib/domain.ts` is where a workflow model, a post-write hook, or a report handler goes. `DOMAIN_SQL_TABLES` is not read by the analytics gate. That allowlist is `KNOWN_TABLES` in `backend/src/services/analytics/sqlExecutor.ts`. Adding a name only in `domain.ts` does not create an API.
 
-`backend/prisma/metadata/views/` is a JSON catalog from the books setup. `setup:kernel` does not load it. Do not sync the whole folder into this database.
+View graphs for the shell are written by `seedKernel.ts`. A domain adds its own graphs in a `seed<Domain>.ts` script. There is no JSON view catalog to sync.
 
 `domain.prisma` and `domainNavigation` are empty on this branch. A domain seed is a second command after `setup:kernel`. The kernel seed does not insert those rows.
 
