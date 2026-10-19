@@ -15,6 +15,10 @@ Start at [docs/README.md](./docs/README.md). A new model, its table, its view, a
 
 Do not run `prisma db push`, `prisma migrate`, or other DDL. New databases are created by `npm run setup:kernel`, which applies generated schema SQL and seeds `org_system`. After `organizations` exists, apply later tables with the SQL diff in `docs/kernel/adding-a-model.md`.
 
+Read [docs/domain/AGENTS.md](./docs/domain/AGENTS.md). That file is the product. Do not add product instructions to this file.
+
+When moving a prod feature onto the shell, follow [docs/kernel/PORTING_A_DOMAIN.md](./docs/kernel/PORTING_A_DOMAIN.md).
+
 Tool-specific folders (`.cursor/`, `.claude/`) stay on the machine that uses them. They are gitignored. Instructions for every coding agent live in this file.
 
 ## Database

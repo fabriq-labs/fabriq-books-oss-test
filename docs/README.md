@@ -39,6 +39,9 @@ To add a model, follow this order: [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDI
 | [kernel/DESIGN_SYSTEM.md](./kernel/DESIGN_SYSTEM.md) | Colors, type, and spacing used by the shell. |
 | [kernel/agent/README.md](./kernel/agent/README.md) | Sessions, tools, prompts, pending actions, supervised mode. |
 | [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md) | Where a domain's files go, and which entry files the kernel imports. |
+| [kernel/PORTING_A_DOMAIN.md](./kernel/PORTING_A_DOMAIN.md) | What stays in the kernel when a prod feature is ported, and which hooks the product fills. |
+
+The product's own notes are [domain/AGENTS.md](./domain/AGENTS.md). This index does not list them.
 
 ## Infrastructure
 

@@ -51,11 +51,9 @@ On the backend, `backend/src` imports `backend/lib/domain.ts`, sometimes through
 
 An unused hook stays an empty function. `DomainRoutes` returns `null` when the product has no extra screens. A metadata list still needs a table, a view, a permission, and a `role_view`. Filling `domain.ts` does not create that API.
 
-This branch already reads `functionMap`, `workflowActionMap`, `reportHandlers`, `DOMAIN_WORKFLOW_MODELS`, and `registerDomainBuilders`. It does not yet export or call `registerDomainImportExtensions`, `registerDomainExtractors`, `registerDomainAgentRoutes`, `registerDomainRoutes`, `DOMAIN_SQL_TABLES`, or `DOMAIN_IMPORT_FIELD_KEYS`, and `App.tsx` does not render `DomainRoutes`. Those call sites are how the ledger branch reaches `backend/lib/gl` and `frontend-0/src/domain/gl`. The one ledger file outside this rule is `backend/src/utils/setup/seedChart.ts`, which imports `backend/lib/gl/seedChart` because it is a seed command.
-
 A seed command may import the product library. `backend/src/utils/setup/seed<Domain>.ts` runs after `setup:kernel`. It is not a request path.
 
-`DEFAULT_GOAL_MODEL`, `RELATED_MODELS`, `PROMPT_EXAMPLES`, `DOMAIN_MODEL_REGISTRY`, and `normalizeAnalyticsSql` are declared on `domain.ts`. The ledger branch does not read them from there. The agent still uses its own copies inside `AgentService.ts`.
+`DEFAULT_GOAL_MODEL`, `RELATED_MODELS`, `PROMPT_EXAMPLES`, `DOMAIN_MODEL_REGISTRY`, and `normalizeAnalyticsSql` are declared on `domain.ts`. The agent still uses its own copies inside `AgentService.ts`. Product notes live in [../domain/AGENTS.md](../domain/AGENTS.md). The rule for a prod migration is [PORTING_A_DOMAIN.md](./PORTING_A_DOMAIN.md).
 
 View graphs for the shell are written by `seedKernel.ts`. A domain adds its own graphs in a `seed<Domain>.ts` script. There is no JSON view catalog to sync.
 
