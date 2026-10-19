@@ -95,32 +95,40 @@ Railway FastAPI sync_service
 
 ### P0 — Must fix before first green sync on books
 
-1. **`source_system` missing on books.** Every normalized model joins `public.source_system`. Port the Prisma model + encryption middleware (or equivalent) before dbt can run.
+1. **`source_system` missing on books.** Every normalized model joins `public.source_system`. Port the Prisma model + encryption middleware (or equivalent) before dbt can run. Also bootstrap `datalake` schema + `sync_batch` (dbt integrations layer); `prisma_guard` must keep refusing DDL on `public`.
 2. **Blind paste of prod dbt will fail.** Column and table names diverge (`customers` vs `customer`, `invoice_type` vs `direction`, `instance_id` vs `invoice_id`, Float vs Decimal, `account.type` vs `account_types`).
-3. **Account classification mapping.** Prod QBO `account.sql` emits `type` as `text[]`; books chart expects `account_types` + enum `classification`. Wrong mapping breaks CoA uniqueness / reports.
-4. **Tax rate type.** Prod stores `tax_rate` as integer percent; books `tax_master.rate` is `Decimal(9,6)`. Convert `rate_value / 100` or store percent consistently — pick one and document in dbt.
+3. **Account classification mapping.** Prod QBO `account.sql` emits `type` as `text[]` and title-case classes (`Assets`); books expects `account_types` + lowercase enum `classification` (`asset`, …).
+4. **Tax rate type.** Prod stores `tax_rate` as integer percent (rounds 9.10→9); books `tax_master.rate` is `Decimal(9,6)`. Stop Int rounding; document percent vs fraction once in a dbt macro.
 5. **Invoice line parent FK.** Must write `invoice_id`, never `instance_id`.
+6. **Status / money semantics.** Prod writes Paid/Partial/Open strings and often sets both net and total from `TotalAmt`. Books: remote open/paid ⇒ `status=posted` + `balance_amount`; map `tax_amount` from `TxnTaxDetail.TotalTax` and `net_amount` from total−tax (or line sum)—do not copy `invoice_net_total = total_amt`.
 
 ### P1 — Should decide in Phase 0 design spike
 
-6. **Posting policy for synced invoices.** Options: (a) leave `status=posted` without `posting` until Track B poster exists; (b) call shared `postInvoice` from a Node hook after dbt; (c) SQL-generate postings in dbt (discouraged). **Recommendation:** (a) for first sync slice with explicit `synced_unposted` doc note, then (b) once posting lib exists.
-7. **Location identity.** Prod uses MD5 deterministic ids without lineage. Books wants lineage. Prefer lineage + natural key, or keep deterministic id **and** set `source_record_id`.
-8. **Payment terms.** Today QBO resolves Term by name join only. Upserting `payment_terms` with `source_record_id` = QBO Term Id is cleaner for universal model.
-9. **Unique constraints with null lineage.** In-app rows have null `source_record_id`; Postgres UNIQUE allows multiple nulls. Synced rows must always set all three lineage keys.
+7. **Posting policy for synced invoices.** Prod dbt never creates `posting`. Options: (a) leave `status=posted` without `posting` until Track B poster exists (`synced_unposted`); (b) call shared `postInvoice` from a Node hook after dbt; (c) SQL-generate postings in dbt (discouraged). **Recommendation:** (a) then (b).
+8. **`due_date` dropped on prod.** Staging extracts `DueDate`; normalized `invoice.sql` never selects it (only uses it for terms matching). Books has `invoice.due_date` — write it.
+9. **Entity HQ join.** Prod uses `is_it_headquartres` and sometimes `coalesce(le.id, org_id)` as legal entity — unsafe when org id ≠ entity id. Use `entity.is_headquarters` and a real `ent_*` id.
+10. **Location / line identity.** Prod uses MD5 deterministic ids without lineage. Prefer lineage + natural key, or deterministic id **and** `source_record_id`.
+11. **Payment terms.** Join today on prod `payment_terms` / `no_of_days` → books `name` / `days`. Upserting `payment_terms` with QBO Term Id as lineage is cleaner than name-only match.
+12. **Multi-connection fragility.** Prod lateral join picks “any active quickbooks” `source_system` without scoping to the sync request’s connection. Scope by `org_id` + the connection being synced.
+13. **Unique constraints with null lineage.** In-app rows may null `source_record_id`; synced rows must always set all three lineage keys.
 
 ### P2 — Follow-ups (not blocking first customer/invoice land)
 
-10. **No QBO Payment / CreditMemo streams in normalized layer** — add after core sales objects sync.
-11. **invoice_line_tax** not populated from `TxnTaxDetail` in prod dbt (tax often header-only). Expand in a tax hardening phase.
-12. **Reverse PO connector** — purchases module; do not port in QBO-first sales slice.
-13. **Airbyte connection management UI** — minimal: store `extraction_config`; full admin UI can wait.
-14. **Department / Class** — parked per `SALES_MODEL.md`.
+14. **No QBO Payment / CreditMemo streams in normalized layer** — add after core sales objects sync (schema already ready).
+15. **`invoice_line_tax` / line `tax_group_id`** — prod leaves these null; wire TaxCode→TaxRate for books tax posting.
+16. **Vendor tax id** — map QBO `TaxIdentifier` into `party_tax_registration` (not a free-text supplier column).
+17. **TaxAgency** — staging only; park as label behind `tax_master` / region, not a first-class table.
+18. **Reverse PO connector** — purchases module; do not port in QBO-first sales slice.
+19. **Airbyte connection management UI** — minimal: store `extraction_config`; full admin UI can wait.
+20. **Department / Class** — parked per `SALES_MODEL.md`.
 
 ### Design smells to clean while porting
 
 - `run_dbt.py` first-run detection still references `public.customers` — update to `public.customer`.
 - Supplier normalized model fills many prod-only required strings (`industry`, `onboarded_date`) — drop for thin supplier.
 - Mixing `status` display strings (`Paid`/`Open`) with books enum (`draft`/`posted`/`void`) — map in dbt: QBO balance==0 → still `posted` with `balance_amount=0`; never invent `draft` for remote posted invoices.
+- Item: map PrefVendor→`preferred_supplier_id` and SalesTaxCode→`tax_group_id`, not only `item_tax_category` label.
+- Prefer real QBO Ids in lineage over synthetic `qbo_code_*` / `qbo_rate_*` codes where unique constraints allow.
 
 ---
 
@@ -131,7 +139,8 @@ Railway FastAPI sync_service
 **Deliverables**
 
 - Prisma `source_system` (org-scoped, encrypted JSON configs, `@@unique([org_id, system_type])`, optional `entity_id`)
-- Shared encryption helper usable from Node (and document Python parity)
+- Datalake bootstrap: `datalake` schema, `sync_batch`, docs for Airbyte `qb_*` landing tables
+- Shared encryption helper usable from Node (and document Python parity in `integrations/shared/`)
 - SQL delta applied on **local/dev only**
 - Env template entries: `ERP_CONFIG_ENCRYPTION_KEY`, QBO OAuth placeholders, Airbyte placeholders — **no secrets committed**
 - Register `source_system` in domain SQL allowlist if analytics needs it
@@ -146,17 +155,17 @@ Railway FastAPI sync_service
 **Deliverables**
 
 - Copy/adapt `backend/integrations/{shared,sync_service,quickbooks}` onto books
-- Rewrite normalized models to universal columns (matrix in §B)
-- Update `run_dbt.py` / dbt tests / first-run checks for `customer`
-- Docker/Railway notes for sync_service pointing at books schema
-- Seed or script: ensure `payment_terms` / currency lookup still works
+- Rewrite normalized models to universal columns (matrix in §B), including: `due_date`, net/tax/total split, HQ `is_headquarters`, scoped `source_system` join
+- Update `run_dbt.py` / dbt tests / first-run checks for `customer` (not `customers`)
+- Docker/Railway notes for sync_service pointing at books schema; keep `prisma_guard` (no public DDL from dbt)
+- Seed or script: ensure `payment_terms` / currency / HQ entity lookup still works
 
 **Acceptance**
 
 - `transform_only` (or full sync against sandbox Airbyte) merges:
   - ≥1 `account`, ≥1 `customer`, ≥1 `item_master`, ≥1 `invoice` + lines, tax group/rate if present in realm
 - All merged rows have lineage populated
-- `invoice.direction = sales`, amounts Decimal, lines use `invoice_id`
+- `invoice.direction = sales`, amounts Decimal, lines use `invoice_id`, `due_date` set when QBO sends DueDate
 - No writes to prod DB
 
 ### Phase 2 — Connection + sync trigger (API)
@@ -245,4 +254,12 @@ Frontend sales forms are **not** in this list. A thin “Connections” settings
 - [ ] Agree reverse PO sync stays out
 - [ ] Confirm `source_system` lives in domain/integrations schema (not kernel platform) on books
 
-Once approved, implementation should start at **Q0** on a branch off the sales-model branch (or merged `fabriq-books` after sales schema lands).
+Once approved, implementation should start at **Phase 0** on a branch off the sales-model branch (or merged `fabriq-books` after sales schema lands).
+
+---
+
+## H. Sources
+
+- Prod tree: `origin/prod:backend/integrations/{quickbooks,shared,sync_service}` and `backend/src/lib/integrations/quickbooks/`
+- Books targets: `sales.prisma`, `tax.prisma`, [`SALES_MODEL.md`](./SALES_MODEL.md)
+- Cross-check: coding-agent inventory of the same prod paths (object matrix, `due_date` drop, net=total smell, HQ join, multi-connection lateral join)
