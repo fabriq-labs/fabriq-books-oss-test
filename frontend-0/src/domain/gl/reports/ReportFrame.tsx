@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { fetchAPI } from '@/api/apiClient';
 import { viewAPI } from '@/api/api';
-import { entityLabel, useEntity } from '@/contexts/EntityContext';
+import { useEntity } from '@/contexts/EntityContext';
 import { ReportFilterBar, type ReportCurrency } from './filters/ReportFilterBar';
+import { applyReportFilters, type ChartAccount } from './filters/applyReportFilters';
+import type { ReportAccountOption } from './filters/ReportAccountFilter';
 import { getCurrentFYOption, type FinancialYearOption, type MonthOption } from './filters/financialYear';
 
 export type ReportEnvelope = {
@@ -44,12 +46,17 @@ export function ReportFrame({
   path: string;
   children: (report: ReportEnvelope | null) => ReactNode;
 }) {
-  const { currentEntity, currentEntityId, loading: entityLoading } = useEntity();
+  const { entities, currentEntityId, loading: entityLoading } = useEntity();
   const initialYear = getCurrentFYOption();
   const [financialYear, setFinancialYear] = useState<FinancialYearOption>(initialYear);
   const [month, setMonth] = useState<MonthOption | null>(null);
   const [currencyId, setCurrencyId] = useState('');
   const [currencies, setCurrencies] = useState<ReportCurrency[]>([]);
+  const [currenciesLoading, setCurrenciesLoading] = useState(true);
+  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
+  const [account, setAccount] = useState<ReportAccountOption | null>(null);
+  const [showOnlyActivity, setShowOnlyActivity] = useState(true);
+  const [accounts, setAccounts] = useState<ChartAccount[]>([]);
   const [report, setReport] = useState<ReportEnvelope | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -57,7 +64,7 @@ export function ReportFrame({
 
   const from = month?.from_date ?? financialYear.from_date;
   const to = month?.to_date ?? financialYear.to_date;
-  const entityPart = currentEntityId ?? '';
+  const entityPart = selectedEntityIds.join(',');
   const filterKey = useMemo(
     () => `${from}|${to}|${entityPart}|${currencyId}`,
     [from, to, entityPart, currencyId]
@@ -66,7 +73,16 @@ export function ReportFrame({
   rangeRef.current = { from, to, currencyId };
 
   useEffect(() => {
-    viewAPI.getAll('currency', 'currency_view', 1, 200).then((res) => setCurrencies(rowsOf(res))).catch(() => setCurrencies([]));
+    setCurrenciesLoading(true);
+    viewAPI
+      .getAll('currency', 'currency_view', 1, 200)
+      .then((res) => setCurrencies(rowsOf(res)))
+      .catch(() => setCurrencies([]))
+      .finally(() => setCurrenciesLoading(false));
+    viewAPI
+      .search('account', 'account_view', 1, 500, undefined, {}, { code: 'asc' })
+      .then((res) => setAccounts(rowsOf(res) as ChartAccount[]))
+      .catch(() => setAccounts([]));
   }, []);
 
   const load = async (key = filterKey) => {
@@ -92,19 +108,34 @@ export function ReportFrame({
 
   useEffect(() => {
     if (entityLoading) return;
+    const ids = currentEntityId ? [currentEntityId] : [];
+    setSelectedEntityIds(ids);
     const range = rangeRef.current;
-    void load(`${range.from}|${range.to}|${currentEntityId ?? ''}|${range.currencyId}`);
-    // The top-bar entity is the report filter. Year and currency still wait for Run report.
+    void load(`${range.from}|${range.to}|${ids.join(',')}|${range.currencyId}`);
+    // The nav entity seeds this panel and reloads the report. Year, currency, and
+    // further entity edits wait for Run report.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, currentEntityId, entityLoading]);
 
-  const missing = (report?.rows ?? []).filter((row) => row.rate_missing).length
-    + (report?.summary && (report.summary as { rate_missing?: boolean }).rate_missing ? 1 : 0);
+  const visibleReport = useMemo(() => {
+    if (!report) return null;
+    return applyReportFilters(report, {
+      path,
+      showOnlyActivity,
+      accountId: account?.id ?? null,
+      accounts,
+      entityIds: selectedEntityIds,
+    });
+  }, [report, path, showOnlyActivity, account, accounts, selectedEntityIds]);
+
+  const missing = (visibleReport?.rows ?? []).filter((row) => row.rate_missing).length
+    + (visibleReport?.summary && (visibleReport.summary as { rate_missing?: boolean }).rate_missing ? 1 : 0);
 
   return (
     <div className="space-y-4">
       <ReportFilterBar
         title={title}
+        path={path}
         reportCurrency={report?.report_currency ?? null}
         financialYear={financialYear}
         onFinancialYearChange={(option) => {
@@ -113,10 +144,19 @@ export function ReportFrame({
         }}
         month={month}
         onMonthChange={setMonth}
-        entityLabel={currentEntity ? entityLabel(currentEntity) : 'All Entities'}
+        entities={entities}
+        entityLoading={entityLoading}
+        selectedEntityIds={selectedEntityIds}
+        onSelectedEntityIdsChange={setSelectedEntityIds}
         currencies={currencies}
+        currenciesLoading={currenciesLoading}
         currencyId={currencyId}
         onCurrencyIdChange={setCurrencyId}
+        account={account}
+        onAccountChange={setAccount}
+        onAccountClear={() => setAccount(null)}
+        showOnlyActivity={showOnlyActivity}
+        onShowOnlyActivityChange={setShowOnlyActivity}
         loading={loading}
         dirty={appliedKey !== '' && appliedKey !== filterKey}
         onRun={() => void load()}
@@ -127,7 +167,7 @@ export function ReportFrame({
           rate_missing: an exchange rate was not found, so the amount stayed in the account currency.
         </p>
       )}
-      {children(report)}
+      {children(visibleReport)}
     </div>
   );
 }
