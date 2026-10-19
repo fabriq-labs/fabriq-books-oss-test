@@ -23,6 +23,7 @@
     "seed:gl": "ts-node --transpile-only src/utils/setup/seedGl.ts",
     "seed:entities": "ts-node --transpile-only src/utils/setup/seedEntities.ts",
     "seed:coa": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedChart.ts",
+    "seed:books-demo": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedBooksDemo.ts",
     "pull-metadata": "ts-node prisma/pull-metadata.ts",
     "pull": "ts-node prisma/pull-metadata-interactive.ts",
     "sync": "ts-node prisma/sync-metadata-interactive.ts",
