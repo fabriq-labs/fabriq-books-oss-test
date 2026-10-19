@@ -11,6 +11,11 @@
 node_modules
 backend/node_modules
 frontend-0/node_modules
+backend/integrations/.venv
+**/__pycache__
+**/dbt/target
+**/dbt/logs
+**/dbt/dbt_packages
 
 # Build artifacts
 dist

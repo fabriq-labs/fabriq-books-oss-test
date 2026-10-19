@@ -1,0 +1,56 @@
+version: 2
+
+models:
+  - name: customer
+    columns:
+      - name: org_id
+        tests: [not_null]
+      - name: source_system_id
+        tests: [not_null]
+      - name: source_record_id
+        tests: [not_null]
+      - name: name
+        tests: [not_null]
+
+  - name: supplier
+    columns:
+      - name: org_id
+        tests: [not_null]
+      - name: source_record_id
+        tests: [not_null]
+      - name: name
+        tests: [not_null]
+
+  - name: invoice
+    columns:
+      - name: org_id
+        tests: [not_null]
+      - name: direction
+        tests: [not_null]
+      - name: source_record_id
+        tests: [not_null]
+
+  - name: invoice_line_item
+    columns:
+      - name: invoice_id
+        tests: [not_null]
+      - name: org_id
+        tests: [not_null]
+      - name: source_record_id
+        tests: [not_null]
+
+  - name: account
+    columns:
+      - name: org_id
+        tests: [not_null]
+      - name: source_record_id
+        tests: [not_null]
+
+  - name: item_master
+    columns:
+      - name: org_id
+        tests: [not_null]
+      - name: name
+        tests: [not_null]
+      - name: source_record_id
+        tests: [not_null]

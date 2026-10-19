@@ -22,6 +22,9 @@ fi
 
 export NGINX_PORT="${PORT:-8080}"
 export BACKEND_PORT="4000"
+export SYNC_PORT="${SYNC_PORT:-8090}"
+# Single-tenant: sync/dbt runs in this same container on loopback (default on).
+export ENABLE_SYNC_SERVICE="${ENABLE_SYNC_SERVICE:-true}"
 
 # Prisma: use whichever query engine was built (openssl-3.0.x or 1.1.x)
 PRISMA_CLIENT_DIR="/app/backend/node_modules/.prisma/client"
@@ -45,6 +48,29 @@ cd /app/backend
     sleep 2
   done
 ) &
+
+# Forward-sync service (Airbyte + dbt) — same image, loopback only.
+INTEGRATIONS_DIR="/app/backend/integrations"
+if [ "${ENABLE_SYNC_SERVICE}" = "true" ] || [ "${ENABLE_SYNC_SERVICE}" = "1" ]; then
+  if [ -x "${INTEGRATIONS_DIR}/.venv/bin/uvicorn" ]; then
+    echo "Starting sync_service on 127.0.0.1:${SYNC_PORT}..."
+    (
+      cd "${INTEGRATIONS_DIR}"
+      export PYTHONPATH="${INTEGRATIONS_DIR}"
+      while true; do
+        .venv/bin/uvicorn sync_service.main:app --host 127.0.0.1 --port "${SYNC_PORT}" &
+        SYNC_PID=$!
+        echo "sync_service started with pid ${SYNC_PID}"
+        wait "${SYNC_PID}"
+        EXIT_CODE=$?
+        echo "WARNING: sync_service (pid ${SYNC_PID}) exited with code ${EXIT_CODE}; restarting in 2s..."
+        sleep 2
+      done
+    ) &
+  else
+    echo "WARNING: ENABLE_SYNC_SERVICE=true but ${INTEGRATIONS_DIR}/.venv missing; skip sync."
+  fi
+fi
 
 echo "Waiting for backend..."
 for i in $(seq 1 30); do

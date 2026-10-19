@@ -188,11 +188,12 @@ Railway FastAPI sync_service
 
 **Deliverables**
 
-- Copy/adapt `backend/integrations/{shared,sync_service,quickbooks}` onto books under **uv**
-- Rewrite normalized models to universal columns (matrix in §B), including: `due_date`, net/tax/total split, HQ `is_headquarters`, scoped `source_system` join
-- Update `run_dbt.py` / dbt tests / first-run checks for `customer` (not `customers`)
-- Extend **root Dockerfile + `start.sh`** so sync/dbt runs in the same image on loopback; keep `prisma_guard` (no public DDL from dbt)
-- Seed or script: ensure `payment_terms` / currency / HQ entity lookup still works
+- Copy/adapt `backend/integrations/{shared,sync_service,quickbooks}` onto books under **uv** — **done**
+- Rewrite normalized models to universal columns (matrix in §B), including: `due_date`, net/tax/total split, HQ `is_headquarters`, scoped `source_system` join — **done**
+- Update `run_dbt.py` / dbt tests / first-run checks for `customer` (not `customers`) — **done**
+- Extend **root Dockerfile + `start.sh`** so sync/dbt runs in the same image on loopback; keep `prisma_guard` (no public DDL from dbt) — **done**
+- Ops guide: [`QUICKBOOKS_FORWARD_SYNC.md`](./QUICKBOOKS_FORWARD_SYNC.md)
+- Remaining: Node sync-trigger routes, `set-extraction-config` script, live Airbyte sandbox dry-run
 
 **Acceptance**
 

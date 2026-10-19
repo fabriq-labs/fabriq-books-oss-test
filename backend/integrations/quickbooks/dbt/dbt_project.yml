@@ -1,0 +1,52 @@
+name: 'quickbooks_integrations'
+version: '1.0.0'
+config-version: 2
+
+profile: 'quickbooks_integrations'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+vars:
+  source_table_prefix: "{{ env_var('DBT_SOURCE_TABLE_PREFIX', 'qb') }}"
+  org_id: "{{ env_var('org_id', 'org_default') }}"
+  force_process_all: false  # Set to true to process all records (bypass incremental filter)
+
+models:
+  quickbooks_integrations:
+    # Staging models - copy-only from source (views in datalake schema)
+    staging:
+      +materialized: view
+      +custom_schema: datalake
+
+    # Integration metadata models (tables in datalake schema)
+    integrations:
+      +materialized: table
+      +custom_schema: datalake
+      # Note: source_system table is managed by Prisma, not DBT
+
+    # Normalized models merge into Prisma-owned public tables.
+    # ignore: dest has extra Prisma columns; do not ADD/DROP/ALTER.
+    # prisma_guard still refuses DDL if dbt tries it. Never --full-refresh.
+    normalized:
+      +materialized: incremental
+      +custom_schema: public
+      +incremental_strategy: merge
+      +unique_key:
+        - source_record_id
+        - source_system_id
+        - org_id
+      +on_schema_change: ignore
+      +full_refresh: false
+      +pre_hook:
+        - "{{ assert_prisma_relation_exists() }}"
+
