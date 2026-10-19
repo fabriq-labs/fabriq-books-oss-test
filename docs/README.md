@@ -38,7 +38,7 @@ To add a model, follow this order: [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDI
 | [kernel/frontend.md](./kernel/frontend.md) | The shell: home, Super Admin navigation, the profile menu, and a metadata list. |
 | [kernel/DESIGN_SYSTEM.md](./kernel/DESIGN_SYSTEM.md) | Colors, type, and spacing used by the shell. |
 | [kernel/agent/README.md](./kernel/agent/README.md) | Sessions, tools, prompts, pending actions, supervised mode. |
-| [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md) | Where a future domain's files go. |
+| [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md) | Where a domain's files go, and which entry files the kernel imports. |
 
 ## Infrastructure
 
