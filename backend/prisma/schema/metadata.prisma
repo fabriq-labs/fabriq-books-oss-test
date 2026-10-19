@@ -35,6 +35,8 @@ model user {
   manager_id               String? // Reference to manager's user id
   manager                  user?                  @relation("ManagerReport", fields: [manager_id], references: [id])
   reports                  user[]                 @relation("ManagerReport")
+  department_id            String?
+  department               department?            @relation("UserDepartment", fields: [department_id], references: [id])
   role_users               role_user[]            @relation("UserToRoleUser")
   wf_histories             workflow_history[]     @relation("workflow_action")
   comments                 comment[]              @relation("UserComments")
@@ -43,6 +45,19 @@ model user {
   api_key                  String?                @db.VarChar(255) // Bcrypt-hashed API key for programmatic access
 
   @@map("user")
+}
+
+model department {
+  id          String   @id @default(dbgenerated("'dept_' || gen_random_uuid()"))
+  name        String
+  created_at  DateTime @default(now())
+  modified_at DateTime @updatedAt
+  created_by  String?
+  modified_by String?
+  org_id      String?
+  users       user[]   @relation("UserDepartment")
+
+  @@map("department")
 }
 
 model role {
@@ -72,7 +87,7 @@ model view {
   org_id          String?
   role_views      role_view[]       @relation("ViewToRoleView")
   permissions     permission[]      @relation("ViewToPermission")
-  data_graph      Json? // default data graph to be returned
+  data_graph      Json // fields and columns this view returns
   prompt_template prompt_template[]
 
   @@map("view")
@@ -140,7 +155,7 @@ model base_model {
 model workflow_flow {
   id          String              @id @default(dbgenerated("'flow_' || gen_random_uuid()"))
   name        String              @unique
-  model_name  String // domain model this flow applies to, e.g. "todo"
+  model_name  String // domain model this flow applies to
   description String?
   is_active   Boolean             @default(true)
   created_by  String?

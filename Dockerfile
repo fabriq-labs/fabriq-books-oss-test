@@ -1,24 +1,13 @@
-# Single Dockerfile for both embedded-PG and external-PG. Mode at runtime via USE_EMBEDDED_PG.
-# Build: clone repos → build frontend, backend, Python sync service → final nginx image.
-# Works the same on Cloud Build, Railway, and local docker build.
-# Build context must be the repo root with ./backend and ./frontend-0.
-# CI: checkout backend + frontend into context, or build from a monorepo that contains both directories.
-# Runtime: nginx + Node (8080 via PORT), Python FastAPI integration sync on 8081 (POST /sync, GET /health).
-# Node uses INTEGRATION_SYNC_URL (set by start scripts when sync is not disabled).
-# Build: COPY monorepo backend/ + frontend-0/ → build → final nginx image.
+# Kernel image: nginx serves frontend-0 and proxies /api to the Node backend.
+# Build context is the repo root (./backend and ./frontend-0).
+# Runtime database mode is USE_EMBEDDED_PG (start-with-pg.sh) or external DATABASE_URL (start-external.sh).
 # CI: GitHub Actions → GHCR. Optional build-args: SOURCE_* for /app/build-info.json.
 #
-# Runtime Node is pinned (see node-runtime stage). Do not use unpinned `apk add nodejs` —
-# Alpine package bumps (e.g. 24.14 → 24.17) broke google-auth-library / GCS on Railway.
+# Runtime Node is pinned (see node-runtime stage). Do not use unpinned `apk add nodejs`.
 
 # Pinned Node.js for production runtime (nginx final stage). Bump only after validation.
 ARG NODE_RUNTIME_VERSION=24.14.1
 FROM node:${NODE_RUNTIME_VERSION}-alpine AS node-runtime
-
-# Stage 0: Application source from build context
-FROM scratch AS source
-COPY backend /src/backend
-COPY frontend-0 /src/frontend-0
 
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
@@ -53,33 +42,7 @@ RUN sed -i '/provider = "prisma-client-js"/a\
 # tsc does not emit JSON under src/config; copy is required at runtime (ModelRegistry).
 RUN npm run build
 RUN npx prisma generate
-# Do not prune: OpenTelemetry/Langfuse deps are in devDependencies but required at runtime
-
-# Stage 2c: Python integration sync service (FastAPI: GET /health, POST /sync — port 8081 at runtime)
-# Matches backend/integrations/sync_service/Dockerfile layout: PYTHONPATH root contains zoho_books/, quickbooks/, sync_service/.
-FROM python:3.12-alpine AS sync-service-builder
-RUN apk add --no-cache \
-    gcc \
-    musl-dev \
-    postgresql-dev \
-    libffi-dev \
-    openssl-dev \
-    cargo \
-    rust
-
-WORKDIR /opt/fabriq-int
-COPY --from=source /src/backend/integrations/sync_service/requirements.txt ./sync_service/requirements.txt
-
-RUN python -m venv /opt/venv \
- && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
- && /opt/venv/bin/pip install --no-cache-dir -r sync_service/requirements.txt
-
-COPY --from=source /src/backend/integrations/zoho_books ./zoho_books
-COPY --from=source /src/backend/integrations/quickbooks ./quickbooks
-COPY --from=source /src/backend/integrations/shared ./shared
-COPY --from=source /src/backend/integrations/sync_service ./sync_service
-
-ENV PYTHONPATH=/opt/fabriq-int
+# Do not prune: OpenTelemetry deps are in devDependencies but required at runtime
 
 # Stage 2b: Image metadata JSON (env-only — do not COPY app trees or this stage
 # invalidates on every code change and slows the build for no benefit).
@@ -109,7 +72,7 @@ RUN BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
 
 # Stage 3a: OS + pinned Node runtime deps.
 # Keep this stage free of per-build ARG/LABEL (BUILD_TIME, IMAGE_TAG, SOURCE_*) so
-# code-only CI rebuilds can CACHED the heavy apk (postgres, tesseract, gcc, …).
+# code-only CI rebuilds can cache the apk layer.
 FROM nginx:alpine AS runtime-deps
 
 ARG NODE_RUNTIME_VERSION=24.14.1
@@ -117,13 +80,6 @@ ARG NODE_RUNTIME_VERSION=24.14.1
 RUN apk add --no-cache \
     wget \
     gettext \
-    python3 \
-    make \
-    g++ \
-    antiword \
-    poppler-utils \
-    tesseract-ocr \
-    tesseract-ocr-data-eng \
     bash \
     postgresql16 \
     postgresql16-contrib \
@@ -144,20 +100,6 @@ FROM runtime-deps
 
 ARG NODE_RUNTIME_VERSION=24.14.1
 
-COPY --from=sync-service-builder /opt/venv /opt/venv
-COPY --from=sync-service-builder /opt/fabriq-int /opt/fabriq-int
-# Venv was built on python:3.12-alpine. Do NOT point it at apk python3 (version skew
-# → ModuleNotFoundError: uvicorn even when /opt/venv/bin/uvicorn exists).
-# Bring the matching CPython 3.12 runtime + shared libs from the builder.
-COPY --from=sync-service-builder /usr/local/bin/python3.12 /usr/local/bin/python3.12
-COPY --from=sync-service-builder /usr/local/lib/libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so.1.0
-COPY --from=sync-service-builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
-RUN ln -sf python3.12 /usr/local/bin/python3 \
- && ln -sf python3.12 /usr/local/bin/python \
- && ln -sf libpython3.12.so.1.0 /usr/local/lib/libpython3.12.so \
- && /opt/venv/bin/python -c "import uvicorn; print('uvicorn ok', uvicorn.__version__)"
-ENV LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-
 COPY --from=backend-builder /app /app/backend
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 COPY --from=build-info /build-info.json /app/build-info.json
@@ -167,9 +109,8 @@ COPY nginx.main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 COPY start-with-pg.sh /start-with-pg.sh
 COPY start-external.sh /start-external.sh
-COPY start-sync-service.sh /start-sync-service.sh
 COPY start.sh /start.sh
-RUN chmod +x /start.sh /start-with-pg.sh /start-external.sh /start-sync-service.sh
+RUN chmod +x /start.sh /start-with-pg.sh /start-external.sh
 
 RUN mkdir -p /app/backend/logs
 RUN mkdir -p /var/lib/postgresql/data && chown -R postgres:postgres /var/lib/postgresql
@@ -180,17 +121,16 @@ ARG IMAGE_TAG=unknown
 ARG SOURCE_REF=unknown
 
 LABEL org.opencontainers.image.created="${BUILD_TIME}"
-LABEL org.opencontainers.image.title="fabriq"
+LABEL org.opencontainers.image.title="kernel"
 LABEL fabriq.source.ref="${SOURCE_REF}"
 LABEL fabriq.backend.branch="${SOURCE_REF}"
 LABEL fabriq.frontend.branch="${SOURCE_REF}"
 LABEL fabriq.image.tag="${IMAGE_TAG}"
 LABEL fabriq.node.runtime="${NODE_RUNTIME_VERSION}"
 
-# Python sync API (POST /sync). Start scripts export INTEGRATION_SYNC_URL when the service is enabled.
-EXPOSE 8080 8081
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${NGINX_PORT:-8080}/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:${PORT:-8080}/health || exit 1
 
 CMD ["/start.sh"]

@@ -23,6 +23,7 @@ export const SHAREABLE_MODELS = new Set([
 export const MODELS_WITHOUT_ORG = new Set([
   'org',
   'agent_model_tool_config',
+  'llm_trace_step',
 ]);
 
 export type ModelTenancy = 'private' | 'shareable' | 'unscoped';

@@ -21,13 +21,16 @@ Application tenancy is in the data access layer, auth middleware, workflow engin
 | Database setup | `cd backend && npm run setup:kernel` |
 | Login | `admin@example.com` / `admin123` on org `org_kernel` |
 
-Do not run `prisma db push` or `prisma migrate`. Setup applies generated schema SQL and seeds `org_system`.
+Do not run `prisma db push` or `prisma migrate`. Setup applies generated schema SQL and seeds `org_system`. Each seeded view includes a `data_graph`. That JSON is the Prisma `select` and the Master columns. Read [kernel/metadata.md](./kernel/metadata.md) before writing one.
+
+To add a model, follow this order: [kernel/BUILDING_A_DOMAIN.md](./kernel/BUILDING_A_DOMAIN.md), [kernel/adding-a-model.md](./kernel/adding-a-model.md), [kernel/metadata.md](./kernel/metadata.md), [kernel/frontend.md](./kernel/frontend.md), [kernel/tenancy.md](./kernel/tenancy.md). Restart the backend after `prisma generate`. `setup:kernel` seeds the shell only. A domain seed is a second command. This branch does not include one.
 
 ## Kernel
 
 | Document | What it teaches |
 |---|---|
-| [kernel/metadata.md](./kernel/metadata.md) | How a view, a permission, and a role produce an API and a screen. Request path from HTTP to the data access layer. |
+| [kernel/metadata.md](./kernel/metadata.md) | How a view, a permission, and a role produce an API and a list. Request path from HTTP to the data access layer. `data_graph` properties. |
+| [kernel/adding-a-model.md](./kernel/adding-a-model.md) | Add a model, apply its table without `db push`, seed its view and permission, and add the list route and form routes. |
 | [kernel/tenancy.md](./kernel/tenancy.md) | Org scope, shareable and private reads, platform-admin writes, and the row-level security sketch to review. |
 | [kernel/examples.md](./kernel/examples.md) | Worked steps on tables and routes that exist: model, view, permission, role, workflow, instance. |
 | [kernel/workflows.md](./kernel/workflows.md) | States, actions, assignment, history, and who may write a definition. |
@@ -39,17 +42,9 @@ Do not run `prisma db push` or `prisma migrate`. Setup applies generated schema 
 
 ## Infrastructure
 
-Build, deploy, and host notes. These are not part of the kernel contract.
-
 | Document | What it covers |
 |---|---|
-| [infrastructure/DEPLOYMENT.md](./infrastructure/DEPLOYMENT.md) | Environment, setup, and deployment |
-| [infrastructure/BUILD_AND_DEPLOY.md](./infrastructure/BUILD_AND_DEPLOY.md) | Root Dockerfile, GHCR, and the image workflow |
-| [infrastructure/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md](./infrastructure/RAILWAY_ARTIFACT_REGISTRY_VERTEX.md) | Railway image and Vertex credentials |
-| [infrastructure/UBUNTU_DOCKER_COMPOSE_SETUP.md](./infrastructure/UBUNTU_DOCKER_COMPOSE_SETUP.md) | Docker Compose on Ubuntu |
-| [infrastructure/VM_REMOTE_DEV.md](./infrastructure/VM_REMOTE_DEV.md) | Remote VM development |
-| [infrastructure/WORKTREE_CLOUD_AGENT_SETUP.md](./infrastructure/WORKTREE_CLOUD_AGENT_SETUP.md) | Cloud agent worktrees |
-| [infrastructure/AGENT_PROMPT_CLOUD_VM.md](./infrastructure/AGENT_PROMPT_CLOUD_VM.md) | Prompt for an agent on the cloud VM |
+| [infrastructure/BUILD_AND_DEPLOY.md](./infrastructure/BUILD_AND_DEPLOY.md) | The single image, and a new Railway service from `RAILWAY_TOKEN` |
 
 ## Security
 

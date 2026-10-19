@@ -14,6 +14,7 @@ interface SidebarNavigationProps {
  */
 const superAdminNav = [
   { label: 'Users', path: '/settings/users' },
+  { label: 'Departments', path: '/settings/departments' },
   { label: 'Roles', path: '/settings/roles' },
   { label: 'Workflows', path: '/settings/workflows' },
   { label: 'Views', path: '/settings/views' },

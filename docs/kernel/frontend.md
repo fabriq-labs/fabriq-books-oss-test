@@ -14,13 +14,14 @@ The kernel UI is `frontend-0`. Dev server port is 5174 (`frontend-0/vite.config.
 
 ## Navigation
 
-`frontend-0/src/components/layout/sidebar/SidebarNavigation.tsx` renders three kernel items, then whatever `frontend-0/src/domain/navigation.ts` exports. That file is an empty list.
+`frontend-0/src/components/layout/sidebar/SidebarNavigation.tsx` renders three kernel items, then `domainNavigation` from `frontend-0/src/domain/navigation.ts`. Add a group there for each product list. On this branch `domainNavigation` is an empty array.
 
 Super Admin routes, each wrapped in `SuperAdminGuard`:
 
 | Label | Path |
 |---|---|
 | Users | `/settings/users` |
+| Departments | `/settings/departments` |
 | Roles | `/settings/roles` |
 | Workflows | `/settings/workflows` |
 | Views | `/settings/views` |
@@ -39,6 +40,8 @@ The avatar in `frontend-0/src/components/layout/TopBar.tsx` opens a menu with th
 
 `/master/:category/:model` renders `DomainMaster`, which mounts `Master` with `view={`${model}_view`}`. For currency that is view `currency_view`, so `/master/app/currency` is the same Master page as `/accounting/currency`.
 
-Master loads rows with `GET /api/{model}/view/{viewId}` and searches with `POST /api/{model}/view/{viewId}/search`. Filters on that page are sent as that search body. Column choice comes from the view's `data_graph` when the view has one. See [metadata.md](./metadata.md).
+Master loads rows with `GET /api/{model}/view/{viewId}` and searches with `POST /api/{model}/view/{viewId}/search`. Filters on that page are sent as that search body. Columns come from `data_graph`. A key needs `displayName`, and a normal column also needs `isColumnShow: true`. A missing graph is not valid: the column is required, and without those properties the table header is empty even when the rows have fields. See [metadata.md](./metadata.md).
+
+New and row click navigate to `/{model}/view/{viewName}` and `/{model}/{id}/view/{viewName}`. The parameter is the view name (`note_view`), not the view row id. Those routes are not created from the view. `App.tsx` registers them per model. Kernel models with forms are user, role, view, permission, prompt template, and LLM trace. A domain model needs its own form component and both routes, calling `viewAPI` in `frontend-0/src/api/metadataApi.ts`. The response body is `{ success, data, metaData }`. Optional dates and foreign keys are sent as `null`, not `""`. The steps and the `SearchDropDown` callback are in [adding-a-model.md](./adding-a-model.md).
 
 Sign-in is `/sign-in`. An authenticated user who opens it is sent back into the app.

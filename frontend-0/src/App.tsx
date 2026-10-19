@@ -13,6 +13,7 @@ import SignInPage from "./pages/sign-in";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ToolProvider } from '@/contexts/ToolContext';
 import { UserMasterForm } from "./components/forms/Masters/UserMasterForm";
+import { DepartmentForm } from "./components/forms/Masters/DepartmentForm";
 import { UserRolesForm } from "./components/forms/Masters/UserRolesForm";
 import WorkflowManagementPage from "./pages/settings/WorkflowManagementPage";
 import WorkflowDetailPage from "./pages/settings/WorkflowDetailPage";
@@ -94,6 +95,9 @@ const AppRoutes: React.FC = () => {
               } />
               <Route path="user/:id/view/:viewId" element={<UserMasterForm />} />
               <Route path="user/view/:viewId" element={<UserMasterForm />} />
+              <Route path="settings/departments" element={<Master type="department" view="department_view" displayName="Departments" />} />
+              <Route path="department/:id/view/:viewId" element={<DepartmentForm />} />
+              <Route path="department/view/:viewId" element={<DepartmentForm />} />
 
               <Route path="settings/roles" element={
                 <SuperAdminGuard>

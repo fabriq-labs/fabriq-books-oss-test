@@ -619,7 +619,15 @@ export class DynamicPromptManager {
                 data: {
                     name: viewName,
                     model_name: this.modelName,
-                    description: `View for ${this.modelName} - ${viewName}`
+                    description: `View for ${this.modelName} - ${viewName}`,
+                    data_graph: {
+                        id: {
+                            dataType: 'string',
+                            permission: 'read',
+                            displayName: 'ID',
+                            isColumnShow: true,
+                        },
+                    },
                 }
             });
         }

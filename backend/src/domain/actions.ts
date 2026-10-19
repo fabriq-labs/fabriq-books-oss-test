@@ -1,29 +1,9 @@
 import { AuthContext } from '../auth/types';
 import logger from '../utils/logger';
+import { functionMap, workflowActionMap } from '../../lib/domain';
 
-export type DomainAction = (
-  context: AuthContext,
-  model: string,
-  instance_id: string,
-  change_set: string[],
-  select_set: any,
-  tx: any,
-  created?: any
-) => any;
-
-export interface DomainActionBinding {
-  fields: string[];
-  method: DomainAction;
-}
-
-/**
- * Post-write hooks keyed by model or "model.relation".
- * A domain registers hooks here. The kernel calls execute_Action after writes.
- */
-export const functionMap: Record<string, DomainActionBinding> = {};
-
-/** Workflow side effects keyed by handler name. */
-export const workflowActionMap: Record<string, (...args: any[]) => any> = {};
+export type { DomainAction, DomainActionBinding } from '../../lib/domain';
+export { functionMap, workflowActionMap };
 
 export const execute_Action = async (
   context: AuthContext,

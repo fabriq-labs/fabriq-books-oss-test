@@ -10,14 +10,14 @@
 # Dependencies (rebuilt in Docker)
 node_modules
 backend/node_modules
-frontend-1/node_modules
+frontend-0/node_modules
 
 # Build artifacts
 dist
 build
 *.tsbuildinfo
 
-# Non-deployment directories (leading / = repo root only — do not exclude e.g. frontend-1/config/scripts/)
+# Non-deployment directories (leading / = repo root only)
 /backups/
 /trash/
 /data/
@@ -35,8 +35,8 @@ logs/
 .env.*
 backend/.env
 backend/.env.*
-frontend-1/.env
-frontend-1/.env.*
+frontend-0/.env
+frontend-0/.env.*
 
 # OS
 .DS_Store

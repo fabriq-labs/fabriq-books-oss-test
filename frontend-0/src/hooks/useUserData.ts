@@ -101,7 +101,7 @@ export const useUserData = () => {
     };
 
     const getUserDepartment = (): string => {
-        return user?.department?.dept_name || 'No Department';
+        return user?.department?.name || 'No Department';
     };
 
     const getUserManager = (): string => {

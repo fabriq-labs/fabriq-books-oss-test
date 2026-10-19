@@ -15,17 +15,24 @@ Seeded rows:
 
 Both orgs set `basecurrency_id` to `curr_kernel_usd`. `attachment` is platform storage and has no seed row.
 
-Views the seed inserts, all on `org_system`, each with a `*` write permission and a `role_view` to Super Admin:
+Views the seed inserts, all on `org_system`, each with a `data_graph`, a `*` write permission, and a `role_view` to Super Admin. The currency graph shows Code, Name, and Symbol. User shows Name, Email, Manager, Department, and Roles. Department shows Name. Role shows Name and Views. The view model shows Name and Model Name. Permission shows Access, View, and Name. Prompt template shows Context, Version, Priority, Is Default, and Prompt Type. Workflow shows Name, Model, Description, and Active.
 
 | View id | `name` | `model_name` |
 |---|---|---|
 | `view_kernel_user` | `user_view` | `user` |
+| `view_kernel_department` | `department_view` | `department` |
 | `view_kernel_role` | `role_view` | `role` |
 | `view_kernel_view` | `view` | `view` |
 | `view_kernel_permission` | `permission_view` | `permission` |
 | `view_kernel_prompt` | `prompt_template_view` | `prompt_template` |
 | `view_kernel_currency` | `currency_view` | `currency` |
 | `view_kernel_flow` | `workflow_flow_view` | `workflow_flow` |
+| `view_kernel_llm_trace` | `llm_trace_view` | `llm_trace` |
+| `view_kernel_llm_trace_step` | `llm_trace_step_view` | `llm_trace_step` |
+| `view_kernel_workflow_instance` | `workflow_instance_view` | `workflow_instance` |
+| `view_kernel_chat_thread` | `chat_thread_view` | `chat_thread` |
+| `view_kernel_import_run` | `import_run_view` | `import_run` |
+| `view_kernel_agent_tools` | `agent_model_tool_config_view` | `agent_model_tool_config` |
 
 Login is `admin@example.com` / `admin123`. That user is a platform admin because the role name contains `super admin`. Calls below assume that session.
 
@@ -48,7 +55,7 @@ orgs org[]
 
 A model stays in `platform.prisma` only when both are true: kernel code reads or writes it with no domain installed, and it is not a product catalog. `attachment` meets that test. The upload routes write a row. There is no seed row.
 
-A new model for a future application does not go in `platform.prisma`. The folders are in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md). The same two-sided rule applies: a relation to `user` needs the matching field on `user` in `metadata.prisma`.
+A new model for a future application does not go in `platform.prisma`. The steps are in [adding-a-model.md](./adding-a-model.md). The same two-sided rule applies: a relation to `user` needs the matching field on `user` in `metadata.prisma`.
 
 `currency.org_id` is a required `String`. Read it as a shareable model: the caller org or `org_system`.
 
@@ -62,7 +69,7 @@ The currency screen is the seeded view, not a custom route.
 - Shell list: `/accounting/currency` (Super Admin), which mounts Master with `type="currency"` and `view="currency_view"`
 - Generic list shape: `/master/app/currency` also loads view `currency_view`, because `DomainMaster` uses `{model}_view`
 
-Creating another view is a row in `view`: `name`, `model_name`, `org_id`. As a platform admin, `POST /api/view/view/view` with `org_id` `org_system` stores the shared default. A tenant view uses `org_kernel`.
+Creating another view is a row in `view`: `name`, `model_name`, `org_id`, and a `data_graph`. The column is required. As a platform admin, `POST /api/view/view/view` with `org_id` `org_system` stores the shared default. A tenant view uses `org_kernel`. The graph is the Prisma `select` and the column list. See [metadata.md](./metadata.md).
 
 ## A permission and a role_view
 
@@ -75,7 +82,7 @@ The seed already attaches currency to Super Admin:
 
 To grant a narrower field, insert a `permission` row with that `field_name` and `access` `read` or `write`. The API is `POST /api/permission/view/permission_view`. The shell screen is `/settings/permissions`.
 
-Then link the view to the role with a `role_view` row. The seed writes that row directly. There is no seeded view whose `model_name` is `role_view`, so the shell has no list page for that join. The role form at `/settings/roles` is where an admin attaches views.
+Then link the view to the role with a `role_view` row. The seed writes that row with Prisma. The view named `role_view` is the role list. The join model `role_view` has no view, so the shell has no list page for the link itself. The role form at `/settings/roles` is where an admin attaches views.
 
 ## A role on org_system and a role_user on the tenant
 

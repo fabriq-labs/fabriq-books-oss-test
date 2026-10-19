@@ -16,6 +16,7 @@ import {
   writeOrgScope,
 } from '../../tenancy/orgScope';
 import { NotFoundError } from '../../tenancy/errors';
+import { rejectUnknownWriteFields, unknownWriteFields, unknownWriteFieldsMessage } from './unknownWriteFields';
 
 export class DataAccessLayer {
   private static instance: DataAccessLayer;
@@ -455,6 +456,10 @@ export class DataAccessLayer {
       // Filter input data based on permissions
       const filteredData = PermissionService.filterFieldsByPermission(data, permissions);
       this.applyWriteScopeDefaults(modelName, filteredData, context);
+      const unknownFields = rejectUnknownWriteFields(modelName, filteredData);
+      if (unknownFields) {
+        return { success: false, error: unknownFields };
+      }
 
       const createArgs = { data: filteredData, ...options };
 
@@ -507,6 +512,10 @@ export class DataAccessLayer {
       const filteredData = PermissionService.filterFieldsByPermission(data, permissions);
       filteredData.modified_by = context.user?.id;
       applyOrgOnWrite(modelName, filteredData, context.user!.org_id, !!context.isPlatformAdmin, false);
+      const unknownFields = rejectUnknownWriteFields(modelName, filteredData);
+      if (unknownFields) {
+        return { success: false, error: unknownFields };
+      }
 
       const scopedWhere = await this.scopedUniqueWhere(modelName, { id }, context, 'write');
       if (!scopedWhere) {
@@ -580,6 +589,10 @@ export class DataAccessLayer {
       const filteredData = PermissionService.filterFieldsByPermission(data, childPermissions);
       filteredData.modified_by = context.user?.id;
       applyOrgOnWrite(relationMetadata.relatedModel, filteredData, context.user!.org_id, !!context.isPlatformAdmin, false);
+      const unknownFields = rejectUnknownWriteFields(relationMetadata.relatedModel, filteredData);
+      if (unknownFields) {
+        return { success: false, error: unknownFields };
+      }
       const model = this.getModel(modelName);
       if (!model) {
         logger.error('Model not found', { model: modelName });
@@ -676,6 +689,7 @@ export class DataAccessLayer {
       if (!model) {
         throw new Error(`Model ${parentModelName} not found`);
       }
+      const childModel = this.getRelationMetadata(parentModelName, childRelationName)?.relatedModel;
       // Add created_by and modified_by to all children
       const childrenWithUserInfo = children.map(child => {
         const row: Record<string, unknown> = {
@@ -684,6 +698,12 @@ export class DataAccessLayer {
           modified_by: context.user?.id,
         };
         applyOrgOnWrite(parentModelName, row, context.user!.org_id, !!context.isPlatformAdmin, true);
+        if (childModel) {
+          const unknownFields = rejectUnknownWriteFields(childModel, row);
+          if (unknownFields) {
+            throw new Error(unknownFields);
+          }
+        }
         return row;
       });
       await this.assertParentWritable(parentModelName, parentId, context, tx);
@@ -935,6 +955,12 @@ export class DataAccessLayer {
         this.applyWriteScopeDefaults(modelName, filtered, context);
         return filtered;
       });
+      const unknownOnCreate = [...new Set(filteredData.flatMap((row) => unknownWriteFields(modelName, row)))];
+      if (unknownOnCreate.length > 0) {
+        const message = unknownWriteFieldsMessage(modelName, unknownOnCreate);
+        logger.warn('Rejected write with unknown fields', { model: modelName, fields: unknownOnCreate });
+        return { success: false, error: message };
+      }
 
       // Execute batch create
       const result = await model.createMany({
@@ -1005,6 +1031,10 @@ export class DataAccessLayer {
         ...filteredUpdate,
         modified_by: context.user?.id,
       };
+      const unknownFields = rejectUnknownWriteFields(modelName, updateData);
+      if (unknownFields) {
+        return { success: false, error: unknownFields };
+      }
       // Build query options
       const queryOptions: any = {
         where: { id: { in: payload.ids } }

@@ -1,22 +1,39 @@
-# Agent notes
+# Kernel
 
-## Cursor Cloud specific instructions
+Metadata-driven CRUD, workflows, and the agent runtime. The app UI is `frontend-0`.
 
-### Railway deploy debug (logs)
+Start at [docs/README.md](./docs/README.md). A new model, its table, its view, and its form are in [docs/kernel/adding-a-model.md](./docs/kernel/adding-a-model.md). Where those files go is [docs/kernel/BUILDING_A_DOMAIN.md](./docs/kernel/BUILDING_A_DOMAIN.md).
 
-This monorepo deploys via root `Dockerfile` → GHCR → Railway Docker Image services.
+`view.data_graph` is required. It is both the Prisma `select` and the list columns (`displayName` plus `isColumnShow`). A relation key needs `type: "table"` and `select`. The kernel seed writes these graphs. Do not sync `backend/prisma/metadata/views/` into this database. Restart the backend after adding a model. Routes are registered only at process start.
 
-To fetch **live logs** and debug a deployed service:
+| | |
+|---|---|
+| Backend | `backend/`, port 4000 |
+| Frontend | `frontend-0/`, port 5174 |
+| Database setup | `cd backend && npm run setup:kernel` |
+| Login | `admin@example.com` / `admin123` |
 
-1. Ensure Cursor secret **`RAILWAY_TOKEN`** is set (Railway project token).
-2. Follow [`.cursor/skills/railway-debug/SKILL.md`](.cursor/skills/railway-debug/SKILL.md).
-3. Prefer non-streaming commands, e.g.:
+Do not run `prisma db push`, `prisma migrate`, or other DDL. New databases are created by `npm run setup:kernel`, which applies generated schema SQL and seeds `org_system`. After `organizations` exists, apply later tables with the SQL diff in `docs/kernel/adding-a-model.md`.
+
+Tool-specific folders (`.cursor/`, `.claude/`) stay on the machine that uses them. They are gitignored. Instructions for every coding agent live in this file.
+
+## Database
+
+Investigate with `SELECT` only. Read `DATABASE_URL` from `backend/.env` and pass it to `psql`. Do not print the URL, and do not commit `.env`.
+
+Quote `"user"`. Filter private rows by `org_id`. Shareable rows (`role`, `workflow_flow`, `workflow_state`, `workflow_action`, `view`, `permission`, `role_view`, `prompt_template`, `currency`) are visible for the caller org or `org_system`. `org` has no `org_id`. The contract is [docs/kernel/tenancy.md](./docs/kernel/tenancy.md).
+
+## Deploy
+
+Given a spec, add the domain with [docs/kernel/adding-a-model.md](./docs/kernel/adding-a-model.md) and [docs/kernel/BUILDING_A_DOMAIN.md](./docs/kernel/BUILDING_A_DOMAIN.md).
+
+Deploy that app as a new Railway service with [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). `RAILWAY_TOKEN` in the repo-root `.env` or `backend/.env` is a project token. Load it into the environment. Never print it or commit it. `railway add` creates the service in that token's project. `railway up` builds the root `Dockerfile`.
+
+To inspect a service that is already deployed, list services, then pass the name or id from that list:
 
 ```bash
-npx -y @railway/cli@latest logs --service b82e07e5-9532-43f3-b15a-797403b7fc92 -n 200
+npx -y @railway/cli@latest service list
+npx -y @railway/cli@latest logs --service <service-id> -n 200
 ```
 
-- **dev** service: `b82e07e5-9532-43f3-b15a-797403b7fc92`
-- **prod** service: `36f474f5-fc9f-4ab7-866b-61800eb3c318`
-
-Do not redeploy/restart prod unless the user explicitly asks. Never commit or echo the token.
+Leave service ids out of this file. Do not redeploy or restart an existing production service unless the user explicitly asks. `railway variable list` prints secret values. Do not write that output into logs, docs, or the repo.
