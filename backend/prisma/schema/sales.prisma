@@ -1,0 +1,521 @@
+// Universal sales models for Fabriq Books.
+// Designed for in-app CRUD and ERP forward sync (QBO, Zoho Books, Xero; NetSuite-mappable).
+// Field include / park judgments: docs/domain/SALES_MODEL.md.
+
+enum invoice_direction {
+  sales
+  purchase
+}
+
+enum sales_document_status {
+  draft
+  posted
+  void
+}
+
+enum payment_type {
+  full
+  partial
+  advance
+}
+
+model customer {
+  id                    String         @id @default(dbgenerated("'cust_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                String
+  name                  String
+  legal_name            String?
+  address               String?
+  city                  String?
+  state                 String?
+  country               String?
+  postal_code           String?
+  email                 String?
+  phone                 String?
+  website               String?
+  currency_id           String?
+  currency              currency?      @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  payment_terms_id      String?
+  payment_terms         payment_terms? @relation(fields: [payment_terms_id], references: [id], onDelete: SetNull)
+  entity_id             String?
+  entity                entity?        @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  receivable_account_id String?
+  receivable_account    account?       @relation("customer_receivable_account", fields: [receivable_account_id], references: [id], onDelete: SetNull)
+  tax_treatment         String?
+  default_tax_region_id String?
+  default_tax_region    tax_region?    @relation("customer_default_tax_region", fields: [default_tax_region_id], references: [id], onDelete: SetNull)
+  is_active             Boolean        @default(true)
+  created_by            String?
+  modified_by           String?
+  created_at            DateTime       @default(now())
+  modified_at           DateTime       @updatedAt
+  source_system_id      String?
+  source_record_id      String?
+  source_updated_at     DateTime?      @default(now())
+  ingest_batch_id       String?
+
+  locations        location[]
+  invoices         invoice[]
+  payment_receipts payment_receipt[]
+  credit_notes     credit_note[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id])
+  @@index([entity_id])
+  @@index([currency_id])
+  @@index([payment_terms_id])
+  @@index([receivable_account_id])
+  @@index([default_tax_region_id])
+  @@index([source_system_id, source_record_id])
+  @@map("customer")
+}
+
+/// Thin supplier for tax registrations, item preferred vendor, and ERP vendor sync.
+/// Purchase bills UI is a later module; keep this model so sales tax and sync do not fork.
+model supplier {
+  id                    String         @id @default(dbgenerated("'supp_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                String
+  name                  String
+  legal_name            String?
+  address               String?
+  city                  String?
+  state                 String?
+  country               String?
+  postal_code           String?
+  email                 String?
+  phone                 String?
+  website               String?
+  currency_id           String?
+  currency              currency?      @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  payment_terms_id      String?
+  payment_terms         payment_terms? @relation(fields: [payment_terms_id], references: [id], onDelete: SetNull)
+  entity_id             String?
+  entity                entity?        @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  payable_account_id    String?
+  payable_account       account?       @relation("supplier_payable_account", fields: [payable_account_id], references: [id], onDelete: SetNull)
+  tax_treatment         String?
+  default_tax_region_id String?
+  default_tax_region    tax_region?    @relation("supplier_default_tax_region", fields: [default_tax_region_id], references: [id], onDelete: SetNull)
+  is_active             Boolean        @default(true)
+  created_by            String?
+  modified_by           String?
+  created_at            DateTime       @default(now())
+  modified_at           DateTime       @updatedAt
+  source_system_id      String?
+  source_record_id      String?
+  source_updated_at     DateTime?      @default(now())
+  ingest_batch_id       String?
+
+  preferred_items item_master[] @relation("item_master_preferred_supplier")
+  invoices        invoice[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id])
+  @@index([entity_id])
+  @@index([currency_id])
+  @@index([payment_terms_id])
+  @@index([payable_account_id])
+  @@index([default_tax_region_id])
+  @@index([source_system_id, source_record_id])
+  @@map("supplier")
+}
+
+model location {
+  id                String    @id @default(dbgenerated("'loca_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  name              String
+  code              String?
+  entity_id         String?
+  entity            entity?   @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  customer_id       String?
+  customer          customer? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  address           String?
+  city              String?
+  state             String?
+  country           String?
+  postal_code       String?
+  is_active         Boolean   @default(true)
+  created_by        String?
+  modified_by       String?
+  created_at        DateTime  @default(now())
+  modified_at       DateTime  @updatedAt
+  source_system_id  String?
+  source_record_id  String?
+  source_updated_at DateTime? @default(now())
+  ingest_batch_id   String?
+
+  invoices     invoice[]
+  credit_notes credit_note[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@unique([org_id, code])
+  @@index([org_id])
+  @@index([entity_id])
+  @@index([customer_id])
+  @@index([source_system_id, source_record_id])
+  @@map("location")
+}
+
+model payment_terms {
+  id                String    @id @default(dbgenerated("'payt_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  name              String
+  description       String?
+  days              Int?
+  entity_id         String?
+  entity            entity?   @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  is_active         Boolean   @default(true)
+  created_by        String?
+  modified_by       String?
+  created_at        DateTime  @default(now())
+  modified_at       DateTime  @updatedAt
+  source_system_id  String?
+  source_record_id  String?
+  source_updated_at DateTime? @default(now())
+  ingest_batch_id   String?
+
+  customers customer[]
+  suppliers supplier[]
+  invoices  invoice[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id])
+  @@index([entity_id])
+  @@index([source_system_id, source_record_id])
+  @@map("payment_terms")
+}
+
+model uom {
+  id                String    @id @default(dbgenerated("'uom_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  name              String
+  code              String?
+  is_active         Boolean   @default(true)
+  created_by        String?
+  modified_by       String?
+  created_at        DateTime  @default(now())
+  modified_at       DateTime  @updatedAt
+  source_system_id  String?
+  source_record_id  String?
+  source_updated_at DateTime? @default(now())
+  ingest_batch_id   String?
+
+  item_masters item_master[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@unique([org_id, code])
+  @@index([org_id])
+  @@index([source_system_id, source_record_id])
+  @@map("uom")
+}
+
+model item_master {
+  id                    String      @id @default(dbgenerated("'item_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                String
+  name                  String
+  code                  String?
+  description           String?
+  item_type             String?
+  sales_account_id      String?
+  sales_account         account?    @relation("item_master_sales_account", fields: [sales_account_id], references: [id], onDelete: SetNull)
+  purchase_account_id   String?
+  purchase_account      account?    @relation("item_master_purchase_account", fields: [purchase_account_id], references: [id], onDelete: SetNull)
+  uom_id                String?
+  uom                   uom?        @relation(fields: [uom_id], references: [id], onDelete: SetNull)
+  unit_price            Decimal?    @db.Decimal(19, 4)
+  is_stockable          Boolean     @default(false)
+  tax_group_id          String?
+  tax_group             tax_group?  @relation("item_master_tax_group", fields: [tax_group_id], references: [id], onDelete: SetNull)
+  tax_master_id         String?
+  tax_master            tax_master? @relation("item_master_tax_master", fields: [tax_master_id], references: [id], onDelete: SetNull)
+  classification_code   String?
+  classification_scheme String?
+  item_tax_category     String?
+  preferred_supplier_id String?
+  preferred_supplier    supplier?   @relation("item_master_preferred_supplier", fields: [preferred_supplier_id], references: [id], onDelete: SetNull)
+  currency_id           String?
+  currency              currency?   @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  is_active             Boolean     @default(true)
+  created_by            String?
+  modified_by           String?
+  created_at            DateTime    @default(now())
+  modified_at           DateTime    @updatedAt
+  source_system_id      String?
+  source_record_id      String?
+  source_updated_at     DateTime?   @default(now())
+  ingest_batch_id       String?
+
+  invoice_line_items invoice_line_item[]
+  credit_note_items  credit_note_item[]
+
+  @@unique([org_id, code])
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id])
+  @@index([sales_account_id])
+  @@index([purchase_account_id])
+  @@index([uom_id])
+  @@index([tax_group_id])
+  @@index([tax_master_id])
+  @@index([preferred_supplier_id])
+  @@index([currency_id])
+  @@index([source_system_id, source_record_id])
+  @@map("item_master")
+}
+
+model invoice {
+  id                   String                @id @default(dbgenerated("'inv_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id               String
+  direction            invoice_direction     @default(sales)
+  number               String?
+  invoice_date         DateTime              @default(now())
+  due_date             DateTime?
+  status               sales_document_status @default(draft)
+  customer_id          String?
+  customer             customer?             @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  supplier_id          String?
+  supplier             supplier?             @relation(fields: [supplier_id], references: [id], onDelete: Restrict)
+  entity_id            String?
+  entity               entity?               @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  location_id          String?
+  location             location?             @relation(fields: [location_id], references: [id], onDelete: SetNull)
+  currency_id          String?
+  currency             currency?             @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  payment_terms_id     String?
+  payment_terms        payment_terms?        @relation(fields: [payment_terms_id], references: [id], onDelete: SetNull)
+  exchange_rate        Decimal               @default(1) @db.Decimal(19, 6)
+  net_amount           Decimal?              @db.Decimal(19, 4)
+  tax_amount           Decimal?              @db.Decimal(19, 4)
+  shipping_amount      Decimal?              @db.Decimal(19, 4)
+  adjustment_amount    Decimal?              @db.Decimal(19, 4)
+  total_amount         Decimal?              @db.Decimal(19, 4)
+  balance_amount       Decimal?              @db.Decimal(19, 4)
+  tax_region_id        String?
+  tax_region           tax_region?           @relation("invoice_tax_region", fields: [tax_region_id], references: [id], onDelete: SetNull)
+  seller_tax_region_id String?
+  seller_tax_region    tax_region?           @relation("invoice_seller_tax_region", fields: [seller_tax_region_id], references: [id], onDelete: SetNull)
+  tax_responsibility   String?
+  bill_to              String?               @db.Text
+  ship_to              String?               @db.Text
+  notes                String?               @db.Text
+  reference            String?
+  /// Optional deposit / AR control account when not taken from the customer.
+  account_id           String?
+  account              account?              @relation("invoice_account", fields: [account_id], references: [id], onDelete: SetNull)
+  created_by           String?
+  modified_by          String?
+  created_at           DateTime              @default(now())
+  modified_at          DateTime              @updatedAt
+  source_system_id     String?
+  source_record_id     String?
+  source_updated_at    DateTime?             @default(now())
+  ingest_batch_id      String?
+
+  line_items                   invoice_line_item[]
+  payment_receipts             payment_receipt[]
+  payment_receipt_applications payment_receipt_application[]
+  credit_notes                 credit_note[]
+  postings                     posting[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id, direction, status])
+  @@index([org_id, invoice_date])
+  @@index([customer_id])
+  @@index([supplier_id])
+  @@index([entity_id])
+  @@index([location_id])
+  @@index([currency_id])
+  @@index([payment_terms_id])
+  @@index([tax_region_id])
+  @@index([seller_tax_region_id])
+  @@index([account_id])
+  @@index([source_system_id, source_record_id])
+  @@map("invoice")
+}
+
+model invoice_line_item {
+  id                    String       @id @default(dbgenerated("'invl_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                String
+  invoice_id            String
+  invoice               invoice      @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  line_number           Int          @default(1)
+  item_master_id        String?
+  item_master           item_master? @relation(fields: [item_master_id], references: [id], onDelete: SetNull)
+  description           String?
+  quantity              Decimal      @default(1) @db.Decimal(19, 4)
+  unit_price            Decimal      @default(0) @db.Decimal(19, 4)
+  discount_rate         Decimal?     @db.Decimal(9, 6)
+  discount_amount       Decimal?     @db.Decimal(19, 4)
+  amount                Decimal      @default(0) @db.Decimal(19, 4)
+  account_id            String?
+  account               account?     @relation("invoice_line_account", fields: [account_id], references: [id], onDelete: SetNull)
+  tax_group_id          String?
+  tax_group             tax_group?   @relation(fields: [tax_group_id], references: [id], onDelete: SetNull)
+  classification_code   String?
+  classification_scheme String?
+  created_by            String?
+  modified_by           String?
+  created_at            DateTime     @default(now())
+  modified_at           DateTime     @updatedAt
+  source_system_id      String?
+  source_record_id      String?
+  source_updated_at     DateTime?    @default(now())
+  ingest_batch_id       String?
+
+  line_taxes        invoice_line_tax[]
+  credit_note_items credit_note_item[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([invoice_id])
+  @@index([item_master_id])
+  @@index([account_id])
+  @@index([tax_group_id])
+  @@index([org_id])
+  @@index([source_system_id, source_record_id])
+  @@map("invoice_line_item")
+}
+
+model payment_receipt {
+  id                String                @id @default(dbgenerated("'payr_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  number            String?
+  receipt_date      DateTime              @default(now())
+  customer_id       String?
+  customer          customer?             @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  /// Convenience FK for single-invoice receipts. Multi-invoice use payment_receipt_application.
+  invoice_id        String?
+  invoice           invoice?              @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  account_id        String?
+  account           account?              @relation(fields: [account_id], references: [id], onDelete: SetNull)
+  amount            Decimal               @default(0) @db.Decimal(19, 4)
+  currency_id       String?
+  currency          currency?             @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  exchange_rate     Decimal               @default(1) @db.Decimal(19, 6)
+  base_amount       Decimal?              @db.Decimal(19, 4)
+  payment_method    String?
+  payment_reference String?
+  payment_type      payment_type?
+  status            sales_document_status @default(draft)
+  notes             String?               @db.Text
+  entity_id         String?
+  entity            entity?               @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  created_by        String?
+  modified_by       String?
+  created_at        DateTime              @default(now())
+  modified_at       DateTime              @updatedAt
+  source_system_id  String?
+  source_record_id  String?
+  source_updated_at DateTime?             @default(now())
+  ingest_batch_id   String?
+
+  posting      posting?                      @relation("posting_payment_receipt")
+  applications payment_receipt_application[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id])
+  @@index([customer_id])
+  @@index([invoice_id])
+  @@index([account_id])
+  @@index([currency_id])
+  @@index([entity_id])
+  @@index([source_system_id, source_record_id])
+  @@map("payment_receipt")
+}
+
+model payment_receipt_application {
+  id                 String          @id @default(dbgenerated("'payra_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id             String
+  payment_receipt_id String
+  payment_receipt    payment_receipt @relation(fields: [payment_receipt_id], references: [id], onDelete: Cascade)
+  invoice_id         String
+  invoice            invoice         @relation(fields: [invoice_id], references: [id], onDelete: Restrict)
+  amount_applied     Decimal         @db.Decimal(19, 4)
+  created_by         String?
+  modified_by        String?
+  created_at         DateTime        @default(now())
+  modified_at        DateTime        @updatedAt
+
+  @@unique([payment_receipt_id, invoice_id])
+  @@index([org_id])
+  @@index([invoice_id])
+  @@map("payment_receipt_application")
+}
+
+model credit_note {
+  id                String                @id @default(dbgenerated("'cn_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  number            String?
+  credit_note_date  DateTime              @default(now())
+  status            sales_document_status @default(draft)
+  customer_id       String?
+  customer          customer?             @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  invoice_id        String?
+  invoice           invoice?              @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  entity_id         String?
+  entity            entity?               @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  location_id       String?
+  location          location?             @relation(fields: [location_id], references: [id], onDelete: SetNull)
+  currency_id       String?
+  currency          currency?             @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  exchange_rate     Decimal               @default(1) @db.Decimal(19, 6)
+  net_amount        Decimal?              @db.Decimal(19, 4)
+  tax_amount        Decimal?              @db.Decimal(19, 4)
+  total_amount      Decimal?              @db.Decimal(19, 4)
+  balance_amount    Decimal?              @db.Decimal(19, 4)
+  reason            String?
+  notes             String?               @db.Text
+  account_id        String?
+  account           account?              @relation(fields: [account_id], references: [id], onDelete: SetNull)
+  created_by        String?
+  modified_by       String?
+  created_at        DateTime              @default(now())
+  modified_at       DateTime              @updatedAt
+  source_system_id  String?
+  source_record_id  String?
+  source_updated_at DateTime?             @default(now())
+  ingest_batch_id   String?
+
+  line_items credit_note_item[]
+
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id])
+  @@index([customer_id])
+  @@index([invoice_id])
+  @@index([entity_id])
+  @@index([location_id])
+  @@index([currency_id])
+  @@index([account_id])
+  @@index([source_system_id, source_record_id])
+  @@map("credit_note")
+}
+
+model credit_note_item {
+  id                   String             @id @default(dbgenerated("'cni_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id               String
+  credit_note_id       String
+  credit_note          credit_note        @relation(fields: [credit_note_id], references: [id], onDelete: Cascade)
+  line_number          Int                @default(1)
+  item_master_id       String?
+  item_master          item_master?       @relation(fields: [item_master_id], references: [id], onDelete: SetNull)
+  invoice_line_item_id String?
+  invoice_line_item    invoice_line_item? @relation(fields: [invoice_line_item_id], references: [id], onDelete: SetNull)
+  description          String?
+  quantity             Decimal            @default(1) @db.Decimal(19, 4)
+  unit_price           Decimal            @default(0) @db.Decimal(19, 4)
+  discount_amount      Decimal?           @db.Decimal(19, 4)
+  amount               Decimal            @default(0) @db.Decimal(19, 4)
+  account_id           String?
+  account              account?           @relation("credit_note_line_account", fields: [account_id], references: [id], onDelete: SetNull)
+  tax_group_id         String?
+  tax_group            tax_group?         @relation(fields: [tax_group_id], references: [id], onDelete: SetNull)
+  created_by           String?
+  modified_by          String?
+  created_at           DateTime           @default(now())
+  modified_at          DateTime           @updatedAt
+
+  @@index([credit_note_id])
+  @@index([item_master_id])
+  @@index([invoice_line_item_id])
+  @@index([account_id])
+  @@index([tax_group_id])
+  @@index([org_id])
+  @@map("credit_note_item")
+}

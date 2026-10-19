@@ -8,22 +8,28 @@
 // attachment — upload routes write a row per file. No shared seed.
 
 model currency {
-  id             String   @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
-  code           String   @unique
-  name           String
-  symbol         String?
-  decimal_places Int      @default(2)
-  is_active      Boolean  @default(true)
-  org_id         String
-  created_by     String?
-  modified_by    String?
-  created_at     DateTime @default(now())
-  modified_at    DateTime @updatedAt
+  id                  String            @id @default(dbgenerated("'curr_' || gen_random_uuid()")) @db.VarChar(50)
+  code                String            @unique
+  name                String
+  symbol              String?
+  decimal_places      Int               @default(2)
+  is_active           Boolean           @default(true)
+  org_id              String
+  created_by          String?
+  modified_by         String?
+  created_at          DateTime          @default(now())
+  modified_at         DateTime          @updatedAt
   orgs                org[]
   accounts            account[]
   entities            entity[]
-  exchange_rates_from exchange_rate[] @relation("exchange_from")
-  exchange_rates_to   exchange_rate[] @relation("exchange_to")
+  exchange_rates_from exchange_rate[]   @relation("exchange_from")
+  exchange_rates_to   exchange_rate[]   @relation("exchange_to")
+  customers           customer[]
+  suppliers           supplier[]
+  item_masters        item_master[]
+  invoices            invoice[]
+  payment_receipts    payment_receipt[]
+  credit_notes        credit_note[]
 
   @@map("currency")
 }

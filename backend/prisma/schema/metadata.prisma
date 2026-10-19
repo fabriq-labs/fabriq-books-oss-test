@@ -20,29 +20,29 @@ model org {
 }
 
 model user {
-  id                       String                 @id @default(dbgenerated("'user_' || gen_random_uuid()"))
-  email                    String                 @unique
+  id                       String             @id @default(dbgenerated("'user_' || gen_random_uuid()"))
+  email                    String             @unique
   name                     String?
   password                 String? // For internal auth provider
-  external_id              String                 @unique @map("auth_id") // For external auth systems
+  external_id              String             @unique @map("auth_id") // For external auth systems
   auth_provider            String? // e.g., 'clerk', 'supertokens', 'internal'
-  created_at               DateTime               @default(now())
-  modified_at              DateTime               @updatedAt
+  created_at               DateTime           @default(now())
+  modified_at              DateTime           @updatedAt
   created_by               String? // Reference to user.id
   modified_by              String? // Reference to user.id
   org_id                   String?
-  org                      org?                   @relation("UserOrg", fields: [org_id], references: [id])
+  org                      org?               @relation("UserOrg", fields: [org_id], references: [id])
   manager_id               String? // Reference to manager's user id
-  manager                  user?                  @relation("ManagerReport", fields: [manager_id], references: [id])
-  reports                  user[]                 @relation("ManagerReport")
+  manager                  user?              @relation("ManagerReport", fields: [manager_id], references: [id])
+  reports                  user[]             @relation("ManagerReport")
   department_id            String?
-  department               department?            @relation("UserDepartment", fields: [department_id], references: [id])
-  role_users               role_user[]            @relation("UserToRoleUser")
-  wf_histories             workflow_history[]     @relation("workflow_action")
-  comments                 comment[]              @relation("UserComments")
-  assigned_workflow_states workflow_state[]       @relation("AssignedUserToWorkflowState")
-  external_config          Json?                  @default("{}") // For storing external service configurations (e.g., Slack user ID)
-  api_key                  String?                @db.VarChar(255) // Bcrypt-hashed API key for programmatic access
+  department               department?        @relation("UserDepartment", fields: [department_id], references: [id])
+  role_users               role_user[]        @relation("UserToRoleUser")
+  wf_histories             workflow_history[] @relation("workflow_action")
+  comments                 comment[]          @relation("UserComments")
+  assigned_workflow_states workflow_state[]   @relation("AssignedUserToWorkflowState")
+  external_config          Json?              @default("{}") // For storing external service configurations (e.g., Slack user ID)
+  api_key                  String?            @db.VarChar(255) // Bcrypt-hashed API key for programmatic access
 
   @@map("user")
 }
@@ -61,16 +61,16 @@ model department {
 }
 
 model role {
-  id              String            @id @default(dbgenerated("'role_' || gen_random_uuid()"))
-  name            String            @unique
-  created_at      DateTime          @default(now())
-  modified_at     DateTime          @updatedAt @map("updated_at")
+  id              String           @id @default(dbgenerated("'role_' || gen_random_uuid()"))
+  name            String           @unique
+  created_at      DateTime         @default(now())
+  modified_at     DateTime         @updatedAt @map("updated_at")
   created_by      String? // Reference to user.id
   modified_by     String? // Reference to user.id
   org_id          String?
-  role_users      role_user[]       @relation("RoleToRoleUser")
-  role_views      role_view[]       @relation("RoleToRoleView")
-  workflow_states workflow_state[]  @relation("RoleToWorkflowState")
+  role_users      role_user[]      @relation("RoleToRoleUser")
+  role_views      role_view[]      @relation("RoleToRoleView")
+  workflow_states workflow_state[] @relation("RoleToWorkflowState")
 
   @@map("role")
 }
@@ -224,23 +224,23 @@ model workflow_action {
 }
 
 model workflow_instance {
-  id                    String                 @id @default(dbgenerated("'wins_' || gen_random_uuid()"))
-  flow_id               String
-  model_id              String // ID of the domain record this instance tracks
-  current_state         String
-  current_state_id      String? // Reference to workflow_state.id
-  assigned_user_id      String? // The user assigned to this instance in current state
-  status                String // active, completed, cancelled
-  created_by            String?
-  modified_by           String?
-  created_at            DateTime               @default(now())
-  modified_at           DateTime               @default(now())
-  org_id                String
-  flow                  workflow_flow          @relation(fields: [flow_id], references: [id])
-  current_state_ref     workflow_state?        @relation("StateToInstance", fields: [current_state_id], references: [id])
-  history               workflow_history[]
-  base_models           base_model[]
-  comments              comment[]              @relation("wf_comments")
+  id                String             @id @default(dbgenerated("'wins_' || gen_random_uuid()"))
+  flow_id           String
+  model_id          String // ID of the domain record this instance tracks
+  current_state     String
+  current_state_id  String? // Reference to workflow_state.id
+  assigned_user_id  String? // The user assigned to this instance in current state
+  status            String // active, completed, cancelled
+  created_by        String?
+  modified_by       String?
+  created_at        DateTime           @default(now())
+  modified_at       DateTime           @default(now())
+  org_id            String
+  flow              workflow_flow      @relation(fields: [flow_id], references: [id])
+  current_state_ref workflow_state?    @relation("StateToInstance", fields: [current_state_id], references: [id])
+  history           workflow_history[]
+  base_models       base_model[]
+  comments          comment[]          @relation("wf_comments")
 
   @@map("workflow_instance")
 }

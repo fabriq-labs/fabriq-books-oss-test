@@ -1,0 +1,182 @@
+// Country-agnostic tax primitives for books sales (and later purchases).
+// Country packs (IN | CA | US | GENERIC) live on entity_tax_settings.
+// See docs/domain/SALES_MODEL.md.
+
+model tax_region {
+  id           String   @id @default(dbgenerated("'txreg_' || gen_random_uuid()")) @db.VarChar(50)
+  country_code String   @db.VarChar(2)
+  code         String   @db.VarChar(16)
+  name         String
+  region_type  String?  @db.VarChar(32)
+  org_id       String   @default("org_system")
+  created_by   String?
+  created_at   DateTime @default(now())
+  modified_by  String?
+  modified_at  DateTime @updatedAt
+
+  entity_defaults         entity[]                 @relation("entity_default_tax_region")
+  customer_defaults       customer[]               @relation("customer_default_tax_region")
+  supplier_defaults       supplier[]               @relation("supplier_default_tax_region")
+  party_tax_registrations party_tax_registration[]
+  invoice_tax_regions     invoice[]                @relation("invoice_tax_region")
+  invoice_seller_regions  invoice[]                @relation("invoice_seller_tax_region")
+
+  @@unique([country_code, code, org_id])
+  @@index([country_code])
+  @@index([org_id])
+  @@map("tax_region")
+}
+
+model party_tax_registration {
+  id                  String    @id @default(dbgenerated("'ptxr_' || gen_random_uuid()")) @db.VarChar(50)
+  party_type          String
+  party_id            String    @db.VarChar(50)
+  scheme              String
+  registration_number String
+  tax_region_id       String?
+  is_primary          Boolean   @default(true)
+  effective_from      DateTime?
+  effective_to        DateTime?
+  org_id              String
+  created_by          String?
+  created_at          DateTime  @default(now())
+  modified_by         String?
+  modified_at         DateTime  @updatedAt
+
+  tax_region tax_region? @relation(fields: [tax_region_id], references: [id], onDelete: SetNull)
+
+  @@index([party_type, party_id])
+  @@index([org_id])
+  @@index([tax_region_id])
+  @@map("party_tax_registration")
+}
+
+model tax_master {
+  id                   String    @id @default(dbgenerated("'tax_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id               String
+  name                 String
+  code                 String
+  rate                 Decimal   @db.Decimal(9, 6)
+  effective_from       DateTime?
+  effective_to         DateTime?
+  component_type       String?
+  is_recoverable       Boolean?
+  is_active            Boolean   @default(true)
+  liability_account_id String?
+  liability_account    account?  @relation("tax_master_liability_account", fields: [liability_account_id], references: [id], onDelete: SetNull)
+  created_by           String?
+  created_at           DateTime  @default(now())
+  modified_by          String?
+  modified_at          DateTime  @updatedAt
+  source_system_id     String?
+  source_record_id     String?
+  source_updated_at    DateTime? @default(now())
+  ingest_batch_id      String?
+
+  tax_group_components tax_group_component[]
+  invoice_line_taxes   invoice_line_tax[]
+  item_defaults        item_master[]         @relation("item_master_tax_master")
+
+  @@unique([org_id, code])
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id])
+  @@index([source_system_id, source_record_id])
+  @@index([liability_account_id])
+  @@map("tax_master")
+}
+
+model tax_group {
+  id                String    @id @default(dbgenerated("'txgrp_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id            String
+  name              String
+  code              String
+  country_code      String?   @db.VarChar(2)
+  is_active         Boolean   @default(true)
+  created_by        String?
+  created_at        DateTime  @default(now())
+  modified_by       String?
+  modified_at       DateTime  @updatedAt
+  source_system_id  String?
+  source_record_id  String?
+  source_updated_at DateTime? @default(now())
+  ingest_batch_id   String?
+
+  components         tax_group_component[]
+  item_defaults      item_master[]         @relation("item_master_tax_group")
+  invoice_line_items invoice_line_item[]
+  invoice_line_taxes invoice_line_tax[]
+  credit_note_items  credit_note_item[]
+
+  @@unique([org_id, code])
+  @@unique([org_id, source_system_id, source_record_id])
+  @@index([org_id])
+  @@index([source_system_id, source_record_id])
+  @@map("tax_group")
+}
+
+model tax_group_component {
+  id            String   @id @default(dbgenerated("'txgc_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id        String
+  tax_group_id  String
+  tax_master_id String
+  sequence      Int      @default(1)
+  created_by    String?
+  created_at    DateTime @default(now())
+  modified_by   String?
+  modified_at   DateTime @updatedAt
+
+  tax_group  tax_group  @relation(fields: [tax_group_id], references: [id], onDelete: Cascade)
+  tax_master tax_master @relation(fields: [tax_master_id], references: [id], onDelete: Restrict)
+
+  @@unique([tax_group_id, tax_master_id])
+  @@index([tax_group_id])
+  @@index([tax_master_id])
+  @@index([org_id])
+  @@map("tax_group_component")
+}
+
+model invoice_line_tax {
+  id                   String   @id @default(dbgenerated("'inltx_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id               String
+  invoice_line_item_id String
+  tax_master_id        String
+  tax_group_id         String?
+  rate                 Decimal  @db.Decimal(9, 6)
+  amount               Decimal  @db.Decimal(19, 4)
+  component_type       String?
+  created_by           String?
+  created_at           DateTime @default(now())
+  modified_by          String?
+  modified_at          DateTime @updatedAt
+
+  invoice_line_item invoice_line_item @relation(fields: [invoice_line_item_id], references: [id], onDelete: Cascade)
+  tax_master        tax_master        @relation(fields: [tax_master_id], references: [id], onDelete: Restrict)
+  tax_group         tax_group?        @relation(fields: [tax_group_id], references: [id], onDelete: SetNull)
+
+  @@index([invoice_line_item_id])
+  @@index([tax_master_id])
+  @@index([tax_group_id])
+  @@index([org_id])
+  @@map("invoice_line_tax")
+}
+
+model entity_tax_settings {
+  id                                String   @id @default(dbgenerated("'enttax_' || gen_random_uuid()")) @db.VarChar(50)
+  entity_id                         String   @unique @db.VarChar(50)
+  org_id                            String
+  tax_country_pack                  String   @default("GENERIC")
+  require_classification_on_taxable Boolean  @default(false)
+  enable_tax_responsibility         Boolean  @default(false)
+  default_tax_payable_account_id    String?
+  default_tax_payable_account       account? @relation("entity_tax_payable_account", fields: [default_tax_payable_account_id], references: [id], onDelete: SetNull)
+  created_by                        String?
+  created_at                        DateTime @default(now())
+  modified_by                       String?
+  modified_at                       DateTime @updatedAt
+
+  entity entity @relation("entity_tax_settings", fields: [entity_id], references: [id], onDelete: Cascade)
+
+  @@index([org_id])
+  @@index([default_tax_payable_account_id])
+  @@map("entity_tax_settings")
+}

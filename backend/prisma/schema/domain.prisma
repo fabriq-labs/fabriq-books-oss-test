@@ -1,8 +1,8 @@
 // General ledger. Account is the chart. Posting is one transaction with a
 // debit account and a credit account. Entity and exchange_rate are the
-// reporting slice. Other models that account or posting point at, and that
-// are not part of this slice, stay stubs: id, org_id, and the foreign keys
-// that keep the relation.
+// reporting slice. Sales and tax models live in sales.prisma and tax.prisma.
+// Remaining stubs: ext_*, trade, holding, budget_period, general_ledger,
+// purchase_requisition, purchase_order, project_master.
 
 enum account_classification {
   asset
@@ -89,21 +89,27 @@ model account {
   created_at        DateTime                @default(now())
   modified_at       DateTime                @updatedAt
 
-  debit_postings         posting[]              @relation("posting_debit_account")
-  credit_postings        posting[]              @relation("posting_credit_account")
-  trades                 trade[]                @relation("trade_account")
-  target_trades          trade[]                @relation("trade_target_account")
-  holdings               holding[]
-  payment_receipts       payment_receipt[]
-  credit_notes           credit_note[]
-  budget_periods         budget_period[]
-  general_ledgers        general_ledger[]
-  purchase_requisitions  purchase_requisition[]
-  purchase_orders        purchase_order[]
-  sales_item_masters     item_master[]          @relation("item_master_sales_account")
-  purchase_item_masters  item_master[]          @relation("item_master_purchase_account")
-  project_masters        project_master[]
-  invoices               invoice[]
+  debit_postings               posting[]              @relation("posting_debit_account")
+  credit_postings              posting[]              @relation("posting_credit_account")
+  trades                       trade[]                @relation("trade_account")
+  target_trades                trade[]                @relation("trade_target_account")
+  holdings                     holding[]
+  payment_receipts             payment_receipt[]
+  credit_notes                 credit_note[]
+  budget_periods               budget_period[]
+  general_ledgers              general_ledger[]
+  purchase_requisitions        purchase_requisition[]
+  purchase_orders              purchase_order[]
+  sales_item_masters           item_master[]          @relation("item_master_sales_account")
+  purchase_item_masters        item_master[]          @relation("item_master_purchase_account")
+  project_masters              project_master[]
+  invoices                     invoice[]              @relation("invoice_account")
+  invoice_line_items           invoice_line_item[]    @relation("invoice_line_account")
+  credit_note_line_items       credit_note_item[]     @relation("credit_note_line_account")
+  customer_receivable_accounts customer[]             @relation("customer_receivable_account")
+  supplier_payable_accounts    supplier[]             @relation("supplier_payable_account")
+  tax_liability_accounts       tax_master[]           @relation("tax_master_liability_account")
+  entity_tax_payable_accounts  entity_tax_settings[]  @relation("entity_tax_payable_account")
 
   @@unique([org_id, code])
   @@unique([source_record_id, source_system_id, org_id])
@@ -118,12 +124,12 @@ model account {
 }
 
 model posting {
-  id                    String                  @id @default(dbgenerated("'post_' || gen_random_uuid()")) @db.VarChar(50)
+  id                    String                 @id @default(dbgenerated("'post_' || gen_random_uuid()")) @db.VarChar(50)
   org_id                String
   debit_account_id      String?
   credit_account_id     String?
-  debit_account         account?                @relation("posting_debit_account", fields: [debit_account_id], references: [id], onDelete: Restrict)
-  credit_account        account?                @relation("posting_credit_account", fields: [credit_account_id], references: [id], onDelete: Restrict)
+  debit_account         account?               @relation("posting_debit_account", fields: [debit_account_id], references: [id], onDelete: Restrict)
+  credit_account        account?               @relation("posting_credit_account", fields: [credit_account_id], references: [id], onDelete: Restrict)
   name                  String?
   account_name          String?
   description           String?
@@ -131,37 +137,37 @@ model posting {
   category_name         String?
   value_date            DateTime?
   posting_date          DateTime?
-  amount                Decimal?                @db.Decimal(19, 4)
+  amount                Decimal?               @db.Decimal(19, 4)
   kind                  String?
-  status                posting_status          @default(active)
+  status                posting_status         @default(active)
   reversed_at           DateTime?
   reverses_id           String?
-  reverses              posting?                @relation("posting_reversal", fields: [reverses_id], references: [id], onDelete: SetNull)
-  reversals             posting[]               @relation("posting_reversal")
+  reverses              posting?               @relation("posting_reversal", fields: [reverses_id], references: [id], onDelete: SetNull)
+  reversals             posting[]              @relation("posting_reversal")
   entity_id             String?
-  entity                entity?                 @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  entity                entity?                @relation(fields: [entity_id], references: [id], onDelete: SetNull)
   invoice_id            String?
-  invoice               invoice?                @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
-  trade_id              String?                 @unique
-  trade                 trade?                  @relation("posting_trade", fields: [trade_id], references: [id], onDelete: SetNull)
+  invoice               invoice?               @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  trade_id              String?                @unique
+  trade                 trade?                 @relation("posting_trade", fields: [trade_id], references: [id], onDelete: SetNull)
   holding_id            String?
-  holding               holding?                @relation(fields: [holding_id], references: [id], onDelete: SetNull)
-  payment_receipt_id    String?                 @unique
-  payment_receipt       payment_receipt?        @relation("posting_payment_receipt", fields: [payment_receipt_id], references: [id], onDelete: SetNull)
+  holding               holding?               @relation(fields: [holding_id], references: [id], onDelete: SetNull)
+  payment_receipt_id    String?                @unique
+  payment_receipt       payment_receipt?       @relation("posting_payment_receipt", fields: [payment_receipt_id], references: [id], onDelete: SetNull)
   income_type           income_type?
   income_source         income_source?
-  ai_category_score     Decimal?                @db.Decimal(5, 4)
+  ai_category_score     Decimal?               @db.Decimal(5, 4)
   ai_categorized_at     DateTime?
-  merchant_key          String?                 @db.VarChar(255)
-  merchant_key_provider String?                 @db.VarChar(32)
+  merchant_key          String?                @db.VarChar(255)
+  merchant_key_provider String?                @db.VarChar(32)
   reconciliation_status reconciliation_status?
   matched_reference     String?
   ext_transaction       ext_transaction?
   assigned_to           String?
   created_by            String?
   modified_by           String?
-  created_at            DateTime                @default(now())
-  modified_at           DateTime                @updatedAt
+  created_at            DateTime               @default(now())
+  modified_at           DateTime               @updatedAt
 
   @@index([org_id, value_date, id])
   @@index([org_id, posting_date, id])
@@ -178,27 +184,39 @@ model posting {
 }
 
 model entity {
-  id              String    @id @default(dbgenerated("'ent_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id          String
-  name            String
-  legal_name      String?
-  address         String?
-  city            String?
-  state           String?
-  country         String?
-  postal_code     String?
-  currency_id     String?
-  currency        currency? @relation(fields: [currency_id], references: [id], onDelete: Restrict)
-  is_headquarters Boolean   @default(false)
-  created_by      String?
-  modified_by     String?
-  created_at      DateTime  @default(now())
-  modified_at     DateTime  @updatedAt
-  accounts        account[]
-  postings        posting[]
+  id                    String               @id @default(dbgenerated("'ent_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                String
+  name                  String
+  legal_name            String?
+  address               String?
+  city                  String?
+  state                 String?
+  country               String?
+  postal_code           String?
+  currency_id           String?
+  currency              currency?            @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  is_headquarters       Boolean              @default(false)
+  tax_treatment         String?
+  default_tax_region_id String?
+  default_tax_region    tax_region?          @relation("entity_default_tax_region", fields: [default_tax_region_id], references: [id], onDelete: SetNull)
+  created_by            String?
+  modified_by           String?
+  created_at            DateTime             @default(now())
+  modified_at           DateTime             @updatedAt
+  accounts              account[]
+  postings              posting[]
+  entity_tax_settings   entity_tax_settings? @relation("entity_tax_settings")
+  customers             customer[]
+  suppliers             supplier[]
+  locations             location[]
+  payment_terms         payment_terms[]
+  invoices              invoice[]
+  payment_receipts      payment_receipt[]
+  credit_notes          credit_note[]
 
   @@index([org_id])
   @@index([currency_id])
+  @@index([default_tax_region_id])
   @@map("entity")
 }
 
@@ -243,48 +261,6 @@ model ext_transaction {
   @@index([org_id])
   @@index([ext_connection_id])
   @@map("ext_transaction")
-}
-
-model invoice {
-  id               String            @id @default(dbgenerated("'inv_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id           String
-  account_id       String?
-  account          account?          @relation(fields: [account_id], references: [id], onDelete: SetNull)
-  postings         posting[]
-  payment_receipts payment_receipt[]
-  credit_notes     credit_note[]
-
-  @@index([org_id])
-  @@index([account_id])
-  @@map("invoice")
-}
-
-model payment_receipt {
-  id         String   @id @default(dbgenerated("'payr_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id     String
-  account_id String?
-  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
-  invoice_id String?
-  invoice    invoice? @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
-  posting    posting? @relation("posting_payment_receipt")
-
-  @@index([org_id])
-  @@index([account_id])
-  @@index([invoice_id])
-  @@map("payment_receipt")
-}
-
-model credit_note {
-  id         String   @id @default(dbgenerated("'cn_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id     String
-  account_id String?
-  account    account? @relation(fields: [account_id], references: [id], onDelete: SetNull)
-  invoice_id String?
-  invoice    invoice? @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
-
-  @@index([org_id])
-  @@index([account_id])
-  @@map("credit_note")
 }
 
 model trade {
@@ -356,20 +332,6 @@ model purchase_order {
   @@index([org_id])
   @@index([account_id])
   @@map("purchase_order")
-}
-
-model item_master {
-  id                  String   @id @default(dbgenerated("'item_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id              String
-  sales_account_id    String?
-  sales_account       account? @relation("item_master_sales_account", fields: [sales_account_id], references: [id], onDelete: SetNull)
-  purchase_account_id String?
-  purchase_account    account? @relation("item_master_purchase_account", fields: [purchase_account_id], references: [id], onDelete: SetNull)
-
-  @@index([org_id])
-  @@index([sales_account_id])
-  @@index([purchase_account_id])
-  @@map("item_master")
 }
 
 model project_master {
