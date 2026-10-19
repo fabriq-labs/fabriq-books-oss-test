@@ -19,6 +19,10 @@ import PostingList from '@/domain/gl/reports/PostingList';
 import ConnectionsPage from '@/domain/connections/ConnectionsPage';
 import ConnectionDetailPage from '@/domain/connections/ConnectionDetailPage';
 import ConnectionFormPage from '@/domain/connections/ConnectionFormPage';
+import InvoiceList from '@/domain/sales/InvoiceList';
+import CustomerList from '@/domain/sales/CustomerList';
+import { InvoiceForm } from '@/domain/sales/InvoiceForm';
+import { CustomerForm } from '@/domain/sales/CustomerForm';
 
 export function DomainRoutes() {
   return (
@@ -27,6 +31,12 @@ export function DomainRoutes() {
       <Route path="settings/connections/new" element={<ConnectionFormPage />} />
       <Route path="settings/connections/:id/edit" element={<ConnectionFormPage />} />
       <Route path="settings/connections/:id" element={<ConnectionDetailPage />} />
+      <Route path="sales/invoices" element={<InvoiceList />} />
+      <Route path="sales/customers" element={<CustomerList />} />
+      <Route path="invoice/:id/view/:viewId" element={<InvoiceForm />} />
+      <Route path="invoice/view/:viewId" element={<InvoiceForm />} />
+      <Route path="customer/:id/view/:viewId" element={<CustomerForm />} />
+      <Route path="customer/view/:viewId" element={<CustomerForm />} />
       <Route path="accounting/accounts" element={<AccountList />} />
       <Route path="accounting/transactions" element={<Transactions />} />
       <Route path="accounting/opening-balances" element={<OpeningBalances />} />

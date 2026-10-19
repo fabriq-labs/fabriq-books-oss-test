@@ -14,6 +14,13 @@ export interface DomainNavGroup {
  */
 export const domainNavigation: DomainNavGroup[] = [
   {
+    label: 'Sales',
+    items: [
+      { label: 'Invoices', path: '/sales/invoices' },
+      { label: 'Customers', path: '/sales/customers' },
+    ],
+  },
+  {
     label: 'Accounting',
     items: [
       { label: 'Chart of Accounts', path: '/accounting/accounts' },
