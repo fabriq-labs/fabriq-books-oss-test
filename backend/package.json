@@ -18,7 +18,8 @@
     "seed:books-demo": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedBooksDemo.ts",
     "smoke:sales-model": "ts-node --transpile-only scripts/smoke-sales-model.ts",
     "smoke:integrations-phase2": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/smoke-integrations-phase2.ts",
-    "integrations:set-extraction-config": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/set-extraction-config.ts"
+    "integrations:set-extraction-config": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/set-extraction-config.ts",
+    "setup:railway-qbo-sync": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/setup-railway-qbo-sync.ts"
   },
   "dependencies": {
     "@ai-sdk/google-vertex": "^2.2.27",

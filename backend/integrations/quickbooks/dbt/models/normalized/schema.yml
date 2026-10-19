@@ -43,8 +43,12 @@ models:
     columns:
       - name: org_id
         tests: [not_null]
+      # Seeded CoA rows may lack lineage; only assert when present.
       - name: source_record_id
-        tests: [not_null]
+        tests:
+          - not_null:
+              config:
+                where: "source_system_id is not null"
 
   - name: item_master
     columns:

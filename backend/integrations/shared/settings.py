@@ -57,17 +57,21 @@ def load_dotenv_files() -> None:
         apply_env_file(here / "quickbooks" / name)
 
 
-def ensure_db_env_from_database_url() -> None:
-    """Derive DB_* for dbt profiles.yml when only DATABASE_URL is set."""
-    if os.getenv("DB_HOST"):
-        return
+def ensure_db_env_from_database_url(*, force: bool = True) -> None:
+    """Derive DB_* for dbt profiles.yml from DATABASE_URL.
+
+    When force=True (default), DATABASE_URL always overwrites stale DB_* from a
+    prior local session so dbt cannot target the wrong database.
+    """
     url = os.getenv("DATABASE_URL")
     if not url:
+        return
+    if not force and os.getenv("DB_HOST"):
         return
     p = urlparse(url)
     if p.hostname:
         os.environ["DB_HOST"] = p.hostname
-    os.environ.setdefault("DB_PORT", str(p.port or 5432))
+    os.environ["DB_PORT"] = str(p.port or 5432)
     if p.username:
         os.environ["DB_USER"] = unquote(p.username)
     if p.password:

@@ -17,11 +17,11 @@ select
     ARRAY[stg.account_type]::text[] as account_types,
     stg.account_sub_type as sub_type,
     case
-        when stg.classification = 'Asset' then 'Assets'::account_classification
-        when stg.classification = 'Liability' then 'Liabilities'::account_classification
-        when stg.classification = 'Revenue' then 'Income'::account_classification
-        when stg.classification = 'Expense' then 'Expense'::account_classification
-        when stg.classification = 'Equity' then 'Equity'::account_classification
+        when stg.classification = 'Asset' then 'asset'::account_classification
+        when stg.classification = 'Liability' then 'liability'::account_classification
+        when stg.classification = 'Revenue' then 'income'::account_classification
+        when stg.classification = 'Expense' then 'expense'::account_classification
+        when stg.classification = 'Equity' then 'equity'::account_classification
         else null
     end as classification,
     stg.current_balance::numeric(19, 4) as balance,
