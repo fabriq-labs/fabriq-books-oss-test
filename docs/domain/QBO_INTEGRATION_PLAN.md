@@ -207,15 +207,28 @@ Railway FastAPI sync_service
 
 **Deliverables**
 
-- Node routes (via `domain.ts`): create/update QBO connection, test connection, trigger sync (**HTTP to loopback sync_service** in the same container)
-- Minimal admin UI **optional** — API + curl/docs enough for parallel track
-- Persist Airbyte connection id in `extraction_config`
-- Default `SYNC_SERVICE_URL=http://127.0.0.1:8090` (overridable if we ever split)
+- Node routes (via `domain.ts` → `lib/integrations/register.ts`): create/update QBO connection, test connection, trigger sync (**HTTP to loopback sync_service**) — **done**
+- Prisma encryption middleware on `connection_config` / `extraction_config` — **done**
+- `npm run integrations:set-extraction-config` — **done**
+- Default `SYNC_SERVICE_URL=http://127.0.0.1:8090` — **done**
+- Minimal admin UI **optional** — deferred (API + curl/docs enough)
+- Smoke: `npm run smoke:integrations-phase2`
+
+**Routes**
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/source_system/connections` | List org connections (secrets redacted) |
+| POST | `/api/source_system/connections` | Upsert QuickBooks OAuth connection |
+| GET | `/api/source_system/connections/:id` | Connection detail (redacted) |
+| POST | `/api/source_system/test-connection` | Probe QBO with oauth or saved `connection_id` |
+| POST | `/api/source_system/:id/sync` | Proxy to sync_service (`sync_mode`) |
 
 **Acceptance**
 
 - Authenticated admin can trigger sync for one org; `last_sync_at` / `last_sync_status` updated
 - Missing credentials → 503/400, app otherwise healthy
+- Encryption round-trip verified by smoke script
 
 ### Phase 3 — Payments + credit memos (QBO gaps)
 

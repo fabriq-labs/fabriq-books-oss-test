@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import { sourceSystemEncryptionMiddleware } from '../../lib/integrations/shared/prisma-encryption-middleware';
 import logger from '../utils/logger';
 
 const prismaClientOptions: {
@@ -30,6 +31,9 @@ const prismaClientOptions: {
 };
 
 const prisma = new PrismaClient(prismaClientOptions);
+
+/** Encrypt/decrypt source_system.connection_config + extraction_config (AES-256-CBC). */
+prisma.$use(sourceSystemEncryptionMiddleware());
 
 if (process.env.PRISMA_SHOW_QUERY === 'true') {
   (prisma as any).$on('query', (e: any) => {

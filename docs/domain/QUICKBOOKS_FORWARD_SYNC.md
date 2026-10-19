@@ -48,8 +48,9 @@ public.customer / supplier / item_master / account / invoice / …
 | **item_master** | `item_code`, `stockable` Y/N, `supplier_id` text | **`code`**, `is_stockable` bool, **`preferred_supplier_id`**, optional `tax_group_id` |
 | **tax_*** | merge on `tax_code`/`code`; Int rate | lineage keys + **Decimal `rate`**; `is_active` bool |
 | **source_system join** | any active quickbooks row | **scoped to `org_id`** |
-| **UI** | `frontend-1` Connections pages | Not ported yet — trigger via sync HTTP / future Node route |
-| **set-extraction-config** | `backend/scripts/set-extraction-config.ts` | Still to port (Phase 2); until then write encrypted `extraction_config` with the shared key |
+| **UI** | `frontend-1` Connections pages | Not ported — use Node APIs / curl (Phase 2) |
+| **set-extraction-config** | `backend/scripts/set-extraction-config.ts` | Ported: `npm run integrations:set-extraction-config` |
+| **Node APIs** | Rest + Connections UI | `POST /api/source_system/connections`, `test-connection`, `:id/sync` via `lib/integrations/` |
 
 ---
 
@@ -67,13 +68,51 @@ uv run python quickbooks/run_dbt.py
 
 # HTTP sync (same process model as the container)
 uv run uvicorn sync_service.main:app --host 127.0.0.1 --port 8090
-# POST /sync  with X-API-Key + { org_id, system_type: quickbooks, connection_id, sync_mode }
+```
+
+### Phase 2 — save connection + trigger sync (Node)
+
+```bash
+# 1) Upsert QBO connection (JWT or X-API-Key auth)
+curl -s -X POST "$API/api/source_system/connections" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "system_type": "quickbooks",
+    "name": "QBO Sandbox",
+    "oauth": {
+      "client_id": "...",
+      "client_secret": "...",
+      "refresh_token": "...",
+      "realm_id": "...",
+      "environment": "sandbox"
+    }
+  }'
+
+# 2) Test connection
+curl -s -X POST "$API/api/source_system/test-connection" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"system_type":"quickbooks","connection_id":"srcsys_xxx"}'
+
+# 3) Attach Airbyte extraction_config
+cd backend
+AIRBYTE_CLIENT_ID=... AIRBYTE_CLIENT_SECRET=... \
+  npm run integrations:set-extraction-config -- \
+  --source-system-id srcsys_xxx \
+  --airbyte-connection-id <airbyte_uuid>
+
+# 4) Generate a user API key once (required for sync proxy → Python)
+curl -s -X POST "$API/api/auth/generate-api-key" -H "Authorization: Bearer $TOKEN"
+
+# 5) Trigger sync
+curl -s -X POST "$API/api/source_system/srcsys_xxx/sync" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"sync_mode":"transform_only"}'
 ```
 
 Container (`start.sh`):
 
 - Starts Node `:4000`, sync `:8090` (loopback), nginx `:$PORT`
-- `ENABLE_SYNC_SERVICE=true` (default), `SYNC_SERVICE_URL=http://127.0.0.1:8090` for the Node proxy (Phase 2)
+- `ENABLE_SYNC_SERVICE=true` (default), `SYNC_SERVICE_URL=http://127.0.0.1:8090` for the Node proxy
 
 ---
 

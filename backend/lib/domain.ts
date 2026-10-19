@@ -13,6 +13,7 @@ import {
   registerGlImportExtension,
   registerGlRoutes,
 } from './gl/register';
+import { registerIntegrationsRoutes } from './integrations/register';
 
 /** Host passed by the kernel extractor registry. */
 export type DomainExtractorHost = {
@@ -168,6 +169,7 @@ export function registerDomainAgentRoutes(router: Router): void {
 export function registerDomainRoutes(router: Router): void {
   installEntityWriteGuard();
   registerGlRoutes(router);
+  registerIntegrationsRoutes(router);
 }
 
 installEntityWriteGuard();
