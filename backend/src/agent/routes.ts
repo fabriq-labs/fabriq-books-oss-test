@@ -1007,16 +1007,11 @@ export function createAgentRouter() {
     }
   });
 
-  /** POST /api/agent/admin/model-tools/seed — Apply prisma/seed-agent-model-tools.sql (idempotent) */
-  router.post('/admin/model-tools/seed', authMiddleware, requirePlatformAdmin, async (req: Request, res) => {
-    try {
-      if (!req.context?.auth?.user) return res.status(401).json({ error: 'Unauthorized' });
-      const { seedDefaultModelToolConfigs } = await import('./agentModelToolConfigCache');
-      const count = await seedDefaultModelToolConfigs();
-      res.json({ success: true, count, created: count });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+  /** POST /api/agent/admin/model-tools/seed — prod SQL seed was removed */
+  router.post('/admin/model-tools/seed', authMiddleware, requirePlatformAdmin, async (_req: Request, res) => {
+    res.status(410).json({
+      error: 'The prod model-tool SQL seed was removed. Edit tool rows with the admin upsert.',
+    });
   });
 
   // ==========================================

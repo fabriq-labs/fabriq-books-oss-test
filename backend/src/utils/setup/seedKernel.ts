@@ -18,8 +18,7 @@ const EXTERNAL_ID = 'auth_kernel_admin';
 const CURRENCY_ID = 'curr_kernel_usd';
 
 /**
- * Column graphs taken from backend/prisma/metadata/views on prod
- * (the files setup-db.js loads through prisma/setup-metadata.ts).
+ * Column graphs copied from the prod view catalog.
  * Fields that are not on the kernel models are left out. Relation keys
  * use type "table" so LegacyDataGraphParser builds a nested select.
  */

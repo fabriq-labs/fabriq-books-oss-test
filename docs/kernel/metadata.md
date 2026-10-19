@@ -45,7 +45,7 @@ A relation the API should return:
 
 `select` values are `read` or `update`. Both become `true` in the Prisma select.
 
-`backend/src/utils/setup/seedKernel.ts` writes a `data_graph` for each shell view. Those graphs were copied from the matching files in `backend/prisma/metadata/views/` (the catalog `setup-db.js` on the books branch loads). Fields that are not on the kernel models were left out. `setup:kernel` does not load that folder. Most of those JSON files name models that are not in this schema. Do not sync the whole catalog into this database.
+`backend/src/utils/setup/seedKernel.ts` writes a `data_graph` for each shell view. The graphs were copied from the prod view catalog, and fields that are not on the kernel models were left out. That JSON catalog is not in this branch. `setup:kernel` writes the TypeScript graphs.
 
 Routes are registered once, when the process starts, by parsing `backend/prisma/schema/`. After a model is added, restart the backend. Until then `GET /api/models` can list the model while `/api/{model}/view/...` returns 404.
 

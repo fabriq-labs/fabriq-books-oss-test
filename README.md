@@ -19,11 +19,12 @@ Start with the [docs index](docs/README.md).
 
 ```bash
 npm run install:all
+cp backend/.env.example backend/.env
 cd backend && npm run setup:kernel
 cd .. && npm run dev
 ```
 
-`setup:kernel` applies the schema and seeds `org_system` when the database is empty. Do not run `prisma db push` or `prisma migrate`. Configure `DATABASE_URL` in `backend/.env` before setup. See [docs/infrastructure/BUILD_AND_DEPLOY.md](docs/infrastructure/BUILD_AND_DEPLOY.md).
+`setup:kernel` applies the schema and seeds `org_system` when the database is empty. Do not run `prisma db push` or `prisma migrate`. Set `DATABASE_URL` in `backend/.env` before setup. Postgres runs outside this app. See [docs/infrastructure/BUILD_AND_DEPLOY.md](docs/infrastructure/BUILD_AND_DEPLOY.md).
 
 API: http://localhost:4000 · UI: http://localhost:5174 · Login: `admin@example.com` / `admin123`
 
@@ -42,6 +43,7 @@ The steps, SQL diff, and form conventions are in [docs/kernel/adding-a-model.md]
 ```
 ├── package.json          # install:all, dev (API + UI)
 ├── Dockerfile            # one image: nginx, the UI, and the API
+├── start.sh              # container entrypoint; external Postgres
 ├── backend/
 ├── frontend-0/
 └── docs/

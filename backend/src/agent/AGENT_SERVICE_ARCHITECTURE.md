@@ -312,7 +312,7 @@ const tools = toolManager.getToolsForModel('default', auth);
    - Orders by: `is_default DESC, priority ASC, version DESC`
 
 3. **Template Retrieval (JSON File Mode - when `USE_LOCAL_PROMPT=true`):**
-   - Reads from `prisma/metadata/prompt-templates/` directory
+   - Reads prompt files under `prisma/metadata/prompt-templates/` when that directory exists. This branch does not ship it.
    - Finds view JSON file matching `model_name` and `viewName`
    - Gets `view_id` from view file
    - Finds matching template files: `view_{view_id}_{prompt_type}.json` and `.txt`
@@ -437,7 +437,7 @@ const tools = toolManager.getToolsForModel('default', auth);
    - Passes: `org_id`, `user_id`, `modelName`, `viewName`, `promptTypes`, `context`
 
 2. **Generate Prompt:**
-   - If `USE_LOCAL_PROMPT=true`: Reads from JSON files in `prisma/metadata/prompt-templates/`
+   - If `USE_LOCAL_PROMPT=true`: reads prompt files under `prisma/metadata/prompt-templates/` when that directory exists. This branch does not ship it.
    - If `USE_LOCAL_PROMPT=false` or unset: Reads from database `prompt_template` table
    - Includes accessible models, permissions, placeholders replaced
 

@@ -1,7 +1,7 @@
 {
   "name": "fabriq-backend",
   "version": "1.0.0",
-  "description": "Fabriq Books API backend — metadata-driven REST/GraphQL, workflows, and AI agent",
+  "description": "Metadata-driven API: views, workflows, and the agent runtime",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc && node -e \"require('fs').cpSync('src/config', 'dist/config', {recursive: true, force: true})\"",
@@ -10,24 +10,12 @@
     "test": "jest",
     "test:suite": "jest --config jest.config.suite.js",
     "test:watch": "jest --watch",
-    "test:posting-prompt": "ts-node --transpile-only src/agent/__tests__/posting-prompt.test.ts",
-    "test:posting-sample-questions": "DOTENV_CONFIG_PATH=.env node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/agent/__tests__/posting-sample-questions.test.ts",
-    "test:import-api-key": "jest src/__tests__/import/bank-statement-import-api-key.test.ts",
-    "generate:sample-bank-pdf": "ts-node --transpile-only scripts/generate-us-ca-sample-bank-pdf.ts",
-    "generate-types": "ts-node scripts/generateTypes.ts",
     "slides": "slidev --open src/agent/slides.md",
-    "apply-views": "ts-node src/utils/setup/applyDatabaseViews.ts",
-    "sync-metadata": "ts-node prisma/sync-metadata.ts",
-    "seed-sql-metadata": "ts-node prisma/seed-sql-metadata.ts",
     "setup:kernel": "node scripts/setup-kernel-db.js",
     "seed:gl": "ts-node --transpile-only src/utils/setup/seedGl.ts",
     "seed:entities": "ts-node --transpile-only src/utils/setup/seedEntities.ts",
     "seed:coa": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedChart.ts",
-    "seed:books-demo": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedBooksDemo.ts",
-    "pull-metadata": "ts-node prisma/pull-metadata.ts",
-    "pull": "ts-node prisma/pull-metadata-interactive.ts",
-    "sync": "ts-node prisma/sync-metadata-interactive.ts",
-    "remove-tenant-data": "ts-node prisma/remove-tenant-data.ts"
+    "seed:books-demo": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedBooksDemo.ts"
   },
   "dependencies": {
     "@ai-sdk/google-vertex": "^2.2.27",

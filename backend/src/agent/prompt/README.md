@@ -4,8 +4,8 @@ The `DynamicPromptManager` is responsible for generating system prompts for AI a
 
 ## Overview
 
-- **When `USE_LOCAL_PROMPT=true`**: Reads prompts from JSON files in `prisma/metadata/prompt-templates/`
-- **When `USE_LOCAL_PROMPT=false` or unset**: Reads prompts from database `prompt_template` table
+- **When `USE_LOCAL_PROMPT=true`**: Reads prompt files under `prisma/metadata/` if that directory is present. This branch does not include it.
+- **When `USE_LOCAL_PROMPT=false` or unset**: Reads prompts from the `prompt_template` table. This is the path `setup:kernel` uses.
 
 Both modes follow the same logic and flow - only the data source differs.
 
@@ -45,7 +45,7 @@ getPromptTemplates()
 #### Local File Mode (`getPromptTemplatesFromFiles()`)
 
 1. **Find View File**:
-   - Searches `prisma/metadata/views/` for JSON file matching `model_name` and `viewName`
+   - Searches `prisma/metadata/views/` for a JSON file matching `model_name` and `viewName`, when that directory exists
    - Extracts `view_id` from the view file
 
 2. **Find Template Files**:
@@ -104,25 +104,13 @@ Replaces template variables with actual values.
 
 - `{{#if context.recordId}}...{{else}}...{{/if}}` → Removes blocks based on context
 
-## Metadata Synchronization
+## Metadata
 
-**Important**: When working with JSON files in `prisma/metadata/prompt-templates/`:
-
-1. **Edit JSON/TXT files** in `prisma/metadata/prompt-templates/`
-2. **Run sync command** to push changes to database:
-   ```bash
-   npm run sync-metadata
-   ```
-   or
-   ```bash
-   npm run sync-prompt-templates
-   ```
-
-This ensures that database and metadata files stay in sync. Without syncing, changes to JSON files will not be reflected in the database.
+Prompt text for this app is a `prompt_template` row. `setup:kernel` does not load a JSON catalog, and `npm run sync-metadata` is not a script on this branch.
 
 ## File Structure
 
-### Local Metadata Files
+File mode expects this layout. The directory is not in this branch.
 
 ```
 prisma/metadata/

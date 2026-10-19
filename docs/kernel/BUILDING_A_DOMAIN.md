@@ -30,7 +30,7 @@ The kernel imports `backend/lib/domain.ts` and `frontend-0/src/domain/register.t
 
 Put the product classes under `backend/lib/<product>/` and `frontend-0/src/domain/<product>/`. `domain.ts`, `domain/register.ts`, and `domain/routes.tsx` are the files that import that folder.
 
-`backend/prisma/metadata/views/` is a JSON catalog from the books setup. `setup:kernel` does not load it. Do not sync the whole folder into this database.
+View graphs for the shell are written by `seedKernel.ts`. A domain adds its own graphs in a `seed<Domain>.ts` script. There is no JSON view catalog to sync.
 
 `domain.prisma` and `domainNavigation` are empty on this branch. A domain seed is a second command after `setup:kernel`. The kernel seed does not insert those rows.
 

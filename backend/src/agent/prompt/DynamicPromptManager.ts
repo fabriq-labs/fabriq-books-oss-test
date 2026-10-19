@@ -79,7 +79,7 @@ export class DynamicPromptManager {
         this.viewName = viewName;
         this.promptTypes = promptTypes;
         this.context = context || {};
-        // Resolve metadata path relative to project root
+        // Optional file fallback. This branch does not ship prisma/metadata; the default source is prompt_template.
         this.metadataBasePath = path.resolve(__dirname, '../../../prisma/metadata');
         this.useLocalPrompt = process.env.USE_LOCAL_PROMPT === 'true';
     }

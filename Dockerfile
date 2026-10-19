@@ -1,6 +1,6 @@
 # Kernel image: nginx serves frontend-0 and proxies /api to the Node backend.
 # Build context is the repo root (./backend and ./frontend-0).
-# Runtime database mode is USE_EMBEDDED_PG (start-with-pg.sh) or external DATABASE_URL (start-external.sh).
+# PostgreSQL is external. /start.sh requires DATABASE_URL and JWT_SECRET.
 # CI: GitHub Actions → GHCR. Optional build-args: SOURCE_* for /app/build-info.json.
 #
 # Runtime Node is pinned (see node-runtime stage). Do not use unpinned `apk add nodejs`.
@@ -81,11 +81,8 @@ RUN apk add --no-cache \
     wget \
     gettext \
     bash \
-    postgresql16 \
-    postgresql16-contrib \
-    su-exec \
+    postgresql16-client \
     openssl \
-    libpq \
     libstdc++
 
 # Pinned Node from official image (not Alpine apk — version must not float).
@@ -95,7 +92,7 @@ RUN ln -sf /usr/local/bin/node /usr/bin/node \
 
 WORKDIR /app
 
-# Stage 3: Final image (app layers + labels; start script chosen by USE_EMBEDDED_PG)
+# Stage 3: Final image (app layers + labels)
 FROM runtime-deps
 
 ARG NODE_RUNTIME_VERSION=24.14.1
@@ -107,13 +104,10 @@ COPY --from=build-info /build-info.json /usr/share/nginx/html/build-info.json
 
 COPY nginx.main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template
-COPY start-with-pg.sh /start-with-pg.sh
-COPY start-external.sh /start-external.sh
 COPY start.sh /start.sh
-RUN chmod +x /start.sh /start-with-pg.sh /start-external.sh
+RUN chmod +x /start.sh
 
 RUN mkdir -p /app/backend/logs
-RUN mkdir -p /var/lib/postgresql/data && chown -R postgres:postgres /var/lib/postgresql
 
 # Per-build metadata LAST so LABEL/ARG changes do not invalidate apk / Node above.
 ARG BUILD_TIME

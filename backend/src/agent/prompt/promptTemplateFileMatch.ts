@@ -41,6 +41,6 @@ export function formatMissingPromptTemplatesError(args: {
     `No prompt templates found for model: ${args.modelName}, view: ${args.viewName}, ` +
     `types: ${types} (${app}). ` +
     `Ensure prompt_template rows exist for this view/type and app_name matches ${app} ` +
-    `(or unset APP_NAME). Seed from prisma/metadata/prompt-templates/.`
+    `(or unset APP_NAME).`
   );
 }
