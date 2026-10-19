@@ -7,28 +7,53 @@ This file says where a domain's files go. Behavior of the engine is in [../READM
 | `backend/prisma/schema/domain.prisma` | Domain models. Every model has `org_id`. Names are `snake_case`. See [adding-a-model.md](./adding-a-model.md). |
 | `backend/src/utils/setup/seed<Domain>.ts` | Idempotent view, permission, and `role_view` rows. `data_graph` is required. Copy `seedKernel.ts`. |
 | `frontend-0/src/domain/navigation.ts` | Sidebar entries. Paths are `/master/app/{model}` when the view is `{model}_view`. |
-| `frontend-0/src/domain/` and `frontend-0/src/App.tsx` | Form components and both routes `/{model}/view/:viewId` and `/{model}/:id/view/:viewId`. |
+| `frontend-0/src/domain/<product>/` | Product screens and import extensions. |
+| `frontend-0/src/domain/routes.tsx` | The only UI file that imports those screens. `App.tsx` renders `DomainRoutes`. |
+| `frontend-0/src/domain/register.ts` | The only UI file that registers a product import extension. |
 | `frontend-0/src/domain/home.tsx` | Home screen rendered at `/` |
-| `backend/lib/domain.ts` | Optional product hooks. A list and a form do not read this file. |
-| `frontend-0/src/domain/register.ts` | Import-screen extensions. The kernel calls `registerDomainImportExtensions`. |
-| `frontend-0/src/domain/routes.tsx` | Product routes. `App.tsx` calls `DomainRoutes()`. |
+| `backend/lib/<product>/` | Product handlers, extractors, and route modules. |
+| `backend/lib/domain.ts` | The only kernel-facing file that imports `backend/lib/<product>/`. |
 
 The app UI is `frontend-0` (port 5174). `/` mounts `DomainHome` from `home.tsx`. Keep that export if you replace the page. See [frontend.md](./frontend.md).
 
 A list appears when four things exist: the table, a view named `{model}_view` whose `data_graph` marks columns with `displayName` and `isColumnShow`, a `*` permission, and a `role_view` to Super Admin. Then restart the backend so the new model is registered. Forms are a separate step. The order is [adding-a-model.md](./adding-a-model.md). What the graph selects is in [metadata.md](./metadata.md).
 
-`backend/lib/domain.ts` is where a workflow model, a post-write hook, or a report handler goes. `DOMAIN_SQL_TABLES` is not read by the analytics gate. That allowlist is `KNOWN_TABLES` in `backend/src/services/analytics/sqlExecutor.ts`. Adding a name only in `domain.ts` does not create an API.
+## How the kernel reaches a domain
 
-The kernel imports `backend/lib/domain.ts` and `frontend-0/src/domain/register.ts`. A todo app and the ledger keep these function names and replace the bodies. The rule for a prod migration is [PORTING_A_DOMAIN.md](./PORTING_A_DOMAIN.md).
+A todo app and the ledger use the same entry files. The product fills the bodies. Kernel files keep the function names and do not import a product folder.
 
-| Hook | Kernel call site | Empty body |
-|---|---|---|
-| `registerDomainImportExtensions()` | Backend import startup, and `frontend-0/src/features/import-extensions/init.ts` | Register nothing |
-| `registerDomainExtractors(registry)` | `ExtractorRegistry` constructor | Register nothing |
-| `registerDomainAgentRoutes(router)` | End of `createAgentRouter`, paths are under `/api/agent` | Register nothing |
-| `DomainRoutes()` | `App.tsx` renders the fragment it returns | Return `null` |
+Product code lives in `backend/lib/<product>/` and `frontend-0/src/domain/<product>/`. These files are the only ones that import that folder:
 
-Put the product classes under `backend/lib/<product>/` and `frontend-0/src/domain/<product>/`. `domain.ts`, `domain/register.ts`, and `domain/routes.tsx` are the files that import that folder.
+| Entry | What it imports |
+|---|---|
+| `backend/lib/domain.ts` | `backend/lib/<product>/` |
+| `frontend-0/src/domain/register.ts` | A product import extension |
+| `frontend-0/src/domain/routes.tsx` | Product screens |
+| `frontend-0/src/domain/navigation.ts` | Sidebar labels and paths |
+| `frontend-0/src/domain/home.tsx` | The home page |
+
+`App.tsx` imports `DomainHome`, `DomainMaster`, and `DomainRoutes`. It does not name a product page. `SidebarNavigation` imports `domainNavigation`. `frontend-0/src/features/import-extensions/init.ts` calls `registerDomainImportExtensions` from `domain/register.ts`.
+
+On the backend, `backend/src` imports `backend/lib/domain.ts`, sometimes through a one-line file in `backend/src/domain/`. It does not import `backend/lib/<product>/`.
+
+| Export on `backend/lib/domain.ts` | Kernel call site |
+|---|---|
+| `registerDomainImportExtensions()` | `initializeImportExtensions` in `backend/src/lib/import-extensions/index.ts` |
+| `registerDomainExtractors(registry)` | `ExtractorRegistry` constructor |
+| `registerDomainAgentRoutes(router)` | End of `createAgentRouter`. Paths are under `/api/agent` |
+| `registerDomainRoutes(router)` | `backend/src/rest/routes.ts`, on the main `/api` router |
+| `DOMAIN_SQL_TABLES` | Analytics allowlist in `sqlExecutor.ts`, added beside `KNOWN_TABLES` |
+| `DOMAIN_IMPORT_FIELD_KEYS` | Import client that drops unknown fields before create |
+| `functionMap`, `workflowActionMap` | `backend/src/domain/actions.ts`, then the data access layer, `ModelService`, and workflow side effects |
+| `reportHandlers` | `backend/src/domain/reports.ts`, then `RestService` |
+| `DOMAIN_WORKFLOW_MODELS` | `backend/src/domain/workflowModels.ts` |
+| `registerDomainBuilders` | `backend/src/domain/agentBuilders.ts`, then the agent builder index |
+
+An unused hook stays an empty function. `DomainRoutes` returns `null` when the product has no extra screens. A metadata list still needs a table, a view, a permission, and a `role_view`. Filling `domain.ts` does not create that API.
+
+A seed command may import the product library. `backend/src/utils/setup/seed<Domain>.ts` runs after `setup:kernel`. It is not a request path.
+
+`DEFAULT_GOAL_MODEL`, `RELATED_MODELS`, `PROMPT_EXAMPLES`, `DOMAIN_MODEL_REGISTRY`, and `normalizeAnalyticsSql` are declared on `domain.ts`. The agent still uses its own copies inside `AgentService.ts`. Product notes live in [../domain/AGENTS.md](../domain/AGENTS.md). The rule for a prod migration is [PORTING_A_DOMAIN.md](./PORTING_A_DOMAIN.md).
 
 View graphs for the shell are written by `seedKernel.ts`. A domain adds its own graphs in a `seed<Domain>.ts` script. There is no JSON view catalog to sync.
 

@@ -58,7 +58,7 @@ Files:
 
 Frontend files:
 - `frontend-0/src/components/import/ImportPannel.tsx`
-- `frontend-0/src/domain/gl/postingImportExtension.tsx`
+- `frontend-0/src/features/import-extensions/`
 
 Backend file:
 - `backend/src/rest/RestService.ts` (`parseDocument`)

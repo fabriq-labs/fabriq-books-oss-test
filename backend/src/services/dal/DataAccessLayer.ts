@@ -18,7 +18,7 @@ import {
 import { NotFoundError } from '../../tenancy/errors';
 import { rejectUnknownWriteFields, unknownWriteFields, unknownWriteFieldsMessage } from './unknownWriteFields';
 
-/** Stubs in this slice have id and org_id and no created_at. Sort those by id. */
+/** A model with no created_at sorts by id. The shell models have created_at. */
 function defaultOrderBy(modelName: string): Array<Record<string, 'asc' | 'desc'>> {
   const model = Prisma.dmmf.datamodel.models.find((item) => item.name === modelName);
   const hasCreatedAt = model?.fields.some((field) => field.name === 'created_at') ?? false;
