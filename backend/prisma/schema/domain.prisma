@@ -213,6 +213,7 @@ model entity {
   invoices              invoice[]
   payment_receipts      payment_receipt[]
   credit_notes          credit_note[]
+  source_systems        source_system[]
 
   @@index([org_id])
   @@index([currency_id])

@@ -1,7 +1,8 @@
--- Universal sales model delta (Module 2 Phase A).
--- Reviewed script: creates sales/tax tables and extends stubs.
--- Does not drop product data. Apply only to local/dev after review.
--- See docs/domain/SALES_MODEL.md.
+-- Module 2 universal sales + tax + source_system delta.
+-- From fabriq-books ledger/entity baseline → sales/tax/integrations models.
+-- Review before apply. Do not run against prod.
+-- After apply: also run datalake_bootstrap.sql
+-- Smoke: npx ts-node --transpile-only scripts/smoke-sales-model.ts
 
 -- CreateEnum
 CREATE TYPE "invoice_direction" AS ENUM ('sales', 'purchase');
@@ -125,6 +126,30 @@ ADD COLUMN     "tax_group_id" TEXT,
 ADD COLUMN     "tax_master_id" TEXT,
 ADD COLUMN     "unit_price" DECIMAL(19,4),
 ADD COLUMN     "uom_id" TEXT;
+
+-- CreateTable
+CREATE TABLE "source_system" (
+    "id" VARCHAR(50) NOT NULL DEFAULT 'srcsys_' || gen_random_uuid(),
+    "org_id" VARCHAR(50) NOT NULL,
+    "system_type" VARCHAR(255) NOT NULL,
+    "name" VARCHAR(255) NOT NULL,
+    "region" VARCHAR(255),
+    "connector_version" VARCHAR(255),
+    "connection_config" JSONB NOT NULL,
+    "extraction_config" JSONB,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "default_purchase_account_id" VARCHAR(255),
+    "default_purchase_account_name" VARCHAR(255),
+    "last_sync_at" TIMESTAMP(3),
+    "last_sync_status" JSONB,
+    "entity_id" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "modified_at" TIMESTAMP(3) NOT NULL,
+    "created_by" VARCHAR(255),
+    "modified_by" VARCHAR(255),
+
+    CONSTRAINT "source_system_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "customer" (
@@ -457,6 +482,18 @@ CREATE TABLE "entity_tax_settings" (
 );
 
 -- CreateIndex
+CREATE INDEX "source_system_org_id_idx" ON "source_system"("org_id");
+
+-- CreateIndex
+CREATE INDEX "source_system_entity_id_idx" ON "source_system"("entity_id");
+
+-- CreateIndex
+CREATE INDEX "source_system_system_type_idx" ON "source_system"("system_type");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "source_system_org_id_system_type_key" ON "source_system"("org_id", "system_type");
+
+-- CreateIndex
 CREATE INDEX "customer_org_id_idx" ON "customer"("org_id");
 
 -- CreateIndex
@@ -775,6 +812,9 @@ CREATE UNIQUE INDEX "item_master_org_id_source_system_id_source_record_id_key" O
 ALTER TABLE "entity" ADD CONSTRAINT "entity_default_tax_region_id_fkey" FOREIGN KEY ("default_tax_region_id") REFERENCES "tax_region"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "source_system" ADD CONSTRAINT "source_system_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "entity"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "customer" ADD CONSTRAINT "customer_currency_id_fkey" FOREIGN KEY ("currency_id") REFERENCES "currency"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -932,3 +972,4 @@ ALTER TABLE "entity_tax_settings" ADD CONSTRAINT "entity_tax_settings_default_ta
 
 -- AddForeignKey
 ALTER TABLE "entity_tax_settings" ADD CONSTRAINT "entity_tax_settings_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "entity"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

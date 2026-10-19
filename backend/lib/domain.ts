@@ -73,6 +73,7 @@ export const DOMAIN_SQL_TABLES: readonly DomainSqlTable[] = [
   { name: 'payment_receipt_application', tenancy: 'private' },
   { name: 'credit_note', tenancy: 'private' },
   { name: 'credit_note_item', tenancy: 'private' },
+  { name: 'source_system', tenancy: 'private' },
   { name: 'trade', tenancy: 'private' },
   { name: 'holding', tenancy: 'private' },
   { name: 'budget_period', tenancy: 'private' },

@@ -15,7 +15,8 @@
     "seed:gl": "ts-node --transpile-only src/utils/setup/seedGl.ts",
     "seed:entities": "ts-node --transpile-only src/utils/setup/seedEntities.ts",
     "seed:coa": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedChart.ts",
-    "seed:books-demo": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedBooksDemo.ts"
+    "seed:books-demo": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedBooksDemo.ts",
+    "smoke:sales-model": "ts-node --transpile-only scripts/smoke-sales-model.ts"
   },
   "dependencies": {
     "@ai-sdk/google-vertex": "^2.2.27",

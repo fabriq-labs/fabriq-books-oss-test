@@ -138,16 +138,17 @@ Railway FastAPI sync_service
 
 **Deliverables**
 
-- Prisma `source_system` (org-scoped, encrypted JSON configs, `@@unique([org_id, system_type])`, optional `entity_id`)
-- Datalake bootstrap: `datalake` schema, `sync_batch`, docs for Airbyte `qb_*` landing tables
-- Shared encryption helper usable from Node (and document Python parity in `integrations/shared/`)
-- SQL delta applied on **local/dev only**
+- Prisma `source_system` in `integrations.prisma` (org-scoped JSON configs, `@@unique([org_id, system_type])`, optional `entity_id`) — **model landed on this branch**; encryption middleware still Phase 0 follow-up when connectors land
+- Datalake bootstrap SQL: `datalake` schema + `sync_batch` (`prisma/migration/2026-10-19/datalake_bootstrap.sql`)
+- Sales/tax/public schema via `sales_universal_model_delta.sql` or fresh `setup:kernel`
+- Shared encryption helper usable from Node (and document Python parity in `integrations/shared/`) — when porting connectors
 - Env template entries: `ERP_CONFIG_ENCRYPTION_KEY`, QBO OAuth placeholders, Airbyte placeholders — **no secrets committed**
-- Register `source_system` in domain SQL allowlist if analytics needs it
+- Register `source_system` in domain SQL allowlist — **done**
 
 **Acceptance**
 
-- Insert one `system_type='quickbooks'` row for a non-prod org; decrypt round-trip works in a unit/script test
+- Insert one `system_type='quickbooks'` row for a non-prod org — covered by `npm run smoke:sales-model`
+- Decrypt round-trip when encryption middleware lands
 - App boots without QBO configured
 
 ### Phase 1 — Bring integrations tree + dbt rename (no new QBO objects)

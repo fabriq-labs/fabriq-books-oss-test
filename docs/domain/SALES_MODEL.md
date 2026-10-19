@@ -2,8 +2,9 @@
 
 **Branch:** `agentc/sales-universal-model-6a16`  
 **Scope:** Module 2 Phase A — Prisma models only (no UI, posting lib, or connectors yet).  
-**Schema files:** `backend/prisma/schema/sales.prisma`, `tax.prisma` (+ `entity` / `account` / `currency` relation updates).  
-**SQL:** `backend/prisma/migration/2026-10-19/sales_universal_model_delta.sql`
+**Schema files:** `backend/prisma/schema/sales.prisma`, `tax.prisma`, `integrations.prisma` (`source_system`) (+ `entity` / `account` / `currency` relation updates).  
+**SQL:** `backend/prisma/migration/2026-10-19/sales_universal_model_delta.sql` + `datalake_bootstrap.sql`  
+**Local smoke (no UI):** `cd backend && npm run smoke:sales-model` (after `setup:kernel` or applying the SQL deltas).
 
 This document is the coverage matrix and include/park judgment call for **QuickBooks Online**, **Zoho Books**, and **Xero**. NetSuite is noted only for forward-compatibility (no connector on prod).
 

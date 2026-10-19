@@ -1,0 +1,31 @@
+// Integration connection store for ERP / bank forward sync.
+// OAuth and Airbyte credentials live in encrypted JSON fields.
+// Kernel code must not import vendor SDKs; connectors live under backend/integrations/.
+
+model source_system {
+  id                            String    @id @default(dbgenerated("'srcsys_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                        String    @db.VarChar(50)
+  system_type                   String    @db.VarChar(255)
+  name                          String    @db.VarChar(255)
+  region                        String?   @db.VarChar(255)
+  connector_version             String?   @db.VarChar(255)
+  connection_config             Json      @db.JsonB
+  extraction_config             Json?     @db.JsonB
+  is_active                     Boolean   @default(true)
+  default_purchase_account_id   String?   @db.VarChar(255)
+  default_purchase_account_name String?   @db.VarChar(255)
+  last_sync_at                  DateTime?
+  last_sync_status              Json?     @db.JsonB
+  entity_id                     String?
+  entity                        entity?   @relation(fields: [entity_id], references: [id], onDelete: SetNull)
+  created_at                    DateTime  @default(now())
+  modified_at                   DateTime  @updatedAt
+  created_by                    String?   @db.VarChar(255)
+  modified_by                   String?   @db.VarChar(255)
+
+  @@unique([org_id, system_type])
+  @@index([org_id])
+  @@index([entity_id])
+  @@index([system_type])
+  @@map("source_system")
+}
