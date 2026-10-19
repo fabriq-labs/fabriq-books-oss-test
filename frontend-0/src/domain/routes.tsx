@@ -16,10 +16,17 @@ import IncomeStatement from '@/domain/gl/reports/IncomeStatement';
 import BalanceSheet from '@/domain/gl/reports/BalanceSheet';
 import CashFlow from '@/domain/gl/reports/CashFlow';
 import PostingList from '@/domain/gl/reports/PostingList';
+import ConnectionsPage from '@/domain/connections/ConnectionsPage';
+import ConnectionDetailPage from '@/domain/connections/ConnectionDetailPage';
+import ConnectionFormPage from '@/domain/connections/ConnectionFormPage';
 
 export function DomainRoutes() {
   return (
     <>
+      <Route path="settings/connections" element={<ConnectionsPage />} />
+      <Route path="settings/connections/new" element={<ConnectionFormPage />} />
+      <Route path="settings/connections/:id/edit" element={<ConnectionFormPage />} />
+      <Route path="settings/connections/:id" element={<ConnectionDetailPage />} />
       <Route path="accounting/accounts" element={<AccountList />} />
       <Route path="accounting/transactions" element={<Transactions />} />
       <Route path="accounting/opening-balances" element={<OpeningBalances />} />

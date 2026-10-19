@@ -70,43 +70,35 @@ uv run python quickbooks/run_dbt.py
 uv run uvicorn sync_service.main:app --host 127.0.0.1 --port 8090
 ```
 
-### Phase 2 — save connection + trigger sync (Node)
+### UI (recommended)
+
+Sidebar → **Integrations → Connections** (`/settings/connections`).
+
+1. **New connection** → enter QBO OAuth → **Test connection** → **Save**
+2. Open the connection → **Airbyte extraction** → paste Airbyte connection UUID + API client id/secret → Save
+3. Once per user: generate an API key (Settings or `POST /api/auth/generate-api-key`) so Node can auth the sync service
+4. **Run sync**
+   - `Full sync` if Airbyte should extract now
+   - `Transform only` if `datalake.qb_*` already has rows
+5. Verify in SQL (below) or refresh and check Last sync status
+
+### Curl (optional)
 
 ```bash
-# 1) Upsert QBO connection (JWT or X-API-Key auth)
+# Upsert QBO connection
 curl -s -X POST "$API/api/source_system/connections" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{
-    "system_type": "quickbooks",
-    "name": "QBO Sandbox",
-    "oauth": {
-      "client_id": "...",
-      "client_secret": "...",
-      "refresh_token": "...",
-      "realm_id": "...",
-      "environment": "sandbox"
-    }
-  }'
+  -d '{"system_type":"quickbooks","name":"QBO","oauth":{"client_id":"...","client_secret":"...","refresh_token":"...","realm_id":"...","environment":"sandbox"}}'
 
-# 2) Test connection
-curl -s -X POST "$API/api/source_system/test-connection" \
+# Airbyte config (or use the UI)
+curl -s -X POST "$API/api/source_system/srcsys_xxx/extraction-config" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"system_type":"quickbooks","connection_id":"srcsys_xxx"}'
+  -d '{"airbyte_connection_id":"<uuid>","client_id":"...","client_secret":"..."}'
 
-# 3) Attach Airbyte extraction_config
-cd backend
-AIRBYTE_CLIENT_ID=... AIRBYTE_CLIENT_SECRET=... \
-  npm run integrations:set-extraction-config -- \
-  --source-system-id srcsys_xxx \
-  --airbyte-connection-id <airbyte_uuid>
-
-# 4) Generate a user API key once (required for sync proxy → Python)
-curl -s -X POST "$API/api/auth/generate-api-key" -H "Authorization: Bearer $TOKEN"
-
-# 5) Trigger sync
+# Sync
 curl -s -X POST "$API/api/source_system/srcsys_xxx/sync" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"sync_mode":"transform_only"}'
+  -d '{"sync_mode":"full_sync"}'
 ```
 
 Container (`start.sh`):
@@ -133,6 +125,17 @@ FROM public.invoice
 WHERE org_id = '<org_id>' AND direction = 'sales'
 LIMIT 20;
 ```
+
+---
+
+## Checklist when Airbyte source already exists
+
+1. Airbyte **destination** = this Books Postgres, schema **`datalake`**, streams → `qb_*`
+2. Copy Airbyte **connection UUID** + API **client id/secret** into Connections UI
+3. Env on the app: `DATABASE_URL`, `ERP_CONFIG_ENCRYPTION_KEY`, sync enabled (`ENABLE_SYNC_SERVICE=true`)
+4. User has generated an API key
+5. Run **Full sync** (or **Transform only** if raw already landed)
+6. SQL verify customers / invoices with `source_system_id`
 
 ---
 

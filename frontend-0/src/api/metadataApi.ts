@@ -211,28 +211,64 @@ export const userAPI = {
   },
 };
 
-// ── ERP Connections API ───────────────────────────────────────────────────────
+// ── ERP Connections API (Books Phase 2 routes) ────────────────────────────────
+
+export type ErpConnectionSummary = {
+  id: string;
+  org_id: string;
+  system_type: string;
+  name: string;
+  is_active: boolean;
+  entity_id: string | null;
+  last_sync_at: string | null;
+  last_sync_status: { status?: string; message?: string; sync_mode?: string } | null;
+  created_at: string;
+  modified_at: string;
+  has_oauth: boolean;
+  oauth_environment: string | null;
+  realm_id: string | null;
+  has_extraction_config: boolean;
+};
+
+export type SyncMode = 'full_sync' | 'transform_only' | 'extract_only';
 
 export const erpConnectionsAPI = {
-  getAll: () => fetchAPI('/api/source_system/view/default'),
-  getById: (id: string) => fetchAPI(`/api/source_system/${id}/view/default`),
-  create: (data: any) =>
-    fetchAPI('/api/source_system/view/default', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) =>
-    fetchAPI(`/api/source_system/${id}/view/default`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) =>
-    fetchAPI(`/api/source_system/${id}/view/default`, { method: 'DELETE' }),
-  testConnection: (systemType: string, credentials: any, connectionId?: string) =>
-    fetchAPI('/api/source_system/test-connection', {
+  getAll: () =>
+    fetchAPI<{ success: boolean; data: ErpConnectionSummary[] }>('/api/source_system/connections'),
+  getById: (id: string) =>
+    fetchAPI<{ success: boolean; data: ErpConnectionSummary }>(
+      `/api/source_system/connections/${id}`
+    ),
+  /** Upsert QuickBooks (or create). Pass connection_id/id to update. */
+  upsert: (data: Record<string, unknown>) =>
+    fetchAPI<{ success: boolean; data: ErpConnectionSummary }>('/api/source_system/connections', {
       method: 'POST',
-      body: JSON.stringify({ system_type: systemType, oauth: credentials, connection_id: connectionId }),
+      body: JSON.stringify(data),
     }),
-  fetchExpenseAccounts: (connectionId: string) => {
-    if (!connectionId) return Promise.reject(new Error('Connection ID is required'));
-    return fetchAPI(`/api/actions/source_system/${connectionId}/fetch-expense-accounts`, { method: 'POST' });
-  },
-  triggerSync: (id: string, syncMode: 'full_sync' | 'transform_only' | 'extract_only' = 'full_sync') =>
-    fetchAPI(`/api/source_system/${id}/sync`, {
+  testConnection: (systemType: string, credentials: Record<string, unknown>, connectionId?: string) =>
+    fetchAPI<{ success: boolean; message?: string; data?: unknown }>('/api/source_system/test-connection', {
+      method: 'POST',
+      body: JSON.stringify({
+        system_type: systemType,
+        oauth: credentials,
+        connection_id: connectionId,
+      }),
+    }),
+  setExtractionConfig: (
+    id: string,
+    body: {
+      airbyte_connection_id: string;
+      client_id: string;
+      client_secret: string;
+      api_base?: string;
+    }
+  ) =>
+    fetchAPI<{ success: boolean; data: ErpConnectionSummary }>(
+      `/api/source_system/${id}/extraction-config`,
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
+  triggerSync: (id: string, syncMode: SyncMode = 'full_sync') =>
+    fetchAPI<{ success: boolean; message?: string; data?: unknown }>(`/api/source_system/${id}/sync`, {
       method: 'POST',
       body: JSON.stringify({ sync_mode: syncMode }),
     }),

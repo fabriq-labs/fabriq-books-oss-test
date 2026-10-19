@@ -67,6 +67,36 @@ export async function getConnection(orgId: string, connectionId: string) {
   return sanitizeConnection(row);
 }
 
+export type SetExtractionConfigInput = {
+  orgId: string;
+  connectionId: string;
+  airbyteConnectionId: string;
+  clientId: string;
+  clientSecret: string;
+  apiBase?: string;
+};
+
+export async function setExtractionConfig(input: SetExtractionConfigInput) {
+  const row = await prisma.source_system.findUnique({ where: { id: input.connectionId } });
+  if (!row || row.org_id !== input.orgId) {
+    throw new Error('Connection not found');
+  }
+  const extraction_config: Record<string, unknown> = {
+    type: 'airbyte',
+    client_id: input.clientId,
+    client_secret: input.clientSecret,
+    connection_id: input.airbyteConnectionId,
+  };
+  if (input.apiBase?.trim()) {
+    extraction_config.api_base = input.apiBase.trim();
+  }
+  const updated = await prisma.source_system.update({
+    where: { id: input.connectionId },
+    data: { extraction_config: extraction_config as object },
+  });
+  return sanitizeConnection(updated);
+}
+
 export async function upsertQuickBooksConnection(input: UpsertQuickBooksConnectionInput) {
   const { orgId, userId, oauth, connectionId, entityId, isActive = true } = input;
   if (!oauth.client_id || !oauth.client_secret || !oauth.refresh_token || !oauth.realm_id) {

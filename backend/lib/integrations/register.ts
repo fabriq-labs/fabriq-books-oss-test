@@ -4,6 +4,7 @@ import logger from '../../src/utils/logger';
 import {
   getConnection,
   listConnections,
+  setExtractionConfig,
   upsertQuickBooksConnection,
 } from './shared/connectionService';
 import { getErpConnectionConfig } from './shared/erp-connection-loader';
@@ -140,6 +141,42 @@ export function registerIntegrationsRoutes(router: Router): void {
       const message = error instanceof Error ? error.message : 'Test connection failed';
       logger.error('test-connection failed', { error: message });
       res.status(400).json({ success: false, error: message });
+    }
+  });
+
+  /** Attach Airbyte extraction_config (encrypted) for forward sync. */
+  int.post('/source_system/:id/extraction-config', async (req: Request, res: Response) => {
+    const auth = orgUser(req);
+    if ('error' in auth) {
+      res.status(401).json({ success: false, error: auth.error });
+      return;
+    }
+    try {
+      const body = req.body ?? {};
+      const airbyteConnectionId = String(body.airbyte_connection_id || body.connection_id || '').trim();
+      const clientId = String(body.client_id || '').trim();
+      const clientSecret = String(body.client_secret || '').trim();
+      const apiBase = body.api_base ? String(body.api_base).trim() : undefined;
+      if (!airbyteConnectionId || !clientId || !clientSecret) {
+        res.status(400).json({
+          success: false,
+          error: 'airbyte_connection_id, client_id, and client_secret are required',
+        });
+        return;
+      }
+      const data = await setExtractionConfig({
+        orgId: auth.orgId,
+        connectionId: req.params.id,
+        airbyteConnectionId,
+        clientId,
+        clientSecret,
+        apiBase,
+      });
+      res.json({ success: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to save extraction config';
+      const status = message === 'Connection not found' ? 404 : 400;
+      res.status(status).json({ success: false, error: message });
     }
   });
 

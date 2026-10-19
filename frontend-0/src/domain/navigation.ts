@@ -33,4 +33,8 @@ export const domainNavigation: DomainNavGroup[] = [
       { label: 'Posting List', path: '/reports/posting-list' },
     ],
   },
+  {
+    label: 'Integrations',
+    items: [{ label: 'Connections', path: '/settings/connections' }],
+  },
 ];
