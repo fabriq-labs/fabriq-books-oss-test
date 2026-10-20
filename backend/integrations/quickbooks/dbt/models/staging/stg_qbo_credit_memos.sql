@@ -19,7 +19,12 @@ select
     "TotalAmt" as total_amt,
     "Balance" as balance,
     "RemainingCredit" as remaining_credit,
-    "PrivateNote" as private_note,
+    -- Airbyte QBO CreditMemo stream often omits PrivateNote; CustomerMemo is jsonb.
+    coalesce(
+        nullif("CustomerMemo"->>'value', ''),
+        nullif("CustomerMemo"::text, ''),
+        null::text
+    ) as private_note,
     "ExchangeRate" as exchange_rate,
 
     "CustomerRef"->>'value' as customer_id,

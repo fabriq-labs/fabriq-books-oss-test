@@ -26,11 +26,13 @@ export SYNC_PORT="${SYNC_PORT:-8090}"
 # Single-tenant: sync/dbt runs in this same container on loopback (default on).
 export ENABLE_SYNC_SERVICE="${ENABLE_SYNC_SERVICE:-true}"
 
-# Prefer the Alpine openssl-3.0.x query engine (matches nginx:alpine runtime).
+# Prefer the query engine that matches this image's libc (Debian glibc or Alpine musl).
 PRISMA_CLIENT_DIR="/app/backend/node_modules/.prisma/client"
 if [ -d "$PRISMA_CLIENT_DIR" ]; then
   ENGINE=""
   for candidate in \
+    "$PRISMA_CLIENT_DIR"/libquery_engine-debian-openssl-3.0.x.so.node \
+    "$PRISMA_CLIENT_DIR"/libquery_engine-linux-openssl-3.0.x.so.node \
     "$PRISMA_CLIENT_DIR"/libquery_engine-linux-musl-openssl-3.0.x.so.node \
     "$PRISMA_CLIENT_DIR"/libquery_engine-linux-musl-openssl-1.1.x.so.node \
     "$PRISMA_CLIENT_DIR"/libquery_engine-linux-musl.so.node
