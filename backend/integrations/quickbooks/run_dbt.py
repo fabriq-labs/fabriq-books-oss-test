@@ -67,19 +67,30 @@ def is_first_run() -> bool:
 
 
 def resolve_dbt_argv() -> list[str]:
-    """Return argv prefix to invoke dbt from the active interpreter's environment."""
-    venv_dbt = Path(sys.executable).resolve().parent / "dbt"
-    if venv_dbt.is_file() and os.access(venv_dbt, os.X_OK):
-        return [str(venv_dbt)]
+    """Return argv prefix to invoke dbt from the active interpreter's environment.
 
-    # Same venv, module form (covers odd installs without a console script).
-    try:
-        import importlib.util
+    Do not resolve() sys.executable before taking .parent — venv ``python`` is
+    often a symlink to /usr/bin/python3, and resolve() would leave the venv.
+    ``python -m dbt`` is not supported (no dbt.__main__).
+    """
+    candidates: list[Path] = []
+    # 1) Same directory as the running interpreter (…/venv/bin/dbt)
+    candidates.append(Path(sys.executable).parent / "dbt")
+    # 2) VIRTUAL_ENV / sys.prefix bin
+    for prefix in (os.environ.get("VIRTUAL_ENV"), sys.prefix):
+        if prefix:
+            candidates.append(Path(prefix) / "bin" / "dbt")
+    # 3) Integrations tree baked by Docker
+    candidates.append(Path(_INTEGRATIONS_ROOT) / ".venv" / "bin" / "dbt")
 
-        if importlib.util.find_spec("dbt") is not None:
-            return [sys.executable, "-m", "dbt"]
-    except Exception:
-        pass
+    seen: set[str] = set()
+    for venv_dbt in candidates:
+        key = str(venv_dbt)
+        if key in seen:
+            continue
+        seen.add(key)
+        if venv_dbt.is_file() and os.access(venv_dbt, os.X_OK):
+            return [str(venv_dbt)]
 
     # Local/dev only: uv when explicitly available.
     if shutil.which("uv") and (Path(_INTEGRATIONS_ROOT) / "uv.lock").exists():
@@ -90,8 +101,8 @@ def resolve_dbt_argv() -> list[str]:
         return [which]
 
     raise FileNotFoundError(
-        "dbt not found next to sys.executable, as a module, via uv, or on PATH. "
-        f"sys.executable={sys.executable!r}"
+        "dbt console script not found in venv bin, via uv, or on PATH. "
+        f"sys.executable={sys.executable!r} candidates={list(seen)}"
     )
 
 
