@@ -57,16 +57,17 @@ cd /app/backend
 ) &
 
 # Forward-sync service (Airbyte + dbt) — same image, loopback only.
+# Use venv python -m uvicorn so a broken uvicorn script shebang is not required.
 INTEGRATIONS_DIR="/app/backend/integrations"
-UVICORN_BIN="${INTEGRATIONS_DIR}/.venv/bin/uvicorn"
+VENV_PYTHON="${INTEGRATIONS_DIR}/.venv/bin/python"
 if [ "${ENABLE_SYNC_SERVICE}" = "true" ] || [ "${ENABLE_SYNC_SERVICE}" = "1" ]; then
-  if [ -x "${UVICORN_BIN}" ]; then
+  if [ -x "${VENV_PYTHON}" ] && "${VENV_PYTHON}" -c "import uvicorn" 2>/dev/null; then
     echo "Starting sync_service on 127.0.0.1:${SYNC_PORT}..."
     (
       cd "${INTEGRATIONS_DIR}"
       export PYTHONPATH="${INTEGRATIONS_DIR}"
       while true; do
-        "${UVICORN_BIN}" sync_service.main:app --host 127.0.0.1 --port "${SYNC_PORT}" &
+        "${VENV_PYTHON}" -m uvicorn sync_service.main:app --host 127.0.0.1 --port "${SYNC_PORT}" &
         SYNC_PID=$!
         echo "sync_service started with pid ${SYNC_PID}"
         wait "${SYNC_PID}"
@@ -76,8 +77,12 @@ if [ "${ENABLE_SYNC_SERVICE}" = "true" ] || [ "${ENABLE_SYNC_SERVICE}" = "1" ]; 
       done
     ) &
   else
-    echo "WARNING: ENABLE_SYNC_SERVICE=true but ${UVICORN_BIN} missing; skip sync."
+    echo "WARNING: ENABLE_SYNC_SERVICE=true but sync venv is not runnable (${VENV_PYTHON}); skip sync."
+    ls -la "${INTEGRATIONS_DIR}/.venv/bin" 2>/dev/null || true
+    "${VENV_PYTHON}" -c "import uvicorn" 2>&1 || true
   fi
+else
+  echo "ENABLE_SYNC_SERVICE=${ENABLE_SYNC_SERVICE}; sync_service not started."
 fi
 
 echo "Waiting for backend..."

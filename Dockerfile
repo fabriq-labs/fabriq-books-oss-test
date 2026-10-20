@@ -121,6 +121,14 @@ COPY --from=build-info /build-info.json /app/build-info.json
 COPY --from=build-info /build-info.json /usr/share/nginx/html/build-info.json
 # Overwrite integrations with the Alpine-built uv venv (dbt + sync_service).
 COPY --from=integrations-builder /app/backend/integrations /app/backend/integrations
+# Venv shebangs point at /usr/local/bin/python3.12 from python:3.12-alpine.
+# nginx:alpine only has apk python3 — bring the matching CPython so uvicorn runs.
+COPY --from=integrations-builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
+COPY --from=integrations-builder /usr/local/bin/python3.12 /usr/local/bin/python3.12
+RUN ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
+ && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python \
+ && /app/backend/integrations/.venv/bin/python -c "import uvicorn, fastapi; print('sync_service deps ok')" \
+ && test -x /app/backend/integrations/.venv/bin/uvicorn
 
 COPY nginx.main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template
