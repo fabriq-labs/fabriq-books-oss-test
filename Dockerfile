@@ -1,6 +1,7 @@
-# Clean single-libc image: Debian bookworm-slim + Node + Python + nginx.
-# uv is build-only; runtime uses baked .venv (dbt / uvicorn) and node binary.
-# Prisma engine: linux-openssl-3.0.x (glibc), not musl.
+# Default production image: Debian bookworm-slim + Node + Python + nginx.
+# One glibc stack — Node/Python shebangs and Prisma (debian-openssl-3.0.x) align.
+# uv is build-only; runtime uses baked .venv (dbt / uvicorn).
+# Legacy Alpine build: Dockerfile.alpine (kept for reference only).
 
 ARG NODE_RUNTIME_VERSION=24.14.1
 
