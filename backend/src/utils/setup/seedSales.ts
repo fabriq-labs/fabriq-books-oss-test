@@ -316,6 +316,21 @@ const VIEWS: Array<{
           },
         },
       },
+      payment_receipt_applications: {
+        type: 'table',
+        datatype: 'table',
+        displayName: 'Applied receipts',
+        isColumnShow: false,
+        select: {
+          id: 'read',
+          amount_applied: 'read',
+          applied_date: 'read',
+          payment_receipt: {
+            type: 'table',
+            select: { id: 'read', number: 'read', receipt_date: 'read' },
+          },
+        },
+      },
     },
   },
   {

@@ -21,6 +21,10 @@ vars:
   org_id: "{{ env_var('org_id', 'org_default') }}"
   force_process_all: false  # Set to true to process all records (bypass incremental filter)
 
+# Phase 3: resolve delayed FKs, orphan-sweep apps/lines, clear apps on voided receipts.
+on-run-end:
+  - "{{ ar_settlement_on_run_end() }}"
+
 models:
   quickbooks_integrations:
     # Staging models - copy-only from source (views in datalake schema)

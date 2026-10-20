@@ -258,11 +258,11 @@ WP1 and WP2 can proceed in parallel after WP0. WP4 can start once WP2 lands data
 
 ## Progress checklist
 
-- [ ] WP0 Schema + seeds  
-- [ ] WP1 Credit memo dbt  
-- [ ] WP2 Payment + application dbt  
-- [ ] WP3 Resolver / sweep / voids  
-- [ ] WP4 Master UI  
-- [ ] WP5 Posting schema + ledger settings  
+- [x] WP0 Schema + seeds  
+- [x] WP1 Credit memo dbt  
+- [x] WP2 Payment + application dbt  
+- [x] WP3 Resolver / sweep / voids (`ar_settlement_ops` on-run-end; CDC deferred)  
+- [x] WP4 Master UI (list views + nav; read-only)  
+- [x] WP5 Posting schema + ledger settings (schema only; poster later)  
 - [ ] WP6 Poster lib  
 - [ ] WP7 Sync wire + backfill + T4  

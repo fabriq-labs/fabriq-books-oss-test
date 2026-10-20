@@ -209,6 +209,56 @@ tax_agencies_batch as (
     from {{ ref('stg_qbo_tax_agencies') }}
     group by _airbyte_generation_id
 ),
+payments_batch as (
+    select
+        md5(concat(_airbyte_generation_id::text, '_', min(_airbyte_extracted_at)::text, '_payments')) as id,
+        'quickbooks' as source_system_type,
+        'payments' as stream_name,
+        'datalake' as namespace,
+        'qb_payments' as destination_table,
+        'incremental' as load_type,
+        'completed' as status,
+        count(*) as row_count,
+        min(_airbyte_extracted_at) as raw_min_emitted_at,
+        max(_airbyte_extracted_at) as raw_max_emitted_at,
+        min(_airbyte_extracted_at)::timestamp as started_at,
+        max(_airbyte_extracted_at)::timestamp as completed_at,
+        _airbyte_generation_id::text as airbyte_job_id,
+        null as airbyte_connection_id,
+        '{{ invocation_id }}' as dbt_run_id,
+        json_build_object(
+            'airbyte_generation_id', _airbyte_generation_id,
+            'dbt_run_at', '{{ run_started_at }}',
+            'record_count', count(*)
+        ) as notes
+    from {{ ref('stg_qbo_payments') }}
+    group by _airbyte_generation_id
+),
+credit_memos_batch as (
+    select
+        md5(concat(_airbyte_generation_id::text, '_', min(_airbyte_extracted_at)::text, '_credit_memos')) as id,
+        'quickbooks' as source_system_type,
+        'credit_memos' as stream_name,
+        'datalake' as namespace,
+        'qb_credit_memos' as destination_table,
+        'incremental' as load_type,
+        'completed' as status,
+        count(*) as row_count,
+        min(_airbyte_extracted_at) as raw_min_emitted_at,
+        max(_airbyte_extracted_at) as raw_max_emitted_at,
+        min(_airbyte_extracted_at)::timestamp as started_at,
+        max(_airbyte_extracted_at)::timestamp as completed_at,
+        _airbyte_generation_id::text as airbyte_job_id,
+        null as airbyte_connection_id,
+        '{{ invocation_id }}' as dbt_run_id,
+        json_build_object(
+            'airbyte_generation_id', _airbyte_generation_id,
+            'dbt_run_at', '{{ run_started_at }}',
+            'record_count', count(*)
+        ) as notes
+    from {{ ref('stg_qbo_credit_memos') }}
+    group by _airbyte_generation_id
+),
 all_batches as (
     select * from accounts_batch
     union all
@@ -225,6 +275,10 @@ all_batches as (
     select * from tax_codes_batch
     union all
     select * from tax_agencies_batch
+    union all
+    select * from payments_batch
+    union all
+    select * from credit_memos_batch
 )
 
 select

@@ -111,3 +111,31 @@ sources:
           - name: _airbyte_meta
             description: "Airbyte metadata"
 
+      - name: "qb_payments"
+        description: "Raw Payment data from QuickBooks Online via Airbyte (AR receipts + LinkedTxn applications)"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: _airbyte_extracted_at
+            description: "Airbyte extraction timestamp"
+          - name: _airbyte_generation_id
+            description: "Airbyte generation ID"
+          - name: _airbyte_meta
+            description: "Airbyte metadata"
+          - name: data
+            description: "JSONB Payment fields (Id, TotalAmt, UnappliedAmt, CustomerRef, Line/LinkedTxn, etc.)"
+
+      - name: "qb_credit_memos"
+        description: "Raw CreditMemo data from QuickBooks Online via Airbyte"
+        columns:
+          - name: _airbyte_raw_id
+            description: "Airbyte raw record ID"
+          - name: _airbyte_extracted_at
+            description: "Airbyte extraction timestamp"
+          - name: _airbyte_generation_id
+            description: "Airbyte generation ID"
+          - name: _airbyte_meta
+            description: "Airbyte metadata"
+          - name: data
+            description: "JSONB CreditMemo fields (Id, DocNumber, RemainingCredit, Line, etc.)"
+

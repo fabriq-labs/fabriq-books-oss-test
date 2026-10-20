@@ -73,9 +73,10 @@ model tax_master {
   source_updated_at    DateTime? @default(now())
   ingest_batch_id      String?
 
-  tax_group_components tax_group_component[]
-  invoice_line_taxes   invoice_line_tax[]
-  item_defaults        item_master[]         @relation("item_master_tax_master")
+  tax_group_components   tax_group_component[]
+  invoice_line_taxes     invoice_line_tax[]
+  credit_note_line_taxes credit_note_line_tax[]
+  item_defaults          item_master[]         @relation("item_master_tax_master")
 
   @@unique([org_id, code])
   @@unique([org_id, source_system_id, source_record_id])
@@ -101,11 +102,12 @@ model tax_group {
   source_updated_at DateTime? @default(now())
   ingest_batch_id   String?
 
-  components         tax_group_component[]
-  item_defaults      item_master[]         @relation("item_master_tax_group")
-  invoice_line_items invoice_line_item[]
-  invoice_line_taxes invoice_line_tax[]
-  credit_note_items  credit_note_item[]
+  components             tax_group_component[]
+  item_defaults          item_master[]         @relation("item_master_tax_group")
+  invoice_line_items     invoice_line_item[]
+  invoice_line_taxes     invoice_line_tax[]
+  credit_note_items      credit_note_item[]
+  credit_note_line_taxes credit_note_line_tax[]
 
   @@unique([org_id, code])
   @@unique([org_id, source_system_id, source_record_id])

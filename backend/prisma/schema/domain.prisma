@@ -94,22 +94,28 @@ model account {
   trades                       trade[]                @relation("trade_account")
   target_trades                trade[]                @relation("trade_target_account")
   holdings                     holding[]
-  payment_receipts             payment_receipt[]
-  credit_notes                 credit_note[]
-  budget_periods               budget_period[]
-  general_ledgers              general_ledger[]
-  purchase_requisitions        purchase_requisition[]
-  purchase_orders              purchase_order[]
-  sales_item_masters           item_master[]          @relation("item_master_sales_account")
-  purchase_item_masters        item_master[]          @relation("item_master_purchase_account")
-  project_masters              project_master[]
-  invoices                     invoice[]              @relation("invoice_account")
-  invoice_line_items           invoice_line_item[]    @relation("invoice_line_account")
-  credit_note_line_items       credit_note_item[]     @relation("credit_note_line_account")
-  customer_receivable_accounts customer[]             @relation("customer_receivable_account")
-  supplier_payable_accounts    supplier[]             @relation("supplier_payable_account")
-  tax_liability_accounts       tax_master[]           @relation("tax_master_liability_account")
-  entity_tax_payable_accounts  entity_tax_settings[]  @relation("entity_tax_payable_account")
+  payment_receipts               payment_receipt[]      @relation("payment_receipt_deposit_account")
+  payment_receipt_receivables    payment_receipt[]      @relation("payment_receipt_receivable_account")
+  credit_notes                   credit_note[]          @relation("credit_note_ar_account")
+  budget_periods                 budget_period[]
+  general_ledgers                general_ledger[]
+  purchase_requisitions          purchase_requisition[]
+  purchase_orders                purchase_order[]
+  sales_item_masters             item_master[]          @relation("item_master_sales_account")
+  purchase_item_masters          item_master[]          @relation("item_master_purchase_account")
+  project_masters                project_master[]
+  invoices                       invoice[]              @relation("invoice_account")
+  invoice_line_items             invoice_line_item[]    @relation("invoice_line_account")
+  credit_note_line_items         credit_note_item[]     @relation("credit_note_line_account")
+  customer_receivable_accounts   customer[]             @relation("customer_receivable_account")
+  supplier_payable_accounts      supplier[]             @relation("supplier_payable_account")
+  tax_liability_accounts         tax_master[]           @relation("tax_master_liability_account")
+  entity_tax_payable_accounts    entity_tax_settings[]  @relation("entity_tax_payable_account")
+  els_receivable_accounts        entity_ledger_settings[] @relation("els_receivable")
+  els_income_accounts            entity_ledger_settings[] @relation("els_income")
+  els_undeposited_accounts       entity_ledger_settings[] @relation("els_undeposited")
+  els_fx_accounts                entity_ledger_settings[] @relation("els_fx")
+  els_discount_accounts          entity_ledger_settings[] @relation("els_discount")
 
   @@unique([org_id, code])
   @@unique([source_record_id, source_system_id, org_id])
@@ -152,8 +158,12 @@ model posting {
   trade                 trade?                 @relation("posting_trade", fields: [trade_id], references: [id], onDelete: SetNull)
   holding_id            String?
   holding               holding?               @relation(fields: [holding_id], references: [id], onDelete: SetNull)
-  payment_receipt_id    String?                @unique
+  payment_receipt_id    String?
   payment_receipt       payment_receipt?       @relation("posting_payment_receipt", fields: [payment_receipt_id], references: [id], onDelete: SetNull)
+  credit_note_id        String?
+  credit_note           credit_note?           @relation("posting_credit_note", fields: [credit_note_id], references: [id], onDelete: SetNull)
+  /// Idempotent reverse-and-repost key (Phase 4). Partial unique in SQL on active rows.
+  posting_key           String?                @db.VarChar(200)
   income_type           income_type?
   income_source         income_source?
   ai_category_score     Decimal?               @db.Decimal(5, 4)
@@ -177,6 +187,9 @@ model posting {
   @@index([credit_account_id])
   @@index([entity_id])
   @@index([invoice_id])
+  @@index([payment_receipt_id])
+  @@index([credit_note_id])
+  @@index([org_id, posting_key])
   @@index([holding_id])
   @@index([reverses_id])
   @@index([org_id, merchant_key, modified_at(sort: Desc)])
@@ -205,15 +218,16 @@ model entity {
   modified_at           DateTime             @updatedAt
   accounts              account[]
   postings              posting[]
-  entity_tax_settings   entity_tax_settings? @relation("entity_tax_settings")
-  customers             customer[]
-  suppliers             supplier[]
-  locations             location[]
-  payment_terms         payment_terms[]
-  invoices              invoice[]
-  payment_receipts      payment_receipt[]
-  credit_notes          credit_note[]
-  source_systems        source_system[]
+  entity_tax_settings    entity_tax_settings?    @relation("entity_tax_settings")
+  entity_ledger_settings entity_ledger_settings?
+  customers              customer[]
+  suppliers              supplier[]
+  locations              location[]
+  payment_terms          payment_terms[]
+  invoices               invoice[]
+  payment_receipts       payment_receipt[]
+  credit_notes           credit_note[]
+  source_systems         source_system[]
 
   @@index([org_id])
   @@index([currency_id])

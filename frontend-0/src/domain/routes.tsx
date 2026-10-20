@@ -20,6 +20,8 @@ import ConnectionsPage from '@/domain/connections/ConnectionsPage';
 import ConnectionDetailPage from '@/domain/connections/ConnectionDetailPage';
 import ConnectionFormPage from '@/domain/connections/ConnectionFormPage';
 import InvoiceList from '@/domain/sales/InvoiceList';
+import PaymentReceiptList from '@/domain/sales/PaymentReceiptList';
+import CreditNoteList from '@/domain/sales/CreditNoteList';
 import CustomerList from '@/domain/sales/CustomerList';
 import { InvoiceForm } from '@/domain/sales/InvoiceForm';
 import { CustomerForm } from '@/domain/sales/CustomerForm';
@@ -40,6 +42,8 @@ export function DomainRoutes() {
       <Route path="source_system/:id/view/:viewId" element={<ConnectionDetailPage />} />
       <Route path="source_system/:id/edit" element={<ConnectionFormPage />} />
       <Route path="sales/invoices" element={<InvoiceList />} />
+      <Route path="sales/payments" element={<PaymentReceiptList />} />
+      <Route path="sales/credit-notes" element={<CreditNoteList />} />
       <Route path="sales/customers" element={<CustomerList />} />
       <Route path="masters/items" element={<Master type="item_master" view="item_master_view" displayName="Items" />} />
       <Route path="purchases/suppliers" element={<Master type="supplier" view="supplier_view" displayName="Suppliers" />} />

@@ -17,6 +17,8 @@ export const domainNavigation: DomainNavGroup[] = [
     label: 'Sales',
     items: [
       { label: 'Invoices', path: '/sales/invoices' },
+      { label: 'Payments received', path: '/sales/payments' },
+      { label: 'Credit notes', path: '/sales/credit-notes' },
       { label: 'Customers', path: '/sales/customers' },
       { label: 'Items', path: '/masters/items' },
     ],

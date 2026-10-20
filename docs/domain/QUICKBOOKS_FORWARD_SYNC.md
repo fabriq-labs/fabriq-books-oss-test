@@ -139,8 +139,44 @@ LIMIT 20;
 
 ---
 
+## Airbyte streams (Phase 3 AR settlement)
+
+Enable these streams on the QBO → Postgres connection. Destination tables must land in schema **`datalake`** with the `qb_` prefix (Airbyte stream name is unprefixed).
+
+| Airbyte stream | Destination table | Books models |
+|---|---|---|
+| `accounts` | `datalake.qb_accounts` | `account` |
+| `customers` | `datalake.qb_customers` | `customer` |
+| `vendors` | `datalake.qb_vendors` | `supplier` |
+| `items` | `datalake.qb_items` | `item_master` |
+| `invoices` | `datalake.qb_invoices` | `invoice`, `invoice_line_item` |
+| `tax_rates` | `datalake.qb_tax_rates` | `tax_master` |
+| `tax_codes` | `datalake.qb_tax_codes` | `tax_group` |
+| `tax_agencies` | `datalake.qb_tax_agencies` | (agency lineage for tax) |
+| **`payments`** *(add)* | `datalake.qb_payments` | `payment_receipt`, `payment_receipt_application` |
+| **`credit_memos`** *(add)* | `datalake.qb_credit_memos` | `credit_note`, `credit_note_item` |
+
+**Do not enable yet for Phase 3–4:** `deposits`, bills / purchase orders, refund receipts, journal entries.
+
+After enabling `payments` + `credit_memos`, apply the schema delta (`backend/prisma/migration/2026-10-20/ar_settlement_phase3_delta.sql`), seed views (`npm run seed:ar-settlement`), then run **Full sync** (or Transform only once raw rows exist).
+
+**Ops notes (Phase 3):** dbt `on-run-end` resolves delayed application FKs, orphan-sweeps apps/lines missing from staging, and clears apps on voided receipts (`PrivateNote` starts with `Voided`). Airbyte does not emit hard deletes for QBO objects — void via PrivateNote is the primary path; monthly id-diff against QBO is the fallback for hard deletes (CDC / `qb_deleted_objects` not wired yet).
+
+Verify:
+
+```sql
+SELECT count(*) FROM datalake.qb_payments;
+SELECT count(*) FROM datalake.qb_credit_memos;
+SELECT number, amount, unapplied_amount, status FROM public.payment_receipt WHERE org_id = '<org_id>' LIMIT 20;
+SELECT number, total_amount, balance_amount, status FROM public.credit_note WHERE org_id = '<org_id>' LIMIT 20;
+```
+
+---
+
 ## Related
 
 - Design / phases: [`QBO_INTEGRATION_PLAN.md`](./QBO_INTEGRATION_PLAN.md)  
+- AR settlement design: [`AR_SETTLEMENT_AND_LEDGER.md`](./AR_SETTLEMENT_AND_LEDGER.md)  
+- Implementation WPs: [`AR_PHASE_3_4_IMPLEMENTATION.md`](./AR_PHASE_3_4_IMPLEMENTATION.md)  
 - Column include/park: [`SALES_MODEL.md`](./SALES_MODEL.md)  
 - Prod operational guide (reference): `origin/prod:docs/QUICKBOOKS_FORWARD_SYNC.md`
