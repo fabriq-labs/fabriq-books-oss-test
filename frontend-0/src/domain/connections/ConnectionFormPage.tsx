@@ -3,12 +3,26 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { erpConnectionsAPI } from '@/api/metadataApi';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { entityLabel, useEntity } from '@/contexts/EntityContext';
 import { emptyQboOAuth, type QboOAuthForm } from './types';
+import { StatusBadge, environmentLabel, selectClassName } from './ConnectionParts';
+
+const OAUTH_FIELDS = [
+  ['client_id', 'Client ID', false],
+  ['client_secret', 'Client secret', true],
+  ['refresh_token', 'Refresh token', true],
+  ['realm_id', 'Company ID (Realm ID)', false],
+] as const;
 
 /**
  * Create or edit QuickBooks OAuth connection.
@@ -35,6 +49,11 @@ const ConnectionFormPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [testedOk, setTestedOk] = useState(false);
   const [loading, setLoading] = useState(isEdit);
+  const [savedConnection, setSavedConnection] = useState<{
+    hasOAuth: boolean;
+    realmId: string | null;
+    environment: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -47,6 +66,11 @@ const ConnectionFormPage: React.FC = () => {
         setEntityId(row.entity_id || '');
         setPurchaseAccountId(row.default_purchase_account_id || '');
         setPurchaseAccountName(row.default_purchase_account_name || '');
+        setSavedConnection({
+          hasOAuth: row.has_oauth,
+          realmId: row.realm_id,
+          environment: row.oauth_environment,
+        });
         setOauth((prev) => ({
           ...prev,
           realm_id: row.realm_id || '',
@@ -56,7 +80,7 @@ const ConnectionFormPage: React.FC = () => {
       .catch((error) => {
         toast({
           variant: 'destructive',
-          title: 'Failed to load connection',
+          title: 'Couldn’t load this connection',
           description: error instanceof Error ? error.message : 'Unknown error',
         });
       })
@@ -80,12 +104,12 @@ const ConnectionFormPage: React.FC = () => {
         throw new Error(res.message || 'Test failed');
       }
       setTestedOk(true);
-      toast({ title: 'Connection OK', description: res.message });
+      toast({ title: 'Connected to QuickBooks', description: res.message });
     } catch (error) {
       setTestedOk(false);
       toast({
         variant: 'destructive',
-        title: 'Test failed',
+        title: 'Couldn’t reach QuickBooks',
         description: error instanceof Error ? error.message : 'Unknown error',
       });
     } finally {
@@ -97,8 +121,8 @@ const ConnectionFormPage: React.FC = () => {
     if (!id) {
       toast({
         variant: 'destructive',
-        title: 'Save first',
-        description: 'Save the connection before loading QuickBooks accounts.',
+        title: 'Save the connection first',
+        description: 'Accounts can be loaded once the connection is saved.',
       });
       return;
     }
@@ -110,7 +134,7 @@ const ConnectionFormPage: React.FC = () => {
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'Failed to load accounts',
+        title: 'Couldn’t load accounts from QuickBooks',
         description: error instanceof Error ? error.message : 'Unknown error',
       });
       setExpenseAccounts([]);
@@ -123,8 +147,8 @@ const ConnectionFormPage: React.FC = () => {
     if (!testedOk && !isEdit) {
       toast({
         variant: 'destructive',
-        title: 'Test first',
-        description: 'Run Test connection before saving a new connection.',
+        title: 'Test the connection first',
+        description: 'Click “Test connection” to check these details before saving.',
       });
       return;
     }
@@ -143,12 +167,12 @@ const ConnectionFormPage: React.FC = () => {
             }
           : {}),
       });
-      toast({ title: 'Saved', description: 'QuickBooks connection saved.' });
+      toast({ title: 'Connection saved', description: 'Your QuickBooks connection is ready.' });
       navigate(`/source_system/${res.data.id}/view/source_system_view`);
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'Save failed',
+        title: 'Couldn’t save the connection',
         description: error instanceof Error ? error.message : 'Unknown error',
       });
     } finally {
@@ -164,27 +188,42 @@ const ConnectionFormPage: React.FC = () => {
     );
   }
 
+  const savedSummary = savedConnection?.hasOAuth
+    ? [
+        savedConnection.realmId ? `Company ${savedConnection.realmId}` : null,
+        environmentLabel(savedConnection.environment),
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+
   return (
     <div className="container mx-auto max-w-2xl space-y-6 py-6">
-      <div className="flex items-center gap-3">
+      <div className="space-y-3">
         <Button
           variant="ghost"
           size="sm"
+          className="-ml-2"
           onClick={() =>
             navigate(id ? `/source_system/${id}/view/source_system_view` : '/settings/connections')
           }
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back
+          {isEdit ? 'Back to connection' : 'Connections'}
         </Button>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isEdit ? 'Edit connection' : 'New QuickBooks connection'}
-        </h1>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isEdit ? 'Edit QuickBooks connection' : 'Connect QuickBooks'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Fabriq uses these details to bring data in from your QuickBooks company.
+          </p>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Connection</CardTitle>
+          <CardTitle className="text-lg">Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -192,10 +231,10 @@ const ConnectionFormPage: React.FC = () => {
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="entity">Entity (optional)</Label>
+            <Label htmlFor="entity">Fabriq entity (optional)</Label>
             <select
               id="entity"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className={selectClassName}
               value={entityId}
               onChange={(e) => setEntityId(e.target.value)}
             >
@@ -206,23 +245,32 @@ const ConnectionFormPage: React.FC = () => {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-muted-foreground">
+              The business in Fabriq that this QuickBooks company belongs to.
+            </p>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">QuickBooks OAuth</CardTitle>
+          <CardTitle className="text-lg">QuickBooks sign-in</CardTitle>
+          <CardDescription>
+            {isEdit
+              ? 'Saved secrets stay hidden. Re-enter all four details to save changes on this page.'
+              : 'Copy these from your app in the Intuit Developer portal.'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {(
-            [
-              ['client_id', 'Client ID', false],
-              ['client_secret', 'Client Secret', true],
-              ['refresh_token', 'Refresh Token', true],
-              ['realm_id', 'Company ID (Realm ID)', false],
-            ] as const
-          ).map(([key, label, secret]) => (
+          {isEdit && savedConnection?.hasOAuth ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              <StatusBadge tone="positive">Connected</StatusBadge>
+              <span className="text-muted-foreground">
+                Connected to QuickBooks{savedSummary ? ` · ${savedSummary}` : ''}
+              </span>
+            </div>
+          ) : null}
+          {OAUTH_FIELDS.map(([key, label, secret]) => (
             <div key={key} className="space-y-2">
               <Label htmlFor={key}>{label}</Label>
               <Input
@@ -231,20 +279,20 @@ const ConnectionFormPage: React.FC = () => {
                 autoComplete="off"
                 value={oauth[key]}
                 onChange={(e) => setField(key, e.target.value)}
-                placeholder={isEdit && secret ? 'Enter to replace saved secret' : undefined}
+                placeholder={isEdit && secret ? 'Saved — re-enter to save changes' : undefined}
               />
             </div>
           ))}
           <div className="space-y-2">
-            <Label htmlFor="environment">Environment</Label>
+            <Label htmlFor="environment">QuickBooks company type</Label>
             <select
               id="environment"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className={selectClassName}
               value={oauth.environment}
               onChange={(e) => setField('environment', e.target.value)}
             >
-              <option value="sandbox">Sandbox</option>
-              <option value="production">Production</option>
+              <option value="sandbox">Sandbox (test company)</option>
+              <option value="production">Production (live company)</option>
             </select>
           </div>
 
@@ -253,11 +301,11 @@ const ConnectionFormPage: React.FC = () => {
               {testing ? 'Testing…' : 'Test connection'}
             </Button>
             <Button type="button" onClick={() => void handleSave()} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Saving…' : 'Save connection'}
             </Button>
           </div>
           {testedOk ? (
-            <p className="text-sm text-emerald-700">Test succeeded — ready to save.</p>
+            <p className="text-sm text-emerald-700">Connection works — ready to save.</p>
           ) : null}
         </CardContent>
       </Card>
@@ -265,29 +313,37 @@ const ConnectionFormPage: React.FC = () => {
       {isEdit ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Default purchase account</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-lg">Default purchase account</CardTitle>
+              <StatusBadge tone="neutral">Optional</StatusBadge>
+            </div>
+            <CardDescription>
+              Optional — needed only when you create purchase orders in QuickBooks from Fabriq.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Optional. Load Accounts Payable from QuickBooks after the connection is saved.
+            <p className="text-sm">
+              <span className="text-muted-foreground">Current: </span>
+              {purchaseAccountName ? (
+                <span className="font-medium">{purchaseAccountName}</span>
+              ) : (
+                <span className="text-muted-foreground">Not set</span>
+              )}
             </p>
-            {purchaseAccountName ? (
-              <p className="text-sm font-medium">Current: {purchaseAccountName}</p>
-            ) : null}
             <Button
               type="button"
               variant="outline"
               disabled={loadingAccounts}
               onClick={() => void handleLoadAccounts()}
             >
-              {loadingAccounts ? 'Loading…' : 'Load accounts from QuickBooks'}
+              {loadingAccounts ? 'Loading accounts…' : 'Load accounts from QuickBooks'}
             </Button>
             {expenseAccounts.length > 0 ? (
               <div className="space-y-2">
-                <Label htmlFor="purchase_account">Select account</Label>
+                <Label htmlFor="purchase_account">Accounts Payable accounts in QuickBooks</Label>
                 <select
                   id="purchase_account"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className={selectClassName}
                   value={purchaseAccountId}
                   onChange={(e) => {
                     const account = expenseAccounts.find((a) => a.account_id === e.target.value);
@@ -302,7 +358,10 @@ const ConnectionFormPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-muted-foreground">Save OAuth form to persist the selection.</p>
+                <p className="text-xs text-muted-foreground">
+                  Saved when you click “Save connection”. You can also change it from the
+                  connection page without re-entering sign-in details.
+                </p>
               </div>
             ) : null}
           </CardContent>
