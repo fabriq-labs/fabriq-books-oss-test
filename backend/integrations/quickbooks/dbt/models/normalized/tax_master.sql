@@ -56,7 +56,6 @@ left join lateral (
 ) ss on true
 
 where sb.id is not null
-  and coalesce(stg.active, true) = true
   and stg.tax_rate_id is not null
 
 {% if is_incremental() and not var('force_process_all', false) %}

@@ -18,6 +18,19 @@ export const domainNavigation: DomainNavGroup[] = [
     items: [
       { label: 'Invoices', path: '/sales/invoices' },
       { label: 'Customers', path: '/sales/customers' },
+      { label: 'Items', path: '/masters/items' },
+    ],
+  },
+  {
+    label: 'Purchases',
+    items: [{ label: 'Suppliers', path: '/purchases/suppliers' }],
+  },
+  {
+    label: 'Tax',
+    items: [
+      { label: 'Tax rates', path: '/masters/tax-rates' },
+      { label: 'Tax groups', path: '/masters/tax-groups' },
+      { label: 'Tax regions', path: '/masters/tax-regions' },
     ],
   },
   {

@@ -19,6 +19,9 @@ export const SHAREABLE_MODELS = new Set([
   'currency',
 ]);
 
+/** Domain shareable tables (see DOMAIN_SQL_TABLES in lib/domain.ts). */
+const DOMAIN_SHAREABLE_MODELS = new Set(['tax_region']);
+
 /** No org_id column. Do not add an org predicate. */
 export const MODELS_WITHOUT_ORG = new Set([
   'org',
@@ -31,7 +34,7 @@ export type ModelTenancy = 'private' | 'shareable' | 'unscoped';
 export function modelTenancy(modelName: string): ModelTenancy {
   const name = modelName.toLowerCase();
   if (MODELS_WITHOUT_ORG.has(name)) return 'unscoped';
-  if (SHAREABLE_MODELS.has(name)) return 'shareable';
+  if (SHAREABLE_MODELS.has(name) || DOMAIN_SHAREABLE_MODELS.has(name)) return 'shareable';
   return 'private';
 }
 

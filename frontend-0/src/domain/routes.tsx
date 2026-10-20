@@ -23,6 +23,11 @@ import InvoiceList from '@/domain/sales/InvoiceList';
 import CustomerList from '@/domain/sales/CustomerList';
 import { InvoiceForm } from '@/domain/sales/InvoiceForm';
 import { CustomerForm } from '@/domain/sales/CustomerForm';
+import { ItemForm } from '@/domain/sales/ItemForm';
+import { SupplierForm } from '@/domain/sales/SupplierForm';
+import { TaxMasterForm } from '@/domain/sales/TaxMasterForm';
+import { TaxRegionForm } from '@/domain/sales/TaxRegionForm';
+import { TaxGroupForm } from '@/domain/sales/TaxGroupForm';
 
 export function DomainRoutes() {
   return (
@@ -33,10 +38,25 @@ export function DomainRoutes() {
       <Route path="settings/connections/:id" element={<ConnectionDetailPage />} />
       <Route path="sales/invoices" element={<InvoiceList />} />
       <Route path="sales/customers" element={<CustomerList />} />
+      <Route path="masters/items" element={<Master type="item_master" view="item_master_view" displayName="Items" />} />
+      <Route path="purchases/suppliers" element={<Master type="supplier" view="supplier_view" displayName="Suppliers" />} />
+      <Route path="masters/tax-rates" element={<Master type="tax_master" view="tax_master_view" displayName="Tax rates" />} />
+      <Route path="masters/tax-groups" element={<Master type="tax_group" view="tax_group_view" displayName="Tax groups" />} />
+      <Route path="masters/tax-regions" element={<Master type="tax_region" view="tax_region_view" displayName="Tax regions" />} />
       <Route path="invoice/:id/view/:viewId" element={<InvoiceForm />} />
       <Route path="invoice/view/:viewId" element={<InvoiceForm />} />
       <Route path="customer/:id/view/:viewId" element={<CustomerForm />} />
       <Route path="customer/view/:viewId" element={<CustomerForm />} />
+      <Route path="item_master/:id/view/:viewId" element={<ItemForm />} />
+      <Route path="item_master/view/:viewId" element={<ItemForm />} />
+      <Route path="supplier/:id/view/:viewId" element={<SupplierForm />} />
+      <Route path="supplier/view/:viewId" element={<SupplierForm />} />
+      <Route path="tax_master/:id/view/:viewId" element={<TaxMasterForm />} />
+      <Route path="tax_master/view/:viewId" element={<TaxMasterForm />} />
+      <Route path="tax_group/:id/view/:viewId" element={<TaxGroupForm />} />
+      <Route path="tax_group/view/:viewId" element={<TaxGroupForm />} />
+      <Route path="tax_region/:id/view/:viewId" element={<TaxRegionForm />} />
+      <Route path="tax_region/view/:viewId" element={<TaxRegionForm />} />
       <Route path="accounting/accounts" element={<AccountList />} />
       <Route path="accounting/transactions" element={<Transactions />} />
       <Route path="accounting/opening-balances" element={<OpeningBalances />} />

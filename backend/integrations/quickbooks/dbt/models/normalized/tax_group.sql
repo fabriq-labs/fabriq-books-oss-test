@@ -48,7 +48,6 @@ left join lateral (
 ) ss on true
 
 where sb.id is not null
-  and coalesce(stg.active, true) = true
   and stg.tax_code_id is not null
   and exists (
       select 1

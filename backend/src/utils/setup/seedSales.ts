@@ -1,6 +1,6 @@
 /**
- * Idempotent seed for sales customers and invoices (incl. nested line items).
- * Run after setup:kernel / sales schema. Views live on org_system.
+ * Idempotent seed for sales + catalog masters (customers, invoices, items,
+ * suppliers, tax rates / groups / regions). Views live on org_system.
  *
  *   cd backend && npm run seed:sales
  */
@@ -34,6 +34,25 @@ const entitySelect = {
   limit: '10',
   instanceKey: 'id',
   instanceType: 'entity',
+  searchParams: 'name',
+  instanceLabel: 'name',
+};
+
+const accountSelect = {
+  type: 'account',
+  limit: '10',
+  instanceKey: 'id',
+  instanceType: 'account',
+  searchParams: 'name',
+  instanceLabel: 'name',
+  instanceSubLabel: 'code',
+};
+
+const taxGroupSelect = {
+  type: 'tax_group',
+  limit: '10',
+  instanceKey: 'id',
+  instanceType: 'tax_group',
   searchParams: 'name',
   instanceLabel: 'name',
 };
@@ -299,6 +318,390 @@ const VIEWS: Array<{
       },
     },
   },
+  {
+    id: 'view_sales_item_master',
+    name: 'item_master_view',
+    model: 'item_master',
+    description: 'Items',
+    data_graph: {
+      id: { dataType: 'string', permission: 'read' },
+      name: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Name',
+        isColumnShow: true,
+        searchProps: { isSearch: true, operation: 'contains' },
+        tableProps: { width: '220', columnType: 'text' },
+      },
+      code: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Code',
+        isColumnShow: true,
+        tableProps: { width: '120', columnType: 'text' },
+      },
+      item_type: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Type',
+        isColumnShow: true,
+        tableProps: { width: '100', columnType: 'text' },
+      },
+      unit_price: {
+        dataType: 'decimal',
+        permission: 'update',
+        displayName: 'Unit price',
+        isColumnShow: true,
+        tableProps: { width: '120', columnType: 'decimal' },
+      },
+      is_active: {
+        dataType: 'boolean',
+        permission: 'update',
+        displayName: 'Active',
+        isColumnShow: true,
+        tableProps: { columnType: 'checkbox' },
+      },
+      description: { dataType: 'string', permission: 'update', displayName: 'Description', isColumnShow: false },
+      is_stockable: {
+        dataType: 'boolean',
+        permission: 'update',
+        displayName: 'Stockable',
+        isColumnShow: true,
+        tableProps: { columnType: 'checkbox' },
+      },
+      sales_account: {
+        type: 'table',
+        datatype: 'table',
+        displayName: 'Sales account',
+        isColumnShow: true,
+        select: { id: 'read', name: 'read', code: 'read' },
+      },
+      sales_account_id: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Sales account',
+        isColumnShow: false,
+        tableProps: {
+          columnType: 'select',
+          selectProps: { ...accountSelect, instanceSourceKey: 'sales_account_id' },
+        },
+      },
+      purchase_account: {
+        type: 'table',
+        datatype: 'table',
+        displayName: 'Purchase account',
+        isColumnShow: false,
+        select: { id: 'read', name: 'read', code: 'read' },
+      },
+      purchase_account_id: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Purchase account',
+        isColumnShow: false,
+        tableProps: {
+          columnType: 'select',
+          selectProps: { ...accountSelect, instanceSourceKey: 'purchase_account_id' },
+        },
+      },
+      tax_group: {
+        type: 'table',
+        datatype: 'table',
+        displayName: 'Tax group',
+        isColumnShow: true,
+        select: { id: 'read', name: 'read', code: 'read' },
+      },
+      tax_group_id: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Tax group',
+        isColumnShow: false,
+        tableProps: {
+          columnType: 'select',
+          selectProps: { ...taxGroupSelect, instanceSourceKey: 'tax_group_id' },
+        },
+      },
+      source_system_id: {
+        dataType: 'string',
+        permission: 'read',
+        displayName: 'Source',
+        isColumnShow: true,
+        tableProps: { width: '100', columnType: 'text' },
+      },
+      source_record_id: { dataType: 'string', permission: 'read', displayName: 'Source id', isColumnShow: false },
+    },
+  },
+  {
+    id: 'view_sales_supplier',
+    name: 'supplier_view',
+    model: 'supplier',
+    description: 'Suppliers',
+    data_graph: {
+      id: { dataType: 'string', permission: 'read' },
+      name: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Name',
+        isColumnShow: true,
+        searchProps: { isSearch: true, operation: 'contains' },
+        tableProps: { width: '220', columnType: 'text' },
+      },
+      email: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Email',
+        isColumnShow: true,
+        tableProps: { width: '200', columnType: 'text' },
+      },
+      phone: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Phone',
+        isColumnShow: true,
+        tableProps: { width: '140', columnType: 'text' },
+      },
+      city: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'City',
+        isColumnShow: true,
+        tableProps: { width: '140', columnType: 'text' },
+      },
+      is_active: {
+        dataType: 'boolean',
+        permission: 'update',
+        displayName: 'Active',
+        isColumnShow: true,
+        tableProps: { columnType: 'checkbox' },
+      },
+      legal_name: { dataType: 'string', permission: 'update', displayName: 'Legal name', isColumnShow: false },
+      address: { dataType: 'string', permission: 'update', displayName: 'Address', isColumnShow: false },
+      state: { dataType: 'string', permission: 'update', displayName: 'State', isColumnShow: false },
+      country: { dataType: 'string', permission: 'update', displayName: 'Country', isColumnShow: false },
+      postal_code: { dataType: 'string', permission: 'update', displayName: 'Postal code', isColumnShow: false },
+      currency: {
+        type: 'table',
+        datatype: 'table',
+        displayName: 'Currency',
+        isColumnShow: true,
+        select: { id: 'read', code: 'read', name: 'read' },
+      },
+      currency_id: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Currency',
+        isColumnShow: false,
+        tableProps: {
+          columnType: 'select',
+          selectProps: { ...currencySelect, instanceSourceKey: 'currency_id' },
+        },
+      },
+      source_system_id: {
+        dataType: 'string',
+        permission: 'read',
+        displayName: 'Source',
+        isColumnShow: true,
+        tableProps: { width: '100', columnType: 'text' },
+      },
+      source_record_id: { dataType: 'string', permission: 'read', displayName: 'Source id', isColumnShow: false },
+    },
+  },
+  {
+    id: 'view_sales_tax_master',
+    name: 'tax_master_view',
+    model: 'tax_master',
+    description: 'Tax rates',
+    data_graph: {
+      id: { dataType: 'string', permission: 'read' },
+      name: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Name',
+        isColumnShow: true,
+        searchProps: { isSearch: true, operation: 'contains' },
+        tableProps: { width: '200', columnType: 'text' },
+      },
+      code: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Code',
+        isColumnShow: true,
+        tableProps: { width: '120', columnType: 'text' },
+      },
+      rate: {
+        dataType: 'decimal',
+        permission: 'update',
+        required: true,
+        displayName: 'Rate',
+        isColumnShow: true,
+        tableProps: { width: '100', columnType: 'decimal' },
+      },
+      component_type: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Component',
+        isColumnShow: true,
+        tableProps: { width: '120', columnType: 'text' },
+      },
+      is_active: {
+        dataType: 'boolean',
+        permission: 'update',
+        displayName: 'Active',
+        isColumnShow: true,
+        tableProps: { columnType: 'checkbox' },
+      },
+      is_recoverable: {
+        dataType: 'boolean',
+        permission: 'update',
+        displayName: 'Recoverable',
+        isColumnShow: true,
+        tableProps: { columnType: 'checkbox' },
+      },
+      effective_from: {
+        dataType: 'date',
+        permission: 'update',
+        displayName: 'From',
+        isColumnShow: false,
+        tableProps: { columnType: 'date' },
+      },
+      effective_to: {
+        dataType: 'date',
+        permission: 'update',
+        displayName: 'To',
+        isColumnShow: false,
+        tableProps: { columnType: 'date' },
+      },
+      source_system_id: {
+        dataType: 'string',
+        permission: 'read',
+        displayName: 'Source',
+        isColumnShow: true,
+        tableProps: { width: '100', columnType: 'text' },
+      },
+      source_record_id: { dataType: 'string', permission: 'read', displayName: 'Source id', isColumnShow: false },
+    },
+  },
+  {
+    id: 'view_sales_tax_group',
+    name: 'tax_group_view',
+    model: 'tax_group',
+    description: 'Tax groups',
+    data_graph: {
+      id: { dataType: 'string', permission: 'read' },
+      name: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Name',
+        isColumnShow: true,
+        searchProps: { isSearch: true, operation: 'contains' },
+        tableProps: { width: '200', columnType: 'text' },
+      },
+      code: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Code',
+        isColumnShow: true,
+        tableProps: { width: '120', columnType: 'text' },
+      },
+      country_code: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Country',
+        isColumnShow: true,
+        tableProps: { width: '80', columnType: 'text' },
+      },
+      is_active: {
+        dataType: 'boolean',
+        permission: 'update',
+        displayName: 'Active',
+        isColumnShow: true,
+        tableProps: { columnType: 'checkbox' },
+      },
+      source_system_id: {
+        dataType: 'string',
+        permission: 'read',
+        displayName: 'Source',
+        isColumnShow: true,
+        tableProps: { width: '100', columnType: 'text' },
+      },
+      source_record_id: { dataType: 'string', permission: 'read', displayName: 'Source id', isColumnShow: false },
+      components: {
+        type: 'table',
+        datatype: 'table',
+        displayName: 'Components',
+        isColumnShow: false,
+        select: {
+          id: 'read',
+          sequence: 'read',
+          tax_master: {
+            type: 'table',
+            select: { id: 'read', name: 'read', code: 'read', rate: 'read' },
+          },
+        },
+      },
+    },
+  },
+  {
+    id: 'view_sales_tax_region',
+    name: 'tax_region_view',
+    model: 'tax_region',
+    description: 'Tax regions',
+    data_graph: {
+      id: { dataType: 'string', permission: 'read' },
+      country_code: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Country',
+        isColumnShow: true,
+        tableProps: { width: '80', columnType: 'text' },
+      },
+      code: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Code',
+        isColumnShow: true,
+        searchProps: { isSearch: true, operation: 'contains' },
+        tableProps: { width: '100', columnType: 'text' },
+      },
+      name: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Name',
+        isColumnShow: true,
+        searchProps: { isSearch: true, operation: 'contains' },
+        tableProps: { width: '200', columnType: 'text' },
+      },
+      region_type: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Type',
+        isColumnShow: true,
+        tableProps: { width: '120', columnType: 'text' },
+      },
+    },
+  },
+];
+
+const DEFAULT_TAX_REGIONS: Array<{
+  id: string;
+  country_code: string;
+  code: string;
+  name: string;
+  region_type: string;
+}> = [
+  { id: 'txreg_us_ca', country_code: 'US', code: 'CA', name: 'California', region_type: 'state' },
+  { id: 'txreg_us_ny', country_code: 'US', code: 'NY', name: 'New York', region_type: 'state' },
+  { id: 'txreg_us_tx', country_code: 'US', code: 'TX', name: 'Texas', region_type: 'state' },
+  { id: 'txreg_us_wa', country_code: 'US', code: 'WA', name: 'Washington', region_type: 'state' },
+  { id: 'txreg_us_fl', country_code: 'US', code: 'FL', name: 'Florida', region_type: 'state' },
 ];
 
 async function upsertView(view: (typeof VIEWS)[number]) {
@@ -360,6 +763,38 @@ async function upsertView(view: (typeof VIEWS)[number]) {
   }
 }
 
+async function seedDefaultTaxRegions() {
+  for (const region of DEFAULT_TAX_REGIONS) {
+    const existing = await prisma.tax_region.findFirst({
+      where: {
+        org_id: ORG_SYSTEM,
+        country_code: region.country_code,
+        code: region.code,
+      },
+    });
+    if (existing) {
+      await prisma.tax_region.update({
+        where: { id: existing.id },
+        data: {
+          name: region.name,
+          region_type: region.region_type,
+        },
+      });
+      continue;
+    }
+    await prisma.tax_region.create({
+      data: {
+        id: region.id,
+        org_id: ORG_SYSTEM,
+        country_code: region.country_code,
+        code: region.code,
+        name: region.name,
+        region_type: region.region_type,
+      },
+    });
+  }
+}
+
 async function main() {
   const role = await prisma.role.findUnique({ where: { id: ROLE_ID } });
   if (!role) {
@@ -368,8 +803,11 @@ async function main() {
   for (const view of VIEWS) {
     await upsertView(view);
   }
-  console.log('Sales views ready.');
-  console.log('  customer_view, invoice_view on org_system (invoice nests line_items)');
+  await seedDefaultTaxRegions();
+  console.log('Sales + catalog views ready.');
+  console.log(
+    '  customer_view, invoice_view, item_master_view, supplier_view, tax_master_view, tax_group_view, tax_region_view'
+  );
 }
 
 main()

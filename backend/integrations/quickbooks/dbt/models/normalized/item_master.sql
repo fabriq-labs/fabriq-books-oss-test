@@ -96,8 +96,8 @@ left join public.tax_group tg
     and tg.source_system_id = ss.id
     and tg.org_id = '{{ var("org_id") }}'
 
+-- Include inactive QBO items so historical invoice lines can resolve.
 where sb.id is not null
-  and coalesce(stg.active, true) = true
 
 {% if is_incremental() and not var('force_process_all', false) %}
 and (

@@ -86,8 +86,8 @@ left join lateral (
     limit 1
 ) pt on true
 
+-- Include inactive QBO customers so invoice customer_id can resolve.
 where sb.id is not null
-  and coalesce(stg.active, true) = true
 
 {% if is_incremental() and not var('force_process_all', false) %}
 and (
