@@ -15,6 +15,8 @@ export type UpsertQuickBooksConnectionInput = {
   /** When set, update this row; otherwise upsert by (org_id, system_type). */
   connectionId?: string;
   isActive?: boolean;
+  defaultPurchaseAccountId?: string | null;
+  defaultPurchaseAccountName?: string | null;
 };
 
 function sanitizeConnection(row: {
@@ -28,6 +30,8 @@ function sanitizeConnection(row: {
   last_sync_status: unknown;
   created_at: Date;
   modified_at: Date;
+  default_purchase_account_id?: string | null;
+  default_purchase_account_name?: string | null;
   connection_config?: unknown;
   extraction_config?: unknown;
 }) {
@@ -40,6 +44,8 @@ function sanitizeConnection(row: {
     name: row.name,
     is_active: row.is_active,
     entity_id: row.entity_id,
+    default_purchase_account_id: row.default_purchase_account_id ?? null,
+    default_purchase_account_name: row.default_purchase_account_name ?? null,
     last_sync_at: row.last_sync_at,
     last_sync_status: row.last_sync_status,
     created_at: row.created_at,
@@ -51,14 +57,6 @@ function sanitizeConnection(row: {
       extraction && typeof extraction === 'object' && extraction.type === 'airbyte'
     ),
   };
-}
-
-export async function listConnections(orgId: string) {
-  const rows = await prisma.source_system.findMany({
-    where: { org_id: orgId },
-    orderBy: { created_at: 'desc' },
-  });
-  return rows.map(sanitizeConnection);
 }
 
 export async function getConnection(orgId: string, connectionId: string) {
@@ -116,6 +114,14 @@ export async function upsertQuickBooksConnection(input: UpsertQuickBooksConnecti
     },
   };
 
+  const purchaseFields =
+    input.defaultPurchaseAccountId !== undefined
+      ? {
+          default_purchase_account_id: input.defaultPurchaseAccountId,
+          default_purchase_account_name: input.defaultPurchaseAccountName ?? null,
+        }
+      : {};
+
   if (connectionId) {
     const existing = await prisma.source_system.findUnique({ where: { id: connectionId } });
     if (!existing || existing.org_id !== orgId) {
@@ -129,6 +135,7 @@ export async function upsertQuickBooksConnection(input: UpsertQuickBooksConnecti
         entity_id: entityId === undefined ? undefined : entityId,
         connection_config: connection_config as object,
         modified_by: userId ?? undefined,
+        ...purchaseFields,
       },
     });
     return sanitizeConnection(updated);
@@ -150,6 +157,7 @@ export async function upsertQuickBooksConnection(input: UpsertQuickBooksConnecti
       connection_config: connection_config as object,
       created_by: userId ?? undefined,
       modified_by: userId ?? undefined,
+      ...purchaseFields,
     },
     update: {
       name,
@@ -157,6 +165,28 @@ export async function upsertQuickBooksConnection(input: UpsertQuickBooksConnecti
       entity_id: entityId === undefined ? undefined : entityId,
       connection_config: connection_config as object,
       modified_by: userId ?? undefined,
+      ...purchaseFields,
+    },
+  });
+  return sanitizeConnection(updated);
+}
+
+/** Update default purchase account without touching OAuth. */
+export async function setDefaultPurchaseAccount(input: {
+  orgId: string;
+  connectionId: string;
+  accountId: string;
+  accountName: string;
+}) {
+  const row = await prisma.source_system.findUnique({ where: { id: input.connectionId } });
+  if (!row || row.org_id !== input.orgId) {
+    throw new Error('Connection not found');
+  }
+  const updated = await prisma.source_system.update({
+    where: { id: input.connectionId },
+    data: {
+      default_purchase_account_id: input.accountId,
+      default_purchase_account_name: input.accountName,
     },
   });
   return sanitizeConnection(updated);

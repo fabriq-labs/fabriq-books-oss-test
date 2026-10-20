@@ -36,6 +36,9 @@ export function DomainRoutes() {
       <Route path="settings/connections/new" element={<ConnectionFormPage />} />
       <Route path="settings/connections/:id/edit" element={<ConnectionFormPage />} />
       <Route path="settings/connections/:id" element={<ConnectionDetailPage />} />
+      <Route path="source_system/view/:viewId" element={<ConnectionFormPage />} />
+      <Route path="source_system/:id/view/:viewId" element={<ConnectionDetailPage />} />
+      <Route path="source_system/:id/edit" element={<ConnectionFormPage />} />
       <Route path="sales/invoices" element={<InvoiceList />} />
       <Route path="sales/customers" element={<CustomerList />} />
       <Route path="masters/items" element={<Master type="item_master" view="item_master_view" displayName="Items" />} />

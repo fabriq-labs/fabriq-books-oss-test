@@ -17,6 +17,7 @@
     "seed:coa": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedChart.ts",
     "seed:books-demo": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedBooksDemo.ts",
     "seed:sales": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedSales.ts",
+    "seed:connections": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedConnections.ts",
     "smoke:sales-model": "ts-node --transpile-only scripts/smoke-sales-model.ts",
 
     "smoke:integrations-phase2": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/smoke-integrations-phase2.ts",

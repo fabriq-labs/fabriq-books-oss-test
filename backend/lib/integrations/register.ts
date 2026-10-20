@@ -1,13 +1,17 @@
 import { Request, Response, Router } from 'express';
 import { authMiddleware } from '../../src/auth/middleware';
 import logger from '../../src/utils/logger';
+import { QuickBooksAPIClient } from './quickbooks/quickbooks_api_client';
 import {
   getConnection,
-  listConnections,
+  setDefaultPurchaseAccount,
   setExtractionConfig,
   upsertQuickBooksConnection,
 } from './shared/connectionService';
-import { getErpConnectionConfig } from './shared/erp-connection-loader';
+import {
+  getErpConnectionById,
+  getErpConnectionConfig,
+} from './shared/erp-connection-loader';
 import { executeSourceSystemSync } from './shared/sync/sourceSystemSync';
 import { testErpConnection } from './shared/test-connection';
 
@@ -19,31 +23,41 @@ function orgUser(req: Request): { orgId: string; userId: string } | { error: str
 }
 
 /**
- * Mount ERP connection + sync routes on the main /api router.
- * Must run before generic /:model handlers so `:id/sync` is not treated as a relation.
+ * Side-effect routes for ERP connections.
+ * List/detail CRUD uses metadata Master + source_system_view.
+ * These routes must mount before generic /:model handlers.
  */
 export function registerIntegrationsRoutes(router: Router): void {
   const int = Router();
   int.use(authMiddleware);
 
-  /** List connections for the caller's org (secrets redacted). */
-  int.get('/source_system/connections', async (req: Request, res: Response) => {
+  /**
+   * Redacted connection flags (has_oauth, realm, Airbyte) — secrets never returned.
+   * List/CRUD stay on /api/source_system/view/source_system_view.
+   */
+  int.get('/source_system/connections/:id', async (req: Request, res: Response) => {
     const auth = orgUser(req);
     if ('error' in auth) {
       res.status(401).json({ success: false, error: auth.error });
       return;
     }
     try {
-      const data = await listConnections(auth.orgId);
+      const data = await getConnection(auth.orgId, req.params.id);
+      if (!data) {
+        res.status(404).json({ success: false, error: 'Connection not found' });
+        return;
+      }
       res.json({ success: true, data });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to list connections';
-      logger.error('list connections failed', { error: message });
+      const message = error instanceof Error ? error.message : 'Failed to load connection';
       res.status(500).json({ success: false, error: message });
     }
   });
 
-  /** Upsert QuickBooks connection (encrypted connection_config). */
+  /**
+   * Upsert QuickBooks OAuth (encrypted connection_config) + optional purchase account.
+   * Prefer this over view write when rotating secrets.
+   */
   int.post('/source_system/connections', async (req: Request, res: Response) => {
     const auth = orgUser(req);
     if ('error' in auth) {
@@ -73,6 +87,14 @@ export function registerIntegrationsRoutes(router: Router): void {
         connectionId: body.connection_id || body.id,
         isActive: body.is_active !== false,
         oauth,
+        defaultPurchaseAccountId:
+          body.default_purchase_account_id !== undefined
+            ? body.default_purchase_account_id
+            : undefined,
+        defaultPurchaseAccountName:
+          body.default_purchase_account_name !== undefined
+            ? body.default_purchase_account_name
+            : undefined,
       });
       res.status(200).json({ success: true, data });
     } catch (error: unknown) {
@@ -83,31 +105,6 @@ export function registerIntegrationsRoutes(router: Router): void {
     }
   });
 
-  /** Connection detail (secrets redacted). */
-  int.get('/source_system/connections/:id', async (req: Request, res: Response) => {
-    const auth = orgUser(req);
-    if ('error' in auth) {
-      res.status(401).json({ success: false, error: auth.error });
-      return;
-    }
-    try {
-      const data = await getConnection(auth.orgId, req.params.id);
-      if (!data) {
-        res.status(404).json({ success: false, error: 'Connection not found' });
-        return;
-      }
-      res.json({ success: true, data });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to load connection';
-      res.status(500).json({ success: false, error: message });
-    }
-  });
-
-  /**
-   * Test QBO (or other) credentials before/after save.
-   * Body: { system_type, oauth?, connection_id? }
-   * If connection_id is set and oauth omitted, loads oauth from DB.
-   */
   int.post('/source_system/test-connection', async (req: Request, res: Response) => {
     const auth = orgUser(req);
     if ('error' in auth) {
@@ -120,6 +117,9 @@ export function registerIntegrationsRoutes(router: Router): void {
       const connectionId = req.body?.connection_id as string | undefined;
 
       if ((!oauth || typeof oauth !== 'object') && connectionId) {
+        const loaded = await getErpConnectionById(auth.orgId, connectionId);
+        oauth = loaded.connection_config.oauth;
+      } else if ((!oauth || typeof oauth !== 'object') && !connectionId) {
         const cfg = await getErpConnectionConfig(auth.orgId, systemType);
         oauth = cfg.oauth;
       }
@@ -144,7 +144,76 @@ export function registerIntegrationsRoutes(router: Router): void {
     }
   });
 
-  /** Attach Airbyte extraction_config (encrypted) for forward sync. */
+  /** Fetch QBO Accounts Payable accounts for default purchase account picker. */
+  int.post(
+    '/actions/source_system/:id/fetch-expense-accounts',
+    async (req: Request, res: Response) => {
+      const auth = orgUser(req);
+      if ('error' in auth) {
+        res.status(401).json({ success: false, message: auth.error });
+        return;
+      }
+      try {
+        const connectionId = req.params.id;
+        const loaded = await getErpConnectionById(auth.orgId, connectionId);
+        if (loaded.system_type.toLowerCase() !== 'quickbooks') {
+          res.status(400).json({
+            success: false,
+            message: 'Expense account fetch is only supported for QuickBooks',
+          });
+          return;
+        }
+        const oauth = loaded.connection_config.oauth;
+        const client = new QuickBooksAPIClient({
+          client_id: oauth.client_id,
+          client_secret: oauth.client_secret,
+          refresh_token: oauth.refresh_token,
+          realm_id: oauth.realm_id || '',
+          environment: oauth.environment || 'production',
+          connectionId,
+        });
+        const accounts = await client.getExpenseAccounts();
+        res.status(200).json({ success: true, data: accounts });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Failed to fetch expense accounts';
+        logger.error('fetch-expense-accounts failed', { error: message });
+        const status =
+          message === 'Connection not found' ? 404 : message.includes('inactive') ? 400 : 500;
+        res.status(status).json({ success: false, message });
+      }
+    }
+  );
+
+  /** Persist default purchase account without rotating OAuth. */
+  int.post('/source_system/:id/default-purchase-account', async (req: Request, res: Response) => {
+    const auth = orgUser(req);
+    if ('error' in auth) {
+      res.status(401).json({ success: false, error: auth.error });
+      return;
+    }
+    try {
+      const accountId = String(req.body?.account_id || req.body?.default_purchase_account_id || '').trim();
+      const accountName = String(
+        req.body?.account_name || req.body?.default_purchase_account_name || ''
+      ).trim();
+      if (!accountId || !accountName) {
+        res.status(400).json({ success: false, error: 'account_id and account_name are required' });
+        return;
+      }
+      const data = await setDefaultPurchaseAccount({
+        orgId: auth.orgId,
+        connectionId: req.params.id,
+        accountId,
+        accountName,
+      });
+      res.json({ success: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to save purchase account';
+      const status = message === 'Connection not found' ? 404 : 400;
+      res.status(status).json({ success: false, error: message });
+    }
+  });
+
   int.post('/source_system/:id/extraction-config', async (req: Request, res: Response) => {
     const auth = orgUser(req);
     if ('error' in auth) {
@@ -180,7 +249,6 @@ export function registerIntegrationsRoutes(router: Router): void {
     }
   });
 
-  /** Trigger Airbyte + dbt sync (proxies to loopback sync_service). */
   int.post('/source_system/:id/sync', async (req: Request, res: Response) => {
     const auth = orgUser(req);
     if ('error' in auth) {

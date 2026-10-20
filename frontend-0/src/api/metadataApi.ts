@@ -220,6 +220,8 @@ export type ErpConnectionSummary = {
   name: string;
   is_active: boolean;
   entity_id: string | null;
+  default_purchase_account_id: string | null;
+  default_purchase_account_name: string | null;
   last_sync_at: string | null;
   last_sync_status: { status?: string; message?: string; sync_mode?: string } | null;
   created_at: string;
@@ -232,14 +234,19 @@ export type ErpConnectionSummary = {
 
 export type SyncMode = 'full_sync' | 'transform_only' | 'extract_only';
 
+export type ExpenseAccountOption = { account_id: string; account_name: string };
+
+/**
+ * Side-effect helpers for ERP connections.
+ * List/CRUD: use viewAPI + Master against source_system_view.
+ */
 export const erpConnectionsAPI = {
-  getAll: () =>
-    fetchAPI<{ success: boolean; data: ErpConnectionSummary[] }>('/api/source_system/connections'),
-  getById: (id: string) =>
+  /** Redacted flags (oauth / Airbyte / realm) — not on view data_graph. */
+  getFlags: (id: string) =>
     fetchAPI<{ success: boolean; data: ErpConnectionSummary }>(
       `/api/source_system/connections/${id}`
     ),
-  /** Upsert QuickBooks (or create). Pass connection_id/id to update. */
+  /** Upsert QuickBooks OAuth (+ optional purchase account). */
   upsert: (data: Record<string, unknown>) =>
     fetchAPI<{ success: boolean; data: ErpConnectionSummary }>('/api/source_system/connections', {
       method: 'POST',
@@ -254,6 +261,19 @@ export const erpConnectionsAPI = {
         connection_id: connectionId,
       }),
     }),
+  fetchExpenseAccounts: (connectionId: string) =>
+    fetchAPI<{ success: boolean; data?: ExpenseAccountOption[]; message?: string }>(
+      `/api/actions/source_system/${connectionId}/fetch-expense-accounts`,
+      { method: 'POST', body: JSON.stringify({}) }
+    ),
+  setDefaultPurchaseAccount: (id: string, accountId: string, accountName: string) =>
+    fetchAPI<{ success: boolean; data: ErpConnectionSummary }>(
+      `/api/source_system/${id}/default-purchase-account`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ account_id: accountId, account_name: accountName }),
+      }
+    ),
   setExtractionConfig: (
     id: string,
     body: {

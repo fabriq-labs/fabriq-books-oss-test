@@ -12,8 +12,8 @@ import { emptyQboOAuth, type QboOAuthForm } from './types';
 
 /**
  * Create or edit QuickBooks OAuth connection.
- * On create: requires full oauth. On edit: secrets can be left blank to keep existing
- * (re-save requires full oauth for now — middleware replaces whole connection_config).
+ * On create: requires full oauth + successful test.
+ * On edit: secrets can be left blank to keep existing (re-save currently requires full oauth).
  */
 const ConnectionFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +25,12 @@ const ConnectionFormPage: React.FC = () => {
   const [name, setName] = useState('QuickBooks Online');
   const [entityId, setEntityId] = useState<string>(currentEntityId ?? '');
   const [oauth, setOauth] = useState<QboOAuthForm>(emptyQboOAuth);
+  const [purchaseAccountId, setPurchaseAccountId] = useState('');
+  const [purchaseAccountName, setPurchaseAccountName] = useState('');
+  const [expenseAccounts, setExpenseAccounts] = useState<
+    Array<{ account_id: string; account_name: string }>
+  >([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testedOk, setTestedOk] = useState(false);
@@ -34,11 +40,13 @@ const ConnectionFormPage: React.FC = () => {
     if (!id) return;
     setLoading(true);
     erpConnectionsAPI
-      .getById(id)
+      .getFlags(id)
       .then((res) => {
         const row = res.data;
         setName(row.name || 'QuickBooks Online');
         setEntityId(row.entity_id || '');
+        setPurchaseAccountId(row.default_purchase_account_id || '');
+        setPurchaseAccountName(row.default_purchase_account_name || '');
         setOauth((prev) => ({
           ...prev,
           realm_id: row.realm_id || '',
@@ -85,6 +93,32 @@ const ConnectionFormPage: React.FC = () => {
     }
   };
 
+  const handleLoadAccounts = async () => {
+    if (!id) {
+      toast({
+        variant: 'destructive',
+        title: 'Save first',
+        description: 'Save the connection before loading QuickBooks accounts.',
+      });
+      return;
+    }
+    setLoadingAccounts(true);
+    try {
+      const res = await erpConnectionsAPI.fetchExpenseAccounts(id);
+      if (!res.success) throw new Error(res.message || 'Failed to fetch accounts');
+      setExpenseAccounts(res.data || []);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to load accounts',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+      setExpenseAccounts([]);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!testedOk && !isEdit) {
       toast({
@@ -102,9 +136,15 @@ const ConnectionFormPage: React.FC = () => {
         entity_id: entityId || null,
         connection_id: id,
         oauth,
+        ...(purchaseAccountId
+          ? {
+              default_purchase_account_id: purchaseAccountId,
+              default_purchase_account_name: purchaseAccountName || null,
+            }
+          : {}),
       });
       toast({ title: 'Saved', description: 'QuickBooks connection saved.' });
-      navigate(`/settings/connections/${res.data.id}`);
+      navigate(`/source_system/${res.data.id}/view/source_system_view`);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -130,7 +170,9 @@ const ConnectionFormPage: React.FC = () => {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(id ? `/settings/connections/${id}` : '/settings/connections')}
+          onClick={() =>
+            navigate(id ? `/source_system/${id}/view/source_system_view` : '/settings/connections')
+          }
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back
@@ -219,6 +261,53 @@ const ConnectionFormPage: React.FC = () => {
           ) : null}
         </CardContent>
       </Card>
+
+      {isEdit ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Default purchase account</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Optional. Load Accounts Payable from QuickBooks after the connection is saved.
+            </p>
+            {purchaseAccountName ? (
+              <p className="text-sm font-medium">Current: {purchaseAccountName}</p>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loadingAccounts}
+              onClick={() => void handleLoadAccounts()}
+            >
+              {loadingAccounts ? 'Loading…' : 'Load accounts from QuickBooks'}
+            </Button>
+            {expenseAccounts.length > 0 ? (
+              <div className="space-y-2">
+                <Label htmlFor="purchase_account">Select account</Label>
+                <select
+                  id="purchase_account"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={purchaseAccountId}
+                  onChange={(e) => {
+                    const account = expenseAccounts.find((a) => a.account_id === e.target.value);
+                    setPurchaseAccountId(e.target.value);
+                    setPurchaseAccountName(account?.account_name || '');
+                  }}
+                >
+                  <option value="">— None —</option>
+                  {expenseAccounts.map((a) => (
+                    <option key={a.account_id} value={a.account_id}>
+                      {a.account_name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">Save OAuth form to persist the selection.</p>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 };

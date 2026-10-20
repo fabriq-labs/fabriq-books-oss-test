@@ -49,3 +49,28 @@ export async function getOAuthCredentials(
   const config = await getErpConnectionConfig(orgId, systemType);
   return config.oauth;
 }
+
+/** Load decrypted OAuth for a specific connection row (org-scoped). */
+export async function getErpConnectionById(
+  orgId: string,
+  connectionId: string
+): Promise<{ system_type: string; is_active: boolean; connection_config: ConnectionConfig }> {
+  const sourceSystem = await prisma.source_system.findUnique({
+    where: { id: connectionId },
+  });
+  if (!sourceSystem || sourceSystem.org_id !== orgId) {
+    throw new Error('Connection not found');
+  }
+  if (!sourceSystem.is_active) {
+    throw new Error('Connection is inactive');
+  }
+  const connectionConfig = sourceSystem.connection_config as ConnectionConfig | null;
+  if (!connectionConfig || typeof connectionConfig !== 'object' || !connectionConfig.oauth) {
+    throw new Error(`Invalid connection_config for ${connectionId}: expected object with oauth`);
+  }
+  return {
+    system_type: sourceSystem.system_type,
+    is_active: sourceSystem.is_active,
+    connection_config: connectionConfig,
+  };
+}
