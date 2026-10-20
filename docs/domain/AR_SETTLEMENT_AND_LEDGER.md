@@ -121,9 +121,9 @@ Parity with `invoice_line_tax` (header tax still on credit_note; line tax for na
 **T2 (warn for sync):**  
 `balance = total − Σ receipt apps (invoice target) − Σ credit_note_application`.
 
-### 3.8 NEW `entity_ledger_settings` (Phase 4)
+### 3.8 Entity ledger defaults (Phase 4)
 
-Per entity: default AR, income, undeposited funds, FX gain/loss, discount; optional `ledger_start_date` cutover.
+Per `entity` (columns, not a separate table): default AR, income, undeposited funds, FX gain/loss, discount; optional `ledger_start_date` cutover.
 
 ### 3.9 Do not store
 
@@ -425,7 +425,7 @@ T2: `70 = 100 − 0 − 30` (receipt apps + credit apps).
 | Phase | Scope |
 |---|---|
 | **3** | Schema delta §3.1–3.7; dbt payments + credit memos; signed apps; resolver + sweep; void detection; Master views; **no GL** |
-| **4** | `entity_ledger_settings`; posting delta; shared poster; backfill `ledger_status=pending`; AR tie-out T4; single functional currency |
+| **4** | entity ledger default columns; posting delta; shared poster; backfill `ledger_status=pending`; AR tie-out T4; single functional currency |
 | **Later** | Deposits, RefundReceipt, multi-currency FX legs, per-agency tax split |
 
 **Non-goals:** reverse sync, Bills/PO, Intuit webhooks, importing QBO GL as SoT.

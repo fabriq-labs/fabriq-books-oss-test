@@ -76,7 +76,6 @@ export const DOMAIN_SQL_TABLES: readonly DomainSqlTable[] = [
   { name: 'credit_note_item', tenancy: 'private' },
   { name: 'credit_note_application', tenancy: 'private' },
   { name: 'credit_note_line_tax', tenancy: 'private' },
-  { name: 'entity_ledger_settings', tenancy: 'private' },
   { name: 'source_system', tenancy: 'private' },
   { name: 'trade', tenancy: 'private' },
   { name: 'holding', tenancy: 'private' },
@@ -111,7 +110,7 @@ export const DOMAIN_MODEL_REGISTRY: Record<string, DomainModelDescriptor> = {
   posting: {
     name: 'posting',
     description: 'A transaction with a debit account and a credit account',
-    businessContext: 'amount is positive. debit_account_id is the debit side and credit_account_id is the credit side. value_date is the accounting date. posting_date is the statement date. kind is opening, duplicate, journal, reversal, sales_invoice, or closing. status is active or reversed.',
+    businessContext: 'amount is positive. debit_account_id is the debit side and credit_account_id is the credit side. value_date is the accounting date. posting_date is the statement date. kind is opening, duplicate, journal, reversal, sales_invoice, sales_credit_note, sales_receipt, sales_settlement, or closing. status is active or reversed. posting_key is the idempotent reverse-and-repost key (partial unique while status=active).',
     examples: ['Show transactions for an account this month', 'Find uncategorized postings'],
     synonyms: ['transaction', 'journal entry', 'ledger line'],
   },

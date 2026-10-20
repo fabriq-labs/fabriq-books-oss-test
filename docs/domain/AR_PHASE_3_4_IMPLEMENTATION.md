@@ -14,7 +14,7 @@ Feed this to a coding agent **one work package at a time**. Design source of tru
 
 | Decision | Default for this plan |
 |---|---|
-| Ledger cutover | Support `entity_ledger_settings.ledger_start_date`; if null, post all synced history |
+| Ledger cutover | Support `entity.ledger_start_date`; if null, post all synced history |
 | Multi-currency Phase 4 | Block non-functional-currency docs (`ledger_status=blocked`) |
 | Deposits | **Out of Phase 3–4** — leave receipts on Undeposited Funds |
 | Bank feed vs QBO cash | Defer policy; do not build bank matching in these WPs |
@@ -30,7 +30,7 @@ WP0 schema + seeds
   ├─► WP2 dbt payments + applications
   │     └─► WP3 resolver + orphan sweep + voids
   │           └─► WP4 Master UI (receipts / credits / apps)
-  └─► WP5 posting schema + entity_ledger_settings
+  └─► WP5 posting schema + entity ledger defaults
         └─► WP6 poster lib (invoice → CN → receipt)
               └─► WP7 wire after sync + backfill + T4
 ```
@@ -162,7 +162,7 @@ WP1 and WP2 can proceed in parallel after WP0. WP4 can start once WP2 lands data
 
 ---
 
-## WP5 — Phase 4 schema: posting + ledger settings
+## WP5 — Phase 4 schema: posting + entity ledger defaults
 
 **Goal.** Unlock multi-posting per document and defaults for the poster.
 
@@ -171,13 +171,15 @@ WP1 and WP2 can proceed in parallel after WP0. WP4 can start once WP2 lands data
 **Do.**
 
 1. SQL/Prisma: `posting.credit_note_id`; `posting_key`; drop `@unique` on `payment_receipt_id` → index; kinds allowlist / `businessContext` for `sales_credit_note`, `sales_receipt`, `sales_settlement`.
-2. NEW `entity_ledger_settings` + seed/prefill from synced CoA (AR, Undeposited Funds) where detectable.
-3. Add `ledger_*` usage: backfill helper sets `ledger_status='pending'` on posted docs with no active posting (script only; do not auto-post yet).
+2. Ledger defaults live as columns on `entity` (not a separate `entity_ledger_settings` table): AR, income, undeposited funds, FX, discount, `ledger_start_date`. Prefill from synced CoA (`npm run ledger:prefill-entity-defaults`) where AR / Undeposited Funds are detectable.
+3. Add `ledger_*` usage: `npm run ledger:mark-pending` sets `ledger_status='pending'` on posted docs with no active posting (script only; do not auto-post yet).
+4. SQL delta: `backend/prisma/migration/2026-10-20/wp5_entity_ledger_columns.sql` (folds any prior `entity_ledger_settings` rows onto `entity`, then drops that table).
 
 **Acceptance.**
 
-- [ ] Can insert two `posting` rows with same `payment_receipt_id`.
-- [ ] Partial unique on `(org_id, posting_key) WHERE active` works in SQL.
+- [x] Can insert two `posting` rows with same `payment_receipt_id`.
+- [x] Partial unique on `(org_id, posting_key) WHERE active` works in SQL.
+- [x] Entity holds poster default account FKs + cutover date; settings table removed.
 
 **Stop.** No poster logic yet.
 
@@ -250,7 +252,7 @@ WP1 and WP2 can proceed in parallel after WP0. WP4 can start once WP2 lands data
 | 2 | “Implement WP2 — dbt payments and signed applications.” |
 | 3 | “Implement WP3 — resolver, orphan sweep, voids.” |
 | 4 | “Implement WP4 — Master UI for receipts and credit notes.” |
-| 5 | “Implement WP5 — posting schema and entity_ledger_settings.” |
+| 5 | “Implement WP5 — posting schema and entity ledger defaults.” |
 | 6 | “Implement WP6 — shared ledger poster with unit tests from design §6.” |
 | 7 | “Implement WP7 — post-after-sync, backfill CLI, T4 docs.” |
 

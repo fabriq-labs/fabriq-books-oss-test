@@ -111,11 +111,11 @@ model account {
   supplier_payable_accounts      supplier[]             @relation("supplier_payable_account")
   tax_liability_accounts         tax_master[]           @relation("tax_master_liability_account")
   entity_tax_payable_accounts    entity_tax_settings[]  @relation("entity_tax_payable_account")
-  els_receivable_accounts        entity_ledger_settings[] @relation("els_receivable")
-  els_income_accounts            entity_ledger_settings[] @relation("els_income")
-  els_undeposited_accounts       entity_ledger_settings[] @relation("els_undeposited")
-  els_fx_accounts                entity_ledger_settings[] @relation("els_fx")
-  els_discount_accounts          entity_ledger_settings[] @relation("els_discount")
+  entity_default_receivable      entity[]               @relation("entity_default_receivable")
+  entity_default_income          entity[]               @relation("entity_default_income")
+  entity_default_undeposited     entity[]               @relation("entity_default_undeposited")
+  entity_default_fx              entity[]               @relation("entity_default_fx")
+  entity_default_discount        entity[]               @relation("entity_default_discount")
 
   @@unique([org_id, code])
   @@unique([source_record_id, source_system_id, org_id])
@@ -197,41 +197,57 @@ model posting {
 }
 
 model entity {
-  id                    String               @id @default(dbgenerated("'ent_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id                String
-  name                  String
-  legal_name            String?
-  address               String?
-  city                  String?
-  state                 String?
-  country               String?
-  postal_code           String?
-  currency_id           String?
-  currency              currency?            @relation(fields: [currency_id], references: [id], onDelete: Restrict)
-  is_headquarters       Boolean              @default(false)
-  tax_treatment         String?
-  default_tax_region_id String?
-  default_tax_region    tax_region?          @relation("entity_default_tax_region", fields: [default_tax_region_id], references: [id], onDelete: SetNull)
-  created_by            String?
-  modified_by           String?
-  created_at            DateTime             @default(now())
-  modified_at           DateTime             @updatedAt
-  accounts              account[]
-  postings              posting[]
-  entity_tax_settings    entity_tax_settings?    @relation("entity_tax_settings")
-  entity_ledger_settings entity_ledger_settings?
-  customers              customer[]
-  suppliers              supplier[]
-  locations              location[]
-  payment_terms          payment_terms[]
-  invoices               invoice[]
-  payment_receipts       payment_receipt[]
-  credit_notes           credit_note[]
-  source_systems         source_system[]
+  id                                     String      @id @default(dbgenerated("'ent_' || gen_random_uuid()")) @db.VarChar(50)
+  org_id                                 String
+  name                                   String
+  legal_name                             String?
+  address                                String?
+  city                                   String?
+  state                                  String?
+  country                                String?
+  postal_code                            String?
+  currency_id                            String?
+  currency                               currency?   @relation(fields: [currency_id], references: [id], onDelete: Restrict)
+  is_headquarters                        Boolean     @default(false)
+  tax_treatment                          String?
+  default_tax_region_id                  String?
+  default_tax_region                     tax_region? @relation("entity_default_tax_region", fields: [default_tax_region_id], references: [id], onDelete: SetNull)
+  /// Phase 4 poster defaults (formerly entity_ledger_settings).
+  default_receivable_account_id          String?
+  default_receivable_account             account?    @relation("entity_default_receivable", fields: [default_receivable_account_id], references: [id], onDelete: SetNull)
+  default_income_account_id              String?
+  default_income_account                 account?    @relation("entity_default_income", fields: [default_income_account_id], references: [id], onDelete: SetNull)
+  default_undeposited_funds_account_id   String?
+  default_undeposited_funds_account      account?    @relation("entity_default_undeposited", fields: [default_undeposited_funds_account_id], references: [id], onDelete: SetNull)
+  default_fx_gain_loss_account_id        String?
+  default_fx_gain_loss_account           account?    @relation("entity_default_fx", fields: [default_fx_gain_loss_account_id], references: [id], onDelete: SetNull)
+  default_discount_account_id            String?
+  default_discount_account               account?    @relation("entity_default_discount", fields: [default_discount_account_id], references: [id], onDelete: SetNull)
+  ledger_start_date                      DateTime?
+  created_by                             String?
+  modified_by                            String?
+  created_at                             DateTime    @default(now())
+  modified_at                            DateTime    @updatedAt
+  accounts                               account[]
+  postings                               posting[]
+  entity_tax_settings                    entity_tax_settings? @relation("entity_tax_settings")
+  customers                              customer[]
+  suppliers                              supplier[]
+  locations                              location[]
+  payment_terms                          payment_terms[]
+  invoices                               invoice[]
+  payment_receipts                       payment_receipt[]
+  credit_notes                           credit_note[]
+  source_systems                         source_system[]
 
   @@index([org_id])
   @@index([currency_id])
   @@index([default_tax_region_id])
+  @@index([default_receivable_account_id])
+  @@index([default_income_account_id])
+  @@index([default_undeposited_funds_account_id])
+  @@index([default_fx_gain_loss_account_id])
+  @@index([default_discount_account_id])
   @@map("entity")
 }
 

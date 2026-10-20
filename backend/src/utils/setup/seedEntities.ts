@@ -18,6 +18,39 @@ const currencySelect = {
   instanceSubLabel: 'name',
 };
 
+const accountSelect = {
+  type: 'account',
+  limit: '10',
+  instanceKey: 'id',
+  instanceType: 'account',
+  searchParams: 'name',
+  instanceLabel: 'name',
+  instanceSubLabel: 'code',
+};
+
+function accountRelation(displayName: string) {
+  return {
+    type: 'table',
+    datatype: 'table',
+    displayName,
+    isColumnShow: false,
+    select: { id: 'read', name: 'read', code: 'read' },
+  };
+}
+
+function accountFkField(field: string, displayName: string) {
+  return {
+    dataType: 'string',
+    permission: 'update',
+    displayName,
+    isColumnShow: false,
+    tableProps: {
+      columnType: 'select',
+      selectProps: { ...accountSelect, instanceSourceKey: field },
+    },
+  };
+}
+
 const VIEWS: Array<{
   id: string;
   name: string;
@@ -88,6 +121,38 @@ const VIEWS: Array<{
           columnType: 'select',
           selectProps: { ...currencySelect, instanceSourceKey: 'currency_id' },
         },
+      },
+      default_receivable_account: accountRelation('Default AR account'),
+      default_receivable_account_id: accountFkField(
+        'default_receivable_account_id',
+        'Default AR account'
+      ),
+      default_income_account: accountRelation('Default income account'),
+      default_income_account_id: accountFkField(
+        'default_income_account_id',
+        'Default income account'
+      ),
+      default_undeposited_funds_account: accountRelation('Default undeposited funds'),
+      default_undeposited_funds_account_id: accountFkField(
+        'default_undeposited_funds_account_id',
+        'Default undeposited funds'
+      ),
+      default_fx_gain_loss_account: accountRelation('Default FX gain/loss'),
+      default_fx_gain_loss_account_id: accountFkField(
+        'default_fx_gain_loss_account_id',
+        'Default FX gain/loss'
+      ),
+      default_discount_account: accountRelation('Default discount account'),
+      default_discount_account_id: accountFkField(
+        'default_discount_account_id',
+        'Default discount account'
+      ),
+      ledger_start_date: {
+        dataType: 'date',
+        permission: 'update',
+        displayName: 'Ledger start date',
+        isColumnShow: false,
+        tableProps: { width: '150', columnType: 'date' },
       },
     },
   },

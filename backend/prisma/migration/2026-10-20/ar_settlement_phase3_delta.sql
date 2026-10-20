@@ -195,7 +195,7 @@ END $$;
 CREATE INDEX IF NOT EXISTS "credit_note_line_tax_org_id_idx" ON "credit_note_line_tax"("org_id");
 CREATE INDEX IF NOT EXISTS "credit_note_line_tax_item_idx" ON "credit_note_line_tax"("credit_note_item_id");
 
--- entity_ledger_settings
+-- entity_ledger_settings (superseded: see wp5_entity_ledger_columns.sql)
 CREATE TABLE IF NOT EXISTS "entity_ledger_settings" (
   "id" TEXT NOT NULL,
   "org_id" TEXT NOT NULL,

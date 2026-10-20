@@ -638,28 +638,3 @@ model credit_note_line_tax {
   @@map("credit_note_line_tax")
 }
 
-/// Per-entity defaults for Phase 4 poster + cutover.
-model entity_ledger_settings {
-  id                                   String   @id @default(dbgenerated("'els_' || gen_random_uuid()")) @db.VarChar(50)
-  org_id                               String
-  entity_id                            String   @unique
-  entity                               entity   @relation(fields: [entity_id], references: [id], onDelete: Cascade)
-  default_receivable_account_id        String?
-  default_receivable_account           account? @relation("els_receivable", fields: [default_receivable_account_id], references: [id], onDelete: SetNull)
-  default_income_account_id            String?
-  default_income_account               account? @relation("els_income", fields: [default_income_account_id], references: [id], onDelete: SetNull)
-  default_undeposited_funds_account_id String?
-  default_undeposited_funds_account    account? @relation("els_undeposited", fields: [default_undeposited_funds_account_id], references: [id], onDelete: SetNull)
-  default_fx_gain_loss_account_id      String?
-  default_fx_gain_loss_account         account? @relation("els_fx", fields: [default_fx_gain_loss_account_id], references: [id], onDelete: SetNull)
-  default_discount_account_id          String?
-  default_discount_account             account? @relation("els_discount", fields: [default_discount_account_id], references: [id], onDelete: SetNull)
-  ledger_start_date                    DateTime?
-  created_by                           String?
-  modified_by                          String?
-  created_at                           DateTime @default(now())
-  modified_at                          DateTime @updatedAt
-
-  @@index([org_id])
-  @@map("entity_ledger_settings")
-}

@@ -20,6 +20,8 @@
     "seed:ar-settlement": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedArSettlement.ts",
     "seed:connections": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedConnections.ts",
     "smoke:sales-model": "ts-node --transpile-only scripts/smoke-sales-model.ts",
+    "ledger:prefill-entity-defaults": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/ledger-prefill-entity-defaults.ts",
+    "ledger:mark-pending": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/ledger-mark-pending.ts",
 
     "smoke:integrations-phase2": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/smoke-integrations-phase2.ts",
     "integrations:set-extraction-config": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only scripts/set-extraction-config.ts",
