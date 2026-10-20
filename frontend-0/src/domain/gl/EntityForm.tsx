@@ -15,6 +15,36 @@ import { SearchDropDown } from '@/components/search_dropdown/dropdown';
 
 const LIST_PATH = '/masters/entity';
 
+const ACCOUNT_FIELDS = [
+  {
+    name: 'default_receivable_account_id' as const,
+    relation: 'default_receivable_account',
+    label: 'Default AR account',
+  },
+  {
+    name: 'default_income_account_id' as const,
+    relation: 'default_income_account',
+    label: 'Default income account',
+  },
+  {
+    name: 'default_undeposited_funds_account_id' as const,
+    relation: 'default_undeposited_funds_account',
+    label: 'Default undeposited funds',
+  },
+  {
+    name: 'default_fx_gain_loss_account_id' as const,
+    relation: 'default_fx_gain_loss_account',
+    label: 'Default FX gain/loss',
+  },
+  {
+    name: 'default_discount_account_id' as const,
+    relation: 'default_discount_account',
+    label: 'Default discount account',
+  },
+] as const;
+
+type AccountFieldName = (typeof ACCOUNT_FIELDS)[number]['name'];
+
 const schema = z.object({
   name: z.string().min(1, { message: 'Name is required' }),
   legal_name: z.string().optional(),
@@ -25,6 +55,12 @@ const schema = z.object({
   postal_code: z.string().optional(),
   currency_id: z.string().optional(),
   is_headquarters: z.boolean(),
+  default_receivable_account_id: z.string().optional(),
+  default_income_account_id: z.string().optional(),
+  default_undeposited_funds_account_id: z.string().optional(),
+  default_fx_gain_loss_account_id: z.string().optional(),
+  default_discount_account_id: z.string().optional(),
+  ledger_start_date: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -39,6 +75,12 @@ const emptyValues: FormValues = {
   postal_code: '',
   currency_id: '',
   is_headquarters: false,
+  default_receivable_account_id: '',
+  default_income_account_id: '',
+  default_undeposited_funds_account_id: '',
+  default_fx_gain_loss_account_id: '',
+  default_discount_account_id: '',
+  ledger_start_date: '',
 };
 
 function blank(value: string | undefined): string | null {
@@ -46,11 +88,23 @@ function blank(value: string | undefined): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
+function dateInput(value: unknown): string {
+  if (!value) return '';
+  const text = String(value);
+  return text.length >= 10 ? text.slice(0, 10) : text;
+}
+
+function datePayload(value: string | undefined): string | null {
+  const day = blank(value);
+  return day ? `${day}T00:00:00.000Z` : null;
+}
+
 export const EntityForm: React.FC = () => {
   const { id, viewId } = useParams<{ id: string; viewId: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currency, setCurrency] = useState<Record<string, unknown> | null>(null);
+  const [accounts, setAccounts] = useState<Partial<Record<AccountFieldName, Record<string, unknown> | null>>>({});
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -76,8 +130,19 @@ export const EntityForm: React.FC = () => {
           postal_code: row.postal_code || '',
           currency_id: row.currency_id || '',
           is_headquarters: row.is_headquarters === true,
+          default_receivable_account_id: row.default_receivable_account_id || '',
+          default_income_account_id: row.default_income_account_id || '',
+          default_undeposited_funds_account_id: row.default_undeposited_funds_account_id || '',
+          default_fx_gain_loss_account_id: row.default_fx_gain_loss_account_id || '',
+          default_discount_account_id: row.default_discount_account_id || '',
+          ledger_start_date: dateInput(row.ledger_start_date),
         });
         setCurrency(row.currency ?? null);
+        const next: Partial<Record<AccountFieldName, Record<string, unknown> | null>> = {};
+        for (const field of ACCOUNT_FIELDS) {
+          next[field.name] = (row[field.relation] as Record<string, unknown> | null) ?? null;
+        }
+        setAccounts(next);
       })
       .catch(() => {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to load entity' });
@@ -97,6 +162,12 @@ export const EntityForm: React.FC = () => {
       postal_code: blank(data.postal_code),
       currency_id: blank(data.currency_id),
       is_headquarters: data.is_headquarters,
+      default_receivable_account_id: blank(data.default_receivable_account_id),
+      default_income_account_id: blank(data.default_income_account_id),
+      default_undeposited_funds_account_id: blank(data.default_undeposited_funds_account_id),
+      default_fx_gain_loss_account_id: blank(data.default_fx_gain_loss_account_id),
+      default_discount_account_id: blank(data.default_discount_account_id),
+      ledger_start_date: datePayload(data.ledger_start_date),
     };
     try {
       setIsSubmitting(true);
@@ -280,6 +351,71 @@ export const EntityForm: React.FC = () => {
                     )}
                   />
                 </div>
+
+                <div className="space-y-3 border-t pt-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-900">Ledger defaults</h2>
+                    <p className="text-sm text-gray-600">
+                      Used by Phase 4 posting. Leave blank to fill later or via CoA prefill.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {ACCOUNT_FIELDS.map((field) => (
+                      <FormField
+                        key={field.name}
+                        control={form.control}
+                        name={field.name}
+                        render={() => (
+                          <FormItem>
+                            <FormLabel>{field.label}</FormLabel>
+                            <FormControl>
+                              <SearchDropDown
+                                instanceType="account"
+                                instanceKey="id"
+                                instanceSourceKey={field.name}
+                                instanceLabel="name"
+                                instanceValue={accounts[field.name] ?? null}
+                                onSelectItem={(_source, key, value) => {
+                                  form.setValue(field.name, value?.[key] || '');
+                                  setAccounts((prev) => ({
+                                    ...prev,
+                                    [field.name]:
+                                      value?.item ??
+                                      (value?.[key] ? { id: value[key], name: value.name } : null),
+                                  }));
+                                }}
+                                onClear={() => {
+                                  form.setValue(field.name, '');
+                                  setAccounts((prev) => ({ ...prev, [field.name]: null }));
+                                }}
+                                limit={10}
+                                searchParams="name"
+                                type="account"
+                                isShowSearch={true}
+                                placeholder="Select account"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                    <FormField
+                      control={form.control}
+                      name="ledger_start_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Ledger start date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => navigate(LIST_PATH)}>
                     Cancel
