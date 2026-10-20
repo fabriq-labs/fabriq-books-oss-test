@@ -232,28 +232,35 @@ Railway FastAPI sync_service
 
 ### Phase 3 — Payments + credit memos (QBO gaps)
 
+**Design:** [`AR_SETTLEMENT_AND_LEDGER.md`](./AR_SETTLEMENT_AND_LEDGER.md)  
+**Implementation (work packages):** [`AR_PHASE_3_4_IMPLEMENTATION.md`](./AR_PHASE_3_4_IMPLEMENTATION.md) WP0–WP4
+
 **Deliverables**
 
-- Staging + normalized: Payment → `payment_receipt` + `payment_receipt_application`
+- Staging + normalized: Payment → `payment_receipt` + signed `payment_receipt_application`
 - CreditMemo → `credit_note` + `credit_note_item` with lineage
-- Map deposit account → `account_id` via synced CoA
+- Map deposit account → `account_id` via synced CoA; `unapplied_amount` for overpay/advance
+- Master UI for receipts / credits / applications
 
 **Acceptance**
 
-- Multi-invoice payment creates application rows summing to payment amount
-- Credit memo links `invoice_id` when QBO provides a usable link; else null
+- Multi-invoice payment: Σ `amount_applied` + `unapplied_amount` = `amount` (T1)
+- Credit apply via QBO \$0 payment: +invoice / −credit application rows
 
 ### Phase 4 — Ledger alignment (join with sales Track B)
 
+**Design:** same AR doc §5–6. **Implementation:** WP5–WP7.
+
 **Deliverables**
 
-- After `postInvoice` / `postReceipt` / `postCreditNote` exist: sync hook or batch job creates `posting` for remote posted docs
-- Trial balance still balances on Module 1 reports
+- Shared `postInvoice` / `postReceipt` / `postCreditNote` (idempotent `posting_key`)
+- Sync hook or batch job posts remote posted docs; applications stay subledger-only
+- Trial balance still balances on Module 1 reports; AR tie-out T4
 
 **Acceptance**
 
 - Synced posted invoice appears on Transactions and trial balance
-- Idempotent re-sync does not duplicate postings (lineage or `posting.invoice_id` guard)
+- Idempotent re-sync does not duplicate postings (`posting_key` reverse-and-repost)
 
 ### Phase 5 — Explicit non-goals (do not start in QBO-first)
 

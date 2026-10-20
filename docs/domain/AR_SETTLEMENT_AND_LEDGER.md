@@ -432,7 +432,7 @@ T2: `70 = 100 − 0 − 30` (receipt apps + credit apps).
 
 ---
 
-## 7. Open decisions (need product call)
+## 8. Open decisions (need product call)
 
 1. **Ledger cutover** — post all history vs `ledger_start_date` + opening balances (**recommend B** if openings already exist).
 2. **Bank feed vs QBO cash** — avoid double-count: match-only bank lines on QBO-sourced accounts (**recommend A**) vs clearing account.
@@ -442,7 +442,7 @@ T2: `70 = 100 − 0 − 30` (receipt apps + credit apps).
 
 ---
 
-## 8. Stub gaps this design closes
+## 9. Stub gaps this design closes
 
 1. Application requires `invoice_id` — cannot store credit or $0 dual lines.  
 2. No application / credit-line lineage — no idempotent merge or sweep.  

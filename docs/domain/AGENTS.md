@@ -4,6 +4,8 @@ This is the product file. Kernel instructions stay in the root [AGENTS.md](../..
 
 Follow [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md) for every later migration from prod. The books lessons are [KERNEL_PORT.md](./KERNEL_PORT.md). The task-sized plan is [AGENT_PLAN.md](./AGENT_PLAN.md). Run one module from that plan, then stop.
 
+AR Phase 3–4 (payments, credit memos, ledger): design [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md), implementation [AR_PHASE_3_4_IMPLEMENTATION.md](./AR_PHASE_3_4_IMPLEMENTATION.md). Run one work package (WP0–WP7), then stop.
+
 ## Metadata-driven models first
 
 If it is a Prisma model (including `source_system` / ERP connections), the **first** option is the kernel metadata path:
