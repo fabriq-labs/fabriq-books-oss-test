@@ -132,7 +132,8 @@ RUN cp -a /tmp/python-local-lib/libpython3.12.so* /usr/local/lib/ 2>/dev/null ||
  && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
  && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python \
  && /app/backend/integrations/.venv/bin/python -c "import uvicorn, fastapi; print('sync_service deps ok')" \
- && test -x /app/backend/integrations/.venv/bin/uvicorn
+ && test -x /app/backend/integrations/.venv/bin/uvicorn \
+ && test -x /app/backend/integrations/.venv/bin/dbt
 
 COPY nginx.main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template
