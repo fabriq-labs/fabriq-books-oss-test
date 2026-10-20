@@ -125,7 +125,11 @@ COPY --from=integrations-builder /app/backend/integrations /app/backend/integrat
 # nginx:alpine only has apk python3 — bring the matching CPython so uvicorn runs.
 COPY --from=integrations-builder /usr/local/lib/python3.12 /usr/local/lib/python3.12
 COPY --from=integrations-builder /usr/local/bin/python3.12 /usr/local/bin/python3.12
-RUN ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
+# Shared lib for the copied interpreter (path varies slightly by Alpine patch level).
+COPY --from=integrations-builder /usr/local/lib /tmp/python-local-lib
+RUN cp -a /tmp/python-local-lib/libpython3.12.so* /usr/local/lib/ 2>/dev/null || true \
+ && rm -rf /tmp/python-local-lib \
+ && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
  && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python \
  && /app/backend/integrations/.venv/bin/python -c "import uvicorn, fastapi; print('sync_service deps ok')" \
  && test -x /app/backend/integrations/.venv/bin/uvicorn
