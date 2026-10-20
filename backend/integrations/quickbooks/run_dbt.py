@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -63,6 +64,35 @@ def is_first_run() -> bool:
             logger.info("First run: %s.%s missing", schema, table)
             return True
     return False
+
+
+def resolve_dbt_argv() -> list[str]:
+    """Return argv prefix to invoke dbt from the active interpreter's environment."""
+    venv_dbt = Path(sys.executable).resolve().parent / "dbt"
+    if venv_dbt.is_file() and os.access(venv_dbt, os.X_OK):
+        return [str(venv_dbt)]
+
+    # Same venv, module form (covers odd installs without a console script).
+    try:
+        import importlib.util
+
+        if importlib.util.find_spec("dbt") is not None:
+            return [sys.executable, "-m", "dbt"]
+    except Exception:
+        pass
+
+    # Local/dev only: uv when explicitly available.
+    if shutil.which("uv") and (Path(_INTEGRATIONS_ROOT) / "uv.lock").exists():
+        return ["uv", "run", "dbt"]
+
+    which = shutil.which("dbt")
+    if which:
+        return [which]
+
+    raise FileNotFoundError(
+        "dbt not found next to sys.executable, as a module, via uv, or on PATH. "
+        f"sys.executable={sys.executable!r}"
+    )
 
 
 def run_dbt_command(argv: list[str], stage_name: str, dbt_dir: Path) -> bool:
@@ -123,8 +153,10 @@ def main() -> None:
     threads = 1 if first_run else int(os.getenv("DBT_THREADS", str(settings.dbt_threads)))
     logger.info("Using %s dbt threads (first_run=%s)", threads, first_run)
 
-    # Prefer `uv run dbt` when available; fall back to PATH dbt
-    dbt_bin = ["uv", "run", "dbt"] if (Path(_INTEGRATIONS_ROOT) / "uv.lock").exists() else ["dbt"]
+    # Runtime contract: use the baked venv (same as start.sh → python -m uvicorn).
+    # `uv` is build-only; never require it on PATH in the container.
+    dbt_bin = resolve_dbt_argv()
+    logger.info("dbt launcher: %s", " ".join(dbt_bin))
 
     def stage(name: str, select: str, with_vars: bool = False) -> list[str]:
         cmd = [

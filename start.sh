@@ -66,6 +66,8 @@ if [ "${ENABLE_SYNC_SERVICE}" = "true" ] || [ "${ENABLE_SYNC_SERVICE}" = "1" ]; 
     (
       cd "${INTEGRATIONS_DIR}"
       export PYTHONPATH="${INTEGRATIONS_DIR}"
+      # Prefer baked venv binaries (dbt, etc.) over missing build-tool `uv` on PATH.
+      export PATH="${INTEGRATIONS_DIR}/.venv/bin:${PATH}"
       while true; do
         "${VENV_PYTHON}" -m uvicorn sync_service.main:app --host 127.0.0.1 --port "${SYNC_PORT}" &
         SYNC_PID=$!
