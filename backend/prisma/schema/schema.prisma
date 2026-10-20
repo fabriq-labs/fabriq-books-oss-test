@@ -1,5 +1,8 @@
 generator client {
-  provider        = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Alpine runtime (nginx:alpine / openssl 3) needs this engine; "native" alone
+  // is not enough when the builder and runtime OpenSSL differ.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
   previewFeatures = ["prismaSchemaFolder"]
 }
 

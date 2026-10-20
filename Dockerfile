@@ -13,8 +13,9 @@ ARG NODE_RUNTIME_VERSION=24.14.1
 FROM node:${NODE_RUNTIME_VERSION}-alpine AS node-runtime
 
 # Integrations: uv + dbt on Alpine (same libc as final image).
+# Workdir must match the final path so venv shebangs resolve after COPY.
 FROM python:3.12-alpine AS integrations-builder
-WORKDIR /app/integrations
+WORKDIR /app/backend/integrations
 RUN apk add --no-cache build-base libpq-dev curl \
   && curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
@@ -23,7 +24,8 @@ COPY backend/integrations/README.md ./
 RUN uv sync --frozen --no-dev
 COPY backend/integrations/ ./
 # Re-sync after full copy so local package layout is intact
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev \
+  && test -x .venv/bin/uvicorn
 
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
@@ -42,7 +44,8 @@ RUN npm run build
 FROM node:20-alpine AS backend-builder
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
+# openssl so prisma generate can resolve linux-musl-openssl-3.0.x (not 1.1.x).
+RUN apk add --no-cache python3 make g++ openssl
 
 COPY backend/package*.json ./
 COPY backend/prisma ./prisma/
@@ -51,13 +54,10 @@ RUN npm ci
 
 COPY backend/ ./
 
-# Ensure Prisma generates engine for Alpine runtime (openssl-3.0.x)
-RUN sed -i '/provider = "prisma-client-js"/a\
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]' prisma/schema/schema.prisma
-
 # tsc does not emit JSON under src/config; copy is required at runtime (ModelRegistry).
 RUN npm run build
-RUN npx prisma generate
+RUN npx prisma generate \
+  && test -f node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
 # Do not prune: OpenTelemetry deps are in devDependencies but required at runtime
 
 # Stage 2b: Image metadata JSON (env-only — do not COPY app trees or this stage
@@ -120,7 +120,7 @@ COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 COPY --from=build-info /build-info.json /app/build-info.json
 COPY --from=build-info /build-info.json /usr/share/nginx/html/build-info.json
 # Overwrite integrations with the Alpine-built uv venv (dbt + sync_service).
-COPY --from=integrations-builder /app/integrations /app/backend/integrations
+COPY --from=integrations-builder /app/backend/integrations /app/backend/integrations
 
 COPY nginx.main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template

@@ -26,10 +26,17 @@ export SYNC_PORT="${SYNC_PORT:-8090}"
 # Single-tenant: sync/dbt runs in this same container on loopback (default on).
 export ENABLE_SYNC_SERVICE="${ENABLE_SYNC_SERVICE:-true}"
 
-# Prisma: use whichever query engine was built (openssl-3.0.x or 1.1.x)
+# Prefer the Alpine openssl-3.0.x query engine (matches nginx:alpine runtime).
 PRISMA_CLIENT_DIR="/app/backend/node_modules/.prisma/client"
 if [ -d "$PRISMA_CLIENT_DIR" ]; then
-  ENGINE=$(ls "$PRISMA_CLIENT_DIR"/libquery_engine-linux-musl-*.so.node 2>/dev/null | head -1)
+  ENGINE=""
+  for candidate in \
+    "$PRISMA_CLIENT_DIR"/libquery_engine-linux-musl-openssl-3.0.x.so.node \
+    "$PRISMA_CLIENT_DIR"/libquery_engine-linux-musl-openssl-1.1.x.so.node \
+    "$PRISMA_CLIENT_DIR"/libquery_engine-linux-musl.so.node
+  do
+    if [ -f "$candidate" ]; then ENGINE="$candidate"; break; fi
+  done
   if [ -n "$ENGINE" ]; then export PRISMA_QUERY_ENGINE_LIBRARY="$ENGINE"; fi
 fi
 
@@ -51,14 +58,15 @@ cd /app/backend
 
 # Forward-sync service (Airbyte + dbt) — same image, loopback only.
 INTEGRATIONS_DIR="/app/backend/integrations"
+UVICORN_BIN="${INTEGRATIONS_DIR}/.venv/bin/uvicorn"
 if [ "${ENABLE_SYNC_SERVICE}" = "true" ] || [ "${ENABLE_SYNC_SERVICE}" = "1" ]; then
-  if [ -x "${INTEGRATIONS_DIR}/.venv/bin/uvicorn" ]; then
+  if [ -x "${UVICORN_BIN}" ]; then
     echo "Starting sync_service on 127.0.0.1:${SYNC_PORT}..."
     (
       cd "${INTEGRATIONS_DIR}"
       export PYTHONPATH="${INTEGRATIONS_DIR}"
       while true; do
-        .venv/bin/uvicorn sync_service.main:app --host 127.0.0.1 --port "${SYNC_PORT}" &
+        "${UVICORN_BIN}" sync_service.main:app --host 127.0.0.1 --port "${SYNC_PORT}" &
         SYNC_PID=$!
         echo "sync_service started with pid ${SYNC_PID}"
         wait "${SYNC_PID}"
@@ -68,7 +76,7 @@ if [ "${ENABLE_SYNC_SERVICE}" = "true" ] || [ "${ENABLE_SYNC_SERVICE}" = "1" ]; 
       done
     ) &
   else
-    echo "WARNING: ENABLE_SYNC_SERVICE=true but ${INTEGRATIONS_DIR}/.venv missing; skip sync."
+    echo "WARNING: ENABLE_SYNC_SERVICE=true but ${UVICORN_BIN} missing; skip sync."
   fi
 fi
 
