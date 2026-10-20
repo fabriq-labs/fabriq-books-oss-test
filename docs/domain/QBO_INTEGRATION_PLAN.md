@@ -28,7 +28,7 @@
 
 - `start.sh` supervises Node **and** `uv run uvicorn sync_service.main:app` (default `SYNC_PORT=8090`, not published).
 - Sync is never a second billable service for v1 single-tenant.
-- **Image base:** prefer **Debian slim** (or multi-stage venv from slim) for the combined image — Alpine + dbt is fragile (musl wheels; prod already caps `dbt-core<1.12` for that). Do not bake `.env` into the image.
+- **Image base:** **Debian bookworm-slim** is the default root `Dockerfile` (Node + Python + nginx on one glibc). Legacy Alpine kept as `Dockerfile.alpine` only. Do not bake `.env` into the image.
 
 ### Config / ops hardening (with uv)
 
