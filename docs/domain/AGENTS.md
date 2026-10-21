@@ -10,7 +10,7 @@ AR Phase 3–4 (payments, credit memos, ledger): design [AR_SETTLEMENT_AND_LEDGE
 
 Hand these to coding agents as paired engagements (same current product surface on `fabriq-books`):
 
-1. [OSS_DOCS_PLAN.md](./OSS_DOCS_PLAN.md) — Books-first public docs for humans; `docs/kernel/` stays domain-neutral; document only what exists (optional Future map only).
+1. [OSS_DOCS_PLAN.md](./OSS_DOCS_PLAN.md) — Books-first public docs for humans; universal AR model (not QBO-shaped); `docs/kernel/` domain-neutral; setup (Airbyte/app credentials) separate from end-user narrative; document only what exists (optional Future map only).
 2. [OSS_TEST_PLAN.md](./OSS_TEST_PLAN.md) — Kernel test harness (API + Playwright) plus Books functional suites on top.
 
 Public docs must be written for humans; agent-brief tone stays in plan files and this AGENTS file.

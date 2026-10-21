@@ -46,7 +46,7 @@ Do not invent a second parallel framework if Jest + Playwright can cover the lay
 
 ### Related plan
 
-Keep module names aligned with [`OSS_DOCS_PLAN.md`](./OSS_DOCS_PLAN.md) (`ledger`, `sales-ar`, `connections`).
+Keep module names aligned with [`OSS_DOCS_PLAN.md`](./OSS_DOCS_PLAN.md) (`ledger`, `sales-ar`, `connections`). Prefer universal Books model language in suite names and assertions; treat QuickBooks as one connection adapter under test fixtures, not as the product under test.
 
 ---
 
