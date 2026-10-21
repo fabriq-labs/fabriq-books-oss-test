@@ -4,13 +4,13 @@ This is the product file. Kernel instructions stay in the root [AGENTS.md](../..
 
 Follow [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md) for every later migration from prod. The books lessons are [KERNEL_PORT.md](./KERNEL_PORT.md). The task-sized plan is [AGENT_PLAN.md](./AGENT_PLAN.md). Run one module from that plan, then stop.
 
-AR Phase 3–4 (payments, credit memos, ledger): design [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md), implementation [AR_PHASE_3_4_IMPLEMENTATION.md](./AR_PHASE_3_4_IMPLEMENTATION.md). Run one work package (WP0–WP7), then stop. Phase 3 + WP5 (entity ledger defaults) are on `fabriq-books`; WP6–7 poster wiring is not released.
+AR Phase 3–4 (payments, credit memos, ledger): design [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md), implementation [AR_PHASE_3_4_IMPLEMENTATION.md](./AR_PHASE_3_4_IMPLEMENTATION.md). Run one work package (WP0–WP7), then stop.
 
 ## Open-source release plans
 
-Hand these to coding agents as paired engagements (same product cut, same honesty about scope):
+Hand these to coding agents as paired engagements (same current product surface on `fabriq-books`):
 
-1. [OSS_DOCS_PLAN.md](./OSS_DOCS_PLAN.md) — Books-first public documentation for human users; kernel linked as substrate.
+1. [OSS_DOCS_PLAN.md](./OSS_DOCS_PLAN.md) — Books-first public docs for humans; `docs/kernel/` stays domain-neutral; document only what exists (optional Future map only).
 2. [OSS_TEST_PLAN.md](./OSS_TEST_PLAN.md) — Kernel test harness (API + Playwright) plus Books functional suites on top.
 
 Public docs must be written for humans; agent-brief tone stays in plan files and this AGENTS file.

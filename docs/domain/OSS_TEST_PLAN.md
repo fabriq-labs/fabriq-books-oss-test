@@ -1,6 +1,6 @@
 # Plan: Open-source test harness for Kernel + Fabriq Books
 
-Feed this file to a coding agent as a single focused engagement (or one work package at a time). Pair it with [`OSS_DOCS_PLAN.md`](./OSS_DOCS_PLAN.md): suites must prove what the public docs claim, and must not assert Phase 4 poster behavior that is not released.
+Feed this file to a coding agent as a single focused engagement (or one work package at a time). Pair it with [`OSS_DOCS_PLAN.md`](./OSS_DOCS_PLAN.md): suites must prove what the public docs describe as **available now**. Do not write tests for behavior that does not exist in the product yet.
 
 ---
 
@@ -15,16 +15,18 @@ Fabriq Books is being prepared for open source on `fabriq-books`. Outside contri
 
 Today the repo has fragmented Jest unit tests, outdated sales-order workflow notes, and Playwright specs aimed at an older workbench flow (hard-coded demo users, port `5173`). That is not an open-source quality bar.
 
-### Product cut under test (match the docs plan)
+### What to cover (match the docs plan inventory)
 
-| Assert in tests | Do not assert yet |
+Test the behaviors public docs will describe:
+
+| Cover | Leave out of default suites |
 |---|---|
-| Login as seeded local admin | Clerk-only production auth paths as the only happy path |
+| Login as seeded local admin | Treating Clerk-only production auth as the only path |
 | Kernel view CRUD + org scoping | Postgres RLS (not implemented) |
-| Entity ledger default account fields round-trip via view API + Entity form UI | Automatic GL posting after sync (WP6–7) |
-| Invoice / receipt / credit note Master lists load | T4 AR GL tie-out |
-| Settlement row shape / signed applications where fixtures exist | Live Airbyte extract against real QBO in default CI |
-| Connection secrets redacted from view payloads | Full OAuth browser dance in default CI |
+| Entity ledger default account fields round-trip via view API + Entity form UI | Automatic GL posting after sync (not implemented) |
+| Invoice / receipt / credit note Master lists load | Live Airbyte extract against real QBO in default CI |
+| Settlement row shape / signed applications where fixtures exist | Full OAuth browser dance in default CI |
+| Connection secrets redacted from view payloads | Features that exist only in design docs / future map |
 
 ### Design mandate (think before coding)
 
@@ -60,10 +62,11 @@ Keep module names aligned with [`OSS_DOCS_PLAN.md`](./OSS_DOCS_PLAN.md) (`ledger
 
 ## Non-goals
 
-- Implementing WP6–7 poster code “so we can test it.”
+- Implementing new product features only to make them testable.
 - Full visual regression / screenshot golden files in the first pass (optional later).
 - Requiring a live QuickBooks company for PR CI.
 - 100% line coverage as a vanity target; prefer critical paths and accounting invariants.
+- Kernel suites that import Books product modules (kernel must stay usable for any domain).
 
 ---
 
@@ -134,11 +137,10 @@ If keeping tests beside packages is preferred (`backend/src/__tests__/kernel`, `
 
 ### Settlement / accounting invariants
 
-Encode named checks from the design (T1–T3) against fixture documents:
+Encode named checks that match **current** settlement behavior (see design docs for formulas, but only assert what the app/dbt already enforce):
 
 - Receipt amount = sum of applications + unapplied (signed apps).
-- Invoice balance consistent with applications (warn-level semantics if sync snapshots differ — document expected strictness).
-- Do **not** add T4 GL vs subledger equality until WP7 exists.
+- Invoice / credit-note balance relationships consistent with applications (document expected strictness if sync snapshots differ).
 
 ### Extensibility contract
 
@@ -278,4 +280,4 @@ WP-T2 and WP-T3 can proceed in parallel after WP-T1. WP-T4 can start after WP-T1
 
 ## Stop conditions
 
-When WP-T0–T6 are done for the locked cut, stop. Do not expand into poster/T4/deposit coverage. If the docs plan renames modules mid-flight, update this plan’s paths in the same change set.
+When WP-T0–T6 are done for current product behavior, stop. Do not expand into unimplemented features. If the docs plan renames modules mid-flight, update this plan’s paths in the same change set.
