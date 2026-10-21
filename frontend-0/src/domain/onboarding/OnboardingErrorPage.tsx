@@ -56,7 +56,7 @@ export function OnboardingInconsistentPage({ status }: { status: OnboardingStatu
           <p className="text-sm leading-relaxed text-gray-600">
             Recovery needs someone with access to the server and database. The server log has an
             error entry with the same findings. What triggers this check is described under
-            R-ONBOARD-ERR in <code className="rounded bg-muted px-1 py-0.5 text-xs break-all">{DOCS_PATH}</code>.
+            <span className="whitespace-nowrap">R-ONBOARD-ERR</span> in <code className="rounded bg-muted px-1 py-0.5 text-xs break-all">{DOCS_PATH}</code>.
           </p>
         </section>
 

@@ -130,7 +130,7 @@ function ChoiceRow({ value, selected, title, description, aside }: ChoiceRowProp
       htmlFor={id}
       className={cn(
         'flex cursor-pointer items-start gap-3 px-4 py-3.5 transition-colors',
-        selected ? 'bg-gray-50' : 'bg-white hover:bg-gray-50/60'
+        selected ? 'bg-gray-50' : 'bg-white hover:bg-gray-50/40'
       )}
     >
       <RadioGroupItem id={id} value={value} className="mt-0.5" />
