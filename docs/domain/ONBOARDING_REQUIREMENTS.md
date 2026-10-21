@@ -116,17 +116,17 @@ All of the following are **process environment variables** on the app container.
 | Host | How `AUTO_SETUP` (and the rest) are set |
 |---|---|
 | Local `docker run` | `-e AUTO_SETUP=true` (and other `-e` flags), or `--env-file`. |
-| Docker Compose (if added in Phase 1 docs/examples) | `environment:` or `env_file:` on the app service. |
+| Docker Compose (Phase 1 example) | `environment:` / `env_file:` on the app service. The checked-in Compose example sets `AUTO_SETUP=true` (R-ENV-2). |
 | Railway (Phase 2) | Service variables in the template / dashboard. Template default `AUTO_SETUP=true`. |
 | Manual CLI deploy | `railway variable set AUTO_SETUP=true --service …` (same as any other var). |
 
 Document the variables in:
 
 - Root or `docs/operations/deploy.md` for Docker.
-- `.env.example` (or a Docker-focused example) with placeholders only — never a real URL or JWT.
+- A Compose example (and `.env.example` / Docker-focused env sample) with placeholders only — never a real URL or JWT.
 - Phase 2 template variable descriptions.
 
-**Image default:** `AUTO_SETUP` remains **off** when unset, so existing deploys that pull a new image do not suddenly migrate. Local happy-path docs and the Phase 2 template **set it on explicitly**.
+**Image default:** `AUTO_SETUP` remains **off** when unset, so existing deploys that pull a new image do not suddenly migrate. The Compose example, local happy-path docs, and the Phase 2 template **set it on explicitly**.
 
 **Acceptance**
 
@@ -134,21 +134,24 @@ Document the variables in:
 - `docker run -e AUTO_SETUP=true` against an empty database does create schema and seed so login works.
 - The same flag name and values work on Railway later; no second “Railway-only” setup switch.
 
-#### R-ENV-2. Docs and examples for local Docker (P0, Phase 1)
+#### R-ENV-2. Docs and Compose example for local Docker (P0, Phase 1)
 
 [docs/operations/deploy.md](../operations/deploy.md) (and getting-started as needed) document:
 
-1. Build the root image.
+1. Build the root image (or `docker compose up --build`).
 2. Point `DATABASE_URL` at new or existing Postgres.
 3. Pass `AUTO_SETUP=true` for first-boot setup.
 4. Open `/health`, sign in, complete onboarding.
+
+Ship a **Compose example** (e.g. `docker-compose.yml` or `docker-compose.example.yml` at the repo root, plus a gitignored `.env` pattern) where the app service has `AUTO_SETUP=true` so copy-paste local runs get setup without an extra flag. Postgres may be a Compose service or an external URL. Secrets stay placeholders / env files, not committed values.
 
 No `railway ssh` is required for that path.
 
 **Acceptance**
 
 - A reader can follow the local Docker section without opening Railway docs.
-- Example commands use placeholders, not live secrets.
+- `docker compose` (or documented equivalent) starts with `AUTO_SETUP=true` without the operator inventing the variable name.
+- Example commands and Compose files use placeholders, not live secrets.
 
 ### 4.1 Local Docker runtime (Phase 1 P0)
 
@@ -164,7 +167,9 @@ Phase 1 uses the root `Dockerfile` and `/start.sh`. It does not invent a second 
 #### R-LOCAL-2. New and existing database (P0)
 
 - **New / empty:** `AUTO_SETUP=true` applies schema when `public.organizations` is missing, then seeds per R-START-*.
-- **Existing with schema:** no DDL. Incomplete onboarding still shows the wizard. Complete onboarding goes to the app.
+- **Existing, onboarding complete** (`settings.onboarding` shows profile + chart complete, or chart skipped): no DDL; go to the app (password gate only if seed password still set — see R-SEED-3).
+- **Existing, onboarding in progress** (flags present but incomplete, and no inconsistent-state signals): resume the wizard at the first incomplete step.
+- **Inconsistent state** (R-ONBOARD-ERR): do not infer completion and do not show the wizard.
 - Database name must not be `postgres` (existing `setup:kernel` rule). Document a dedicated app database name in examples (`kernel_app` or similar).
 
 **Acceptance**
@@ -173,14 +178,37 @@ Phase 1 uses the root `Dockerfile` and `/start.sh`. It does not invent a second 
 - DB that already has `organizations` + `AUTO_SETUP=true` → no `CREATE`/`ALTER`/`DROP` on application tables; restart does not reset password or org name after onboarding.
 - Pointing at an already-onboarded DB does not force the wizard again.
 
+#### R-ONBOARD-ERR. Inconsistent database → error page, not a guess (P0)
+
+Treat as **inconsistent** when `org_kernel` (or the caller's org) shows signs of real use **and** `settings.onboarding` is missing or incomplete. Signs of real use include any of:
+
+- `org.name` is not the seed default `Kernel`
+- the seeded admin password no longer matches `admin123`
+- chart-seeded or hand-entered accounts exist
+- other business rows exist (entities, postings, parties, invoices, etc.)
+
+**Do not** infer “onboarding complete.” **Do not** open the wizard and overwrite or “fix” the data. Show a dedicated **error page** (authenticated shell is fine) with a short operator-facing message: this database was modified outside the onboarding flow (or before onboarding flags existed); refuse to continue automatically; point at docs / support for recovery.
+
+Log clearly on the server (level error): org id, which signals fired, whether `settings.onboarding` was absent or partial. Do **not** log `DATABASE_URL`, JWT, or password material.
+
+The same rule applies to **manual** `npm run setup:kernel` / `seedKernel.ts` (R-START-3): if identity rows already exist and the database is inconsistent (or a re-run would reset password / org name on a customized org), **fail with a clear error and the same class of log lines**. Do not silently upsert the seed password or rename the org back to `Kernel`.
+
+**Acceptance**
+
+- A DB with renamed org (or changed password, or accounts) and no `settings.onboarding` shows the error page after sign-in; wizard steps are not offered.
+- Server logs name the inconsistency signals without secrets.
+- `npm run setup:kernel` against that DB exits non-zero with an explicit message; password and org name are unchanged.
+- A pristine post–auto-setup DB (name still `Kernel`, seed password, no business rows, no flags) still enters the wizard normally.
+
 #### R-LOCAL-3. Phase 1 verification (P0)
 
 Before Phase 2 work starts, the implementer demonstrates on a machine:
 
-1. Build image; run against empty Postgres with `AUTO_SETUP=true`.
-2. `/health` 200; sign-in; password change; org name; geo → chart visible.
+1. Build image; run against empty Postgres with `AUTO_SETUP=true` (Compose example or `docker run`).
+2. `/health` 200; sign-in; password change; org name; geo → chart **or skip chart**; land on home.
 3. Restart container; still signs in with new password; org name unchanged; wizard does not return.
-4. Optional: second run against that same DB with `AUTO_SETUP=true` still healthy and non-destructive.
+4. Second run against that same DB with `AUTO_SETUP=true` still healthy and non-destructive.
+5. (Optional) Point at a hand-renamed org without onboarding flags → error page + log line, not wizard.
 
 Record the commands and results in the PR / walkthrough for Phase 1. Screen recording or screenshots of the wizard are preferred.
 
@@ -282,13 +310,14 @@ If `organizations` exists but kernel/Books metadata is missing, may run idempote
 
 Create `org_system`, `org_kernel`, USD, Super Admin, `user_kernel_admin` / `admin@example.com`, shell views — only when that user row is absent. When present, do not update password, email, org name, slug, or `basecurrency_id`.
 
-Manual `npm run setup:kernel` may keep always-reseed until open question §7.1 is decided. Auto-setup must not depend on changing that first.
+**Manual `npm run setup:kernel` / `seedKernel.ts` follow the same non-clobber rule.** When identity rows already exist, do not reset password or org name. If the database is in an inconsistent state (R-ONBOARD-ERR), exit non-zero with a clear error and server/CLI logging — same class of failure as the in-app error page, not a silent re-seed.
 
 **Acceptance**
 
 - First boot: seed login works with `admin123`.
 - After password + org name change, restart with `AUTO_SETUP=true` keeps both.
 - Schema without admin user gets identity seed on next boot without second schema apply.
+- Second `npm run setup:kernel` on an onboarded or customized DB does not restore `admin123` or the name `Kernel`; it either no-ops identity safely or fails per R-ONBOARD-ERR.
 
 #### R-START-4. Books view seeds on first boot (P0)
 
@@ -340,7 +369,9 @@ Host-agnostic. Local Docker and Railway both hit the same routes and wizard.
 
 #### R-ORG-1. First-run wizard (P0)
 
-After the password gate: organization profile, then geography/chart. Resume incomplete step on re-login. When complete, home page; wizard does not return.
+After the password gate: organization profile, then geography/chart **or skip chart** (R-COA-4). Resume incomplete step on re-login. When complete, home page; wizard does not return.
+
+If R-ONBOARD-ERR applies, show the error page instead of any wizard step.
 
 #### R-ORG-2. Profile step (P0)
 
@@ -353,20 +384,21 @@ Completion flags in `org.settings` JSON, e.g.:
   "onboarding": {
     "profileCompleted": true,
     "geo": "us-ca",
-    "chartCompleted": true
+    "chartCompleted": true,
+    "chartSkipped": false
   }
 }
 ```
 
-Do not treat "name is not Kernel" alone as complete.
+Do not treat "name is not Kernel" alone as complete (that signal contributes to R-ONBOARD-ERR when flags are missing).
 
 #### R-ORG-3. Net-new onboarding API (P0)
 
 Super Admin only; act only on caller's `org_id`:
 
-- `GET /api/admin/onboarding` — status (seed password still set?, profile/chart complete?, org fields, stored geo). No password material.
+- `GET /api/admin/onboarding` — status (seed password still set?, profile/chart complete?, chart skipped?, inconsistent?, org fields, stored geo). No password material. When inconsistent, the payload (or a sibling error code) must be enough for the client to render the error page.
 - `PATCH /api/admin/onboarding/organization` — `{ "name", "timezone"? }`.
-- `POST /api/admin/onboarding/chart` — `{ "geo": "us-ca" | "india" }` (R-COA-2).
+- `POST /api/admin/onboarding/chart` — `{ "geo": "us-ca" | "india" }` or `{ "skip": true }` (R-COA-2, R-COA-4).
 
 Do not call `onboard-tenant`.
 
@@ -386,9 +418,15 @@ Two choices: United States / Canada (`us-ca`, USD); India (`india`, INR). Confir
 
 Same geo again: upsert, no duplicates. Different geo when `chart_seed` rows exist: **409**. CLI `seed:coa` unchanged for intentional retargeting.
 
-#### R-COA-4. Skip the chart (P1)
+#### R-COA-4. Skip the chart (P0)
 
-Skip sets `chartCompleted` / `chartSkipped`, inserts no accounts. Open question whether this is P0.
+The chart step offers **Skip** as a first-class exit (same priority as choosing a geo). Skip sets `chartCompleted: true` and `chartSkipped: true`, inserts no accounts, and does not change `base_currency`. The user can open Chart of Accounts and add rows by hand later (CLI `seed:coa` or the UI). Skip does not re-open the wizard on the next login.
+
+**Acceptance**
+
+- Skip finishes the wizard and leaves `account` empty for that org.
+- `GET /api/admin/onboarding` reports chart complete with skipped true.
+- A later visit does not trap the user in the wizard.
 
 ## 5. Non-functional requirements
 
@@ -429,11 +467,12 @@ Public `/health` succeeds only after setup when `AUTO_SETUP` is on. Size Docker 
 Build and test:
 
 1. `AUTO_SETUP` in `start.sh` (R-ENV-*, R-START-*).
-2. Password gate + org + geo/chart wizard and APIs (R-SEED-*, R-ORG-*, R-COA-*).
-3. Docs for `docker build` / `docker run` with local or host Postgres (R-LOCAL-*, R-ENV-2).
-4. Verification checklist R-LOCAL-3.
+2. Password gate + org + geo/chart-or-skip wizard and APIs (R-SEED-*, R-ORG-*, R-COA-*, R-ONBOARD-ERR).
+3. Compose example with `AUTO_SETUP=true` plus docs for `docker build` / `docker run` / Compose (R-LOCAL-*, R-ENV-2).
+4. Non-destructive `setup:kernel` / `seedKernel` aligned with R-START-3 and R-ONBOARD-ERR.
+5. Verification checklist R-LOCAL-3.
 
-**Exit criteria:** An operator following the local Docker docs gets from empty Postgres to a named org with a chart, without Railway and without hand-running seed scripts when `AUTO_SETUP=true`.
+**Exit criteria:** An operator following the local Docker / Compose docs gets from empty Postgres to a named org with a chart **or** a deliberate chart skip, without Railway and without hand-running seed scripts when `AUTO_SETUP=true`. Inconsistent DBs show the error page (and CLI fails clearly) instead of guessing.
 
 ### Phase 2 — Railway template (after public repo)
 
@@ -454,23 +493,25 @@ Not designed here beyond the boundary:
 
 Kernel tenancy, view/`data_graph` mechanics, generic CRUD, and “schema after `organizations` exists is reviewed SQL.”
 
-## 7. Open questions / decisions needed
+## 7. Decisions and remaining open questions
 
-### Decide before or during Phase 1
+### Decided (Phase 1)
 
-1. **Manual `setup:kernel` overwrite.** Auto-setup will not re-run destructive upserts. Should `seedKernel.ts` / manual `setup:kernel` also stop resetting password and org name when rows exist?
-2. **Base currency on India chart.** Confirm wizard sets org base currency to INR for India (and USD for `us-ca`), not the books-demo “USD org + INR accounts” arrangement.
-3. **Chart skip.** Is R-COA-4 P0 or P1 for Phase 1?
-4. **`AUTO_SETUP` default in Compose examples.** Image default stays off when unset. Should a Compose example file ship with `AUTO_SETUP=true` so copy-paste local runs get setup without an extra flag?
-5. **Existing DB without `settings.onboarding`.** If an operator points Docker at a long-lived DB that already has real data and a renamed org but never wrote onboarding flags, should we infer “complete” (e.g. any `chart_seed` accounts, or name ≠ Kernel and password ≠ seed), or only trust the flags (and risk trapping them in the wizard once)?
+| Topic | Decision |
+|---|---|
+| Existing DB with real use and no/partial `settings.onboarding` | **Inconsistent state** → error page + clear logging; do not infer complete; do not run the wizard (R-ONBOARD-ERR). |
+| Chart skip | **P0** (R-COA-4). |
+| Compose example | Ship with **`AUTO_SETUP=true`** (R-ENV-2). Image default when unset remains off. |
+| Manual `setup:kernel` / `seedKernel` | **Same as inconsistent-state rule:** no silent password/org reset; fail with clear error + logging when a re-seed would clobber or the DB is inconsistent (R-START-3, R-ONBOARD-ERR). |
+| India / US-CA base currency | Wizard sets org base currency to **INR** or **USD** to match the chosen chart (R-COA-2). Still the working assumption unless product reverses it before implement. |
 
-### Decide before Phase 2
+### Still open (mostly Phase 2)
 
-6. **License before the button.** Wait for a `LICENSE` file?
-7. **Who publishes the template** and owns the button’s template code?
-8. **Fabriq brand in the image** vs Kernel default for local `npm run dev`.
-9. **Sync off in the template** until connections setup — confirm.
-10. **Slug** stays `kernel` with no UI to change it — confirm.
+1. **License before the button.** Wait for a `LICENSE` file?
+2. **Who publishes the template** and owns the button’s template code?
+3. **Fabriq brand in the image** vs Kernel default for local `npm run dev`.
+4. **Sync off in the template** until connections setup — confirm.
+5. **Slug** stays `kernel` with no UI to change it — confirm.
 
 ## 8. References
 
