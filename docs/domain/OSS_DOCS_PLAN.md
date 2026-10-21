@@ -166,6 +166,43 @@ Adjust names only if a clearer scheme emerges during implementation; update this
 
 **Acceptance.** A short inventory checklist committed as a comment in the PR or as a temporary section in this file marked DONE.
 
+#### WP-D0 inventory (DONE)
+
+Recorded 2026-10-21 on `agentc/oss-books-docs-6a16`, branched from `agentc/oss-release-plans-6a16` (`c8b967e`), which already contains the `fabriq-books` product and this plan. No `LICENSE` file exists. Do not invent one.
+
+**Entry points a newcomer opens in the first five minutes**
+
+| File | What it said | Flag |
+|---|---|---|
+| `README.md` | Metadata-framework homepage. No Books capabilities, no sales model, no connections. | Rewrite as the Books front door (WP-D1). |
+| `docs/README.md` | Titled “Kernel”. Says this documentation does not describe a domain, and that this branch has no domain seed. | False after the Books merge. Becomes the Books hub (WP-D2). The engine index moves to `docs/kernel/README.md` and stays domain-neutral (WP-D4). |
+| `docs/domain/AGENTS.md` | Correct product pointer for agents. Agent-brief tone. Plans are the reading list; public docs are not linked yet. | Keep the agent tone. Point agents at the public docs once they exist (WP-D5). Demote this file from the human hub. |
+| `backend/README.md` | Accurate API package guide, except “This branch does not include” a domain seed. | Fix that sentence. Point at the product getting-started guide without turning the file into a Books manual. |
+| `frontend-0/README.md` | Describes “Zeiv Procure”, port 5173, Supabase, and Clerk. | Wrong product and wrong port. Replace with a short shell readme that points at the repository README. |
+| `frontend-0/AGENTS.md` | Points “the index” at `docs/README.md`. Tells you to set `VITE_API_BASE_URL`. | After the hub rewrite, the shell index is `docs/kernel/README.md`. Local Vite already proxies `/api` to port 4000 when that variable is unset. |
+| Root `AGENTS.md` | Kernel agent file. “Start at `docs/README.md`”. | Still the right first link once that file is the Books hub, with the engine index linked beside it. Do not add product procedures here. |
+
+**Secrets, private URLs, and tone**
+
+- `.env.example`, `backend/.env.example`, `frontend-0/.env.example`, and `backend/integrations/sync_service/.env.example` use local placeholders (`postgresql://kernel:kernel@localhost:5432/kernel_app`, `change-me-to-a-long-random-string`) and empty secret slots. No live tokens and no customer realm ids.
+- The seeded login `admin@example.com` / `admin123` is the local demo user already printed by `seedKernel.ts`. It is not a customer credential.
+- Design notes under `docs/domain/` use `"..."` placeholders in curl samples and mention `origin/prod`. They stay off the public front door.
+- `docs/kernel/agent/MCP.md` uses the placeholder `your-api-key-here`.
+- Root README and `docs/README.md` are written as engine briefs (tables, imperatives, little product context). Public replacements need complete paragraphs. Agent-brief tone stays in `AGENTS.md` and in this plan.
+- `docs/infrastructure/BUILD_AND_DEPLOY.md` is operationally useful and contains no secrets. It still says this branch has no domain seed, and it presents Railway as the deploy story. Humanize a Books-facing copy under `docs/operations/deploy.md` and keep a local Docker path next to Railway.
+
+**Confirmed against the tree (do not document past this)**
+
+- Shell label in the checked-in `frontend-0/src/config/config.json` is “Kernel”. `frontend-0/config/fabriq/config.json` is the Fabriq Books brand; `node config/scripts/select-brand.js fabriq` copies it into `src/config`. `npm run dev` from the repo root does not run that switch.
+- Sidebar groups in `frontend-0/src/domain/navigation.ts`: Sales (invoices, payments received, credit notes, customers, items), Purchases (suppliers), Tax (rates, groups, regions), Accounting (chart, transactions, opening balances, entities, exchange rates), Reports (trial balance, income statement, balance sheet, cash flow, posting list), Integrations (connections). Super Admin and Workbench remain kernel shell items.
+- Create/edit forms exist for entities (including ledger default account dropdowns and ledger start date), accounts, postings, exchange rates, customers, items, suppliers, and tax masters/groups/regions. The invoice screen displays a stored invoice and its lines. Payment receipts and credit notes are Master lists.
+- Entity ledger defaults are stored fields. `npm run ledger:prefill-entity-defaults` can fill empty ones from the chart. It does not post. There is no automatic sales-to-ledger poster in this tree.
+- Settlement rows exist: signed `payment_receipt_application`, `credit_note_application` (direct allocation; the QuickBooks transform does not write it), balances, and a post-sync resolve / orphan sweep / void cleanup in the QuickBooks dbt project.
+- Connections UI: list, QuickBooks credential form with test-before-save, connection detail with import run modes (import now, reprocess, pull only), import settings (Airbyte connection id and API client), optional default purchase account. Secrets stay out of `source_system_view`.
+- Seeds: `setup:kernel` (shell), then `seed:gl`, `seed:entities`, `seed:sales` (views plus a few US tax regions), `seed:ar-settlement`, `seed:connections`. Optional data: `seed:coa` (`us-ca` or `india`), `seed:books-demo`.
+- Fresh database: `setup:kernel` applies SQL generated from `prisma/schema` when `organizations` is missing. Dated files in `backend/prisma/migration/` are for databases that already have tables. `datalake_bootstrap.sql` is safe to re-run and is required before sync. Do not use `prisma db push` or `prisma migrate` as the routine path.
+- One image (`Dockerfile`, Debian bookworm). Postgres is external. Sync listens on loopback inside the container when `ENABLE_SYNC_SERVICE` is true (the default).
+
 ---
 
 ### WP-D1 — Root README (Books)
