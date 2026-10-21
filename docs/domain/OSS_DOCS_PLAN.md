@@ -8,7 +8,9 @@ Feed this file to a coding agent as a single focused engagement (or one work pac
 
 ### What you are documenting
 
-**Fabriq Books** is an open-source multi-entity accounting application in this repository. It includes a chart of accounts, journal postings, financial reports, customers and suppliers, invoices, payment receipts, credit notes (including settlement applications), entity ledger default accounts, and a QuickBooks Online forward-sync path (Airbyte extract → dbt transform → Books tables).
+**Fabriq Books** is an open-source multi-entity accounting application in this repository. It includes a chart of accounts, journal postings, financial reports, customers and suppliers, invoices, payment receipts, credit notes (including settlement applications), entity ledger default accounts, and **connections** that import data from external bookkeeping / ERP systems into Books.
+
+The sales, tax, and settlement models are a **universal Books data model**. External systems map *into* that model. QuickBooks Online is the first connected system that ships today; it is an integration adapter, not the shape of the product. Do not write public docs as if Books were a QuickBooks companion app. Prefer product language (invoice, payment receipt, credit note, connection, sync) over vendor jargon except where a setup guide must name a specific connector.
 
 Books is built with a **metadata-driven application kernel** that also lives in this repository: views, permissions, roles, tenancy, workflows, and the Master list. People who only run Books do not need to learn the engine. People who extend Books (or who build a different app on the same engine) read `docs/kernel/`.
 
@@ -30,12 +32,19 @@ Use this as a checklist of topics the public docs *may* cover. If it is not here
 | Area | Available now |
 |---|---|
 | GL | Entities (including ledger default account fields and ledger start date in the entity UI), chart of accounts, postings / transactions, financial reports, opening-balances UI |
-| Sales / AR | Customers, suppliers, items, tax masters / groups / regions, invoices, payment receipts, credit notes; Master lists and forms where seeded |
-| Settlement | Payment receipt applications (signed amounts), credit-note applications, dbt resolver / orphan / void handling for synced QBO payments and credit memos |
-| Connections | QuickBooks connection setup, Airbyte extraction config, sync trigger (`full_sync` / `transform_only` / `extract_only` as implemented) |
+| Sales / AR | Universal model: customers, suppliers, items, tax masters / groups / regions, invoices, payment receipts, credit notes; Master lists and forms where seeded |
+| Settlement | Payment receipt applications (signed amounts), credit-note applications; import pipeline resolves and cleans synced settlement rows for connected systems |
+| Connections (end user) | Create/manage a connection, configure what to import, run sync, review imported books data in Books screens |
+| Connections (setup) | One-time / admin plumbing that exists today for the QuickBooks path: Intuit app credentials, Airbyte workspace/connector, extraction config — keep this out of the main narrative |
 | Platform | Metadata views/permissions, local auth demo user, single Docker image deploy path |
 
-Design references for getting details right (not front-door reading): [`SALES_MODEL.md`](./SALES_MODEL.md), [`QUICKBOOKS_FORWARD_SYNC.md`](./QUICKBOOKS_FORWARD_SYNC.md), [`AR_SETTLEMENT_AND_LEDGER.md`](./AR_SETTLEMENT_AND_LEDGER.md) (read for how settlement works *today*; do not copy roadmap sections into public docs).
+Design references for getting details right (not front-door reading): [`SALES_MODEL.md`](./SALES_MODEL.md) (universal model), [`AR_SETTLEMENT_AND_LEDGER.md`](./AR_SETTLEMENT_AND_LEDGER.md) (settlement behavior today), [`QUICKBOOKS_FORWARD_SYNC.md`](./QUICKBOOKS_FORWARD_SYNC.md) (QBO-specific operator detail — mine for the **setup** section, not as the voice of the product hub).
+
+### Universal model; do not overfit QuickBooks
+
+- README, concepts, sales/AR, and settlement docs describe **Books** objects and flows.
+- When import matters, say “from a connected bookkeeping system” or “via a connection.” Name QuickBooks only when documenting the connector that exists today or in setup steps that are QBO-specific.
+- Future map may mention additional ERPs / bookkeeping systems at a high level; do not rewrite today’s model docs around QBO field names (`CreditMemo`, `UndepositedFunds`, etc.) unless explaining a setup mapping table.
 
 ### Kernel docs stay domain-neutral
 
@@ -82,6 +91,7 @@ Open-source readers should never encounter:
 
 - Turning `docs/kernel/` into Books product documentation.
 - Documenting unfinished or planned features outside one optional Future map section.
+- Framing Books as a QuickBooks-only product, or structuring the main docs around Airbyte / Intuit developer console steps.
 - Implementing new product features in a docs engagement.
 - Generating screenshots unless the task explicitly asks (placeholders / “add screenshot” captions are fine).
 
@@ -102,11 +112,12 @@ docs/
   architecture.md                  How Books uses the metadata kernel → link docs/kernel/
   modules/
     ledger.md                      Entities, CoA, postings, reports, ledger defaults
-    sales-ar.md                    Customers, invoices, receipts, credit notes, settlement
-    connections.md                 QBO / Airbyte / sync modes and stream list
+    sales-ar.md                    Universal AR model: parties, invoices, receipts, credits, settlement
+    connections.md                 End-user: connections, sync, reviewing imported data
   operations/
     deploy.md                      Single Docker image + deploy notes (humanized)
     database.md                    Schema apply, SQL deltas, seeds, no db push
+    connections-setup.md           Admin/setup: Airbyte, Intuit app, extraction config (QBO path today)
   contributing-books.md            Optional deeper contributor guide (or fold into CONTRIBUTING.md)
 
   kernel/                          Domain-neutral engine docs (any app)
@@ -143,12 +154,12 @@ Adjust names only if a clearer scheme emerges during implementation; update this
 
 **Do.** Rewrite root [`README.md`](../../README.md) to:
 
-- Open with what Books is (multi-entity books / accounting app).
-- Summarize **current** capabilities from the inventory table (present tense).
+- Open with what Books is (multi-entity books / accounting app with a universal sales/AR model).
+- Summarize **current** capabilities from the inventory table (present tense). Mention connections/import in product terms; do not lead with QuickBooks or Airbyte.
 - One short subsection: built on a metadata-driven kernel, with a link to `docs/kernel/` (engine for this app and others).
-- Local quick start (`install:all`, `setup:kernel`, `npm run dev`, ports, demo login) without dumping engine theory.
+- Local quick start (`install:all`, `setup:kernel`, `npm run dev`, ports, demo login) without dumping engine theory or connector setup.
 - Link table to `docs/README.md` (Books hub), getting started, modules, operations, contributing.
-- Optional: one short **Future map** paragraph or bullet list at the end—not mixed into the capability summary.
+- Optional: one short **Future map** paragraph or bullet list at the end—not mixed into the capability summary. Additional bookkeeping/ERP connectors is a reasonable Future map item.
 
 **Acceptance.** A reader who knows accounting but not this repo can explain what the project does after reading the README alone, without being told about unfinished work packages.
 
@@ -162,7 +173,7 @@ Adjust names only if a clearer scheme emerges during implementation; update this
 
 1. Rewrite [`docs/README.md`](../README.md) as the **Books** hub (not “Kernel”). Link modules, operations, architecture, and a clearly labeled section for the metadata engine pointing at `docs/kernel/`. Optional Future map lives only here or on the root README—not on every module page.
 2. Add `docs/getting-started.md`: prerequisites (Node, Postgres), env files from examples, `setup:kernel`, optional domain seeds (`seed:gl`, `seed:sales`, `seed:ar-settlement`, `seed:entities`, `seed:connections`) with what each does, login, where to click first in the UI.
-3. Add `docs/concepts.md`: entity, account, posting, customer, invoice, payment receipt, credit note, application (signed amounts), source system / connection — in product language, describing how they work today. Link design docs only for readers who want deeper settlement detail.
+3. Add `docs/concepts.md`: entity, account, posting, customer, invoice, payment receipt, credit note, application (signed amounts), connection / source system — in **Books product language**, describing how they work today. Treat connection as “link to an external bookkeeping system,” not as a QuickBooks tutorial. Link design docs only for readers who want deeper settlement detail.
 
 **Acceptance.** `docs/README.md` describes Books as the product documentation for this repository.
 
@@ -173,12 +184,13 @@ Adjust names only if a clearer scheme emerges during implementation; update this
 **Do.** Write:
 
 - `docs/modules/ledger.md` — entities (including ledger default account dropdowns), chart, transactions, reports.
-- `docs/modules/sales-ar.md` — parties, tax, invoices, receipts, credit notes; settlement as the subledger behavior that exists today (applications, balances, sync-fed documents).
-- `docs/modules/connections.md` — connection Master vs custom actions; Airbyte streams; sync modes; link to `QUICKBOOKS_FORWARD_SYNC.md` as operator deep dive.
+- `docs/modules/sales-ar.md` — universal AR: parties, tax, invoices, receipts, credit notes; settlement as subledger behavior today (applications, balances, documents that may be entered in Books or imported through a connection).
+- `docs/modules/connections.md` — **end-user narrative**: what a connection is, connecting a system, choosing what to sync, running sync, where imported customers/invoices/payments appear in Books, how re-sync behaves at a high level. Stay in the UI story. Link out to setup for “before you can connect.”
+- `docs/operations/connections-setup.md` — **setup / admin only**: creating an Intuit (or other) client app, Airbyte workspace and connector, extraction config, stream list, env vars, sync modes at the plumbing level. This is where QuickBooks-specific steps belong today. Structure the page so a later ERP can add a sibling subsection without rewriting the end-user module.
 - `docs/operations/database.md` — `setup:kernel`, SQL deltas under `backend/prisma/migration/`, never `prisma db push` / `migrate` for routine work.
 - `docs/operations/deploy.md` — humanized from [`BUILD_AND_DEPLOY.md`](../infrastructure/BUILD_AND_DEPLOY.md); keep Railway as one option, not the only story.
 
-**Acceptance.** Each module page states what is UI-editable vs sync-fed vs script-only, using present-tense behavior only.
+**Acceptance.** A bookkeeper can read `modules/connections.md` without opening Airbyte docs. A deployer can follow `operations/connections-setup.md` for the QBO path that exists today. Sales/AR docs do not read as QBO field manuals.
 
 ---
 
@@ -227,6 +239,8 @@ Prefer one PR per WP or a single PR with clear commits per WP. Coordinate naming
 
 - [ ] No secrets, no private customer identifiers
 - [ ] Public pages describe current behavior only (roadmap confined to optional Future map)
+- [ ] Sales/AR and concepts stay universal; QBO not the product frame
+- [ ] Airbyte / Intuit app / connector plumbing live under setup, not the main connections narrative
 - [ ] `docs/kernel/` stays domain-neutral (Books only as labeled examples)
 - [ ] Books hub is the product front door; kernel is linked, not co-branded as Books
 - [ ] Front-door prose is human-readable
