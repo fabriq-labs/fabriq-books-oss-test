@@ -366,4 +366,101 @@ adminRouter.post('/setup-chart-of-accounts', authMiddleware, async (_req: Reques
   return res.status(501).json({ error: 'Domain setup endpoints are added by the domain, not the kernel.' });
 });
 
+// ─── Books first-run onboarding (not onboard-tenant / multi-org SaaS) ─────────
+
+adminRouter.get('/onboarding', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const context = (req as any).context?.auth;
+    if (!context?.user?.id) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const isSA = await isSuperAdmin(context.user.id);
+    if (!isSA) {
+      return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+    }
+    const orgId = context.user.org_id;
+    if (!orgId) {
+      return res.status(400).json({ error: 'User has no organization' });
+    }
+    const {
+      getOnboardingStatus,
+    } = await import('../onboarding/service');
+    const status = await getOnboardingStatus(prisma, orgId, { userId: context.user.id });
+    return res.json(status);
+  } catch (error) {
+    logger.error('GET /onboarding failed', { error });
+    return res.status(500).json({ error: 'Failed to load onboarding status' });
+  }
+});
+
+adminRouter.patch('/onboarding/organization', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const context = (req as any).context?.auth;
+    if (!context?.user?.id) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const isSA = await isSuperAdmin(context.user.id);
+    if (!isSA) {
+      return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+    }
+    const orgId = context.user.org_id;
+    if (!orgId) {
+      return res.status(400).json({ error: 'User has no organization' });
+    }
+    const { updateOnboardingOrganization, getOnboardingStatus } = await import('../onboarding/service');
+    const name = typeof req.body?.name === 'string' ? req.body.name : '';
+    const timezone = typeof req.body?.timezone === 'string' ? req.body.timezone : undefined;
+    try {
+      await updateOnboardingOrganization(prisma, orgId, { name, timezone });
+    } catch (e: any) {
+      const status = e?.status || 500;
+      return res.status(status).json({
+        error: e?.message || 'Failed to update organization',
+        code: e?.code,
+      });
+    }
+    const status = await getOnboardingStatus(prisma, orgId, { userId: context.user.id });
+    return res.json(status);
+  } catch (error) {
+    logger.error('PATCH /onboarding/organization failed', { error });
+    return res.status(500).json({ error: 'Failed to update organization' });
+  }
+});
+
+adminRouter.post('/onboarding/chart', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const context = (req as any).context?.auth;
+    if (!context?.user?.id) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const isSA = await isSuperAdmin(context.user.id);
+    if (!isSA) {
+      return res.status(403).json({ error: 'Forbidden: Super Admin only' });
+    }
+    const orgId = context.user.org_id;
+    if (!orgId) {
+      return res.status(400).json({ error: 'User has no organization' });
+    }
+    const { completeOnboardingChart, getOnboardingStatus } = await import('../onboarding/service');
+    let result;
+    try {
+      result = await completeOnboardingChart(prisma, orgId, {
+        geo: req.body?.geo,
+        skip: req.body?.skip === true,
+      });
+    } catch (e: any) {
+      const status = e?.status || 500;
+      return res.status(status).json({
+        error: e?.message || 'Failed to complete chart step',
+        code: e?.code,
+      });
+    }
+    const status = await getOnboardingStatus(prisma, orgId, { userId: context.user.id });
+    return res.json({ ...status, chartResult: result });
+  } catch (error) {
+    logger.error('POST /onboarding/chart failed', { error });
+    return res.status(500).json({ error: 'Failed to complete chart step' });
+  }
+});
+
 export default adminRouter;

@@ -220,6 +220,9 @@ async function handleChangePassword(req: Request, res: Response) {
         error: 'New password must contain at least one special character (non-letter, non-digit)',
       });
     }
+    if (newPassword === 'admin123') {
+      return res.status(400).json({ error: 'Choose a password other than the seeded default' });
+    }
 
     const dbUser = await prisma.user.findUnique({
       where: { id: auth.user.id },

@@ -1,0 +1,45 @@
+# Local Phase 1 stack: Postgres + the root Dockerfile app image.
+# Copy `.env.example` to `.env` and set JWT_SECRET. AUTO_SETUP defaults on here.
+#
+#   docker compose up --build
+#
+# App: http://localhost:8080  Login after setup: admin@example.com / admin123
+# (change password in the onboarding wizard)
+
+services:
+  db:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_USER: kernel
+      POSTGRES_PASSWORD: kernel
+      POSTGRES_DB: kernel_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - fabriq_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kernel -d kernel_app"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://kernel:kernel@db:5432/kernel_app
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string}
+      AUTH_PROVIDER: local
+      NODE_ENV: production
+      AUTO_SETUP: "true"
+      ENABLE_SYNC_SERVICE: "false"
+      PORT: "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  fabriq_pgdata:

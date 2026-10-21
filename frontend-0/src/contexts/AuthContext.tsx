@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
 import { User } from '@/models/User';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -21,6 +21,8 @@ interface AuthContextType {
   isMeApiLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** Re-fetch `/api/metadata/user/me` and replace the cached user (e.g. after an org rename). */
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -165,6 +167,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshUser = useCallback(async () => {
+    const response = await userAPI.getCurrentUser() as UserAPIResponse;
+    if (response && response.success && response.data) {
+      setUser(response.data);
+      userStorage.setUserData(response.data);
+    }
+  }, []);
+
   const logout = () => {
     triggerChatReset();
     // Clear all user-related data first
@@ -184,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isMeApiLoading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, isMeApiLoading, login, logout, refreshUser, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

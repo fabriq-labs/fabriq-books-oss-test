@@ -39,7 +39,13 @@ docker run --name fabriq-books --rm -p 8080:8080 \
   fabriq-books:local
 ```
 
-The container does not apply the schema on boot. After it is up, run setup inside it. The image includes `psql`.
+**First-boot setup.** Set `AUTO_SETUP=true` on the container to apply schema and the minimum seed when `public.organizations` is missing (see [Onboarding requirements](../domain/ONBOARDING_REQUIREMENTS.md)). The Compose example at the repo root sets this for you:
+
+```bash
+docker compose up --build
+```
+
+With `AUTO_SETUP` unset or false, the container does not apply the schema on boot. After it is up, run setup inside it. The image includes `psql`.
 
 ```bash
 docker exec fabriq-books sh -c 'cd /app/backend && npm run setup:kernel'

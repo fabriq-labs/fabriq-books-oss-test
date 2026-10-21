@@ -79,8 +79,23 @@ export function parseChartGeo(value: string | undefined): ChartGeo {
   throw new Error(`Chart geo must be one of: ${choices}`);
 }
 
+function chartsDir(): string {
+  // Prefer source tree (dev / ts-node). Fall back to paths next to this file
+  // and under cwd so compiled `dist/` and Docker `/app/backend` both work.
+  const candidates = [
+    path.join(process.cwd(), 'lib/gl/charts'),
+    path.join(process.cwd(), 'backend/lib/gl/charts'),
+    path.join(__dirname, 'charts'),
+    path.join(__dirname, '../../../lib/gl/charts'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, 'us-ca.json'))) return dir;
+  }
+  return candidates[0];
+}
+
 function loadTemplate(geo: ChartGeo): AccountTemplate[] {
-  const file = path.join(__dirname, 'charts', CHARTS[geo].file);
+  const file = path.join(chartsDir(), CHARTS[geo].file);
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as AccountTemplate[];
   if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error(`Chart template ${CHARTS[geo].file} is empty`);

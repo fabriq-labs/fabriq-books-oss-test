@@ -3,6 +3,18 @@ import { API_URL } from "./apiClient";
 
 // ── Shared helper (raw fetch, no global toast — callers handle errors) ─────────
 
+export class AdminApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = 'AdminApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function adminFetch<T>(endpoint: string, init: RequestInit = {}): Promise<T> {
   const token = Cookies.get('__session');
   const response = await fetch(`${API_URL}${endpoint}`, {
@@ -15,7 +27,7 @@ async function adminFetch<T>(endpoint: string, init: RequestInit = {}): Promise<
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const msg = (data as any)?.error || (data as any)?.message || 'Admin API request failed';
-    throw new Error(msg);
+    throw new AdminApiError(msg, response.status, data);
   }
   return data as T;
 }
@@ -199,9 +211,52 @@ export interface RemoveLegalEntityResponse {
   result: RemoveLegalEntityResult;
 }
 
+export type OnboardingGeo = 'us-ca' | 'india';
+
+export interface OnboardingOrg {
+  id: string;
+  name: string;
+  slug: string;
+  base_currency: string | null;
+}
+
+/** `GET /api/admin/onboarding`. Never carries password material. */
+export interface OnboardingStatus {
+  mustChangePassword: boolean;
+  profileCompleted: boolean;
+  chartCompleted: boolean;
+  chartSkipped: boolean;
+  inconsistent: boolean;
+  inconsistencyReasons?: string[];
+  org: OnboardingOrg;
+  geo?: OnboardingGeo | null;
+}
+
+export interface UpdateOnboardingOrganizationPayload {
+  name: string;
+  timezone?: string;
+}
+
+export type OnboardingChartPayload = { geo: OnboardingGeo } | { skip: true };
+
 // ── Admin API ─────────────────────────────────────────────────────────────────
 
 export const adminAPI = {
+  getOnboardingStatus: () =>
+    adminFetch<OnboardingStatus>('/api/admin/onboarding'),
+
+  updateOnboardingOrganization: (payload: UpdateOnboardingOrganizationPayload) =>
+    adminFetch<OnboardingStatus>('/api/admin/onboarding/organization', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  completeOnboardingChart: (payload: OnboardingChartPayload) =>
+    adminFetch<OnboardingStatus & { chartResult?: unknown }>('/api/admin/onboarding/chart', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   devOptionsSyncMetadata: (targets: SyncMetadataTarget[]) =>
     adminFetch<DevOptionsSyncMetadataResponse>('/api/admin/dev-options/sync-metadata', {
       method: 'POST',

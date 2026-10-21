@@ -75,12 +75,12 @@ docker run --name fabriq-books --rm -p 8080:8080 \
 5. The user signs in as `admin@example.com` / `admin123`. The shell then blocks on the **same** first-run flow used on any host:
    1. Change the password (`POST /api/auth/change-password` rules).
    2. Enter the organization name (updates `org_kernel`; id and slug stay `org_kernel` / `kernel`).
-   3. Choose geography: United States / Canada (`us-ca`) or India (`india`). The server loads that chart and sets base currency to USD or INR.
-6. The user arrives on the home page. Accounting → Chart of Accounts lists the seeded accounts. Other lists are empty and usable later.
+   3. Choose geography: United States / Canada (`us-ca`) or India (`india`) — the server loads that chart and sets base currency to USD or INR — **or Skip** and add accounts later.
+6. The user arrives on the home page. If they chose a geo, Accounting → Chart of Accounts lists the seeded accounts; if they skipped, that list is empty. Other lists are empty and usable later.
 
 **New database:** auto-setup creates schema + minimum seed, then the wizard.
 
-**Existing database** that already has `organizations`: auto-setup does not alter tables. If onboarding flags say the wizard is incomplete (or password is still the seed), the user is taken through the remaining steps. If onboarding is already complete, they go straight to the app.
+**Existing database** that already has `organizations`: auto-setup does not alter tables. If onboarding flags say the wizard is incomplete (and the DB is not inconsistent), the user resumes the remaining steps. If onboarding is already complete, they go straight to the app. If the DB shows real use without onboarding flags, they get the **error page** (R-ONBOARD-ERR), not a guessed completion or a forced wizard.
 
 A restart must not drop tables, rewrite the password, or rename the organization back to "Kernel".
 
