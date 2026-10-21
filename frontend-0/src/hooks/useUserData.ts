@@ -31,12 +31,34 @@ export const useUserData = () => {
         return user?.org?.customer_timezone || 'UTC';
     };
 
+    const currencyInfo = {
+        'USD': { symbol: '$', fullName: 'US Dollar' },
+        'EUR': { symbol: '€', fullName: 'Euro' },
+        'GBP': { symbol: '£', fullName: 'British Pound' },
+        'INR': { symbol: 'INR', fullName: 'Indian Rupee' },
+        'JPY': { symbol: '¥', fullName: 'Japanese Yen' },
+        'CAD': { symbol: 'C$', fullName: 'Canadian Dollar' },
+        'AUD': { symbol: 'A$', fullName: 'Australian Dollar' },
+        'CHF': { symbol: 'CHF', fullName: 'Swiss Franc' },
+        'CNY': { symbol: '¥', fullName: 'Chinese Yuan' },
+        'SGD': { symbol: 'S$', fullName: 'Singapore Dollar' }
+    } as const;
+
+    /** Prefer org.currency.code, then org.base_currency, then legacy currency_master. */
+    const resolveBaseCurrencyCode = (): string => {
+        const fromRelation = user?.org?.currency?.code;
+        if (fromRelation) return fromRelation;
+        const fromOrg = user?.org?.base_currency;
+        if (fromOrg) return fromOrg;
+        return user?.org?.currency_master?.base_currency || 'USD';
+    };
+
     const getBaseCurrency = () => {
         return user?.org?.currency_master || null;
     };
 
     const getBaseCurrencyCode = (): string => {
-        return user?.org?.currency_master?.base_currency || 'USD';
+        return resolveBaseCurrencyCode();
     };
 
     const getCurrencyValue = (): number => {
@@ -44,11 +66,15 @@ export const useUserData = () => {
     };
 
     const getBaseCurrencyDetails = () => {
-        const currency = user?.org?.currency_master;
-        // console.log('getBaseCurrencyDetails - Raw currency data:', currency);
+        const code = resolveBaseCurrencyCode();
+        const legacy = user?.org?.currency_master;
+        const relation = user?.org?.currency;
+        const info = currencyInfo[code as keyof typeof currencyInfo] || {
+            symbol: relation?.symbol || code,
+            fullName: relation?.name || legacy?.name || code,
+        };
 
-        if (!currency) {
-            console.log('getBaseCurrencyDetails - No currency data, using USD fallback');
+        if (!legacy && !relation && !user?.org?.base_currency) {
             return {
                 id: null,
                 name: 'USD',
@@ -65,39 +91,20 @@ export const useUserData = () => {
             };
         }
 
-        // Get currency symbol and full name
-        const currencyInfo = {
-            'USD': { symbol: '$', fullName: 'US Dollar' },
-            'EUR': { symbol: '€', fullName: 'Euro' },
-            'GBP': { symbol: '£', fullName: 'British Pound' },
-            'INR': { symbol: 'INR', fullName: 'Indian Rupee' }, // Use INR instead of ₹ for PDF compatibility
-            'JPY': { symbol: '¥', fullName: 'Japanese Yen' },
-            'CAD': { symbol: 'C$', fullName: 'Canadian Dollar' },
-            'AUD': { symbol: 'A$', fullName: 'Australian Dollar' },
-            'CHF': { symbol: 'CHF', fullName: 'Swiss Franc' },
-            'CNY': { symbol: '¥', fullName: 'Chinese Yuan' },
-            'SGD': { symbol: 'S$', fullName: 'Singapore Dollar' }
-        };
-
-        // console.log('getBaseCurrencyDetails - Currency code:', currency.base_currency);
-        // console.log('getBaseCurrencyDetails - Available currencies:', Object.keys(currencyInfo));
-
-        const info = currencyInfo[currency.base_currency as keyof typeof currencyInfo] ||
-            { symbol: currency.base_currency, fullName: currency.name || currency.base_currency };
-
-        // console.log('getBaseCurrencyDetails - Selected info:', info);
-
-        const result = {
-            ...currency,
+        return {
+            id: relation?.id || legacy?.id || null,
+            name: relation?.name || legacy?.name || code,
+            base_currency: code,
+            from_currency: legacy?.from_currency || code,
+            effective_from: legacy?.effective_from || new Date().toISOString(),
+            currency_value: legacy?.currency_value ?? 1,
+            status: legacy?.status || 'Active',
             symbol: info.symbol,
             fullName: info.fullName,
-            isActive: currency.status === 'Active',
-            effectiveDate: new Date(currency.effective_from),
-            formattedValue: currency.currency_value.toFixed(4)
+            isActive: (legacy?.status || 'Active') === 'Active',
+            effectiveDate: new Date(legacy?.effective_from || Date.now()),
+            formattedValue: (legacy?.currency_value ?? 1).toFixed(4)
         };
-
-        // console.log('getBaseCurrencyDetails - Final result:', result);
-        return result;
     };
 
     const getUserDepartment = (): string => {
