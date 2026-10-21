@@ -94,21 +94,24 @@ This repository has two long-lived lines:
 
 ## Goals
 
-1. Replace the kernel-first front door with a Books product front door.
+1. Replace the kernel-first front door with a Books product front door **on `fabriq-books`**.
 2. Give operators a path from clone → local run → first entity / chart / invoice list without reading the engine internals.
 3. Give contributors a path to add a model/screen correctly (metadata first), with kernel docs as the deep dive for any domain.
 4. Demote agent/design plans from the front door without deleting them.
 5. Add OSS hygiene files if missing: `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md` (or `docs/security` pointer), and a cleaned `.env.example`.
+6. After the Books docs pass: sync portable kernel doc improvements to `main` without Books product docs (**WP-D6**).
 
 ---
 
 ## Non-goals
 
 - Turning `docs/kernel/` into Books product documentation.
-- Documenting unfinished or planned features outside one optional Future map section.
+- Merging the full Books doc tree onto `main` (kernel branch must stay Books-free aside from optional one-line pointers).
 - Framing Books as a QuickBooks-only product, or structuring the main docs around Airbyte / Intuit developer console steps.
+- Documenting unfinished or planned features outside one optional Future map section.
 - Implementing new product features in a docs engagement.
 - Generating screenshots unless the task explicitly asks (placeholders / “add screenshot” captions are fine).
+- Starting WP-D6 before WP-D0–D5 are accepted on `fabriq-books`.
 
 ---
 
