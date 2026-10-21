@@ -74,7 +74,7 @@ backend/src/lib/integrations/broker/
 
 **Mount point**: `src/index.ts` → `app.use('/api/mcp', mcpRouter)`
 
-**Database**: `option_chain_cache` — lazy same-day cache of chain skeletons (see [INVESTMENTS.md](../book-keeping/INVESTMENTS.md#option-chain-cache-and-mcp)).
+**Database**: `option_chain_cache` — lazy same-day cache of chain skeletons.
 
 ---
 
@@ -354,7 +354,7 @@ Use `expiry_offset` / `strike_offset` for Fabriq-level pagination (Questrade has
 cd backend && npx ts-node --transpile-only scripts/test-option-chain-live.ts VFV.TO
 ```
 
-Requires the `option_chain_cache` table (see INVESTMENTS.md).
+Requires the `option_chain_cache` table.
 
 ### `get_options_income`
 

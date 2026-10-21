@@ -68,7 +68,7 @@ Use Airbyte Cloud, or an Airbyte API you can reach, with a source of QuickBooks 
 | `payments` | `datalake.qb_payments` | Payment receipts and applications |
 | `credit_memos` | `datalake.qb_credit_memos` | Credit notes and lines |
 
-Payments and credit memos are what fill the settlement lists. Without them, an import still loads customers and invoices, and the payments and credit notes lists stay empty. Deposits, bills, purchase orders, and journal entries are not mapped by this transform. Leave those streams off unless you are keeping the raw tables for your own use; dbt will not turn them into Books documents.
+The `payments` and `credit_memos` streams are what fill payment receipts and credit notes. Without them, an import still loads customers and invoices, and those two lists stay empty. Deposits, bills, purchase orders, and journal entries are not mapped by this transform. Leave those streams off unless you are keeping the raw tables for your own use; dbt will not turn them into Books documents.
 
 Copy the Airbyte **connection** UUID (the connection between that source and destination, not the QuickBooks company id) and an Airbyte **API** client id and secret. In the Books connection, open **Set up data import** and paste:
 

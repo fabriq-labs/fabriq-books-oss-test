@@ -2,7 +2,7 @@
 
 The kernel is the domain-neutral metadata engine in this repository. A screen and an API appear from metadata: a view names a model and its fields, a permission grants read or write on those fields to a role, and the generic REST API and the Master screen render from that metadata.
 
-These pages describe the engine. They do not walk through a particular product. A product fills the slots in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md) — schema, seeds, navigation, forms — and documents its own screens elsewhere. When this checkout is a product branch, that product’s guide is the [docs hub](../README.md). The engine reference stays here either way. Examples on these pages use kernel tables (users, roles, currencies). A product model is mentioned only when it is labeled as an example of the mechanism, and the page still makes sense if that table is absent.
+These pages describe the engine. A product fills the slots in [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md) — schema, seeds, navigation, forms — and documents its own screens elsewhere. When this checkout is a product branch, that product’s guide is the [docs hub](../README.md). The engine reference stays here either way. Worked steps in [examples.md](./examples.md) use the kernel seed: users, roles, and currencies. A product model shows up only as a labeled example of a mechanism, or inside an engine note (the agent pages, for instance) that is not the product manual.
 
 In scope:
 

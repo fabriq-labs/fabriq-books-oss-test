@@ -46,7 +46,7 @@ Do not invent a second parallel framework if Jest + Playwright can cover the lay
 
 ### Related plan
 
-Keep module names aligned with [`OSS_DOCS_PLAN.md`](./OSS_DOCS_PLAN.md) (`ledger`, `sales-ar`, `connections`). Prefer universal Books model language in suite names and assertions; treat QuickBooks as one connection adapter under test fixtures, not as the product under test.
+Keep module names aligned with [`OSS_DOCS_PLAN.md`](./OSS_DOCS_PLAN.md) (`ledger`, `sales-ar`, `connections`). The public pages that use those names are [`docs/modules/ledger.md`](../modules/ledger.md), [`docs/modules/sales-ar.md`](../modules/sales-ar.md), and [`docs/modules/connections.md`](../modules/connections.md). Airbyte and Intuit setup live in [`docs/operations/connections-setup.md`](../operations/connections-setup.md) and stay out of the default end-user suite. Prefer universal Books model language in suite names and assertions; treat QuickBooks as one connection adapter under test fixtures, not as the product under test.
 
 ---
 

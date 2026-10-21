@@ -136,7 +136,7 @@ docs/
     deploy.md                      Single Docker image + deploy notes (humanized)
     database.md                    Schema apply, SQL deltas, seeds, no db push
     connections-setup.md           Admin/setup: Airbyte, Intuit app, extraction config (QBO path today)
-  contributing-books.md            Optional deeper contributor guide (or fold into CONTRIBUTING.md)
+  contributing-books.md            Folded into the root CONTRIBUTING.md (no separate file)
 
   kernel/                          Domain-neutral engine docs (any app)
     README.md                      Metadata engine for builders; not Books-specific

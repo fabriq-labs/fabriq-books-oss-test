@@ -1,6 +1,20 @@
 # Books
 
-This is the product file. Kernel instructions stay in the root [AGENTS.md](../../AGENTS.md).
+This is the product file for coding agents. Kernel instructions stay in the root [AGENTS.md](../../AGENTS.md). Human readers start at the [Books docs hub](../README.md), not here.
+
+## Public docs (humans)
+
+Write and read these in complete paragraphs. They describe the software that runs today. Agent-brief tone stays in this file and in the plans below.
+
+| Audience | Document |
+|---|---|
+| Anyone evaluating or running Books | [docs/README.md](../README.md), [getting-started.md](../getting-started.md), [concepts.md](../concepts.md) |
+| Ledger, sales, connections | [modules/ledger.md](../modules/ledger.md), [modules/sales-ar.md](../modules/sales-ar.md), [modules/connections.md](../modules/connections.md) |
+| Database, deploy, connector setup | [operations/database.md](../operations/database.md), [operations/deploy.md](../operations/deploy.md), [operations/connections-setup.md](../operations/connections-setup.md) |
+| How Books uses the engine | [architecture.md](../architecture.md). The engine itself is [kernel/README.md](../kernel/README.md) and stays domain-neutral. |
+| Contributors | [CONTRIBUTING.md](../../CONTRIBUTING.md), [SECURITY.md](../../SECURITY.md) |
+
+When you change a public module name, update the module map in [OSS_TEST_PLAN.md](./OSS_TEST_PLAN.md) in the same change.
 
 Follow [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md) for every later migration from prod. The books lessons are [KERNEL_PORT.md](./KERNEL_PORT.md). The task-sized plan is [AGENT_PLAN.md](./AGENT_PLAN.md). Run one module from that plan, then stop.
 

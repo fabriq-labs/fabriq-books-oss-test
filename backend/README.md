@@ -23,7 +23,7 @@ npm run dev
 
 `setup:kernel` applies schema SQL when `organizations` is missing, then seeds `org_system` and the shell views. Each view has a `data_graph`. It does not use `prisma db push`. When `organizations` already exists it only re-seeds. A new table uses the SQL diff in [docs/kernel/adding-a-model.md](../docs/kernel/adding-a-model.md). Restart this process after `prisma generate`. Routes are registered only at startup.
 
-A domain seed is a second command, run from `backend/` after `setup:kernel`. This branch does not include one.
+A product seed is a second command, run from `backend/` after `setup:kernel`. `setup:kernel` does not run it. On the Books line those commands, and the local login, are in [Getting started](../docs/getting-started.md).
 
 `setup:kernel` writes view graphs from `src/utils/setup/seedKernel.ts`. It does not load a JSON view catalog.
 
