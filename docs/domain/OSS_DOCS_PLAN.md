@@ -69,11 +69,26 @@ Open-source readers should never encounter:
 
 ### Pitch (locked)
 
-**Books-first** at the repository root and `docs/` hub. Disclose the metadata kernel early and link to `docs/kernel/` for builders. Kernel documentation itself stays product-agnostic.
+**Books-first** at the repository root and `docs/` hub on `fabriq-books`. Disclose the metadata kernel early and link to `docs/kernel/` for builders. Kernel documentation itself stays product-agnostic.
+
+### How this relates to the kernel branch (`main`)
+
+This repository has two long-lived lines:
+
+| Branch | Product front door | Books docs |
+|---|---|---|
+| `fabriq-books` | Books (this plan) | Yes — hub, modules, connections, domain plans |
+| `main` (kernel) | Metadata engine / framework | **No** — must stay free of Books product documentation |
+
+**While WP-D0–D5 run on `fabriq-books`:** write Books pages under `docs/` (and a Books root README). Keep every change under `docs/kernel/` domain-neutral so those files can later land on `main` without dragging Books with them. Prefer Books-specific examples in Books pages (`docs/concepts.md`, `docs/modules/…`), not inside kernel pages. If a kernel page needs an illustration, use a generic sample model or a clearly labeled example that does not require the Books product tree.
+
+**After WP-D0–D5 complete:** run **WP-D6** (below). That phase cherry-picks / ports the improved kernel docs (and shared ops such as deploy/database if still accurate for a kernel-only tree) from `fabriq-books` onto `main`, restores a **kernel** root README and `docs/README.md`, and **excludes** Books hub, modules, connections, architecture-as-Books, and `docs/domain/*` Books plans from `main`. Do not leave `main` with a Books homepage.
+
+`docs/domain/AGENTS.md` on `main` today is a stub pointer; on `fabriq-books` it is the Books agent file. WP-D6 must not overwrite `main`’s thin domain stub with the full Books AGENTS unless maintainers explicitly want a one-line “see fabriq-books for the Books product.”
 
 ### Related plan
 
-[`OSS_TEST_PLAN.md`](./OSS_TEST_PLAN.md) should test the same modules and behaviors the public docs describe. If you rename a public module section, update the test plan’s module map in the same PR or leave a follow-up note in both files.
+[`OSS_TEST_PLAN.md`](./OSS_TEST_PLAN.md) should test the same modules and behaviors the public docs describe on `fabriq-books`. If you rename a public module section, update the test plan’s module map in the same PR or leave a follow-up note in both files. Kernel-branch sync (WP-D6) is docs-only relative to `main`; it does not replace the test plan.
 
 ---
 
@@ -220,35 +235,70 @@ Adjust names only if a clearer scheme emerges during implementation; update this
 
 ---
 
+### WP-D6 — Sync kernel branch (`main`) from `fabriq-books` (after D0–D5)
+
+**When.** Only after WP-D0–D5 are complete and merged on `fabriq-books`. This is a separate engagement / PR targeting `main` (or the agreed kernel release branch). Do not fold it into the Books docs PR.
+
+**Goal.** Bring forward the improved **domain-neutral** documentation (especially `docs/kernel/` and any shared infrastructure docs that still apply to a kernel-only tree) while keeping the kernel branch **free of Books product docs**.
+
+**Do.**
+
+1. Diff `docs/kernel/` (and shared files such as `docs/infrastructure/BUILD_AND_DEPLOY.md`, security PDFs if touched) between `fabriq-books` and `main`. Cherry-pick or port only changes that remain valid without the Books domain.
+2. Restore / keep a **kernel** root [`README.md`](../../README.md) and [`docs/README.md`](../README.md) on `main`: metadata framework front door, not Books. Different from the Books README on `fabriq-books` by design.
+3. **Do not** copy onto `main`: `docs/getting-started.md` / `docs/concepts.md` / `docs/architecture.md` / `docs/modules/**` / `docs/operations/connections*.md` if they are Books-specific; Books `docs/domain/*` plans (AR, QBO, OSS Books plans) unless a maintainer asks for a single pointer file.
+4. Ensure `docs/kernel/` on `main` has no Books-required narrative. Strip or rephrase any example that only makes sense with Books tables present if that would confuse a kernel-only clone.
+5. Confirm `docs/domain/AGENTS.md` on `main` stays a minimal kernel/domain placeholder (or a one-liner pointing at `fabriq-books` for the Books product)—not the full Books AGENTS.
+6. Open the PR against `main` with a checklist proving Books paths are absent.
+
+**Acceptance.**
+
+- `main` README presents the metadata kernel / framework.
+- `fabriq-books` README presents Books.
+- `git ls-tree` (or equivalent) on `main` shows no Books module hub (`docs/modules/sales-ar.md`, connections end-user guide, etc.).
+- Kernel docs improvements from the Books work are present on `main` where they apply.
+
+**Stop.** Do not merge Books application code onto `main` in this phase unless a separate, explicit product decision says so. Docs sync only.
+
+---
+
 ## Order of operations
 
 ```
 WP-D0 inventory
-  └─► WP-D1 README
+  └─► WP-D1 README (Books, on fabriq-books)
         └─► WP-D2 hub + getting-started + concepts
               ├─► WP-D3 modules + operations
               ├─► WP-D4 architecture + kernel index (domain-neutral)
               └─► WP-D5 hygiene + AGENTS links
+                    └─► WP-D6 sync kernel branch (main)   ← after D0–D5 accepted
 ```
 
-Prefer one PR per WP or a single PR with clear commits per WP. Coordinate naming with [`OSS_TEST_PLAN.md`](./OSS_TEST_PLAN.md) before merging the last WP.
+Prefer one PR per WP or a single PR with clear commits per WP for D0–D5 on `fabriq-books`. **WP-D6 is always a separate PR to `main`.** Coordinate naming with [`OSS_TEST_PLAN.md`](./OSS_TEST_PLAN.md) before merging the last Books docs WP.
 
 ---
 
-## Review checklist (every PR)
+## Review checklist (every Books docs PR on `fabriq-books`)
 
 - [ ] No secrets, no private customer identifiers
 - [ ] Public pages describe current behavior only (roadmap confined to optional Future map)
 - [ ] Sales/AR and concepts stay universal; QBO not the product frame
 - [ ] Airbyte / Intuit app / connector plumbing live under setup, not the main connections narrative
-- [ ] `docs/kernel/` stays domain-neutral (Books only as labeled examples)
-- [ ] Books hub is the product front door; kernel is linked, not co-branded as Books
+- [ ] `docs/kernel/` stays domain-neutral (portable to `main`; Books only as labeled examples)
+- [ ] Books hub is the product front door on this branch; kernel is linked, not co-branded as Books
 - [ ] Front-door prose is human-readable
 - [ ] Links resolve
 - [ ] Sibling test plan still matches module vocabulary
+
+## Review checklist (WP-D6 PR on `main`)
+
+- [ ] Root README and docs hub are kernel/framework, not Books
+- [ ] No Books module / connections / domain plan tree copied onto `main`
+- [ ] Cherry-picked kernel doc improvements still make sense without Books
+- [ ] No secrets
 
 ---
 
 ## Stop conditions
 
-When WP-D0–D5 are done, stop. Do not start the testing plan in the same engagement unless explicitly asked. Do not implement product features “while you are in the docs.”
+- After **WP-D0–D5**: stop the Books docs engagement. Do not start the testing plan unless explicitly asked. Do not implement product features “while you are in the docs.”
+- **WP-D6** is the follow-on phase once D0–D5 are done; run it only when asked to update the kernel branch from `fabriq-books`.
