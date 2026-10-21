@@ -51,9 +51,13 @@ Do not run `prisma db push` or `prisma migrate` for this. Setup applies reviewed
 
 ## Seed the Books screens
 
-From `backend/`:
+From `backend/`, load `backend/.env` into the shell first. The API’s dev script and most of the seed scripts load that file themselves. `seed:gl` and `seed:entities` do not, and they need `DATABASE_URL` in the environment:
 
 ```bash
+cd backend
+set -a
+. ./.env
+set +a
 npm run seed:gl
 npm run seed:entities
 npm run seed:sales
