@@ -39,10 +39,10 @@ Compared with `prod`:
 
 `platform.prisma` is storage the kernel uses with no product installed.
 
-- `currency` moved here from the books schema. Columns are `code`, `name`, `symbol`, `decimal_places`, `is_active`, `org_id`, and the audit fields, plus `orgs`. Invoice, supplier, customer, item, account, holding, and exchange-rate relations are gone. The seed is one USD row on `org_system`.
+- `currency` lives here because kernel code reads it (`org.basecurrency_id`) with no product installed. Columns are `code`, `name`, `symbol`, `decimal_places`, `is_active`, `org_id`, and the audit fields, plus `orgs`. A product may add further relations on this same model. The kernel seed is one USD row on `org_system`. Do not create a second currency model.
 - `attachment` is the upload row: `path`, `instance_id`, `type_name`, `name`, `org_id`. No seed row.
 
-Product models go in `domain.prisma`. That file is empty on this branch. Do not add a catalog to `platform.prisma` or `metadata.prisma`.
+Product models go in `domain.prisma`, or in additional schema files beside it. A checkout with no product leaves `domain.prisma` empty. Do not add a product catalog to `platform.prisma` or `metadata.prisma`.
 
 ## 1. Model
 

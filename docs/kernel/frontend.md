@@ -10,11 +10,11 @@ The kernel UI is `frontend-0`. Dev server port is 5174 (`frontend-0/vite.config.
 <Route index element={<DomainHome />} />
 ```
 
-`DomainHome` is exported from `frontend-0/src/domain/home.tsx`. It shows counts for users, roles, views, permissions, currencies, and workflows, and links to those screens. To replace the home page, replace the component in `home.tsx` and keep the `DomainHome` export. The Dashboard item in the sidebar points at `/`.
+`DomainHome` is exported from `frontend-0/src/domain/home.tsx`. The cards on `/` are whatever that file loads. Replace the component and keep the `DomainHome` export. The Dashboard item in the sidebar points at `/`.
 
 ## Navigation
 
-`frontend-0/src/components/layout/sidebar/SidebarNavigation.tsx` renders three kernel items, then `domainNavigation` from `frontend-0/src/domain/navigation.ts`. Add a group there for each product list. On this branch `domainNavigation` is an empty array.
+`frontend-0/src/components/layout/sidebar/SidebarNavigation.tsx` renders the kernel items, then `domainNavigation` from `frontend-0/src/domain/navigation.ts`. A product adds a group there for each list. A checkout with no product leaves the array empty.
 
 Super Admin routes, each wrapped in `SuperAdminGuard`:
 
@@ -34,7 +34,7 @@ Workbench is `/workbench`.
 
 ## Profile menu
 
-The avatar in `frontend-0/src/components/layout/TopBar.tsx` opens a menu with the user's name, email, and organization, then My Profile, and Logout. My Profile opens `MyProfileModal` (name and password). A chat toggle is rendered when `VITE_ENABLE_AI` is `true`.
+The avatar in `frontend-0/src/components/layout/TopBar.tsx` opens a menu with the user's name, email, and organization, then My Profile, and Logout. My Profile opens `MyProfileModal` (name, password, and an API key). A chat toggle is rendered when `VITE_ENABLE_AI` is `true`.
 
 ## A metadata list
 
