@@ -130,8 +130,12 @@ export async function calculate_invoice_total(
     adjustment_amount: invoice.adjustment_amount,
   });
 
-  const appliedPayments = sumApplied(invoice.payment_receipt_applications);
-  const appliedCredits = sumApplied(invoice.credit_note_applications);
+  const appliedPayments = sumApplied(
+    invoice.payment_receipt_applications.filter((a) => a.payment_receipt?.status === 'posted')
+  );
+  const appliedCredits = sumApplied(
+    invoice.credit_note_applications.filter((a) => a.credit_note?.status === 'posted')
+  );
   const balance_amount = money(total_amount.minus(appliedPayments).minus(appliedCredits));
 
   await tx.invoice.update({
