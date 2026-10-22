@@ -42,16 +42,19 @@ After a successful auto-setup, open `/health`, then the app host. Sign in as `ad
 
 ## Run the image locally
 
-Build from the repository root:
+Build from the repository root. Emit git metadata first so `/build-info.json` is not all `unknown` (`.git` is excluded from the Docker context):
 
 ```bash
+npm run docker:meta
 docker build -t fabriq-books:local .
+# or: npm run docker:build
 ```
 
 **Compose (recommended for a first look).** The checked-in `docker-compose.yml` starts Postgres and the app with `AUTO_SETUP=true`:
 
 ```bash
-docker compose up --build
+npm run docker:compose
+# or: npm run docker:meta && docker compose up --build
 ```
 
 Open `http://localhost:8080/health`, then `http://localhost:8080`. Complete the onboarding wizard. Chart of accounts appears after you pick a geography (or stays empty if you skip).
@@ -109,13 +112,15 @@ railway variable set \
 openssl rand -base64 32 | railway variable set JWT_SECRET --stdin --service "$APP" --skip-deploys --json
 ```
 
-6. From the repository root, upload and build:
+6. From the repository root, emit build metadata, then upload and build:
 
 ```bash
+npm run docker:meta
 railway up --service "$APP" --detach --yes
+# or: npm run railway:up -- --service "$APP"
 ```
 
-`railway up` follows `.gitignore`. Poll `railway deployment list --service "$APP" --limit 5 --json` until the newest deployment finishes. On failure, `railway logs --service "$APP" --build -n 200` and `railway logs --service "$APP" -n 200` show the build and the runtime. Leave service ids out of committed docs.
+`railway up` follows `.gitignore`. The overwritten `docker-build-meta.json` is a tracked file, so the local commit SHA is included in the upload. Poll `railway deployment list --service "$APP" --limit 5 --json` until the newest deployment finishes. On failure, `railway logs --service "$APP" --build -n 200` and `railway logs --service "$APP" -n 200` show the build and the runtime. Leave service ids out of committed docs.
 
 7. With `AUTO_SETUP=true`, you do not need `railway ssh` + `setup:kernel` for an empty database. Watch the deploy logs for `AUTO_SETUP complete`, then open the public URL. If you left `AUTO_SETUP` off, apply schema once the deployment is up:
 

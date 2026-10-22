@@ -60,10 +60,11 @@ RUN npx prisma generate \
   && test -f node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
 # Do not prune: OpenTelemetry deps are in devDependencies but required at runtime
 
-# Stage 2b: Image metadata JSON (env-only — do not COPY app trees or this stage
-# invalidates on every code change and slows the build for no benefit).
+# Stage 2b: Image metadata JSON — do not COPY app trees or this stage invalidates
+# on every code change. Prefer docker-build-meta.json + optional SOURCE_* / RAILWAY_GIT_*.
 FROM node:20-alpine AS build-info
 COPY docker-build-info.js /docker-build-info.js
+COPY docker-build-meta.json /docker-build-meta.json
 
 ARG SOURCE_REF=unknown
 ARG SOURCE_COMMIT=unknown
@@ -74,6 +75,9 @@ ARG BUILD_TIME
 ARG IMAGE_TAG=unknown
 # Bust this stage only (not runtime apk / npm) when CI passes a new commit.
 ARG CACHEBUST=1
+ARG RAILWAY_GIT_COMMIT_SHA=
+ARG RAILWAY_GIT_BRANCH=
+ARG RAILWAY_GIT_COMMIT_MESSAGE=
 
 ENV SOURCE_REF=${SOURCE_REF}
 ENV SOURCE_COMMIT=${SOURCE_COMMIT}
@@ -81,6 +85,9 @@ ENV SOURCE_COMMIT_MESSAGE=${SOURCE_COMMIT_MESSAGE}
 ENV SOURCE_COMMIT_MESSAGE_B64=${SOURCE_COMMIT_MESSAGE_B64}
 ENV SOURCE_COMMIT_DATE=${SOURCE_COMMIT_DATE}
 ENV IMAGE_TAG=${IMAGE_TAG}
+ENV RAILWAY_GIT_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
+ENV RAILWAY_GIT_BRANCH=${RAILWAY_GIT_BRANCH}
+ENV RAILWAY_GIT_COMMIT_MESSAGE=${RAILWAY_GIT_COMMIT_MESSAGE}
 
 RUN BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
     export BUILD_TIME && \

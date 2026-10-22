@@ -31,7 +31,7 @@ Quote `"user"`. Filter private rows by `org_id`. Shareable rows (`role`, `workfl
 
 Given a spec, add the domain with [docs/kernel/adding-a-model.md](./docs/kernel/adding-a-model.md) and [docs/kernel/BUILDING_A_DOMAIN.md](./docs/kernel/BUILDING_A_DOMAIN.md).
 
-Deploy that app as a new Railway service with [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). `RAILWAY_TOKEN` in the repo-root `.env` or `backend/.env` is a project token. Load it into the environment. Never print it or commit it. `railway add` creates the service in that token's project. `railway up` builds the root `Dockerfile`.
+Deploy that app as a new Railway service with [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). `RAILWAY_TOKEN` in the repo-root `.env` or `backend/.env` is a project token. Load it into the environment. Never print it or commit it. `railway add` creates the service in that token's project. Before `railway up` or `docker build`, run `npm run docker:meta` so `/build-info.json` gets the commit (`.git` is not in the image context). Prefer `npm run railway:up -- --service <name>`.
 
 To inspect a service that is already deployed, list services, then pass the name or id from that list:
 

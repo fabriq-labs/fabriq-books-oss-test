@@ -13,7 +13,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 | `frontend-builder` | `npm ci` and `npm run build` in `frontend-0` on `node:*-bookworm-slim`. `VITE_API_BASE_URL=""` so the browser calls `/api` on the same host. |
 | `backend-builder` | `npm ci`, `npm run build`, and `prisma generate` for Debian (`debian-openssl-3.0.x`). Dependencies stay in the image. |
 | `integrations-builder` | `uv sync` on `python:3.12-slim-bookworm` → baked `.venv` (dbt + sync_service). `uv` is not copied to runtime. |
-| final | `debian:bookworm-slim` with apt `nginx` + `postgresql-client`, Node and Python from matching bookworm images, backend + frontend + integrations venv. `/app/build-info.json` records the commit when build-args are passed. |
+| final | `debian:bookworm-slim` with apt `nginx` + `postgresql-client`, Node and Python from matching bookworm images, backend + frontend + integrations venv. `/app/build-info.json` (also served at `/build-info.json`) records commit metadata from `docker-build-meta.json`, `SOURCE_*` build-args, and/or Railway `RAILWAY_GIT_*` args. |
 
 `nginx.conf` listens on `PORT` (default `8080`):
 
@@ -27,9 +27,24 @@ The image listens on `8080` only.
 
 This repo has no Railway config file. A new Railway service defaults to Railpack. Before the first upload, set the service build to the Dockerfile at the repo root and set the deploy health check to `GET /health`. The upload has to be the repo root. An upload rooted at `backend/` does not contain `Dockerfile`. Fly.io uses the same Dockerfile via a `fly.toml` `[build]` section (example in [../operations/deploy.md](../operations/deploy.md)).
 
-Local image:
+`.git` is not in the Docker build context (see `.dockerignore`). Before any image build — local Docker, Compose, or `railway up` — emit commit metadata into the context:
 
 ```bash
+npm run docker:meta
+```
+
+That writes `docker-build-meta.json` (committed stub stays `unknown` in git; the emit overwrites it locally). The `build-info` stage copies that file and also accepts `SOURCE_*` build-args (GitHub Actions) and `RAILWAY_GIT_*` (GitHub-connected Railway). Prefer the wrappers so you do not forget the emit step:
+
+```bash
+npm run docker:build          # meta + docker build -t kernel:local .
+npm run docker:compose        # meta + docker compose up --build
+npm run railway:up -- --service "$APP"   # meta + railway up --detach --yes
+```
+
+Local image (manual):
+
+```bash
+npm run docker:meta
 docker build -t kernel:local .
 ```
 
@@ -89,10 +104,12 @@ openssl rand -base64 32 | railway variable set JWT_SECRET --stdin --service "$AP
 
 `railway variable list --json` and `--kv` print secret values. Do not write that output into logs, docs, or the repo.
 
-4. From the repo root, upload this tree and build the Dockerfile on Railway. `railway up` follows `.gitignore`.
+4. From the repo root, emit build metadata, then upload and build the Dockerfile on Railway. `railway up` follows `.gitignore` (the meta file is tracked, so the local overwrite is included in the upload).
 
 ```bash
+npm run docker:meta
 railway up --service "$APP" --detach --yes
+# or: npm run railway:up -- --service "$APP"
 ```
 
 5. Poll until the newest deployment finishes:
