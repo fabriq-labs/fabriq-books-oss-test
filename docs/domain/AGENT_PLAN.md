@@ -98,140 +98,220 @@ Nav labels may say “Imported …” for connector-fed lists; the view id stays
 
 ## Module 3B — Sales create (invoice, payment, credit)
 
-**Goal.** Create and manage Books-authored sales invoices, payment receipts, and credit notes on the same tables QBO sync fills. **`_edit_view` / `_readonly_view`** separate writable vs display-only populations. **No GL poster** in this module (see Deferred). **No reverse sync.**
+**Goal.** A **complete** Books-authored create path for sales invoices (with full line editor), payment receipts, and credit notes on the same tables QBO sync fills. Dual `*_edit_view` / `*_readonly_view`. **No GL poster. No reverse sync.**
 
 **Already on the branch (do not rebuild):**
 
-- Schema: `invoice`, `invoice_line_item`, `payment_receipt`, `payment_receipt_application`, `credit_note`, `credit_note_item`, `credit_note_application`, tax models, lineage columns, `ledger_*` columns.
-- QBO forward sync + WP4 read-only Master lists (today’s single views).
-- Customers, items, entity ledger default *columns* (unused until poster).
+- Schema: `invoice`, `invoice_line_item`, `invoice_line_tax`, `payment_receipt`, `payment_receipt_application`, `credit_note`, `credit_note_item`, `credit_note_application`, tax models, lineage, `ledger_*`.
+- QBO forward sync + current read-only lists/detail.
+- Customers, items, tax masters/groups/regions UI.
 
 **Read first.**
 
-- This file (view naming + acceptance).
-- [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md) §§3, 6.8–6.9 (applications vs postings; native credit apply).
-- Current UI: `frontend-0/src/domain/sales/InvoiceForm.tsx`, `PaymentReceiptList.tsx`, `CreditNoteList.tsx`, `routes.tsx`, `navigation.ts`.
-- Seeds: `backend/src/utils/setup/seedSales.ts`, `seedArSettlement.ts`.
+- This file (especially [Detailed requirements](#detailed-requirements-complete-create) below).
+- [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md) §§3, 6.8–6.9.
+- Prod (study, do not copy wholesale): `frontend-1/src/components/InvoiceForm.tsx`, `forms/Masters/SalesInvoiceItemTable.tsx`, `PaymentReceiptForm.tsx`, `PaymentReceiptModal.tsx`, `forms/sales/CreditNoteForm.tsx`, `CreditNoteItems.tsx`; totals logic in prod `backend/src/lib/actions/zeiv.ts` (`calculate_invoice_total`).
+- This branch: `frontend-0/src/domain/sales/*`, `backend/prisma/schema/sales.prisma`, `tax.prisma`.
 
-### Schema
+---
 
-No new header models. Application-level rules only:
+### Detailed requirements (complete create)
 
-| Rule | Detail |
+Captured against prod sales create + Books schema. **Module 3B is incomplete unless these are met** (unless marked Defer).
+
+#### 1. Create entry points (buttons + routes) — **must**
+
+| Surface | Requirement |
 |---|---|
-| Direction | Editable invoice create always `direction = sales`. |
-| Customer | Required on sales invoice / receipt / credit note. |
-| Lineage | Writes via `_edit_view` leave lineage null. Reject create/update that sets lineage from the form. |
-| Readonly immutability | API/UI: if `source_system_id` is set (Module 3B readonly population), reject update/delete. |
-| Status | Editable invoice: `draft` → `posted` → `void`. Readonly (imported) rows stay as sync mapped them. |
-| Money | Header totals and line amounts `Decimal(19, 4)`. On save, recompute `net_amount` / `tax_amount` / `total_amount` from lines (or require explicit tax fields — pick one approach and document in the form). |
-| Balance | On create of a posted invoice with no apps: `balance_amount = total_amount`. Receipt/credit apply updates balances per design T1/T2 **in application code** (do not wait for poster). |
-| Payment apply | Prefer `payment_receipt_application` rows (signed amounts). Convenience `payment_receipt.invoice_id` only when exactly one invoice target. |
-| Credit apply (editable) | Prefer `credit_note_application` (example 6.8). Do **not** invent a $0 payment unless matching QBO shape for tests. |
+| Invoice edit list | **Create** / “New invoice” on `/sales/invoices` (`invoice_edit_view`) → opens blank create form (or create-draft-then-edit). |
+| Payment edit list | **Create** on `/sales/payments` → receipt form (optionally deep-link `?invoice_id=`). |
+| Credit note edit list | **Create** on `/sales/credit-notes`. |
+| From posted invoice | Footer **Record payment** / **Apply credit** navigates to create with invoice pre-selected. |
+| Imported lists | **No Create** on `*_readonly_view` paths. Row action = View (eye) only. |
+| Edit lists | Row action = Edit (pencil). |
 
-Optional thin fields if missing for UX: keep using existing columns (`number`, dates, `entity_id`, `currency_id`, `account_id` on receipt, line `item_master_id` / `account_id`).
+Prod analogue: `InvoiceList` → `Master` Create New + `createDefaults`; Books must not depend on workflow `workflowAPI.create` — use view API / domain save that inserts `status=draft`, `direction=sales`, lineage null.
 
-### Form CTA policy (dynamic footer)
+#### 2. Invoice header — **must**
 
-Prod already has two levers; Module 3B should reuse the idea, not copy the PR wizard shell wholesale.
-
-| Lever (prod) | What it drives | Books equivalent |
+| Field | Required | Notes |
 |---|---|---|
-| `isExternalSource(source_system_id)` / `isFabriqSource` | Masters + invoice: Close vs Save; Master list Eye vs Edit | View id (`*_edit_view` vs `*_readonly_view`) **and** record `source_system_id` (defense in depth) |
-| `workflow_context.current_state_ref.source_actions` | Approve / Reject / Submit buttons from DB | Not required for Module 3B (no sales workflow yet). Leave a slot for later |
-| Imperative footer (`WorkflowActions`) | Wizard step, role, Save Draft vs Cancel | Replace with a small shared **document footer** driven by a mode object |
+| `customer_id` | Yes | Lookup; on select may default currency / payment terms / bill_to from customer when empty |
+| `entity_id` | Yes | Legal entity; default HQ if one exists |
+| `invoice_date` | Yes | Default today |
+| `due_date` | No* | *Compute from `payment_terms.days` when terms set; user may override |
+| `payment_terms_id` | Recommended | Drives due date |
+| `currency_id` | Yes | Default customer currency → org/entity currency |
+| `exchange_rate` | Yes if FX | Default 1 when same as org reporting currency; editable |
+| `number` | No | Manual or leave null until numbering series (polish) |
+| `location_id` / `bill_to` | Optional | bill_to editable text |
+| `tax_region_id` | Optional | Place of supply when entity tax pack ≠ GENERIC; Defer full pack UX if GENERIC-only orgs |
+| `notes` / `reference` | Optional | |
+| `shipping_amount` / `adjustment_amount` | Optional | Include in total calc if shown; shipping UI may be Defer |
 
-**Mode object (compute once per form open):**
+Always: `direction = sales`, lineage null on create.
 
-```
-mode.capability:  'edit' | 'readonly'     // from route/view; assert vs source_system_id
-mode.status:      draft | posted | void   // document status
-mode.actions:     DocumentAction[]        // resolved CTAs for the footer
-```
+#### 3. Invoice line items — **must**
 
-**Module 3B action matrix (no workflow engine):**
+**UI**
+
+- Add line, remove line, reorder by `line_number` (add appends; drag-reorder optional Defer).
+- Block Post if zero lines or any line missing description + (qty and unit_price).
+- Columns: Item (lookup), Description, Qty, Unit price, Discount %, Tax (group or rate), Tax amount (display), Line amount (display), Account (optional), remove.
+
+**Non-catalog / free-text lines — Yes (Books)**
+
+- `item_master_id` is **optional** (schema already).
+- User may add a line with **description only** (no item): enter description, qty, price, tax manually.
+- Prod sales UX forces item SearchDropDown; Books **relaxes** this so services/ad-hoc lines work without a catalog row.
+- If item cleared: keep description/qty/price user typed; clear auto-filled tax/account only if they still match the previous item defaults (or clear tax_group and account always on clear — pick one; default: clear `tax_group_id` + `account_id`, keep description/qty/price).
+
+**Item select → copy onto line (defaults; all user-editable after)**
+
+| From `item_master` | Onto `invoice_line_item` | Editable after? |
+|---|---|---|
+| `id` | `item_master_id` | Yes (change/clear item) |
+| `name` and/or `description` | `description` (prefer item description if set, else name) | **Yes** |
+| `unit_price` | `unit_price` | **Yes** |
+| `sales_account_id` | `account_id` | **Yes** |
+| `tax_group_id` (else see tax rules) | `tax_group_id` | **Yes** |
+| `classification_code` / `classification_scheme` | same on line | Yes |
+| `code` | *display only* via relation (no denormalized code column) | — |
+| `uom_id` | *display only* via item relation for 3B | Defer line uom column |
+
+Do **not** copy qty (leave 1 or prior). Do **not** overwrite description/unit_price/tax if user already edited them **unless** this is a fresh select on an empty line (standard: selecting a new item always refreshes defaults from the item).
+
+#### 4. Discount & amount calculation — **must**
+
+Per line (money `Decimal(19,4)`; rates as stored):
+
+1. `base = quantity × unit_price`
+2. If `discount_rate` set: `discount_amount = base × discount_rate` (store rate as fraction **or** percent consistently — **lock: UI shows percent; persist `discount_rate` as percent/100 in Decimal(9,6) matching schema intent, or persist percent and document — prefer **percent in UI, store as 0–100 in `discount_rate` like prod**, compute `discount_amount = base × (discount_rate/100)`).
+3. `taxable = base − discount_amount` (floor at 0).
+4. Tax (next section) → `line_tax_amount`; write `invoice_line_tax` rows when using a group.
+5. Persist line `amount = taxable` (**exclusive of tax**, matching typical `net` semantics) **or** `amount = taxable + tax` — **lock: `amount` = taxable (net of discount, before tax)**; tax lives in `invoice_line_tax` / header `tax_amount`. Align with QBO sync conventions on this branch when they conflict — prefer exclusive net on `amount`.
+
+Header on every recalculate/save:
+
+1. `net_amount` = Σ line taxable  
+2. `tax_amount` = Σ line tax  
+3. `total_amount` = `net_amount` + `tax_amount` + (`shipping_amount` \|\| 0) + (`adjustment_amount` \|\| 0)  
+4. If no applications: `balance_amount = total_amount` when status is `posted`; draft may show projected balance = total  
+
+Recalculate on line blur/change and on Save/Post (server must recompute; do not trust client-only totals).
+
+#### 5. Tax behavior — **must**
+
+| Behavior | Requirement |
+|---|---|
+| Auto from item | On item select: set `tax_group_id` from `item_master.tax_group_id` when present. If only `tax_master_id` on item, either set a one-component calculation from that master **or** require user to pick a group — **prefer:** if `tax_group_id` null and `tax_master_id` set, create/display tax from that single `tax_master.rate`. |
+| Line tax control | User can change `tax_group_id` via lookup **or** clear tax. |
+| Edit rate | User may override: changing group rebuilds `invoice_line_tax` from `tax_group_component` → each `tax_master.rate`. For simple orgs, allow a line-level effective % override that writes a single `invoice_line_tax` row (rate + amount) tied to a chosen `tax_master` or a null-group override — **minimum:** group select + amounts from components; **also must:** allow clearing tax (0). Manual percent field that updates amounts is **must** when no group (GENERIC pack / ad-hoc lines). |
+| Persist | `invoice_line_tax`: `tax_master_id`, `rate`, `amount`, optional `tax_group_id`. |
+| Header | `tax_amount` = sum of line tax amounts. |
+| Interstate / export suggestion engine | **Defer** (prod `suggestTaxGroupId` / tax packs). Storing the user-selected group is enough for 3B. |
+
+#### 6. Payment create — **must**
+
+- Create button on payments edit list; optional from invoice **Record payment**.
+- Fields: `customer_id`, `receipt_date`, `amount`, deposit `account_id` (bank/UF), `currency_id`, optional reference/notes/`payment_method`, `entity_id`.
+- Apply: one or more `payment_receipt_application` rows (`target_type=invoice`, `amount_applied ≥ 0`).
+- T1: `amount = Σ applications.amount_applied + unapplied_amount`.
+- Default: reject apply that would make invoice `balance_amount` &lt; 0; overpay only by leaving `unapplied_amount` &gt; 0 with explicit UX.
+- Status draft/posted; lineage null.
+- Convenience `invoice_id` only when exactly one invoice application.
+
+#### 7. Credit note create — **must**
+
+- Create button on credit-notes edit list; optional from invoice **Apply credit**.
+- Header: customer, entity, date, currency, optional origin `invoice_id` (reference only), notes.
+- Lines: same line editor rules as invoice (item lookup + copy matrix, discount, tax, free-text description lines).
+- Totals: `net_amount` / `tax_amount` / `total_amount` / `balance_amount` on credit note.
+- Apply via **`credit_note_application`** (not $0 payment). Reduces invoice and credit balances in app code.
+- Status draft/posted/void; lineage null.
+
+#### 8. Form CTA policy (dynamic footer) — **must**
 
 | Capability | Status | Primary CTAs |
 |---|---|---|
-| `readonly` | any | **Close** only (optional: Open in connection — later) |
+| `readonly` | any | **Close** only |
 | `edit` | new / `draft` | **Cancel**, **Save draft**, **Post** |
-| `edit` | `posted` | **Cancel**/Close, **Record payment** / **Apply credit** (where relevant), **Void** |
+| `edit` | `posted` | **Close**, **Record payment** / **Apply credit**, **Void** |
 | `edit` | `void` | **Close** |
 
-List rows: `_edit_view` → Edit (pencil); `_readonly_view` → View (eye). Same idea as prod `Master.tsx` `isFabriqSource` branching.
+Shared `resolveDocumentActions(mode)`; route/view sets capability; if `source_system_id` set, force readonly. Later workflows **append** `source_actions`; do not replace edit/readonly.
 
-**Rules:**
+#### 9. Schema / product locks
 
-1. Prefer resolving CTAs from `mode` in one shared helper (`resolveDocumentActions(mode)`), not copy-pasted if/else in each sales form.
-2. Route/`viewId` sets capability; if the loaded row’s `source_system_id` disagrees (e.g. opened edit URL for an imported id), force `readonly` and show the imported banner.
-3. Do **not** invent fake workflow states to mean “synced”. Provenance stays on lineage; capability stays on the view + mode.
-4. When a later module adds a real workflow on invoices, **append** `source_actions` into `mode.actions` (prod pattern) instead of replacing the edit/readonly switch. Workflow buttons are an extra catalog; readonly still suppresses all mutating CTAs.
+| Topic | Lock |
+|---|---|
+| New tables for 3B | None required for MVP create |
+| Line without item | Allowed |
+| QBO write-back | No |
+| GL poster | Deferred (WP6/7) |
+| Prod workflow create | Do not require; Books uses draft/post status |
 
-Prod references (read, do not port wholesale): `frontend-1/src/utils/sourceSystem.ts`, `Master.tsx` Eye/Edit branch, `InvoiceForm.tsx` `readOnly` footer, `components/forms/sales/WorkflowActions.tsx` / `purchase-requisition/WorkflowActions.tsx`.
+#### 10. Must vs defer (summary)
+
+**Must:** Create buttons; complete invoice header+lines (add/remove, item copy, discount %, tax group/rate editable, free-text lines); server totals; draft/post/void; payment+apply; credit+apply; edit/readonly CTAs.
+
+**Defer:** IN interstate tax suggestion; shipping UI; attachments/PDF; numbering series; line UOM column; drag-reorder; multi-currency bank charges nuance; quote/SO; purchases; poster.
+
+---
+
+### Schema rules (persistence)
+
+| Rule | Detail |
+|---|---|
+| Direction | Always `sales` on editable create |
+| Lineage | Null on edit-view writes; reject form-set lineage |
+| Readonly immutability | `source_system_id` set → reject update/delete |
+| Status | `draft` → `posted` → `void` |
+| Money | `Decimal(19, 4)`; server recomputes totals |
+| Balance | Posted + no apps → `balance_amount = total_amount`; apps update per T1/T2 in app code |
 
 ### Code
 
-**Seeds**
+**Seeds** — six views + permissions; Create only on edit views.
 
-- Extend `seed:sales` / `seed:ar-settlement` (or one `seed:sales-native`) to upsert the six views above with default filters and `data_graph`.
-- Permissions / role_view for the new view names.
+**Backend** — `backend/lib/sales/`: `saveInvoice` (header+lines+line taxes+totals), `saveReceipt` + applications, `saveCreditNote` + applications, `applySettlement` helpers. **No** `ledgerPosting.ts`.
 
-**Backend**
-
-- Domain helpers under `backend/lib/sales/` for **document persistence and settlement math only** (create/update draft, post status transition, apply payment, apply credit, void).  
-  Names suggestion: `saveInvoice.ts`, `saveReceipt.ts`, `saveCreditNote.ts`, `applySettlement.ts`.
-- **Do not** implement `ledgerPosting.ts` / `postInvoice` GL legs here.
-- On `posted` / apply / void for editable rows: set or leave `ledger_status = pending` (or leave null) so a future poster can pick them up. Do not invent postings.
-- Mount routes from `domain.ts` only if the Master view API cannot express the action (e.g. “post draft”, “apply payment”). Prefer view API create/update when sufficient.
-
-**Frontend**
-
-- Forms under `frontend-0/src/domain/sales/`:
-  - Invoice create/edit on `invoice_edit_view` (lines editor).
-  - Payment create + apply-to-invoice(s) on `payment_receipt_edit_view`.
-  - Credit note create + optional apply via `credit_note_application` on `credit_note_edit_view`.
-- Shared document footer using the CTA policy above; readonly detail banner (“Imported from a connection — edit in the source system”).
-- Wire nav to dual paths; edit lists show Create. Port a thin `isExternalSource` / `isEditableSource` helper (null lineage or Books-authored = editable).
+**Frontend** — create/edit forms with line table; shared footer; `isEditableSource`; nav Create on edit lists only.
 
 ### Acceptance
 
-1. Create an invoice with one line → appears on **Invoices** (`invoice_edit_view`), **not** on Imported invoices.
-2. A QBO-synced invoice appears only on **Imported invoices** (`invoice_readonly_view`). Opening it is read-only; save is rejected if attempted.
-3. Payment against that editable invoice reduces `balance_amount`; application row visible; receipt on **Payments received** only.
-4. Credit note + `credit_note_application` reduces invoice balance without a $0 payment.
-5. Second payment that would drive balance below zero is rejected (or overpay only via explicit unapplied on the receipt — pick one; default: reject over-apply to an invoice).
-6. No `posting` rows required for acceptance (poster deferred). Trial balance unchanged by these docs until WP6.
-7. Backend `tsc --noEmit` clean.
-8. Readonly imported invoice footer shows **Close** only (no Save / Post / Void). Editable draft shows **Save draft** + **Post**.
+1. **Create** on Invoices edit list opens a blank invoice; Save draft → row on `invoice_edit_view` only.
+2. Add line → pick item → description, unit_price, account_id, tax_group_id populated; user changes tax → totals update; Post succeeds.
+3. Add line **without** item → description + qty + price + tax % → included in totals.
+4. Discount % reduces taxable and tax base correctly (server + UI).
+5. Imported invoice: no Create on imported list; open → Close only; save rejected.
+6. Record payment → applications → invoice `balance_amount` drops; T1 holds.
+7. Credit note + `credit_note_application` → balances drop; no $0 payment.
+8. Over-apply to invoice rejected (default).
+9. No GL `posting` rows required. `tsc --noEmit` clean.
 
 ### Out of scope for Module 3B
 
-- GL poster / WP6–WP7.
-- Push to QBO or any reverse sync.
-- Quote, sales order, delivery challan (Module 4 parked).
-- Purchase bills / PO / PR.
-- Editing synced rows, PDF upload, email ingest, tax engine auto-calc beyond storing amounts the user entered (or selected group totals you choose to compute client-side — no new tax service required).
+- GL poster / WP6–WP7; QBO write-back; Module 4; purchases; PDF/email; full tax-pack suggestion engine; editing synced rows.
 
 ### Recommended work packages (run one, then stop)
 
-Feed these to an agent in order. Each package must meet its own acceptance before the next starts.
-
 | WP | Name | Do | Stop when |
 |---|---|---|---|
-| **3B.0** | Dual views + nav | Seed `*_edit_view` / `*_readonly_view` for invoice, payment_receipt, credit_note with filters; wire nav/routes (`/sales/…` + `/imported`); retire single views from sidebar; list Eye vs Edit by view | Imported QBO invoice on readonly list only; empty edit list OK |
-| **3B.1** | Document mode + footer | `isEditableSource` helper; `resolveDocumentActions(mode)`; shared footer; readonly detail banner; force readonly if lineage disagrees with route | Open imported invoice → Close only; no Save |
-| **3B.2** | Invoice create/edit | Form on `invoice_edit_view`: lines, draft/post/void, lineage null, totals/balance rules | Create draft → Post → on edit list; not on imported |
-| **3B.3** | Payment create + apply | Form on `payment_receipt_edit_view`; `payment_receipt_application`; balance T1/T2 in app code | Pay posted invoice → balance drops; on payments edit list |
-| **3B.4** | Credit note + apply | Form on `credit_note_edit_view`; `credit_note_application` (no $0 payment) | Credit + apply → invoice balance drops |
+| **3B.0** | Dual views + nav + **Create buttons** | Seed edit/readonly views; routes incl. `/imported`; **Create** on each edit list only; Eye vs Edit row actions; retire old single views from nav | Create visible on Invoices/Payments/Credit notes edit lists; absent on imported lists |
+| **3B.1** | Document mode + footer | `isEditableSource`; `resolveDocumentActions`; shared footer; readonly banner | Imported open → Close only |
+| **3B.2** | Invoice create (**complete** line editor) | Header + line add/remove; item lookup + copy matrix; free-text lines; discount %; tax group/rate editable; `invoice_line_tax`; server totals; draft/post/void | Acceptance 1–5 for invoice |
+| **3B.3** | Payment create + apply | Create button + from-invoice; applications; T1/T2 | Acceptance 6, 8 |
+| **3B.4** | Credit note create + apply | Lines (same line rules); `credit_note_application` | Acceptance 7 |
 
 Do **not** fold poster, reverse sync, or purchases into any 3B.* package.
 
 ### After Module 3B (priority order)
 
-1. **Optional polish** — uom / payment_terms Master screens if create UX needs them; numbering series for `invoice.number`.
-2. **OSS** — WP-D6 (kernel docs → `main`) and/or WP-T* test harness when asked; not blocked on 3B.
-3. **Parked until explicitly un-parked** — Module 4 (quote/SO), purchases (bills/PR/PO), investing.
-4. **Deferred agentic** — WP6 poster, then WP7 sync-wire (see Deferred). Freeze open decisions in the PR before coding.
+1. **Optional polish** — numbering series; uom on lines; attachments; tax-pack suggestions.
+2. **OSS** — WP-D6 / WP-T* when asked.
+3. **Parked** — Module 4, purchases, investing.
+4. **Deferred** — WP6 → WP7 (see Deferred).
 
 ---
 
