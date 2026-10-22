@@ -87,8 +87,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Node + npm/npx from official bookworm image (same glibc).
-# npm/npx are required for AUTO_SETUP (prisma migrate diff, seed scripts).
+# Python first, then Node/npm on top so /usr/local from Python does not wipe npm.
+COPY --from=python-runtime /usr/local /usr/local
+RUN ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
+ && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python
+
+# Node + npm/npx (same glibc). npm/npx needed for AUTO_SETUP while we still
+# invoke prisma/seeds via npx; can move to baked SQL later.
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=node-runtime /usr/local/bin/npm /usr/local/bin/npm
 COPY --from=node-runtime /usr/local/bin/npx /usr/local/bin/npx
@@ -98,11 +103,6 @@ RUN ln -sf /usr/local/bin/node /usr/bin/node \
  && ln -sf /usr/local/bin/npx /usr/bin/npx \
  && node -v | grep -q "v${NODE_RUNTIME_VERSION}" \
  && npm -v >/dev/null
-
-# Python interpreter the venv shebangs expect
-COPY --from=python-runtime /usr/local /usr/local
-RUN ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
- && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python
 
 WORKDIR /app
 COPY --from=backend-builder /app /app/backend
