@@ -25,7 +25,7 @@ AR settlement design (already largely built for sync): [AR_SETTLEMENT_AND_LEDGER
 | Parties / items / tax schema + UI | Mostly done (universal model); sync lineage kept |
 | QBO forward sync → customers, items, invoices, payments, credit notes | Done (subledger; no GL poster) |
 | AR Phase 3–4 WP0–WP5 | Done (schema, dbt, Master UI, entity ledger defaults) |
-| **Next — Module 3B native create** (invoice + payment + credit) | **This plan** |
+| **Next — Module 3B create** (invoice + payment + credit; edit vs readonly views) | **This plan** |
 | Module 4 — quote / SO / challan | Parked |
 | Purchases (bills, PR, PO) | Parked |
 | Investing | Parked |
@@ -49,52 +49,56 @@ Money: `Decimal(19, 4)`. Enums lowercase. `department` stays the kernel model. `
 
 ---
 
-## View naming: native vs synced
+## View naming: edit vs readonly
 
-One Prisma model, **two Master views**. Do not use one combined list for create UX.
+One Prisma model, **two Master views**. Name views by **capability**, not by how the row got there. That keeps the pattern reusable (synced connectors today; later: locked periods, voided docs, audit mirrors, imported CSV batches, etc.).
 
 ### Convention
 
 ```
-{model}_native_view   → rows with source_system_id IS NULL   (Books-authored)
-{model}_synced_view   → rows with source_system_id IS NOT NULL (connector-authored)
+{model}_edit_view       → rows the operator may create / update in Books
+{model}_readonly_view   → rows shown in Books but not edited here
 ```
 
-| Model | Native view | Synced view |
+| Model | Edit view | Readonly view |
 |---|---|---|
-| `invoice` | `invoice_native_view` | `invoice_synced_view` |
-| `payment_receipt` | `payment_receipt_native_view` | `payment_receipt_synced_view` |
-| `credit_note` | `credit_note_native_view` | `credit_note_synced_view` |
+| `invoice` | `invoice_edit_view` | `invoice_readonly_view` |
+| `payment_receipt` | `payment_receipt_edit_view` | `payment_receipt_readonly_view` |
+| `credit_note` | `credit_note_edit_view` | `credit_note_readonly_view` |
 
-**Filters (required in seed `data_graph` / list default filter):**
+**Module 3B default filters** (seed these; change filters later without renaming views):
 
-- Native: `source_system_id` null **and** (for invoice) `direction = sales`.
-- Synced: `source_system_id` not null **and** (for invoice) `direction = sales`.
+- Edit: `source_system_id` is null **and** (for invoice) `direction = sales`.
+- Readonly: `source_system_id` is not null **and** (for invoice) `direction = sales`.
+
+Provenance (Books-authored vs connector) belongs in the **filter**, not the view name. A later module can point `_readonly_view` at a different predicate without a rename.
 
 **Nav / routes (preferred):**
 
 | Label | Path | View |
 |---|---|---|
-| Invoices | `/sales/invoices` | `invoice_native_view` |
-| Synced invoices | `/sales/invoices/synced` | `invoice_synced_view` |
-| Payments received | `/sales/payments` | `payment_receipt_native_view` |
-| Synced payments | `/sales/payments/synced` | `payment_receipt_synced_view` |
-| Credit notes | `/sales/credit-notes` | `credit_note_native_view` |
-| Synced credit notes | `/sales/credit-notes/synced` | `credit_note_synced_view` |
+| Invoices | `/sales/invoices` | `invoice_edit_view` |
+| Imported invoices | `/sales/invoices/imported` | `invoice_readonly_view` |
+| Payments received | `/sales/payments` | `payment_receipt_edit_view` |
+| Imported payments | `/sales/payments/imported` | `payment_receipt_readonly_view` |
+| Credit notes | `/sales/credit-notes` | `credit_note_edit_view` |
+| Imported credit notes | `/sales/credit-notes/imported` | `credit_note_readonly_view` |
+
+Nav labels may say “Imported …” for connector-fed lists; the view id stays `_readonly_view`.
 
 **Rules:**
 
-1. Create / edit forms bind only to **`_native_view`**. Synced paths are read-only detail (current invoice detail pattern).
-2. Native create leaves lineage null: `source_system_id`, `source_record_id`, `source_updated_at`, `ingest_batch_id`.
-3. Synced rows: **no edit, no void from Books UI** in this module (mirror only). No push to QBO.
-4. Retire or stop linking the old single `invoice_view` / `payment_receipt_view` / `credit_note_view` from nav once dual views are seeded. Keep the old names temporarily as aliases only if a seed migration needs them; do not leave both in the sidebar.
-5. Synced list may show Origin / source id columns; native list should not emphasize lineage (columns optional, hidden by default).
+1. Create / edit forms bind only to **`_edit_view`**. Readonly paths use read-only detail (current invoice detail pattern).
+2. Rows created via `_edit_view` leave lineage null: `source_system_id`, `source_record_id`, `source_updated_at`, `ingest_batch_id`.
+3. Rows on `_readonly_view` (Module 3B: connector-fed): **no edit, no void from Books UI**. No push to QBO.
+4. Retire or stop linking the old single `invoice_view` / `payment_receipt_view` / `credit_note_view` from nav once dual views are seeded. Keep old names as temporary aliases only if a seed migration needs them; do not leave both in the sidebar.
+5. Readonly list may show Origin / source id columns; edit list hides lineage by default.
 
 ---
 
-## Module 3B — Native sales create (invoice, payment, credit)
+## Module 3B — Sales create (invoice, payment, credit)
 
-**Goal.** Create and manage **Books-authored** sales invoices, payment receipts, and credit notes on the same tables QBO sync fills. Dual views separate the two populations. **No GL poster** in this module (see Deferred). **No reverse sync.**
+**Goal.** Create and manage Books-authored sales invoices, payment receipts, and credit notes on the same tables QBO sync fills. **`_edit_view` / `_readonly_view`** separate writable vs display-only populations. **No GL poster** in this module (see Deferred). **No reverse sync.**
 
 **Already on the branch (do not rebuild):**
 
@@ -136,27 +140,27 @@ Optional thin fields if missing for UX: keep using existing columns (`number`, d
 
 **Backend**
 
-- Domain helpers under `backend/lib/sales/` for **document persistence and settlement math only** (create/update draft, post status transition, apply payment, apply credit, void native).  
-  Names suggestion: `saveNativeInvoice.ts`, `saveNativeReceipt.ts`, `saveNativeCreditNote.ts`, `applySettlement.ts`.
+- Domain helpers under `backend/lib/sales/` for **document persistence and settlement math only** (create/update draft, post status transition, apply payment, apply credit, void).  
+  Names suggestion: `saveInvoice.ts`, `saveReceipt.ts`, `saveCreditNote.ts`, `applySettlement.ts`.
 - **Do not** implement `ledgerPosting.ts` / `postInvoice` GL legs here.
-- On native `posted` / apply / void: set or leave `ledger_status = pending` (or leave null) so a future poster can pick them up. Do not invent postings.
+- On `posted` / apply / void for editable rows: set or leave `ledger_status = pending` (or leave null) so a future poster can pick them up. Do not invent postings.
 - Mount routes from `domain.ts` only if the Master view API cannot express the action (e.g. “post draft”, “apply payment”). Prefer view API create/update when sufficient.
 
 **Frontend**
 
 - Forms under `frontend-0/src/domain/sales/`:
-  - Native invoice create/edit (lines editor).
-  - Native payment create + apply-to-invoice(s).
-  - Native credit note create + optional apply via `credit_note_application`.
-- Synced detail pages stay read-only; show a clear banner (“Synced from connection — edit in the source system”).
-- Wire nav to dual paths; native lists show Create.
+  - Invoice create/edit on `invoice_edit_view` (lines editor).
+  - Payment create + apply-to-invoice(s) on `payment_receipt_edit_view`.
+  - Credit note create + optional apply via `credit_note_application` on `credit_note_edit_view`.
+- Readonly detail pages: banner (“Imported from a connection — edit in the source system”).
+- Wire nav to dual paths; edit lists show Create.
 
 ### Acceptance
 
-1. Create a native customer invoice with one line → appears on **Invoices** (`invoice_native_view`), **not** on Synced invoices.
-2. A QBO-synced invoice appears only on **Synced invoices**. Opening it is read-only; save is rejected if attempted.
-3. Native payment against that invoice reduces `balance_amount`; application row visible; receipt on **Payments received** only.
-4. Native credit note + `credit_note_application` reduces invoice balance without a $0 payment.
+1. Create an invoice with one line → appears on **Invoices** (`invoice_edit_view`), **not** on Imported invoices.
+2. A QBO-synced invoice appears only on **Imported invoices** (`invoice_readonly_view`). Opening it is read-only; save is rejected if attempted.
+3. Payment against that editable invoice reduces `balance_amount`; application row visible; receipt on **Payments received** only.
+4. Credit note + `credit_note_application` reduces invoice balance without a $0 payment.
 5. Second payment that would drive balance below zero is rejected (or overpay only via explicit unapplied on the receipt — pick one; default: reject over-apply to an invoice).
 6. No `posting` rows required for acceptance (poster deferred). Trial balance unchanged by these docs until WP6.
 7. Backend `tsc --noEmit` clean.
@@ -183,7 +187,7 @@ Schema absent by design ([SALES_MODEL.md](./SALES_MODEL.md)). Fulfillment-only; 
 |---|---|
 | Bills | Same `invoice` with `direction = purchase`; `supplier.payable_account_id` exists. No `/purchases/bills`, no `postBill`. |
 | PO / PR | Stubs only (`purchase_order`, `purchase_requisition`). No line models, no workflow seed. |
-| Why parked | Sales native create + dual-view UX first; AP is a separate engagement. |
+| Why parked | Sales create + edit/readonly view UX first; AP is a separate engagement. |
 
 Suppliers list/form may stay for tax/catalog; do not expand into bill entry under this plan.
 
@@ -304,4 +308,4 @@ Capture these in the future poster brief:
 
 ## Done when
 
-Module 3B acceptance passes. Purchases, Module 4, investing, and WP6–WP7 remain parked/deferred. Sidebar shows dual native/synced sales lists. Synced data remains read-only in Books. No write-back to QBO.
+Module 3B acceptance passes. Purchases, Module 4, investing, and WP6–WP7 remain parked/deferred. Sidebar shows `_edit_view` / `_readonly_view` sales lists. Imported (readonly) data is not edited in Books. No write-back to QBO.
