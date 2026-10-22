@@ -6,7 +6,7 @@ If you want to run the app, start with [Getting started](./getting-started.md). 
 
 ## Guides
 
-**[Getting started](./getting-started.md).** Install Node and Postgres, create the database, seed the screens, sign in, and make the first entity.
+**[Getting started](./getting-started.md).** Install Node and Postgres, create the database, seed the screens, sign in, and make the first entity. For a container first-boot (Compose, Railway, or Fly) with the in-app org/chart wizard, use [Deploy](./operations/deploy.md).
 
 **[Concepts](./concepts.md).** Organization, entity, account, posting, customer, invoice, payment receipt, credit note, application, and connection, in the sense Books uses those words.
 
@@ -29,7 +29,7 @@ A bookkeeper can follow the connections guide without setting up Airbyte. The ad
 | Guide | What it covers |
 |---|---|
 | [Database](./operations/database.md) | `setup:kernel`, why routine work does not use `prisma db push`, and how later SQL files are applied. |
-| [Deploy](./operations/deploy.md) | The single Docker image, a local container, and Railway as one way to host it. |
+| [Deploy](./operations/deploy.md) | The single Docker image, `AUTO_SETUP` onboarding, local Compose, Railway, and Fly.io. |
 | [Connections setup](./operations/connections-setup.md) | Intuit app credentials, Airbyte, extraction settings, and the stream list for the QuickBooks path. |
 
 The longer operator note that the deploy guide is written from is [infrastructure/BUILD_AND_DEPLOY.md](./infrastructure/BUILD_AND_DEPLOY.md).

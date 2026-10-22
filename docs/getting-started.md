@@ -1,6 +1,8 @@
 # Getting started
 
-This page takes a new checkout from an empty database to a signed-in Books shell with the ledger and sales lists registered. Connector setup (Intuit, Airbyte, encryption keys) is not part of this path. You can explore entities, the chart, customers, and reports without a connection. When you want imported data, read [Connections](./modules/connections.md) and then [Connections setup](./operations/connections-setup.md).
+This page takes a new checkout from an empty database to a signed-in Books shell with the ledger and sales lists registered. It is the **Node + Postgres on your laptop** path. If you prefer one container that creates the schema on first boot and walks you through password, organization name, and chart of accounts in the UI, use Compose / Railway / Fly in [Deploy](./operations/deploy.md) instead (`AUTO_SETUP=true`).
+
+Connector setup (Intuit, Airbyte, encryption keys) is not part of either path. You can explore entities, the chart, customers, and reports without a connection. When you want imported data, read [Connections](./modules/connections.md) and then [Connections setup](./operations/connections-setup.md).
 
 ## What you need
 

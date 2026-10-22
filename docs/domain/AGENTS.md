@@ -10,7 +10,8 @@ Write and read these in complete paragraphs. They describe the software that run
 |---|---|
 | Anyone evaluating or running Books | [docs/README.md](../README.md), [getting-started.md](../getting-started.md), [concepts.md](../concepts.md) |
 | Ledger, sales, connections | [modules/ledger.md](../modules/ledger.md), [modules/sales-ar.md](../modules/sales-ar.md), [modules/connections.md](../modules/connections.md) |
-| Database, deploy, connector setup | [operations/database.md](../operations/database.md), [operations/deploy.md](../operations/deploy.md), [operations/connections-setup.md](../operations/connections-setup.md) |
+| Database, deploy, connector setup | [operations/database.md](../operations/database.md), [operations/deploy.md](../operations/deploy.md) (Compose, Railway, Fly + `AUTO_SETUP` onboarding), [operations/connections-setup.md](../operations/connections-setup.md) |
+| Onboarding requirements | [ONBOARDING_REQUIREMENTS.md](./ONBOARDING_REQUIREMENTS.md) |
 | How Books uses the engine | [architecture.md](../architecture.md). The engine itself is [kernel/README.md](../kernel/README.md) and stays domain-neutral. |
 | Contributors | [CONTRIBUTING.md](../../CONTRIBUTING.md), [SECURITY.md](../../SECURITY.md) |
 

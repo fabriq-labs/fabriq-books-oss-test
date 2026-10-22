@@ -1,6 +1,6 @@
 # Open-source onboarding requirements
 
-Status: requirements only. Merging this page does not implement deploy, startup, or UI behavior.
+Status: Phase 1 implemented on the Books branch (local Compose / Docker `AUTO_SETUP`, onboarding APIs and wizard). Phase 2 Railway template / README button is still outstanding. Operator deploy steps for Docker, Railway, and Fly.io are in [../operations/deploy.md](../operations/deploy.md).
 
 This document specifies how an open-source operator gets from this repository to a usable Fabriq Books instance: the container creates schema and minimum seed when pointed at an empty database, the seeded Super Admin signs in, and a short in-app wizard names the tenant and loads a chart of accounts.
 

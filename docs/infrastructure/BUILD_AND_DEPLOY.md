@@ -1,6 +1,6 @@
 # Build and deploy
 
-One image serves the UI and the API. Build the app in this repo, then deploy that image as a new service in the Railway project your token already belongs to.
+One image serves the UI and the API. Build the app in this repo, then run that image anywhere Docker runs — local Compose, Railway, or Fly.io. The operator path and onboarding env contract are in [../operations/deploy.md](../operations/deploy.md). This page keeps the image layout and the Railway / Fly CLI detail.
 
 Build the domain first. A model, its table, its view, and its form are in [../kernel/adding-a-model.md](../kernel/adding-a-model.md). Where domain files go is in [../kernel/BUILDING_A_DOMAIN.md](../kernel/BUILDING_A_DOMAIN.md).
 
@@ -21,11 +21,11 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 - `/health` proxies to `127.0.0.1:4000/api/health`
 - every other path is the SPA
 
-`/start.sh` is the only entrypoint. It requires `DATABASE_URL` and `JWT_SECRET` for an external Postgres. Nginx uses `PORT` (default `8080`). The API listens on `4000` inside the container.
+`/start.sh` is the only entrypoint. It requires `DATABASE_URL` and `JWT_SECRET` for an external Postgres. Nginx uses `PORT` (default `8080`). The API listens on `4000` inside the container. When `AUTO_SETUP` is `true` or `1`, start runs first-boot schema and minimum seed before the API (see [../operations/deploy.md](../operations/deploy.md)). The runtime image includes `npm` / `npx` so that path can invoke Prisma and the seed scripts.
 
 The image listens on `8080` only.
 
-This repo has no Railway config file. A new service defaults to Railpack. Before the first upload, set the service build to the Dockerfile at the repo root and set the deploy health check to `GET /health`. The upload has to be the repo root. An upload rooted at `backend/` does not contain `Dockerfile`.
+This repo has no Railway config file. A new Railway service defaults to Railpack. Before the first upload, set the service build to the Dockerfile at the repo root and set the deploy health check to `GET /health`. The upload has to be the repo root. An upload rooted at `backend/` does not contain `Dockerfile`. Fly.io uses the same Dockerfile via a `fly.toml` `[build]` section (example in [../operations/deploy.md](../operations/deploy.md)).
 
 Local image:
 
@@ -74,6 +74,8 @@ railway variable set \
   "DATABASE_URL=\${{${DB}.DATABASE_URL}}" \
   "AUTH_PROVIDER=local" \
   "NODE_ENV=production" \
+  "AUTO_SETUP=true" \
+  "ENABLE_SYNC_SERVICE=false" \
   --service "$APP" \
   --skip-deploys \
   --json
@@ -106,7 +108,7 @@ railway logs --service "$APP" --build -n 200
 railway logs --service "$APP" -n 200
 ```
 
-6. Apply the schema once, after the deployment is up. `npm run setup:kernel` creates the application database when needed, applies SQL from `prisma/schema` when `organizations` is missing, and seeds `org_system`, the kernel tenant, Super Admin, USD, and the shell views. Each of those views has a `data_graph`. It does not use `prisma db push`. If `organizations` already exists, it leaves the schema alone and re-runs that seed. Later tables use the SQL diff in [../kernel/adding-a-model.md](../kernel/adding-a-model.md). A product seed is a second command from `/app/backend`, after that product's tables exist. `setup:kernel` does not run it.
+6. With `AUTO_SETUP=true`, first boot applies schema when `organizations` is missing and seeds Super Admin plus Books views. Watch logs for `AUTO_SETUP complete`, then open the public URL and finish the in-app wizard. If you left `AUTO_SETUP` off, apply the schema once after the deployment is up. `npm run setup:kernel` creates the application database when needed, applies SQL from `prisma/schema` when `organizations` is missing, and seeds `org_system`, the kernel tenant, Super Admin, USD, and the shell views. Each of those views has a `data_graph`. It does not use `prisma db push`. If `organizations` already exists, it leaves the schema alone. Later tables use the SQL diff in [../kernel/adding-a-model.md](../kernel/adding-a-model.md). A product seed is a second command from `/app/backend`, after that product's tables exist. `setup:kernel` does not run it.
 
 ```bash
 railway ssh --service "$APP" -- sh -c 'cd /app/backend && npm run setup:kernel'
@@ -118,11 +120,24 @@ railway ssh --service "$APP" -- sh -c 'cd /app/backend && npm run setup:kernel'
 railway domain --service "$APP" --json
 ```
 
-Open `https://<that-host>/health`, then the same host in a browser. Login is `admin@example.com` / `admin123`.
+Open `https://<that-host>/health`, then the same host in a browser. Login is `admin@example.com` / `admin123` (change password in the onboarding wizard when `AUTO_SETUP` seeded the user).
 
 Changing a variable redeploys the service. Pass `--skip-deploys` when you are setting several, then `railway up` or `railway redeploy --service "$APP" --yes` once.
 
 To debug a service that is already deployed, read its name from `railway service list` and follow the log commands in [../../AGENTS.md](../../AGENTS.md). Leave service ids out of docs.
+
+## Fly.io: new app
+
+Use a Fly org or personal token as `FLY_API_TOKEN`. Never print it or commit it.
+
+1. `fly apps create <name> --org <org>`
+2. Create Managed Postgres (`fly mpg create`), create an application database if needed, and `fly mpg attach <cluster-id> --app <name> --database <db>` so `DATABASE_URL` is set.
+3. `fly secrets set AUTH_PROVIDER=local NODE_ENV=production AUTO_SETUP=true ENABLE_SYNC_SERVICE=false --app <name>`, and set `JWT_SECRET` from stdin (`fly secrets set JWT_SECRET=-`).
+4. Add a `fly.toml` with `dockerfile = "Dockerfile"`, `internal_port = 8080`, and `GET /health` (full example in [../operations/deploy.md](../operations/deploy.md)).
+5. From the repo root: `fly deploy --app <name> --ha=false --yes --wait-timeout 600`.
+6. Open `https://<name>.fly.dev/health`, sign in, complete onboarding.
+
+Do not write `fly secrets` or connection strings into docs or the repository.
 
 ## GitHub Actions
 

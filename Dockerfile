@@ -94,15 +94,18 @@ RUN ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
 
 # Node + npm/npx (same glibc). npm/npx needed for AUTO_SETUP while we still
 # invoke prisma/seeds via npx; can move to baked SQL later.
+# Copy the npm package tree and link the real CLIs — copying /usr/local/bin/npm
+# as a file breaks its require('../lib/cli.js') relative to bin/.
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
-COPY --from=node-runtime /usr/local/bin/npm /usr/local/bin/npm
-COPY --from=node-runtime /usr/local/bin/npx /usr/local/bin/npx
 COPY --from=node-runtime /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
-RUN ln -sf /usr/local/bin/node /usr/bin/node \
+RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+ && ln -sf /usr/local/bin/node /usr/bin/node \
  && ln -sf /usr/local/bin/npm /usr/bin/npm \
  && ln -sf /usr/local/bin/npx /usr/bin/npx \
  && node -v | grep -q "v${NODE_RUNTIME_VERSION}" \
- && npm -v >/dev/null
+ && npm -v >/dev/null \
+ && npx -v >/dev/null
 
 WORKDIR /app
 COPY --from=backend-builder /app /app/backend
