@@ -1,237 +1,307 @@
 # Agent plan: next books modules
 
-Feed this file to a coding agent one module at a time. The overview is [KERNEL_PORT.md](./KERNEL_PORT.md). The kernel rule is [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md).
+Feed this file to a coding agent **one module at a time**. Overview: [KERNEL_PORT.md](./KERNEL_PORT.md). Kernel rule: [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md).
 
-Prod is the git ref `prod` (`frontend-1`, `backend/prisma/schema/{data,sales,zeiv,tax,plaid}.prisma`). This branch is the kernel shell plus the ledger (`frontend-0`, `backend/lib/gl`, `backend/prisma/schema/domain.prisma`).
+AR settlement design (already largely built for sync): [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md). Implementation checklist: [AR_PHASE_3_4_IMPLEMENTATION.md](./AR_PHASE_3_4_IMPLEMENTATION.md) — **WP0–WP5 done; WP6–WP7 deferred** (see [Deferred — ledger poster](#deferred--ledger-poster-wp67) below).
 
 ## How to run a module
 
 1. Do the module named in the task, then stop. Do not start the next module.
-2. Read the prod files listed for that module before editing. Copy behavior. Do not copy a 1,000-line form wholesale when this schema has fewer fields.
-3. Work on a branch from this one. Domain code goes in `backend/lib/<module>/` and `frontend-0/src/domain/<module>/`. Register screens from `frontend-0/src/domain/routes.tsx` by calling `DomainRoutes()` (already how `App.tsx` mounts them). Register backend hooks from `backend/lib/domain.ts`.
+2. Read the files listed for that module before editing. Prefer current-branch schema and screens over copying prod wholesale.
+3. Work on a branch from `fabriq-books`. Domain code: `backend/lib/<module>/`, `frontend-0/src/domain/<module>/`. Register via `frontend-0/src/domain/routes.tsx` (`DomainRoutes()`) and `backend/lib/domain.ts`.
 4. Kernel files under `backend/src` and under `frontend-0/src` outside `domain/` must not import the product folder.
 5. Replace a stub in place. Keep its id prefix and `@@map` name. Do not add a second table.
 6. Do not run `prisma db push` or `prisma migrate`. Propose the SQL diff from [../kernel/adding-a-model.md](../kernel/adding-a-model.md) and apply it only if the task says the database is the local one.
-7. Do not copy `backend/integrations`, prod `setup-db.js`, or `backend/prisma/metadata/views/`. Do not redeploy an existing prod or dev service. Do not print tokens or `DATABASE_URL`.
-8. Seed with a new `npm run seed:<module>` script modeled on `backend/src/utils/setup/seedGl.ts`. Views need `data_graph`. Restart the backend after the model is registered.
-9. Prove the module: the screen creates a row, a posted document appears on Transactions, and `npx tsc --noEmit` in `backend` is clean.
+7. Do not redeploy an existing prod or dev service. Do not print tokens or `DATABASE_URL`.
+8. Seed views with `data_graph`. Restart the backend after registering a model.
+9. Prove the module: create a **native** row, list it on the native view, confirm a synced row does not appear there (and vice versa). `npx tsc --noEmit` in `backend` is clean.
 
-## Snapshot
+## Current status (fabriq-books)
 
-| Prod area | Prod home | This branch |
-|---|---|---|
-| Chart and transactions | `data.prisma` `account`, `posting`. Screens `AccountList`, `AccountForm` (35 KB), `Transactions`, `PostingForm` (64 KB) | Ported, thinner. Forms are about 420 lines. Views `account_view`, `posting_view` |
-| Statement import and categorize | `frontend-1/src/features/import-extensions/posting/`. Handler `backend/src/agent/handlers/erp/categorizeTransactionBatch.ts` (34 KB) plus historical match | Ported as a dry-run chart score in `backend/lib/gl/categorizeImportBatch.ts`. No historical match |
-| Import discard | `POST /api/import_run/:id/discard` | Ported. This is kernel |
-| Reports | `backend/src/lib/reports/perfin.ts` (70 KB). Pages under `frontend-1/src/pages/reports/` | Absent. SQL still says `account_id`, `posting_type`, `legal_entity_id` |
-| Opening balances | `frontend-1/src/pages/accounting/OpeningBalances.tsx` (31 KB) | Absent. `kind = opening` exists on `posting` |
-| Bank transactions screen | `frontend-1/src/pages/reports/BankTransactions.tsx` (51 KB) | Absent |
-| Bank feed | `plaid.prisma`, `backend/src/plaid/plaid.service.ts` (40 KB) | Stubs `ext_connection`, `ext_transaction` only. No vendor name in the schema |
-| Legal entity | `zeiv.prisma` `entity`. Form `OrganizationForm.tsx` (22 KB) | Stub: `id`, `org_id` |
-| Customers, suppliers | `zeiv.prisma` `customers`, `supplier`. Forms 25 KB and 90 KB | Absent |
-| Items | `item_master` plus `uom`, `item_category`. Form 90 KB | `item_master` stub: id, org, two account ids |
-| Sales documents | `sales.prisma` quote, sales order, delivery challan. Invoice, receipt, credit note in `zeiv.prisma` | Stubs: `invoice`, `payment_receipt`, `credit_note`. No quote or sales order |
-| Bills | Same `invoice` with `invoice_type = PURCHASE`. `BillsInvoiceForm.tsx` (49 KB), `InvoiceUpload.tsx` (66 KB) | Same invoice stub |
-| Purchase requisition and order | `zeiv.prisma`. Workflow detail pages | Stubs: id, org, `account_id` |
-| Investing | `instrument`, `trade`, `holding` in `data.prisma`. `investments.ts` (46 KB). Portfolio and options pages | Stubs: `trade`, `holding`. No `instrument` |
-| Tax | `tax.prisma`, `tax_master` | Absent |
-| ERP sync | `backend/integrations` | Do not port |
-| Categories | `category`, `category_group` | Absent. The ledger uses the contra account as the category |
+| Area | Status |
+|---|---|
+| Ledger (chart, transactions, statement import, dry-run categorize, discard) | Done |
+| Module 1 — reports, entity, exchange rates, opening balances | Done |
+| Parties / items / tax schema + UI | Mostly done (universal model); sync lineage kept |
+| QBO forward sync → customers, items, invoices, payments, credit notes | Done (subledger; no GL poster) |
+| AR Phase 3–4 WP0–WP5 | Done (schema, dbt, Master UI, entity ledger defaults) |
+| **Next — Module 3B native create** (invoice + payment + credit) | **This plan** |
+| Module 4 — quote / SO / challan | Parked |
+| Purchases (bills, PR, PO) | Parked |
+| Investing | Parked |
+| WP6 poster + WP7 sync-wire | Deferred (detailed notes below) |
+| Reverse sync / push to QBO | **Out of scope** (confirmed) |
 
 ## Names already locked
 
-Use these. Do not reintroduce the prod name.
+Use these. Do not reintroduce prod names.
 
 | Prod | This branch |
 |---|---|
 | `posting.account_id` | `debit_account_id` |
-| `posting.credit_account_id` | unchanged |
-| `posting.posting_type` | `kind` (`opening`, `duplicate`, `journal`, `reversal`, `sales_invoice`, `closing`) |
+| `posting.posting_type` | `kind` |
 | `posting.reversal_of_posting_id` | `reverses_id` |
-| `posting.legal_entity_id` | `entity_id` |
-| `posting.ai_cat_score` | `ai_category_score` |
+| `posting.legal_entity_id` / `legal_entity_id` | `entity_id` |
 | `account.base_currency_id` | `currency_id` |
-| `account.type` `String[]` | `account_types` |
-| `account.legal_entity_id` | `entity_id` |
-| `account.plaid_item_id` | `ext_connection_id` |
-| `account.inst_id` | `ext_account_id` |
-| `plaid_item` | `ext_connection` |
-| `plaid_transaction` | `ext_transaction` |
-| classification, status, reconciliation | lowercase enums already on the ledger |
+| `plaid_item` / `plaid_transaction` | `ext_connection` / `ext_transaction` |
 
-`customers` becomes `customer` when that module starts. `legal_entity_id` on every later model becomes `entity_id`. Amounts that are money use `Decimal(19, 4)`, matching `posting.amount`. Prod `Float` totals get that treatment when the column is ported.
+Money: `Decimal(19, 4)`. Enums lowercase. `department` stays the kernel model. `currency` and `attachment` stay platform. Do not fill `general_ledger`.
 
-`department` already exists on the kernel (`metadata.prisma`, id prefix `dept_`). Do not add a second department model from `zeiv.prisma`. Extend the kernel one only when a requisition needs a field it does not have.
+---
 
-`currency` and `attachment` are platform models. Do not move them into `domain.prisma`.
+## View naming: native vs synced
 
-`general_ledger` is the old chart stub. Do not fill it in. The chart is `account`.
+One Prisma model, **two Master views**. Do not use one combined list for create UX.
 
-## Module 1 — Reports, entities, and exchange rates
+### Convention
 
-**Goal.** Trial balance, income statement, balance sheet, cash flow, and posting list for an org that has more than one legal entity. Amounts in an account currency convert into the org reporting currency. Opening balances write `kind = opening` postings.
+```
+{model}_native_view   → rows with source_system_id IS NULL   (Books-authored)
+{model}_synced_view   → rows with source_system_id IS NOT NULL (connector-authored)
+```
 
-**Read first.**
+| Model | Native view | Synced view |
+|---|---|---|
+| `invoice` | `invoice_native_view` | `invoice_synced_view` |
+| `payment_receipt` | `payment_receipt_native_view` | `payment_receipt_synced_view` |
+| `credit_note` | `credit_note_native_view` | `credit_note_synced_view` |
 
-- `prod:backend/src/lib/reports/perfin.ts` functions `getTrialBalance`, `getIncomeStatement`, `getCashFlowStatement`, `getClassificationBreakdown`. Study `org_base`, `period_avg_rates`, `opening_close_rates`, and the `legalEntityIds` filter. Rewrite the SQL. Do not paste it.
-- `prod:frontend-1/src/pages/reports/BalanceSheet.tsx`, `IncomeStatement.tsx`, `CashFlow.tsx`, `PostingList.tsx`
-- `prod:frontend-1/src/pages/accounting/OpeningBalances.tsx`
-- `prod:docs/book-keeping/INCOME_STATEMENT_AND_BALANCE_SHEET.md`, `OPENING_BALANCE_AND_BALANCE_SHEET.md`, and the entity section of `BOOKKEEPING_DOMAIN.md`
-- `prod:backend/prisma/schema/zeiv.prisma` model `entity` and `prod:backend/prisma/schema/data.prisma` model `exchange_rate`
-- This branch `account`, `posting`, and the `entity` stub in `domain.prisma`. `org.basecurrency_id` and `org.base_currency` are already on `metadata.prisma`.
+**Filters (required in seed `data_graph` / list default filter):**
 
-**Schema.**
+- Native: `source_system_id` null **and** (for invoice) `direction = sales`.
+- Synced: `source_system_id` not null **and** (for invoice) `direction = sales`.
 
-Replace the `entity` stub. Keep the `ent_` id prefix and the `accounts` and `postings` relations. Fields: `name`, `legal_name`, `address`, `city`, `state`, `country`, `postal_code`, `currency_id` (functional currency; prod calls this `basecurrency_id`), `is_headquarters` boolean, required `org_id`. One org has many entities. At most one entity per org has `is_headquarters` true. Enforce that in the write path.
+**Nav / routes (preferred):**
 
-Add `exchange_rate`. Id prefix `exrt_`. Required `org_id`. `from_currency_id`, `to_currency_id`, `effective_date` as a date, `rate` as `Decimal(19, 6)`, `rate_type` enum lowercase `spot`, `closing`, `average`. Unique on `(org_id, from_currency_id, to_currency_id, effective_date, rate_type)`. Prod stores `SPOT`, `CLOSING`, `AVERAGE`. Do not copy the uppercase enum.
+| Label | Path | View |
+|---|---|---|
+| Invoices | `/sales/invoices` | `invoice_native_view` |
+| Synced invoices | `/sales/invoices/synced` | `invoice_synced_view` |
+| Payments received | `/sales/payments` | `payment_receipt_native_view` |
+| Synced payments | `/sales/payments/synced` | `payment_receipt_synced_view` |
+| Credit notes | `/sales/credit-notes` | `credit_note_native_view` |
+| Synced credit notes | `/sales/credit-notes/synced` | `credit_note_synced_view` |
 
-`account.entity_id`, `account.currency_id`, `posting.entity_id` already exist. The account form already edits `currency_id`. Add `entity_id` to the account form and the posting form.
+**Rules:**
 
-**FX rule.** The report currency is `org.basecurrency_id`. A caller may pass another `currency.id`. An account whose `currency_id` equals the report currency uses rate 1. Otherwise multiply by the latest `exchange_rate` for that org with `to_currency_id` equal to the report currency:
+1. Create / edit forms bind only to **`_native_view`**. Synced paths are read-only detail (current invoice detail pattern).
+2. Native create leaves lineage null: `source_system_id`, `source_record_id`, `source_updated_at`, `ingest_batch_id`.
+3. Synced rows: **no edit, no void from Books UI** in this module (mirror only). No push to QBO.
+4. Retire or stop linking the old single `invoice_view` / `payment_receipt_view` / `credit_note_view` from nav once dual views are seeded. Keep the old names temporarily as aliases only if a seed migration needs them; do not leave both in the sidebar.
+5. Synced list may show Origin / source id columns; native list should not emphasize lineage (columns optional, hidden by default).
 
-- Period activity on the income statement and the cash-flow lines uses `rate_type = average` with `effective_date` on or before the period end.
-- Balance-sheet balances and opening balances use `rate_type = closing` with `effective_date` before the period start for the opening column, and on or before the period end for the closing column.
-- Missing rate: leave the row in the source currency, set a `rate_missing` flag, and do not invent 1. The page shows that flag.
+---
 
-**Entity rule.** No `entity_id` query param means every posting in the org, including rows whose entity is null. `entity_id` may be repeated. When it is present, include only postings and accounts for those entities. A null entity does not match a filter. Combined multi-entity is the unfiltered report, after FX into the one report currency. Do not build HQ account remapping (`hq_account_id`) in this module.
+## Module 3B — Native sales create (invoice, payment, credit)
 
-**Reports.** Query `account` and `posting`. Rewrite every prod column from the rename table. Classifications are lowercase. Opening rows are `kind = 'opening'` and stay out of period activity. Skip `account_hierarchy` until a report is wrong without it. A recursive query in the report file is enough.
+**Goal.** Create and manage **Books-authored** sales invoices, payment receipts, and credit notes on the same tables QBO sync fills. Dual views separate the two populations. **No GL poster** in this module (see Deferred). **No reverse sync.**
 
-**Code.**
+**Already on the branch (do not rebuild):**
 
-- `backend/lib/gl/reports.ts` with one function per report. Org id comes from the caller. No SQL string from the client.
-- Mount read routes from a domain router registered in `domain.ts`. Paths under `/api`: `GET /gl/reports/trial-balance`, `income-statement`, `balance-sheet`, `cash-flow`, `posting-list`. Query params: `from`, `to`, optional repeated `entity_id`, optional `currency_id`.
-- `frontend-0/src/domain/gl/reports/` pages. Reports group in `navigation.ts`. Paths: `/reports/trial-balance`, `/reports/income-statement`, `/reports/balance-sheet`, `/reports/cash-flow`, `/reports/posting-list`. Each page has an entity multi-select and shows the report currency.
-- Opening balances: `frontend-0/src/domain/gl/OpeningBalances.tsx` at `/accounting/opening-balances`. Saving creates paired postings with `kind = opening` and the selected `entity_id`. Debit and credit totals match in the account currency.
-- Entity screen: `frontend-0/src/domain/gl/EntityForm.tsx` and a list at `/masters/entity`, view `entity_view`. Seed it from `npm run seed:gl` or a `seed:entities` script. Do not port the 22 KB prod `OrganizationForm.tsx`.
-- Exchange rates: Master list `/accounting/exchange-rates`, view `exchange_rate_view`, form routes `exchange_rate/view/:viewId` and `exchange_rate/:id/view/:viewId`.
-
-**Acceptance.**
-
-- A posting on Operating Cash and Rent Expense in the org currency appears on the trial balance with debit and credit equal.
-- An `opening` posting shows in the opening column and not in the period column.
-- Income statement shows income and expense only.
-- Two entities in one org. A posting on entity A does not appear when the report is filtered to entity B. The unfiltered report includes both, in the org reporting currency.
-- An account in a second currency with a `closing` rate of 2 contributes twice its balance to the balance sheet. With no rate row, the page shows the missing-rate flag and does not treat the rate as 1.
-- Backend `tsc --noEmit` is clean. Pages render while logged in as `admin@example.com`.
-
-**Out of scope.** Monthly trial balance, personal-income report, net-worth ratios, HQ account-to-account consolidation, translation to a presentation currency that is not the org base unless the caller passed `currency_id`.
-
-## Module 2 — Customer, supplier, item
-
-**Goal.** Add `customer`, `supplier`, `uom`, and `payment_terms`. Replace the `item_master` stub. Lists and forms. No invoices yet. The legal entity already exists from module 1. Do not replace `entity` again.
+- Schema: `invoice`, `invoice_line_item`, `payment_receipt`, `payment_receipt_application`, `credit_note`, `credit_note_item`, `credit_note_application`, tax models, lineage columns, `ledger_*` columns.
+- QBO forward sync + WP4 read-only Master lists (today’s single views).
+- Customers, items, entity ledger default *columns* (unused until poster).
 
 **Read first.**
 
-- `prod:backend/prisma/schema/zeiv.prisma` models `customers`, `supplier`, `item_master`, `uom`, `payment_terms`
-- Forms: `CustomersForm.tsx`, `SupplierForm.tsx`, `ItemMasterForm.tsx`, `UOMForm.tsx`, `PaymentTermsForm.tsx` under `prod:frontend-1/src/components/forms/Masters/`
+- This file (view naming + acceptance).
+- [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md) §§3, 6.8–6.9 (applications vs postings; native credit apply).
+- Current UI: `frontend-0/src/domain/sales/InvoiceForm.tsx`, `PaymentReceiptList.tsx`, `CreditNoteList.tsx`, `routes.tsx`, `navigation.ts`.
+- Seeds: `backend/src/utils/setup/seedSales.ts`, `seedArSettlement.ts`.
 
-**Schema.** Keep the `item_` id prefix. New prefixes: `cust_`, `supp_`, `uom_`, `payt_`. Required `org_id` on all of them. Customer and supplier: `name`, address lines, `email`, `phone`, `currency_id`, `payment_terms_id`, `entity_id` optional, `is_active`. Item: `name`, `code`, `description`, `sales_account_id`, `purchase_account_id`, `uom_id`, `unit_price` as `Decimal(19, 4)`. Drop prod sync columns (`ingest_batch_id`, default source-system id).
+### Schema
 
-`item_master.code` is unique per org, not globally. Prod’s global `@unique` on `item_code` is not copied.
+No new header models. Application-level rules only:
 
-**Code.**
+| Rule | Detail |
+|---|---|
+| Direction | Native invoice create always `direction = sales`. |
+| Customer | Required on sales invoice / receipt / credit note. |
+| Lineage | Native writes must leave lineage null. Reject create/update that sets lineage from the form. |
+| Synced immutability | API/UI: if `source_system_id` is set, reject update/delete from native forms. |
+| Status | Native invoice: `draft` → `posted` → `void`. Synced rows stay as sync mapped them (`posted` / `void`). |
+| Money | Header totals and line amounts `Decimal(19, 4)`. On save, recompute `net_amount` / `tax_amount` / `total_amount` from lines (or require explicit tax fields — pick one approach and document in the form). |
+| Balance | On create of a posted invoice with no apps: `balance_amount = total_amount`. Receipt/credit apply updates balances per design T1/T2 **in application code** (do not wait for poster). |
+| Payment apply | Prefer `payment_receipt_application` rows (signed amounts). Convenience `payment_receipt.invoice_id` only when exactly one invoice target. |
+| Credit apply (native) | Prefer `credit_note_application` (example 6.8). Do **not** invent a $0 payment unless matching QBO shape for tests. |
 
-- `backend/src/utils/setup/seedParties.ts` and `npm run seed:parties`. Views: `customer_view`, `supplier_view`, `item_master_view`, `uom_view`, `payment_terms_view`. `entity_view` already exists from module 1.
-- Forms in `frontend-0/src/domain/parties/`. Routes in `routes.tsx`: `/sales/customers`, `/purchases/suppliers`, `/masters/items`, `/masters/uom`, `/accounting/payment-terms`, plus `/{model}/view/:viewId` and `/{model}/:id/view/:viewId`. `/masters/entity` stays the module 1 screen.
-- Sidebar groups: Organization, Sales, Purchases. Sales and Purchases only show the party or item screens until module 3 and 4.
+Optional thin fields if missing for UX: keep using existing columns (`number`, dates, `entity_id`, `currency_id`, `account_id` on receipt, line `item_master_id` / `account_id`).
 
-**Acceptance.** Create one customer, one supplier, and one item whose sales account is an income account. Attach the customer to an entity from module 1. Reload the lists. `item_master` still has `sales_account_id` and `purchase_account_id`.
+### Code
 
-**Out of scope.** Item categories, locations, business units, cost centers, projects, shipping terms, tax fields on the item. `project_master` stays a stub.
+**Seeds**
 
-## Module 3 — Sales invoices, receipts, credit notes
+- Extend `seed:sales` / `seed:ar-settlement` (or one `seed:sales-native`) to upsert the six views above with default filters and `data_graph`.
+- Permissions / role_view for the new view names.
 
-**Goal.** A sales invoice posts to the ledger. A receipt settles it. A credit note reverses it.
+**Backend**
 
-**Read first.**
+- Domain helpers under `backend/lib/sales/` for **document persistence and settlement math only** (create/update draft, post status transition, apply payment, apply credit, void native).  
+  Names suggestion: `saveNativeInvoice.ts`, `saveNativeReceipt.ts`, `saveNativeCreditNote.ts`, `applySettlement.ts`.
+- **Do not** implement `ledgerPosting.ts` / `postInvoice` GL legs here.
+- On native `posted` / apply / void: set or leave `ledger_status = pending` (or leave null) so a future poster can pick them up. Do not invent postings.
+- Mount routes from `domain.ts` only if the Master view API cannot express the action (e.g. “post draft”, “apply payment”). Prefer view API create/update when sufficient.
 
-- `prod:backend/prisma/schema/zeiv.prisma` models `invoice`, `invoice_line_item`, `payment_receipt`, `credit_note`, `credit_note_item`
-- `prod:frontend-1/src/pages/InvoiceList.tsx`, `components/forms/invoice/BillsInvoiceForm.tsx` (sales mode), `components/forms/Masters/PaymentReceiptForm.tsx`, `components/forms/sales/CreditNoteForm.tsx`
-- This branch stubs in `domain.prisma` (`inv_`, `payr_`, `cn_`)
+**Frontend**
 
-**Schema.** Replace the three stubs. Add `invoice_line_item` (`invl_`) and `credit_note_item` (`cni_`). `invoice.direction` is `sales` or `purchase` (prod `invoice_type`, stored lowercase). This module only writes `sales`. Header: `number`, `invoice_date`, `due_date`, `customer_id`, `entity_id`, `currency_id`, `status` (`draft`, `posted`, `void`), `net_amount`, `tax_amount`, `total_amount`, `balance_amount`, all money `Decimal(19, 4)`. Lines: `item_master_id`, `description`, `quantity`, `unit_price`, `amount`, `account_id`. Receipt: `customer_id`, `invoice_id`, `account_id` (bank), `amount`, `receipt_date`, `posting_id`. Credit note: `invoice_id`, `customer_id`, lines, `posting_id`.
+- Forms under `frontend-0/src/domain/sales/`:
+  - Native invoice create/edit (lines editor).
+  - Native payment create + apply-to-invoice(s).
+  - Native credit note create + optional apply via `credit_note_application`.
+- Synced detail pages stay read-only; show a clear banner (“Synced from connection — edit in the source system”).
+- Wire nav to dual paths; native lists show Create.
 
-On post, insert one `posting`: debit the customer’s receivable account (require an account id on the customer, add `receivable_account_id` in this module), credit the line account. `posting.invoice_id` is already on the posting model. `kind` may be `sales_invoice`. Receipt: debit bank, credit receivable, set `payment_receipt.posting_id`. Void sets `status` and writes a reversing posting through `reverses_id`.
+### Acceptance
 
-**Code.** `backend/lib/sales/postInvoice.ts` and `postReceipt.ts`. Seed `npm run seed:sales` for `invoice_view`, `payment_receipt_view`, `credit_note_view`. Screens under `frontend-0/src/domain/sales/`. Paths match prod: `/sales/invoices`, `/sales/payment-receipts`, `/sales/credit-notes`.
+1. Create a native customer invoice with one line → appears on **Invoices** (`invoice_native_view`), **not** on Synced invoices.
+2. A QBO-synced invoice appears only on **Synced invoices**. Opening it is read-only; save is rejected if attempted.
+3. Native payment against that invoice reduces `balance_amount`; application row visible; receipt on **Payments received** only.
+4. Native credit note + `credit_note_application` reduces invoice balance without a $0 payment.
+5. Second payment that would drive balance below zero is rejected (or overpay only via explicit unapplied on the receipt — pick one; default: reject over-apply to an invoice).
+6. No `posting` rows required for acceptance (poster deferred). Trial balance unchanged by these docs until WP6.
+7. Backend `tsc --noEmit` clean.
 
-**Acceptance.** Post a one-line invoice. Transactions shows the debit and credit. Trial balance from module 1 still balances. A receipt reduces `balance_amount`. A second receipt past the balance is rejected.
+### Out of scope for Module 3B
 
-**Out of scope.** Quote, sales order, delivery challan, invoice PDF upload, email ingest, tax calculation. Leave those prod files unread except to avoid copying them.
+- GL poster / WP6–WP7.
+- Push to QBO or any reverse sync.
+- Quote, sales order, delivery challan (Module 4 parked).
+- Purchase bills / PO / PR.
+- Editing synced rows, PDF upload, email ingest, tax engine auto-calc beyond storing amounts the user entered (or selected group totals you choose to compute client-side — no new tax service required).
 
-## Module 4 — Sales orders (after module 3)
+---
 
-**Goal.** Quote, sales order, and delivery challan, without posting until an invoice is created from the order.
+## Parked (do not start)
 
-**Read first.** `prod:backend/prisma/schema/sales.prisma`. Forms `QuotesForm.tsx`, `SalesOrderForm.tsx`, `DeliveryChallanForm.tsx`.
+### Module 4 — Quotes, sales orders, delivery challan
 
-**Schema.** New models `quote`, `quote_item`, `sales_order`, `sales_order_item`, `delivery_challan`, `delivery_challan_item`. Status strings lowercase. `sales_order.invoice_id` optional. Creating the invoice copies lines and then uses module 3’s post function.
+Schema absent by design ([SALES_MODEL.md](./SALES_MODEL.md)). Fulfillment-only; no posting until invoice. Revisit when native invoice create is stable and a fulfillment workflow is needed.
 
-**Acceptance.** An order in `draft` creates no posting. “Create invoice” creates a draft invoice whose lines match the order.
+### Purchases — bills, purchase orders, requisitions
 
-## Module 5 — Purchase bills
+| Item | Notes |
+|---|---|
+| Bills | Same `invoice` with `direction = purchase`; `supplier.payable_account_id` exists. No `/purchases/bills`, no `postBill`. |
+| PO / PR | Stubs only (`purchase_order`, `purchase_requisition`). No line models, no workflow seed. |
+| Why parked | Sales native create + dual-view UX first; AP is a separate engagement. |
 
-**Goal.** A supplier bill is an `invoice` with `direction = purchase`. It posts debit expense (or the item purchase account), credit the supplier payable.
+Suppliers list/form may stay for tax/catalog; do not expand into bill entry under this plan.
 
-**Read first.** `BillsInvoiceForm.tsx`, `InvoiceLineItems.tsx`, and the purchase branch of the prod invoice save path. Search prod for `PURCHASE` near invoice create.
+### Investing — instruments, trades, holdings
 
-**Schema.** Add `supplier.payable_account_id`. Bill header uses `supplier_id` and leaves `customer_id` null. Check constraint is application-level: sales requires customer, purchase requires supplier.
+Stubs only; no `instrument` model. Manual trade posting is a later module after sales native path exists.
 
-**Code.** `backend/lib/purchases/postBill.ts`. Screen `/purchases/bills` in `frontend-0/src/domain/purchases/`. Seed can extend `seed:sales` or be `npm run seed:bills` if the invoice view must filter by direction. Prefer one `invoice_view` and a default filter `direction = sales` on the sales list, `direction = purchase` on the bills list.
-
-**Acceptance.** A posted bill increases the payable and the expense. Trial balance balances. Paying it writes the opposite posting and clears `balance_amount`.
-
-**Out of scope.** Bill PDF upload (`InvoiceUpload.tsx`), PO match, tax lines.
-
-## Module 6 — Purchase orders and requisitions
-
-**Goal.** Requisition, then purchase order, then “create bill” from the order. Requisition approval uses the kernel workflow.
-
-**Read first.** `prod:backend/prisma/schema/zeiv.prisma` models `purchase_requisition`, `item` (the PR line; do not confuse with `item_master`), `purchase_order`, `purchase_order_item`. Pages `PurchaseRequisition.tsx`, `PurchaseOrder.tsx`. Kernel workflow docs: [../kernel/workflows.md](../kernel/workflows.md).
-
-**Schema.** Replace the `purchase_requisition` and `purchase_order` stubs. Add line models. Prod names the PR line `item`, which collides with nothing here but is a bad name. Call it `purchase_requisition_line`. Status lowercase. `entity_id` not `legal_entity_id`. Money as `Decimal`. Do not port every boolean on the prod requisition (`on_behalf_of`, `on_budget`, `request_for_project`). First slice: number, date, requester user id, `entity_id`, `account_id`, lines (description, quantity, `unit_price`, `item_master_id`), status.
-
-**Workflow.** Seed one flow: draft → submitted → approved → closed, and a reject back to draft. Register the model on `DOMAIN_WORKFLOW_MODELS` in `domain.ts` only after the flow exists.
-
-**Acceptance.** An approved order can create a purchase invoice (module 5) whose lines copy over. The order itself has no posting.
-
-**Out of scope.** Budget check, project, cost center, location. Stubs `budget_period` and `project_master` stay stubs.
-
-## Module 7 — Investing, manual only
-
-**Goal.** Instruments, trades, and holdings. A trade writes a posting. No broker calls.
-
-**Read first.**
-
-- `prod:backend/prisma/schema/data.prisma` models `instrument`, `trade`, `holding` and enums `instrument_type`, `trade_type`
-- `prod:docs/book-keeping/INVESTMENTS.md` through the manual-entry section
-- Forms `TradeForm.tsx`, `HoldingForm.tsx`
-- Skip `backend/src/lib/reports/investments.ts` and `frontend-1/src/pages/investments/OptionsIncomeReport.tsx` until a follow-up says otherwise
-
-**Schema.** Add `instrument` as shareable: `org_id` is `system`, same pattern as `currency`. Fields: `symbol`, `name`, `instrument_type` lowercase (`stock`, `etf`, `option`, `cash`, `bond`, `mutual_fund`), `currency_id`, `isin`. Replace `trade` and `holding` stubs. Trade: `instrument_id`, `account_id` (cash), `target_account_id` (investment account), `trade_type` (`buy`, `sell`), `quantity`, `price`, `amount`, `trade_date`, `posting_id`, `org_id`. Holding: `instrument_id`, `account_id`, `quantity`, `org_id`. Prod `holding.account_id` is required; keep it required.
-
-Buy posting: debit `target_account_id`, credit `account_id`. Sell is the reverse. `kind` stays `journal` unless you add `trade` to the kind comment in `domain.prisma` and the seed description.
-
-**Code.** `backend/lib/investing/postTrade.ts`. Seed `npm run seed:investing`. Screens `/investments/instruments`, `/investments/trades`, `/investments/holdings`. Portfolio page is a later report, not this module.
-
-**Acceptance.** Buy 1 unit at a price. Transactions shows the two accounts. Holding quantity for that org and instrument is 1. A sell larger than the holding is rejected.
-
-**Out of scope.** Option chain, quotes, mobile `/m`, portfolio MCP tools, any broker SDK. The connection model remains `ext_connection`.
-
-## Do not start these
+### Other stand-downs (unchanged)
 
 | Item | Reason |
 |---|---|
-| Bank-feed service and bank-transactions screen | Statement CSV and PDF already import. A live feed is a connector on `ext_connection` after reports exist |
-| Tax regions, groups, line tax | Add when a bill or invoice task says a rate is required. US/CA and India do not share one table |
-| ERP connectors and prod `backend/integrations` | Sales and purchases have to exist here first |
-| Historical categorization and `suggestReconciliationMatches.ts` | The mapper scores against the chart. Matching a bank line to an invoice is a sales/purchase task, in that module’s lib |
-| Invoice and bill PDF extractors | `prod:backend/src/lib/extractors/invoice-extractor.ts` and `InvoiceUpload.tsx` |
-| Filling `general_ledger` | The chart is `account` |
-| Copying prod `category` / `category_group` | The contra account is the category |
+| Bank-feed service / bank-transactions screen | Statement CSV/PDF already import |
+| Reverse sync / QBO write-back | Product decision: **no** |
+| Historical bank↔invoice match | Separate from document create |
+| Invoice/bill PDF extractors | Prod-only for now |
+| Filling `general_ledger` / copying `category` | Chart is `account`; contra is category |
 
-## Done when the sequence is done
+---
 
-Modules 1 through 7 each meet their acceptance checks. `backend/src` still has no import from `backend/lib/sales`, `backend/lib/purchases`, or `backend/lib/investing` except the calls inside `backend/lib/domain.ts`. The sidebar shows Reports, the party screens, Sales, Purchases, and Investments. A sales invoice, a supplier bill, and a trade each appear on Transactions and on the trial balance.
+## Deferred — ledger poster (WP6/WP7)
+
+**Status:** Deferred to a later **agentic** (or dedicated) engagement. Do **not** implement under Module 3B.
+
+**Design source:** [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md) §5–§6, §8. Checklist: [AR_PHASE_3_4_IMPLEMENTATION.md](./AR_PHASE_3_4_IMPLEMENTATION.md) WP6–WP7.
+
+### Why defer
+
+Subledger sync and (after 3B) native documents can exist without GL. The poster is **mostly deterministic** for happy-path economics, but several **policy decisions and resolution rules are still open**. Coding WP6 without freezing them forces an implementer to invent accounting policy.
+
+### What is already specified (deterministic core)
+
+Use this as the future requirements baseline — do not contradict it when the poster is built.
+
+1. **What creates GL**
+   - Invoice → Dr AR / Cr income (+ tax liability when `tax_amount` > 0).
+   - Credit note → reverse of invoice legs.
+   - Payment receipt → Dr deposit account (UF/bank) / Cr AR for `amount`.
+   - **Applications do not post** (no GL on `payment_receipt_application` / `credit_note_application`), except a possible later FX/reclass exception.
+   - Receipt `amount = 0` → `ledger_status = not_required` (QBO-style credit apply via $0 payment).
+
+2. **Idempotency**
+   - Reverse-and-repost by `posting_key`.
+   - Partial unique on active `(org_id, posting_key)`.
+   - Kinds: `sales_invoice`, `sales_credit_note`, `sales_receipt` (+ `sales_settlement` only if FX/reclass ever posts).
+   - Shared functions for native and sync so backfill cannot double-post.
+
+3. **Order of operations (WP7)**
+   - After sync (or on native post): invoices → credit notes → receipts.
+   - Then optional app FX (out of scope until multi-currency is chosen).
+
+4. **Close invariant (T4)**
+   ```
+   GL A/R  =  Σ invoice.balance_amount
+            − Σ payment_receipt.unapplied_amount
+            − Σ credit_note.balance_amount
+   ```
+
+5. **Worked examples** in design §6.1–6.9 (full pay, partial, multi-invoice receipt, overpay, advance, credit+$0 payment, mixed cash+credit, native `credit_note_application`). Future poster tests should encode these fixtures.
+
+6. **Schema already landed (WP5)**
+   - `posting.credit_note_id`, `posting_key`, multi-posting per receipt, entity default account columns, `ledger_status` on docs.
+
+### Open decisions that must be frozen before WP6
+
+From design §8 and gaps found in review — **product/agent must choose before coding**:
+
+| # | Topic | Options / recommendation in design | Impact if undecided |
+|---|---|---|---|
+| 1 | Ledger cutover | Post all history vs honor `entity.ledger_start_date` (+ openings). Design leans cutover date. | Wrong opening AR / duplicate history |
+| 2 | Multi-currency | Block non-functional-currency docs (`ledger_status=blocked`) vs FX legs now. Design leans block. | Silent bad rates vs blocked backlog |
+| 3 | Bank feed vs QBO cash | Avoid double-count when statement import and QBO receipts both hit cash. | Double cash / AR |
+| 4 | Void in closed period | Retroactive reverse vs dated contra void. Design leans reverse. | Audit trail shape |
+| 5 | QBO Deposits | Out of Phase 3–4; receipts stay on Undeposited Funds. Confirm still true. | UF vs bank presentation |
+
+### Requirements still thin (agent will guess unless written)
+
+Capture these in the future poster brief:
+
+| Topic | Needed rule |
+|---|---|
+| Account resolution order | Priority when building legs: line `account_id` → item sales/purchase account → `entity.default_income_account_id` / `default_receivable_account_id` / `default_undeposited_funds_account_id` → customer `receivable_account_id` → receipt `account_id`. On miss → `ledger_status=blocked` + `ledger_error`, **do not** invent accounts. |
+| Tax liability account | Which account for tax credit leg: tax_master / group component / entity setting? Not specified. |
+| Discount / shipping / adjustment | Header and line fields exist; no poster examples. Include or park explicitly. |
+| Multiple income accounts on one invoice | One posting per distinct credit account vs single lumped income leg. Example `posting_key` shapes suggest per-bucket keys — confirm algorithm. |
+| Native vs sync trigger | Native: post on status→`posted` and on void. Sync: WP7 after dbt + resolve/sweep. Same library both paths. |
+| Repost triggers | Amount/date/account change on a native posted doc → reverse old keys, write new. Synced: re-sync then poster; no Books edit. |
+| `ledger_mark-pending` | Script exists; poster should select `pending` / null / needs-repost, skip `posted` unchanged, skip `not_required` / `blocked`. |
+
+### Suggested future package shape (when un-deferred)
+
+**WP6 — Shared poster library (no sync hook)**
+
+- `backend/lib/sales/ledgerPosting.ts`: `postInvoice`, `postCreditNote`, `postPaymentReceipt`.
+- Advisory lock per doc; reverse-and-repost by `posting_key`.
+- Unit tests from design examples 6.1, 6.3, 6.6 (and 6.8 for “no receipt posting”).
+- Acceptance: post twice → no duplicate active rows; change amount + repost → old reversed; $0 receipt → `not_required`.
+
+**WP7 — Wire after sync + backfill + T4**
+
+- Run poster after successful sync for the org (invoice → CN → receipt).
+- CLI `ledger:post-org` for backfill.
+- Warn-level T4 report; document variances (unsynced refunds/JEs, deposits).
+- Acceptance: synced payment → receipt in UI → postings on Transactions / trial balance; re-sync does not duplicate.
+
+### Explicitly still later than WP6/7
+
+- QBO Deposit → `bank_deposit`
+- RefundReceipt / refund checks / A/R journal entries
+- Multi-currency FX on applications
+- Reverse sync
+- Bills / PO
+
+### Agent prompt when ready
+
+> Implement WP6 only from `docs/domain/AR_PHASE_3_4_IMPLEMENTATION.md`, using the Deferred section of `AGENT_PLAN.md` as the requirements freeze. Before coding, confirm the open-decision table (cutover, multi-currency=block, void policy) in the PR description. Do not start WP7.
+
+---
+
+## Done when
+
+Module 3B acceptance passes. Purchases, Module 4, investing, and WP6–WP7 remain parked/deferred. Sidebar shows dual native/synced sales lists. Synced data remains read-only in Books. No write-back to QBO.

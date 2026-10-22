@@ -45,18 +45,18 @@ Not ported, and not part of the ledger slice: trial balance and the other financ
 
 ## Module order
 
-Sales, purchases, and investing all post into `account` and `posting`. Reports come first so those postings can be checked. Parties and items are shared, so they come before either document flow. Investing does not depend on sales or purchases.
+Reports came first so postings can be checked. Parties and the universal sales schema landed next; QBO forward sync fills the same tables. The active slice is **native create** on those tables (dual native/synced views). Purchases, fulfillment (quote/SO), investing, and the GL poster are parked or deferred — see [AGENT_PLAN.md](./AGENT_PLAN.md).
 
 ```
 ledger (done)
-  → reports, legal entities, exchange rates
-  → customers, suppliers, items
-  → sales
-  → purchases
-  → investing
+  → reports, legal entities, exchange rates (done)
+  → parties / items / tax + QBO sync subledger (done)
+  → Module 3B: native invoice + payment + credit (next)
+  → [parked] purchases, quote/SO, investing
+  → [deferred] WP6/WP7 ledger poster
 ```
 
-Tax rates, bank feeds, and ERP sync are called out inside the module that needs them. They are not a separate first slice.
+No reverse sync / push to QBO in the current plan.
 
 ### 1. Reports, legal entities, and exchange rates
 

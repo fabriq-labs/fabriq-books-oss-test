@@ -187,9 +187,11 @@ WP1 and WP2 can proceed in parallel after WP0. WP4 can start once WP2 lands data
 
 ## WP6 — Shared poster library
 
+> **Deferred.** Do not implement until a task explicitly names WP6. Requirements freeze, open decisions, and thin spots: [AGENT_PLAN.md](./AGENT_PLAN.md) § Deferred — ledger poster (WP6/7). Native document create is Module 3B in that plan and must not grow a poster.
+
 **Goal.** Idempotent create/reverse/repost for invoice, credit note, receipt.
 
-**Read.** Design §5 legs table; §6 examples; existing `backend/lib/gl` patterns if any.
+**Read.** Design §5 legs table; §6 examples; AGENT_PLAN Deferred section; existing `backend/lib/gl` patterns if any.
 
 **Do.**
 
@@ -210,9 +212,11 @@ WP1 and WP2 can proceed in parallel after WP0. WP4 can start once WP2 lands data
 
 ## WP7 — Wire after sync + backfill + AR tie-out
 
+> **Deferred** with WP6. See [AGENT_PLAN.md](./AGENT_PLAN.md) Deferred section.
+
 **Goal.** Production path: sync lands docs → poster runs → close check.
 
-**Read.** Design §5 order of operations; T4 close invariant.
+**Read.** Design §5 order of operations; T4 close invariant; AGENT_PLAN Deferred.
 
 **Do.**
 
@@ -266,5 +270,5 @@ WP1 and WP2 can proceed in parallel after WP0. WP4 can start once WP2 lands data
 - [x] WP3 Resolver / sweep / voids (`ar_settlement_ops` on-run-end; CDC deferred)  
 - [x] WP4 Master UI (list views + nav; read-only)  
 - [x] WP5 Posting schema + ledger settings (schema only; poster later)  
-- [ ] WP6 Poster lib  
-- [ ] WP7 Sync wire + backfill + T4  
+- [ ] WP6 Poster lib — **deferred** (see [AGENT_PLAN.md](./AGENT_PLAN.md) Deferred — ledger poster)  
+- [ ] WP7 Sync wire + backfill + T4 — **deferred** (same)
