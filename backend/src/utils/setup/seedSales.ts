@@ -450,6 +450,45 @@ const VIEWS: Array<{
     },
   },
   {
+    id: 'view_sales_payment_terms',
+    name: 'payment_terms_view',
+    model: 'payment_terms',
+    description: 'Payment terms',
+    data_graph: {
+      id: { dataType: 'string', permission: 'read' },
+      name: {
+        dataType: 'string',
+        permission: 'update',
+        required: true,
+        displayName: 'Name',
+        isColumnShow: true,
+        searchProps: { isSearch: true, operation: 'contains' },
+        tableProps: { width: '200', columnType: 'text' },
+      },
+      days: {
+        dataType: 'number',
+        permission: 'update',
+        displayName: 'Days',
+        isColumnShow: true,
+        tableProps: { width: '80', columnType: 'number' },
+      },
+      description: {
+        dataType: 'string',
+        permission: 'update',
+        displayName: 'Description',
+        isColumnShow: true,
+        tableProps: { width: '240', columnType: 'text' },
+      },
+      is_active: {
+        dataType: 'boolean',
+        permission: 'update',
+        displayName: 'Active',
+        isColumnShow: true,
+        tableProps: { columnType: 'checkbox' },
+      },
+    },
+  },
+  {
     id: 'view_sales_invoice',
     name: 'invoice_view',
     model: 'invoice',
@@ -958,7 +997,7 @@ async function main() {
   await seedDefaultTaxRegions();
   console.log('Sales + catalog views ready.');
   console.log(
-    '  customer_view, invoice_view, invoice_edit_view, invoice_readonly_view, item_master_view, supplier_view, tax_master_view, tax_group_view, tax_region_view'
+    '  customer_view, payment_terms_view, invoice_view, invoice_edit_view, invoice_readonly_view, item_master_view, supplier_view, tax_master_view, tax_group_view, tax_region_view'
   );
 }
 

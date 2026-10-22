@@ -199,6 +199,7 @@ async function main() {
             'customer_view',
             'invoice_view',
             'invoice_edit_view',
+            'payment_terms_view',
             'item_master_view',
             'supplier_view',
             'tax_master_view',

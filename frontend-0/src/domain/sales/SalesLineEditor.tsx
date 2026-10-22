@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SearchDropDown } from '@/components/search_dropdown/dropdown';
-import { computeLinePreview, moneyLabel } from './lineMath';
+import { moneyLabel } from './lineMath';
 
 export type SalesLineDraft = {
   /** Server id when persisted */
@@ -19,11 +19,12 @@ export type SalesLineDraft = {
   discount_rate: string;
   tax_group_id?: string | null;
   tax_group?: { id?: string; name?: string } | null;
-  /** Manual tax % when no group (preview + persisted via single tax row after save if group used). */
-  tax_rate: string;
   account_id?: string | null;
   account?: { id?: string; name?: string; code?: string | null } | null;
+  /** Server-computed net (ex-tax). Shown after API calc — never computed in the browser. */
   amount?: string | number | null;
+  /** Server-computed line tax total when available from line_taxes. */
+  tax_amount?: string | number | null;
 };
 
 type Props = {
@@ -46,13 +47,14 @@ export function emptySalesLine(lineNumber: number): SalesLineDraft {
     quantity: '1',
     unit_price: '0',
     discount_rate: '',
-    tax_rate: '',
     item_master_id: null,
     item_master: null,
     tax_group_id: null,
     tax_group: null,
     account_id: null,
     account: null,
+    amount: null,
+    tax_amount: null,
   };
 }
 
@@ -69,6 +71,8 @@ function applyItemDefaults(
       tax_group: null,
       account_id: null,
       account: null,
+      amount: null,
+      tax_amount: null,
     };
   }
   const description =
@@ -101,17 +105,65 @@ function applyItemDefaults(
       : item.tax_group_id
         ? { id: item.tax_group_id }
         : null,
-    tax_rate: item.tax_group_id
-      ? line.tax_rate
-      : item.tax_master?.rate != null
-        ? String(item.tax_master.rate)
-        : line.tax_rate,
+    // Clearing local money display — server recomputes on save/API.
+    amount: null,
+    tax_amount: null,
+  };
+}
+
+function sumLineTaxes(lineTaxes: any[] | undefined): string | number | null {
+  if (!Array.isArray(lineTaxes) || lineTaxes.length === 0) return null;
+  let sum = 0;
+  let any = false;
+  for (const row of lineTaxes) {
+    if (row?.amount == null || row.amount === '') continue;
+    const n = Number(row.amount);
+    if (!Number.isFinite(n)) continue;
+    sum += n;
+    any = true;
+  }
+  return any ? sum : null;
+}
+
+export function mapServerLine(row: any, idx: number): SalesLineDraft {
+  return {
+    key: row.id || newLineKey(),
+    id: row.id,
+    line_number: row.line_number ?? idx + 1,
+    item_master_id: row.item_master_id ?? null,
+    item_master: row.item_master ?? null,
+    description: row.description ?? '',
+    quantity: row.quantity != null ? String(row.quantity) : '1',
+    unit_price: row.unit_price != null ? String(row.unit_price) : '0',
+    discount_rate: row.discount_rate != null ? String(row.discount_rate) : '',
+    tax_group_id: row.tax_group_id ?? null,
+    tax_group: row.tax_group ?? null,
+    account_id: row.account_id ?? null,
+    account: row.account ?? null,
+    amount: row.amount ?? null,
+    tax_amount: sumLineTaxes(row.line_taxes),
   };
 }
 
 export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
   const updateLine = (key: string, patch: Partial<SalesLineDraft>) => {
-    onChange(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+    const clearsServerMoney =
+      'quantity' in patch ||
+      'unit_price' in patch ||
+      'discount_rate' in patch ||
+      'tax_group_id' in patch ||
+      'item_master_id' in patch;
+    onChange(
+      lines.map((l) => {
+        if (l.key !== key) return l;
+        const next = { ...l, ...patch };
+        if (clearsServerMoney) {
+          if (patch.amount === undefined) next.amount = null;
+          if (patch.tax_amount === undefined) next.tax_amount = null;
+        }
+        return next;
+      })
+    );
   };
 
   const removeLine = (key: string) => {
@@ -138,147 +190,135 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
               <th className="py-2 pr-2 font-medium">Qty</th>
               <th className="py-2 pr-2 font-medium">Unit price</th>
               <th className="py-2 pr-2 font-medium">Disc %</th>
-              <th className="py-2 pr-2 font-medium">Tax</th>
-              <th className="py-2 pr-2 font-medium">Tax %</th>
+              <th className="py-2 pr-2 font-medium">Tax group</th>
               <th className="py-2 pr-2 text-right font-medium">Net</th>
-              <th className="py-2 pr-2 text-right font-medium">Tax amt</th>
+              <th className="py-2 pr-2 text-right font-medium">Tax</th>
               {!readOnly ? <th className="py-2 font-medium" /> : null}
             </tr>
           </thead>
           <tbody>
-            {lines.map((line) => {
-              const preview = computeLinePreview(line);
-              return (
-                <tr key={line.key} className="border-b align-top last:border-0">
-                  <td className="py-2 pr-2 pt-3">{line.line_number}</td>
-                  <td className="py-2 pr-2" style={{ minWidth: 160 }}>
-                    {readOnly ? (
-                      <span>{line.item_master?.name ?? line.item_master?.code ?? '—'}</span>
-                    ) : (
-                      <SearchDropDown
-                        instanceType="item_master"
-                        instanceKey="id"
-                        instanceSourceKey="item_master_id"
-                        instanceLabel="name"
-                        instanceSubLabel="code"
-                        instanceValue={line.item_master ?? null}
-                        onSelectItem={(_source, _key, value) => {
-                          const item = (value?.item ?? value) as Record<string, any>;
-                          updateLine(line.key, applyItemDefaults(line, item));
-                        }}
-                        onClear={() => updateLine(line.key, applyItemDefaults(line, null))}
-                        limit={10}
-                        searchParams="name"
-                        type="item_master"
-                        isShowSearch={true}
-                        placeholder="Item"
-                      />
-                    )}
+            {lines.map((line) => (
+              <tr key={line.key} className="border-b align-top last:border-0">
+                <td className="py-2 pr-2 pt-3">{line.line_number}</td>
+                <td className="py-2 pr-2" style={{ minWidth: 160 }}>
+                  {readOnly ? (
+                    <span>{line.item_master?.name ?? line.item_master?.code ?? '—'}</span>
+                  ) : (
+                    <SearchDropDown
+                      instanceType="item_master"
+                      instanceKey="id"
+                      instanceSourceKey="item_master_id"
+                      instanceLabel="name"
+                      instanceSubLabel="code"
+                      instanceValue={line.item_master ?? null}
+                      onSelectItem={(_source, _key, value) => {
+                        const item = (value?.item ?? value) as Record<string, any>;
+                        updateLine(line.key, applyItemDefaults(line, item));
+                      }}
+                      onClear={() => updateLine(line.key, applyItemDefaults(line, null))}
+                      limit={10}
+                      searchParams="name"
+                      type="item_master"
+                      isShowSearch={true}
+                      placeholder="Item"
+                    />
+                  )}
+                </td>
+                <td className="py-2 pr-2" style={{ minWidth: 180 }}>
+                  {readOnly ? (
+                    <span>{line.description || '—'}</span>
+                  ) : (
+                    <Input
+                      value={line.description ?? ''}
+                      onChange={(e) => updateLine(line.key, { description: e.target.value })}
+                    />
+                  )}
+                </td>
+                <td className="py-2 pr-2" style={{ width: 88 }}>
+                  {readOnly ? (
+                    <span>{line.quantity}</span>
+                  ) : (
+                    <Input
+                      value={line.quantity}
+                      onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
+                    />
+                  )}
+                </td>
+                <td className="py-2 pr-2" style={{ width: 110 }}>
+                  {readOnly ? (
+                    <span>{line.unit_price}</span>
+                  ) : (
+                    <Input
+                      value={line.unit_price}
+                      onChange={(e) => updateLine(line.key, { unit_price: e.target.value })}
+                    />
+                  )}
+                </td>
+                <td className="py-2 pr-2" style={{ width: 80 }}>
+                  {readOnly ? (
+                    <span>{line.discount_rate || '—'}</span>
+                  ) : (
+                    <Input
+                      value={line.discount_rate}
+                      onChange={(e) => updateLine(line.key, { discount_rate: e.target.value })}
+                    />
+                  )}
+                </td>
+                <td className="py-2 pr-2" style={{ minWidth: 140 }}>
+                  {readOnly ? (
+                    <span>{line.tax_group?.name ?? '—'}</span>
+                  ) : (
+                    <SearchDropDown
+                      instanceType="tax_group"
+                      instanceKey="id"
+                      instanceSourceKey="tax_group_id"
+                      instanceLabel="name"
+                      instanceValue={line.tax_group ?? null}
+                      onSelectItem={(_source, key, value) => {
+                        updateLine(line.key, {
+                          tax_group_id: value?.[key] || null,
+                          tax_group:
+                            value?.item ?? (value?.[key] ? { id: value[key], name: value.name } : null),
+                        });
+                      }}
+                      onClear={() =>
+                        updateLine(line.key, {
+                          tax_group_id: null,
+                          tax_group: null,
+                        })
+                      }
+                      limit={10}
+                      searchParams="name"
+                      type="tax_group"
+                      isShowSearch={true}
+                      placeholder="Tax group"
+                    />
+                  )}
+                </td>
+                <td className="py-2 pr-2 text-right text-muted-foreground">{moneyLabel(line.amount)}</td>
+                <td className="py-2 pr-2 text-right text-muted-foreground">{moneyLabel(line.tax_amount)}</td>
+                {!readOnly ? (
+                  <td className="py-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500"
+                      onClick={() => removeLine(line.key)}
+                      title="Remove line"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
                   </td>
-                  <td className="py-2 pr-2" style={{ minWidth: 180 }}>
-                    {readOnly ? (
-                      <span>{line.description || '—'}</span>
-                    ) : (
-                      <Input
-                        value={line.description ?? ''}
-                        onChange={(e) => updateLine(line.key, { description: e.target.value })}
-                      />
-                    )}
-                  </td>
-                  <td className="py-2 pr-2" style={{ width: 88 }}>
-                    {readOnly ? (
-                      <span>{line.quantity}</span>
-                    ) : (
-                      <Input
-                        value={line.quantity}
-                        onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
-                      />
-                    )}
-                  </td>
-                  <td className="py-2 pr-2" style={{ width: 110 }}>
-                    {readOnly ? (
-                      <span>{line.unit_price}</span>
-                    ) : (
-                      <Input
-                        value={line.unit_price}
-                        onChange={(e) => updateLine(line.key, { unit_price: e.target.value })}
-                      />
-                    )}
-                  </td>
-                  <td className="py-2 pr-2" style={{ width: 80 }}>
-                    {readOnly ? (
-                      <span>{line.discount_rate || '—'}</span>
-                    ) : (
-                      <Input
-                        value={line.discount_rate}
-                        onChange={(e) => updateLine(line.key, { discount_rate: e.target.value })}
-                      />
-                    )}
-                  </td>
-                  <td className="py-2 pr-2" style={{ minWidth: 140 }}>
-                    {readOnly ? (
-                      <span>{line.tax_group?.name ?? '—'}</span>
-                    ) : (
-                      <SearchDropDown
-                        instanceType="tax_group"
-                        instanceKey="id"
-                        instanceSourceKey="tax_group_id"
-                        instanceLabel="name"
-                        instanceValue={line.tax_group ?? null}
-                        onSelectItem={(_source, key, value) => {
-                          updateLine(line.key, {
-                            tax_group_id: value?.[key] || null,
-                            tax_group: value?.item ?? (value?.[key] ? { id: value[key], name: value.name } : null),
-                            tax_rate: '',
-                          });
-                        }}
-                        onClear={() =>
-                          updateLine(line.key, {
-                            tax_group_id: null,
-                            tax_group: null,
-                          })
-                        }
-                        limit={10}
-                        searchParams="name"
-                        type="tax_group"
-                        isShowSearch={true}
-                        placeholder="Tax group"
-                      />
-                    )}
-                  </td>
-                  <td className="py-2 pr-2" style={{ width: 80 }}>
-                    {readOnly || line.tax_group_id ? (
-                      <span className="text-muted-foreground">{line.tax_group_id ? '—' : line.tax_rate || '—'}</span>
-                    ) : (
-                      <Input
-                        value={line.tax_rate}
-                        onChange={(e) => updateLine(line.key, { tax_rate: e.target.value })}
-                        placeholder="%"
-                      />
-                    )}
-                  </td>
-                  <td className="py-2 pr-2 text-right">{moneyLabel(preview.taxable)}</td>
-                  <td className="py-2 pr-2 text-right">{moneyLabel(preview.tax_amount)}</td>
-                  {!readOnly ? (
-                    <td className="py-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500"
-                        onClick={() => removeLine(line.key)}
-                        title="Remove line"
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
+                ) : null}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Net and tax update from the server when you save (totals action).
+      </p>
       {!readOnly ? (
         <Button type="button" variant="outline" size="sm" className="gap-1" onClick={addLine}>
           <Plus size={14} />

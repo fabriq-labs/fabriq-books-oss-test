@@ -1,31 +1,9 @@
-/** Client-side preview mirroring backend/lib/sales invoice line math (percent discount). */
+/** Display helpers only. Invoice/payment/credit money math runs on the API via functionMap. */
 
 export function toNumber(value: string | number | null | undefined): number {
   if (value === null || value === undefined || value === '') return 0;
   const n = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(n) ? n : 0;
-}
-
-export function computeLinePreview(line: {
-  quantity?: string | number | null;
-  unit_price?: string | number | null;
-  discount_rate?: string | number | null;
-  tax_rate?: string | number | null;
-}): { taxable: number; discount_amount: number; tax_amount: number; line_total: number } {
-  const qty = toNumber(line.quantity);
-  const price = toNumber(line.unit_price);
-  const rate = line.discount_rate == null || line.discount_rate === '' ? 0 : toNumber(line.discount_rate);
-  const base = qty * price;
-  const discount_amount = base * (rate / 100);
-  const taxable = Math.max(0, base - discount_amount);
-  const tax_rate = line.tax_rate == null || line.tax_rate === '' ? 0 : toNumber(line.tax_rate);
-  const tax_amount = taxable * (tax_rate / 100);
-  return {
-    taxable,
-    discount_amount,
-    tax_amount,
-    line_total: taxable + tax_amount,
-  };
 }
 
 export function moneyLabel(value: string | number | null | undefined): string {
@@ -37,4 +15,18 @@ export function moneyLabel(value: string | number | null | undefined): string {
 
 export function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** `<input type="date">` value → Prisma DateTime string. */
+export function datePayload(value: string | undefined | null): string | null {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return null;
+  if (trimmed.includes('T')) return trimmed;
+  return `${trimmed}T00:00:00.000Z`;
+}
+
+export function dateInput(value: unknown): string {
+  if (!value) return '';
+  const text = String(value);
+  return text.length >= 10 ? text.slice(0, 10) : text;
 }

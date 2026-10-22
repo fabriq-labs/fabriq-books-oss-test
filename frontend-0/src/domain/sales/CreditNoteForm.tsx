@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,11 +21,12 @@ import {
 } from './documentActions';
 import {
   emptySalesLine,
+  mapServerLine,
   newLineKey,
   SalesLineEditor,
   type SalesLineDraft,
 } from './SalesLineEditor';
-import { computeLinePreview, moneyLabel, todayIsoDate, toNumber } from './lineMath';
+import { dateInput, datePayload, moneyLabel, todayIsoDate, toNumber } from './lineMath';
 
 const LIST_PATH = '/sales/credit-notes';
 const EDIT_VIEW = 'credit_note_edit_view';
@@ -66,30 +67,7 @@ function linesFromServer(raw: any[] | undefined): SalesLineDraft[] {
   if (!Array.isArray(raw) || raw.length === 0) return [emptySalesLine(1)];
   return [...raw]
     .sort((a, b) => (a.line_number ?? 0) - (b.line_number ?? 0))
-    .map((row, idx) => {
-      const taxRows = Array.isArray(row.line_taxes) ? row.line_taxes : [];
-      const manualRate =
-        !row.tax_group_id && taxRows.length === 1 && taxRows[0]?.rate != null
-          ? String(taxRows[0].rate)
-          : '';
-      return {
-        key: row.id || newLineKey(),
-        id: row.id,
-        line_number: row.line_number ?? idx + 1,
-        item_master_id: row.item_master_id ?? null,
-        item_master: row.item_master ?? null,
-        description: row.description ?? '',
-        quantity: row.quantity != null ? String(row.quantity) : '1',
-        unit_price: row.unit_price != null ? String(row.unit_price) : '0',
-        discount_rate: row.discount_rate != null ? String(row.discount_rate) : '',
-        tax_group_id: row.tax_group_id ?? null,
-        tax_group: row.tax_group ?? null,
-        tax_rate: manualRate,
-        account_id: row.account_id ?? null,
-        account: row.account ?? null,
-        amount: row.amount,
-      };
-    });
+    .map((row, idx) => mapServerLine(row, idx));
 }
 
 function linePayload(line: SalesLineDraft) {
@@ -222,9 +200,7 @@ export const CreditNoteForm: React.FC = () => {
         });
         form.reset({
           number: row.number || '',
-          credit_note_date: row.credit_note_date
-            ? String(row.credit_note_date).slice(0, 10)
-            : todayIsoDate(),
+          credit_note_date: dateInput(row.credit_note_date) || todayIsoDate(),
           customer_id: row.customer_id || '',
           entity_id: row.entity_id || '',
           currency_id: row.currency_id || '',
@@ -250,17 +226,6 @@ export const CreditNoteForm: React.FC = () => {
       .finally(() => setIsLoading(false));
   }, [id, formView, form, toast]);
 
-  const previewTotals = useMemo(() => {
-    let net = 0;
-    let tax = 0;
-    for (const line of lines) {
-      const p = computeLinePreview(line);
-      net += p.taxable;
-      tax += p.tax_amount;
-    }
-    return { net, tax, total: net + tax };
-  }, [lines]);
-
   const actions = resolveDocumentActions({
     capability: draftEditable || (status === 'posted' && isEditableSource(sourceSystemId)) ? 'edit' : 'readonly',
     status: recordId ? status : 'new',
@@ -270,7 +235,7 @@ export const CreditNoteForm: React.FC = () => {
 
   const headerPayload = (data: FormValues, nextStatus?: string) => ({
     number: blank(data.number),
-    credit_note_date: data.credit_note_date,
+    credit_note_date: datePayload(data.credit_note_date),
     customer_id: data.customer_id,
     entity_id: data.entity_id,
     currency_id: data.currency_id,
@@ -323,7 +288,7 @@ export const CreditNoteForm: React.FC = () => {
       const payload = {
         invoice_id: app.invoice_id,
         amount_applied: app.amount_applied || '0',
-        applied_date: todayIsoDate(),
+        applied_date: datePayload(todayIsoDate()),
       };
       if (app.id && serverIds.has(app.id)) {
         await viewAPI.updateChild('credit_note', cnId, formView, 'applications', app.id, payload);
@@ -793,26 +758,23 @@ export const CreditNoteForm: React.FC = () => {
               <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <div>
                   <div className="text-xs uppercase text-muted-foreground">Net</div>
-                  <div className="text-sm font-medium">
-                    {moneyLabel(serverTotals.net ?? previewTotals.net)}
-                  </div>
+                  <div className="text-sm font-medium">{moneyLabel(serverTotals.net)}</div>
                 </div>
                 <div>
                   <div className="text-xs uppercase text-muted-foreground">Tax</div>
-                  <div className="text-sm font-medium">
-                    {moneyLabel(serverTotals.tax ?? previewTotals.tax)}
-                  </div>
+                  <div className="text-sm font-medium">{moneyLabel(serverTotals.tax)}</div>
                 </div>
                 <div>
                   <div className="text-xs uppercase text-muted-foreground">Total</div>
-                  <div className="text-sm font-medium">
-                    {moneyLabel(serverTotals.total ?? previewTotals.total)}
-                  </div>
+                  <div className="text-sm font-medium">{moneyLabel(serverTotals.total)}</div>
                 </div>
                 <div>
                   <div className="text-xs uppercase text-muted-foreground">Balance</div>
                   <div className="text-sm font-medium">{moneyLabel(serverTotals.balance)}</div>
                 </div>
+                <p className="col-span-2 text-xs text-muted-foreground md:col-span-4">
+                  Totals come from the server after Save draft / Post.
+                </p>
               </CardContent>
             </Card>
           </form>

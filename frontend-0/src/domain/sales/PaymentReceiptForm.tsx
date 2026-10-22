@@ -19,7 +19,7 @@ import {
   viewCapability,
   type DocumentActionId,
 } from './documentActions';
-import { moneyLabel, todayIsoDate, toNumber } from './lineMath';
+import { dateInput, datePayload, moneyLabel, todayIsoDate, toNumber } from './lineMath';
 import { newLineKey } from './SalesLineEditor';
 
 const LIST_PATH = '/sales/payments';
@@ -152,7 +152,7 @@ export const PaymentReceiptForm: React.FC = () => {
         setUnapplied(row.unapplied_amount);
         form.reset({
           number: row.number || '',
-          receipt_date: row.receipt_date ? String(row.receipt_date).slice(0, 10) : todayIsoDate(),
+          receipt_date: dateInput(row.receipt_date) || todayIsoDate(),
           customer_id: row.customer_id || '',
           entity_id: row.entity_id || '',
           currency_id: row.currency_id || '',
@@ -195,7 +195,7 @@ export const PaymentReceiptForm: React.FC = () => {
 
   const headerPayload = (data: FormValues, nextStatus?: string) => ({
     number: blank(data.number),
-    receipt_date: data.receipt_date,
+    receipt_date: datePayload(data.receipt_date),
     customer_id: data.customer_id,
     entity_id: blank(data.entity_id),
     currency_id: data.currency_id,
@@ -228,7 +228,7 @@ export const PaymentReceiptForm: React.FC = () => {
         target_type: 'invoice',
         invoice_id: app.invoice_id,
         amount_applied: app.amount_applied || '0',
-        applied_date: todayIsoDate(),
+        applied_date: datePayload(todayIsoDate()),
       };
       if (app.id && serverIds.has(app.id)) {
         await viewAPI.updateChild(
