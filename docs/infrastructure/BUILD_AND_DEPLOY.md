@@ -13,7 +13,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 | `frontend-builder` | `npm ci` and `npm run build` in `frontend-0` on `node:*-bookworm-slim`. `VITE_API_BASE_URL=""` so the browser calls `/api` on the same host. |
 | `backend-builder` | `npm ci`, `npm run build`, and `prisma generate` for Debian (`debian-openssl-3.0.x`). Dependencies stay in the image. |
 | `integrations-builder` | `uv sync` on `python:3.12-slim-bookworm` → baked `.venv` (dbt + sync_service). `uv` is not copied to runtime. |
-| final | `debian:bookworm-slim` with apt `nginx` + `postgresql-client`, Node and Python from matching bookworm images, backend + frontend + integrations venv. `/app/build-info.json` (also served at `/build-info.json`) records commit metadata from `docker-build-meta.json`, `SOURCE_*` build-args, and/or Railway `RAILWAY_GIT_*` args. |
+| final | `debian:bookworm-slim` with apt `nginx` + `postgresql-client`, Node and Python from matching bookworm images, backend + frontend + integrations venv. `/app/build-info.json` (also served at `/build-info.json`) records commit metadata from `SOURCE_*` / `IMAGE_TAG` / `BUILD_TIME` build-args only. |
 
 `nginx.conf` listens on `PORT` (default `8080`):
 
@@ -27,26 +27,19 @@ The image listens on `8080` only.
 
 This repo has no Railway config file. A new Railway service defaults to Railpack. Before the first upload, set the service build to the Dockerfile at the repo root and set the deploy health check to `GET /health`. The upload has to be the repo root. An upload rooted at `backend/` does not contain `Dockerfile`. Fly.io uses the same Dockerfile via a `fly.toml` `[build]` section (example in [../operations/deploy.md](../operations/deploy.md)).
 
-`.git` is not in the Docker build context (see `.dockerignore`). Before any image build — local Docker, Compose, or `railway up` — emit commit metadata into the context:
+`.git` is not in the Docker build context (see `.dockerignore`). `/build-info.json` is filled only when the **builder** passes `SOURCE_*` (and related) build-args — the same contract in GitHub Actions and locally. The runtime host (Railway, Fly, GCP, AWS, Compose) just runs the image; it does not supply this metadata.
+
+| Builder | How args are passed |
+|---|---|
+| GitHub Actions | `.github/workflows/deploy-railway.yml` `docker/build-push-action` `build-args` |
+| Local Docker / Compose | `./docker-build.sh` or `npm run docker:build` / `npm run docker:compose` |
 
 ```bash
-npm run docker:meta
+npm run docker:build          # ./docker-build.sh → kernel:local with SOURCE_* args
+npm run docker:compose        # same args via compose build.args, then up --build
 ```
 
-That writes `docker-build-meta.json` (committed stub stays `unknown` in git; the emit overwrites it locally). The `build-info` stage copies that file and also accepts `SOURCE_*` build-args (GitHub Actions) and `RAILWAY_GIT_*` (GitHub-connected Railway). Prefer the wrappers so you do not forget the emit step:
-
-```bash
-npm run docker:build          # meta + docker build -t kernel:local .
-npm run docker:compose        # meta + docker compose up --build
-npm run railway:up -- --service "$APP"   # meta + railway up --detach --yes
-```
-
-Local image (manual):
-
-```bash
-npm run docker:meta
-docker build -t kernel:local .
-```
+A plain `docker build .` or `railway up` without those args leaves branch/commit/tag as `unknown` (build time may still be set inside the Dockerfile). For a deployable image with real metadata, build in CI (or with `./docker-build.sh`), push to a registry, then point the runtime at that image.
 
 ## Railway: new service
 
@@ -104,12 +97,10 @@ openssl rand -base64 32 | railway variable set JWT_SECRET --stdin --service "$AP
 
 `railway variable list --json` and `--kv` print secret values. Do not write that output into logs, docs, or the repo.
 
-4. From the repo root, emit build metadata, then upload and build the Dockerfile on Railway. `railway up` follows `.gitignore` (the meta file is tracked, so the local overwrite is included in the upload).
+4. From the repo root, upload and build on Railway (quick bring-up). `railway up` does not pass `SOURCE_*` build-args, so `/build-info.json` will show `unknown` for commit fields. For real metadata, build and push with GitHub Actions (or `./docker-build.sh` + your registry), then point the service at that image instead.
 
 ```bash
-npm run docker:meta
 railway up --service "$APP" --detach --yes
-# or: npm run railway:up -- --service "$APP"
 ```
 
 5. Poll until the newest deployment finishes:

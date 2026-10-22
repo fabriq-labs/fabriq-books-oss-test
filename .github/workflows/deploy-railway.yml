@@ -52,9 +52,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Emit docker-build-meta.json into the build context
-        run: node docker-emit-build-meta.js
-
       - name: Monorepo git metadata for image labels
         id: git_meta
         run: |

@@ -46,12 +46,10 @@ RUN npm run build \
   && test -f node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node
 
 # --- Build info ---
-# Metadata comes from (in order): SOURCE_* build-args, docker-build-meta.json in
-# the context (npm run docker:meta before build / railway up), then RAILWAY_GIT_*.
-# .git is dockerignored, so the image cannot discover the commit on its own.
+# .git is dockerignored. Callers must pass SOURCE_* / IMAGE_TAG / BUILD_TIME
+# build-args (GitHub Actions, ./docker-build.sh, or any other builder).
 FROM node:${NODE_RUNTIME_VERSION}-bookworm-slim AS build-info
 COPY docker-build-info.js /docker-build-info.js
-COPY docker-build-meta.json /docker-build-meta.json
 ARG SOURCE_REF=unknown
 ARG SOURCE_COMMIT=unknown
 ARG SOURCE_COMMIT_MESSAGE=
@@ -60,19 +58,12 @@ ARG SOURCE_COMMIT_DATE=
 ARG BUILD_TIME
 ARG IMAGE_TAG=unknown
 ARG CACHEBUST=1
-# Railway injects these when the service is GitHub-connected and the ARG name matches.
-ARG RAILWAY_GIT_COMMIT_SHA=
-ARG RAILWAY_GIT_BRANCH=
-ARG RAILWAY_GIT_COMMIT_MESSAGE=
 ENV SOURCE_REF=${SOURCE_REF}
 ENV SOURCE_COMMIT=${SOURCE_COMMIT}
 ENV SOURCE_COMMIT_MESSAGE=${SOURCE_COMMIT_MESSAGE}
 ENV SOURCE_COMMIT_MESSAGE_B64=${SOURCE_COMMIT_MESSAGE_B64}
 ENV SOURCE_COMMIT_DATE=${SOURCE_COMMIT_DATE}
 ENV IMAGE_TAG=${IMAGE_TAG}
-ENV RAILWAY_GIT_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
-ENV RAILWAY_GIT_BRANCH=${RAILWAY_GIT_BRANCH}
-ENV RAILWAY_GIT_COMMIT_MESSAGE=${RAILWAY_GIT_COMMIT_MESSAGE}
 RUN BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
     export BUILD_TIME && \
     node /docker-build-info.js

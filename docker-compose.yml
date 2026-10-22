@@ -1,10 +1,8 @@
 # Local Phase 1 stack: Postgres + the root Dockerfile app image.
 # Copy `.env.example` to `.env` and set JWT_SECRET. AUTO_SETUP defaults on here.
 #
-# Prefer: npm run docker:compose
-# (emits docker-build-meta.json so /build-info.json has commit metadata)
-#
-#   docker compose up --build
+# Prefer: npm run docker:compose   # sets SOURCE_* build-args then compose up --build
+# Bare `docker compose up --build` leaves /build-info.json as unknown.
 #
 # App: http://localhost:8080  Login after setup: admin@example.com / admin123
 # (change password in the onboarding wizard)
@@ -30,6 +28,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        SOURCE_REF: ${SOURCE_REF:-unknown}
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-unknown}
+        SOURCE_COMMIT_MESSAGE_B64: ${SOURCE_COMMIT_MESSAGE_B64:-}
+        SOURCE_COMMIT_DATE: ${SOURCE_COMMIT_DATE:-}
+        BUILD_TIME: ${BUILD_TIME:-}
+        IMAGE_TAG: ${IMAGE_TAG:-unknown}
+        CACHEBUST: ${CACHEBUST:-1}
     ports:
       - "8080:8080"
     environment:

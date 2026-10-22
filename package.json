@@ -9,10 +9,8 @@
     "dev:frontend": "cd frontend-0 && npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../frontend-0 && npm install",
     "build:all": "cd backend && npm run build && cd ../frontend-0 && npm run build",
-    "docker:meta": "node docker-emit-build-meta.js",
-    "docker:build": "npm run docker:meta && docker build -t kernel:local .",
-    "docker:compose": "npm run docker:meta && docker compose up --build",
-    "railway:up": "npm run docker:meta && npx -y @railway/cli@latest up --detach --yes"
+    "docker:build": "./docker-build.sh",
+    "docker:compose": "./docker-build.sh --compose up --build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
