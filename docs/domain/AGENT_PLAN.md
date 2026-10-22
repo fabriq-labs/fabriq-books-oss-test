@@ -14,7 +14,7 @@ AR settlement design (already largely built for sync): [AR_SETTLEMENT_AND_LEDGER
 6. Do not run `prisma db push` or `prisma migrate`. Propose the SQL diff from [../kernel/adding-a-model.md](../kernel/adding-a-model.md) and apply it only if the task says the database is the local one.
 7. Do not redeploy an existing prod or dev service. Do not print tokens or `DATABASE_URL`.
 8. Seed views with `data_graph`. Restart the backend after registering a model.
-9. Prove the module: create a **native** row, list it on the native view, confirm a synced row does not appear there (and vice versa). `npx tsc --noEmit` in `backend` is clean.
+9. Prove the slice: create an editable row, list it on `_edit_view`, confirm an imported row appears only on `_readonly_view` (and vice versa). `npx tsc --noEmit` in `backend` is clean.
 
 ## Current status (fabriq-books)
 
@@ -211,6 +211,27 @@ Prod references (read, do not port wholesale): `frontend-1/src/utils/sourceSyste
 - Quote, sales order, delivery challan (Module 4 parked).
 - Purchase bills / PO / PR.
 - Editing synced rows, PDF upload, email ingest, tax engine auto-calc beyond storing amounts the user entered (or selected group totals you choose to compute client-side — no new tax service required).
+
+### Recommended work packages (run one, then stop)
+
+Feed these to an agent in order. Each package must meet its own acceptance before the next starts.
+
+| WP | Name | Do | Stop when |
+|---|---|---|---|
+| **3B.0** | Dual views + nav | Seed `*_edit_view` / `*_readonly_view` for invoice, payment_receipt, credit_note with filters; wire nav/routes (`/sales/…` + `/imported`); retire single views from sidebar; list Eye vs Edit by view | Imported QBO invoice on readonly list only; empty edit list OK |
+| **3B.1** | Document mode + footer | `isEditableSource` helper; `resolveDocumentActions(mode)`; shared footer; readonly detail banner; force readonly if lineage disagrees with route | Open imported invoice → Close only; no Save |
+| **3B.2** | Invoice create/edit | Form on `invoice_edit_view`: lines, draft/post/void, lineage null, totals/balance rules | Create draft → Post → on edit list; not on imported |
+| **3B.3** | Payment create + apply | Form on `payment_receipt_edit_view`; `payment_receipt_application`; balance T1/T2 in app code | Pay posted invoice → balance drops; on payments edit list |
+| **3B.4** | Credit note + apply | Form on `credit_note_edit_view`; `credit_note_application` (no $0 payment) | Credit + apply → invoice balance drops |
+
+Do **not** fold poster, reverse sync, or purchases into any 3B.* package.
+
+### After Module 3B (priority order)
+
+1. **Optional polish** — uom / payment_terms Master screens if create UX needs them; numbering series for `invoice.number`.
+2. **OSS** — WP-D6 (kernel docs → `main`) and/or WP-T* test harness when asked; not blocked on 3B.
+3. **Parked until explicitly un-parked** — Module 4 (quote/SO), purchases (bills/PR/PO), investing.
+4. **Deferred agentic** — WP6 poster, then WP7 sync-wire (see Deferred). Freeze open decisions in the PR before coding.
 
 ---
 
