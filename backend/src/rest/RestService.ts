@@ -719,7 +719,7 @@ export class RestService {
         reason,
         context.user.org_id
       );
-      if (outcome === 'forbidden') {
+      if (outcome === 'forbidden' || outcome === 'missing') {
         throw new NotFoundError('Import run not found');
       }
       res.json({ success: true, data: { id: importId, status: 'ABANDONED' } });
