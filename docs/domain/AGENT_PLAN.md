@@ -131,6 +131,44 @@ No new header models. Application-level rules only:
 
 Optional thin fields if missing for UX: keep using existing columns (`number`, dates, `entity_id`, `currency_id`, `account_id` on receipt, line `item_master_id` / `account_id`).
 
+### Form CTA policy (dynamic footer)
+
+Prod already has two levers; Module 3B should reuse the idea, not copy the PR wizard shell wholesale.
+
+| Lever (prod) | What it drives | Books equivalent |
+|---|---|---|
+| `isExternalSource(source_system_id)` / `isFabriqSource` | Masters + invoice: Close vs Save; Master list Eye vs Edit | View id (`*_edit_view` vs `*_readonly_view`) **and** record `source_system_id` (defense in depth) |
+| `workflow_context.current_state_ref.source_actions` | Approve / Reject / Submit buttons from DB | Not required for Module 3B (no sales workflow yet). Leave a slot for later |
+| Imperative footer (`WorkflowActions`) | Wizard step, role, Save Draft vs Cancel | Replace with a small shared **document footer** driven by a mode object |
+
+**Mode object (compute once per form open):**
+
+```
+mode.capability:  'edit' | 'readonly'     // from route/view; assert vs source_system_id
+mode.status:      draft | posted | void   // document status
+mode.actions:     DocumentAction[]        // resolved CTAs for the footer
+```
+
+**Module 3B action matrix (no workflow engine):**
+
+| Capability | Status | Primary CTAs |
+|---|---|---|
+| `readonly` | any | **Close** only (optional: Open in connection — later) |
+| `edit` | new / `draft` | **Cancel**, **Save draft**, **Post** |
+| `edit` | `posted` | **Cancel**/Close, **Record payment** / **Apply credit** (where relevant), **Void** |
+| `edit` | `void` | **Close** |
+
+List rows: `_edit_view` → Edit (pencil); `_readonly_view` → View (eye). Same idea as prod `Master.tsx` `isFabriqSource` branching.
+
+**Rules:**
+
+1. Prefer resolving CTAs from `mode` in one shared helper (`resolveDocumentActions(mode)`), not copy-pasted if/else in each sales form.
+2. Route/`viewId` sets capability; if the loaded row’s `source_system_id` disagrees (e.g. opened edit URL for an imported id), force `readonly` and show the imported banner.
+3. Do **not** invent fake workflow states to mean “synced”. Provenance stays on lineage; capability stays on the view + mode.
+4. When a later module adds a real workflow on invoices, **append** `source_actions` into `mode.actions` (prod pattern) instead of replacing the edit/readonly switch. Workflow buttons are an extra catalog; readonly still suppresses all mutating CTAs.
+
+Prod references (read, do not port wholesale): `frontend-1/src/utils/sourceSystem.ts`, `Master.tsx` Eye/Edit branch, `InvoiceForm.tsx` `readOnly` footer, `components/forms/sales/WorkflowActions.tsx` / `purchase-requisition/WorkflowActions.tsx`.
+
 ### Code
 
 **Seeds**
@@ -152,8 +190,8 @@ Optional thin fields if missing for UX: keep using existing columns (`number`, d
   - Invoice create/edit on `invoice_edit_view` (lines editor).
   - Payment create + apply-to-invoice(s) on `payment_receipt_edit_view`.
   - Credit note create + optional apply via `credit_note_application` on `credit_note_edit_view`.
-- Readonly detail pages: banner (“Imported from a connection — edit in the source system”).
-- Wire nav to dual paths; edit lists show Create.
+- Shared document footer using the CTA policy above; readonly detail banner (“Imported from a connection — edit in the source system”).
+- Wire nav to dual paths; edit lists show Create. Port a thin `isExternalSource` / `isEditableSource` helper (null lineage or Books-authored = editable).
 
 ### Acceptance
 
@@ -164,6 +202,7 @@ Optional thin fields if missing for UX: keep using existing columns (`number`, d
 5. Second payment that would drive balance below zero is rejected (or overpay only via explicit unapplied on the receipt — pick one; default: reject over-apply to an invoice).
 6. No `posting` rows required for acceptance (poster deferred). Trial balance unchanged by these docs until WP6.
 7. Backend `tsc --noEmit` clean.
+8. Readonly imported invoice footer shows **Close** only (no Save / Post / Void). Editable draft shows **Save draft** + **Post**.
 
 ### Out of scope for Module 3B
 
