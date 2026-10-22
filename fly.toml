@@ -1,0 +1,39 @@
+# Fly.io app for kernel onboarding checkout (fabriq-kernel-onboard).
+# Image: root Dockerfile. External Managed Postgres via DATABASE_URL secret.
+
+app = "fabriq-kernel-onboard"
+primary_region = "yyz"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  AUTH_PROVIDER = "local"
+  NODE_ENV = "production"
+  AUTO_SETUP = "true"
+  ENABLE_SYNC_SERVICE = "false"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 50
+    soft_limit = 25
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "120s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2048mb"

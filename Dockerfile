@@ -87,10 +87,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Node binary from official bookworm image (same glibc)
+# Node + npm/npx from official bookworm image (same glibc).
+# npm/npx are required for AUTO_SETUP (prisma migrate diff, seed scripts).
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-runtime /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=node-runtime /usr/local/bin/npx /usr/local/bin/npx
+COPY --from=node-runtime /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -sf /usr/local/bin/node /usr/bin/node \
- && node -v | grep -q "v${NODE_RUNTIME_VERSION}"
+ && ln -sf /usr/local/bin/npm /usr/bin/npm \
+ && ln -sf /usr/local/bin/npx /usr/bin/npx \
+ && node -v | grep -q "v${NODE_RUNTIME_VERSION}" \
+ && npm -v >/dev/null
 
 # Python interpreter the venv shebangs expect
 COPY --from=python-runtime /usr/local /usr/local
