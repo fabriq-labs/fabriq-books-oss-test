@@ -147,8 +147,7 @@ in the plan. Any other status (`awaiting_approval`, `awaiting_input`,
 auto-continuation to fire. If the LLM made tool calls but did not call
 `completeStep`, the step index stays the same, `stepAdvanced === false`, and
 continuation is skipped with a warning log. This is the primary defence
-against infinite loops (Pattern 3 in
-[debugging/SESSION_FAILURE_PATTERNS.md](./debugging/SESSION_FAILURE_PATTERNS.md)).
+against an infinite loop when the model calls tools without advancing the step.
 
 ### Per-Step Execution
 
@@ -415,9 +414,7 @@ still in `planning` or `executing`. If the session moved to
 **Implication**: A session stuck in `executing` (e.g. LLM failed to call
 `completeStep` or `requestClarification`) will be marked `failed` after the
 timeout. Sessions in `awaiting_approval` or `awaiting_input` are NOT killed by
-the watchdog — they wait indefinitely. See
-[debugging/SESSION_FAILURE_PATTERNS.md](./debugging/SESSION_FAILURE_PATTERNS.md)
-for patterns.
+the watchdog — they wait indefinitely.
 
 **Why not `AbortController` on the LLM call?** `AbortController` would cancel
 the in-flight HTTP call to the LLM provider but would not clean up session

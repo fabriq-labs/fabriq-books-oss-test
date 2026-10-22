@@ -26,6 +26,20 @@ export SYNC_PORT="${SYNC_PORT:-8090}"
 # Single-tenant: sync/dbt runs in this same container on loopback (default on).
 export ENABLE_SYNC_SERVICE="${ENABLE_SYNC_SERVICE:-true}"
 
+# Opt-in first-boot schema + minimum seed (see docs/domain/ONBOARDING_REQUIREMENTS.md).
+# Unset / false / 0: leave today's behavior (no migrate on boot).
+case "${AUTO_SETUP:-}" in
+  true|TRUE|1)
+    echo "AUTO_SETUP enabled; running first-boot setup before starting services..."
+    cd /app/backend
+    node scripts/auto-setup.js
+    cd /
+    ;;
+  *)
+    echo "AUTO_SETUP=${AUTO_SETUP:-unset}; skipping schema/seed on boot."
+    ;;
+esac
+
 # Prefer the query engine that matches this image's libc (Debian glibc or Alpine musl).
 PRISMA_CLIENT_DIR="/app/backend/node_modules/.prisma/client"
 if [ -d "$PRISMA_CLIENT_DIR" ]; then

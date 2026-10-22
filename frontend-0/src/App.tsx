@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { ConfigProvider } from 'antd';
 import { ChatProvider } from "./contexts/ChatContext";
 import { ChatAuthSync } from "./components/chat/ChatAuthSync";
@@ -36,7 +36,7 @@ import { InboxPage } from "./pages/workbench/InboxPage";
 import { GoalSetter } from "./components/workbench/GoalSetter";
 import DomainMaster from "./domain/DomainMaster";
 import { DomainHome } from "./domain/home";
-import { DomainRoutes } from "./domain/routes";
+import { DomainRoutes, DomainShellGate, DomainStandaloneRoutes } from "./domain/routes";
 import ProtectedRouteWithLoading from "./components/layout/ProtectedRouteWithLoading";
 
 const queryClient = new QueryClient();
@@ -81,9 +81,19 @@ const AppRoutes: React.FC = () => {
             <Route path="/signup" element={<PublicAuthRoute><SignInPage /></PublicAuthRoute>} />
             <Route path="/auth" element={<PublicAuthRoute><SignInPage /></PublicAuthRoute>} />
 
+            <Route element={
+              <ProtectedRouteWithLoading>
+                <Outlet />
+              </ProtectedRouteWithLoading>
+            }>
+              {DomainStandaloneRoutes()}
+            </Route>
+
             <Route path="/" element={
               <ProtectedRouteWithLoading>
-                <AppLayout />
+                <DomainShellGate>
+                  <AppLayout />
+                </DomainShellGate>
               </ProtectedRouteWithLoading>
             }>
               <Route index element={<DomainHome />} />

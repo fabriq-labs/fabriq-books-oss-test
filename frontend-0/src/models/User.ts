@@ -21,7 +21,15 @@ export interface User {
     name: string;
     logo?: string | null;
     customer_timezone?: string | null;
+    base_currency?: string | null;
     basecurrency_id?: string | null;
+    /** Org base currency from `currency` (preferred over legacy currency_master). */
+    currency?: {
+      id: string;
+      code: string;
+      name?: string | null;
+      symbol?: string | null;
+    } | null;
     currency_master?: {
       id: string;
       name: string | null;

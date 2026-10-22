@@ -1,21 +1,32 @@
-# Fabriq
+# Fabriq Books
 
-Fabriq is a metadata framework for building a multi-tenant web app. You describe a model and who may see it. The kernel turns that description into a permission-checked API and a list screen. Product behavior lives in a small set of domain files; the engine stays the same from one app to the next.
+Fabriq Books is a multi-entity accounting application. It keeps a chart of accounts, journal postings, and financial reports for each legal entity, and it keeps a sales subledger — customers, suppliers, items, tax, invoices, payment receipts, and credit notes — in one model that does not belong to any single outside product. When you connect an external bookkeeping system, Books imports that system's records into these same screens. QuickBooks Online is the connector that ships today.
 
-A **view** names one model and the fields to show. A **permission** grants read or write on those fields. A **role** reaches a view through `role_view`, and a user reaches a role through `role_user`. The generic REST API is `/api/{model}/view/{viewId}`. The Master list is `/master/app/{model}` when the view is named `{model}_view`. Create and edit forms are components you write; they call the same view API.
+The application is meant for someone who already knows bookkeeping and wants the books in a database they can run themselves: one organization, several entities, one chart and one set of reports that can span those entities when exchange rates are present.
 
-Every business row carries `org_id`. Shared defaults are seeded on `org_system`. A request sees the caller’s org and those shared rows. Writes stay on the caller’s org unless a platform admin writes `org_system` on purpose.
+## What Books does
 
-| Package | Path | Role |
-|---------|------|------|
-| API | [`backend/`](backend/) | Express, Prisma, views, workflows, agent |
-| Web app | [`frontend-0/`](frontend-0/) | React/Vite shell and the Master list |
-| Domain | [`backend/lib/domain.ts`](backend/lib/domain.ts), [`frontend-0/src/domain/`](frontend-0/src/domain/) | Models, navigation, and home for one app |
-| Docs | [`docs/`](docs/) | How the engine works and how to deploy it |
+You sign in, pick an entity from the bar at the top of the window, and work from the sidebar.
 
-Start with the [docs index](docs/README.md).
+**Accounting.** Entities carry a name, an address, a currency, and a headquarters flag. Each entity also stores ledger default accounts (receivable, income, undeposited funds, foreign-exchange gain or loss, and discounts) and an optional ledger start date. Those are values you edit and save on the entity. They record which accounts belong to that entity. The chart of accounts, manual journal postings, and an opening-balances screen sit beside the entities. Reports cover the trial balance, income statement, balance sheet, cash flow, and a posting list, with a period, a reporting currency, and one or more entities.
+
+**Sales.** Customers, suppliers, items, and tax rates, groups, and regions have their own lists and forms. Invoices, payment receipts, and credit notes have lists of their own. An invoice opens onto its header, amounts, open balance, and lines. A payment receipt records cash received and how much of it is still unapplied. Applications carry a signed amount: a positive amount settles an invoice, and a negative amount consumes a credit. A direct credit-note application (credit applied straight onto an invoice) is part of the same model. Documents may be keyed into Books where a form exists, or they may arrive through a connection. Balances on the lists are the balances stored on the documents.
+
+**Connections.** A connection is a link to an external bookkeeping system for one organization. You create it, test it, choose how to run the import, and then read the imported customers, invoices, payments, and the rest in the Books screens above. The QuickBooks connection is the one implemented today. The steps that create an Intuit app and an Airbyte workspace are operator setup, written separately from the day-to-day import story.
+
+Local sign-in uses a demo user created by the database seed. The window title in a fresh checkout reads “Kernel” until you apply the Fabriq Books brand; [getting started](docs/getting-started.md) shows that one command.
+
+## Built on a metadata kernel
+
+Lists, permissions, and the generic API are not hand-built once per screen. A **view** names a model and the fields to show. A **permission** grants read or write on those fields. A **role** reaches a view through `role_view`. The same description drives `GET/POST /api/{model}/view/{view}` and the Master list in the web shell. Forms are ordinary React screens that call that API, which is why a form can be specific (an invoice with its lines, an entity with account dropdowns) while the list stays generic.
+
+Every business row carries `org_id`. Shared defaults — roles, views, the seeded US dollar — live on an organization named `org_system`. A request sees the caller's organization plus those shared rows. Writes stay on the caller's organization.
+
+That engine is documented on its own, for anyone building an application on it, whether or not the application is Books. Start at the [kernel index](docs/kernel/README.md).
 
 ## Run it locally
+
+You need Node.js 20 or newer, npm, a PostgreSQL server, and the `psql` client on your `PATH`. Postgres runs outside this repository. The example URL expects a role that can create a database.
 
 ```bash
 npm run install:all
@@ -24,44 +35,28 @@ cd backend && npm run setup:kernel
 cd .. && npm run dev
 ```
 
-`setup:kernel` applies the schema and seeds `org_system` when the database is empty. Do not run `prisma db push` or `prisma migrate`. Set `DATABASE_URL` in `backend/.env` before setup. Postgres runs outside this app. See [docs/infrastructure/BUILD_AND_DEPLOY.md](docs/infrastructure/BUILD_AND_DEPLOY.md).
+Edit `DATABASE_URL` and `JWT_SECRET` in `backend/.env` before setup if the example role does not match your Postgres. `setup:kernel` creates the application database when it is missing, applies SQL generated from the Prisma schema, and seeds the shell: a system organization, a tenant organization, the Super Admin role, and the demo user. It does not use `prisma db push` or `prisma migrate`. Those commands are outside the workflow this repository uses; schema changes are reviewed SQL, and a push would skip that review.
 
 API: http://localhost:4000 · UI: http://localhost:5174 · Login: `admin@example.com` / `admin123`
 
-## Build an app
-
-1. Add models in `backend/prisma/schema/domain.prisma`. Every model has `org_id`.
-2. Register tables, workflow models, and hooks in `backend/lib/domain.ts`.
-3. Seed a view, a permission, and a `role_view` row. The view's `data_graph` is required. It selects the columns Prisma loads and the headers the list shows (`displayName` and `isColumnShow`). Restart the API after the model is added.
-4. Add sidebar entries in `frontend-0/src/domain/navigation.ts` and the home page in `frontend-0/src/domain/home.tsx`.
-5. Add create and edit form routes. Forms are not generated.
-
-The steps, SQL diff, and form conventions are in [docs/kernel/adding-a-model.md](docs/kernel/adding-a-model.md). File locations are in [docs/kernel/BUILDING_A_DOMAIN.md](docs/kernel/BUILDING_A_DOMAIN.md).
-
-## Layout
-
-```
-├── package.json          # install:all, dev (API + UI)
-├── Dockerfile            # one image: nginx, the UI, and the API
-├── start.sh              # container entrypoint; external Postgres
-├── backend/
-├── frontend-0/
-└── docs/
-```
+The shell lists are empty until you run the Books view seeds and, if you want sample numbers in the reports, the demo chart. The commands and the first clicks are in [getting started](docs/getting-started.md).
 
 ## Documentation
 
 | Question | Document |
-|----------|----------|
-| Where do I start? | [docs/README.md](docs/README.md) |
-| How do views, permissions, and the API fit together? | [docs/kernel/metadata.md](docs/kernel/metadata.md) |
-| How do I add a model? | [docs/kernel/adding-a-model.md](docs/kernel/adding-a-model.md) |
-| How does tenancy work? | [docs/kernel/tenancy.md](docs/kernel/tenancy.md) |
-| Worked requests on kernel tables | [docs/kernel/examples.md](docs/kernel/examples.md) |
-| Approvals and state machines | [docs/kernel/workflows.md](docs/kernel/workflows.md) |
-| Login and platform admin | [docs/kernel/auth.md](docs/kernel/auth.md) |
-| Shell, navigation, and the Master list | [docs/kernel/frontend.md](docs/kernel/frontend.md) |
-| Colors, type, and spacing | [docs/kernel/DESIGN_SYSTEM.md](docs/kernel/DESIGN_SYSTEM.md) |
-| Agent sessions and tools | [docs/kernel/agent/README.md](docs/kernel/agent/README.md) |
-| Where domain files go | [docs/kernel/BUILDING_A_DOMAIN.md](docs/kernel/BUILDING_A_DOMAIN.md) |
-| Image and a new Railway service | [docs/infrastructure/BUILD_AND_DEPLOY.md](docs/infrastructure/BUILD_AND_DEPLOY.md) |
+|---|---|
+| Where do I start? | [Docs hub](docs/README.md) |
+| How do I install and sign in? | [Getting started](docs/getting-started.md) |
+| What do the accounting words mean here? | [Concepts](docs/concepts.md) |
+| Ledger, sales, or connections? | [Ledger](docs/modules/ledger.md) · [Sales and receivables](docs/modules/sales-ar.md) · [Connections](docs/modules/connections.md) |
+| Database, deploy, or connector setup? | [Operations](docs/operations/database.md) |
+| How does the app use the engine? | [Architecture](docs/architecture.md) |
+| How do I contribute? | [Contributing](CONTRIBUTING.md) |
+
+## Future map
+
+A few directions are visible from the model that is already in the tree. Further bookkeeping and ERP connectors can sit beside QuickBooks, mapping into the same customers, invoices, receipts, and credit notes. Sales documents can be posted into the general ledger from the default accounts stored on each entity. More of those documents can be entered directly in Books, next to the records a connection imports. This list is only a map. The pages above describe the software as it runs today.
+
+## License
+
+This repository does not yet contain a `LICENSE` file. Maintainers need to choose a license before the project can be reused under one. Until that file exists, do not assume a license from the presence of the source.

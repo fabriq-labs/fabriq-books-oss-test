@@ -170,6 +170,7 @@ export class RestService {
             name: true,
             logo: true,
             customer_timezone: true,
+            base_currency: true,
             basecurrency_id: true,
             currency: {
               select: {

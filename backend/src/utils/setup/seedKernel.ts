@@ -5,10 +5,14 @@
  * Platform rows are only the ones the engine needs. currency gets a single USD
  * row on org_system because org.basecurrency_id points at it. attachment has
  * no seed rows: those are files a tenant uploads.
+ *
+ * When the seeded admin already exists, password and org name/slug are left alone.
+ * If the database looks customized without onboarding flags, this exits with an error.
  */
 import bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma';
+import { assertSafeForKernelReseed, SEED_ADMIN_USER_ID } from '../../onboarding/service';
 
 const ORG_SYSTEM = 'org_system';
 const ORG_KERNEL = 'org_kernel';
@@ -705,11 +709,16 @@ const VIEWS: Array<{
 ];
 
 async function main() {
+  const existingAdmin = await prisma.user.findUnique({ where: { id: SEED_ADMIN_USER_ID } });
+  if (existingAdmin) {
+    await assertSafeForKernelReseed(prisma);
+  }
+
   const passwordHash = await bcrypt.hash('admin123', 10);
 
   await prisma.org.upsert({
     where: { id: ORG_SYSTEM },
-    update: { name: 'System', slug: 'system' },
+    update: {},
     create: {
       id: ORG_SYSTEM,
       name: 'System',
@@ -721,7 +730,7 @@ async function main() {
 
   await prisma.currency.upsert({
     where: { id: CURRENCY_ID },
-    update: { org_id: ORG_SYSTEM, code: 'USD', name: 'US Dollar', symbol: '$' },
+    update: {},
     create: {
       id: CURRENCY_ID,
       code: 'USD',
@@ -740,7 +749,8 @@ async function main() {
 
   await prisma.org.upsert({
     where: { id: ORG_KERNEL },
-    update: { name: 'Kernel', slug: 'kernel', basecurrency_id: CURRENCY_ID },
+    // Do not reset name/slug/password-related identity after first create.
+    update: {},
     create: {
       id: ORG_KERNEL,
       name: 'Kernel',
@@ -761,24 +771,19 @@ async function main() {
     },
   });
 
-  await prisma.user.upsert({
-    where: { id: USER_ID },
-    update: {
-      email: 'admin@example.com',
-      password: passwordHash,
-      org_id: ORG_KERNEL,
-      external_id: EXTERNAL_ID,
-    },
-    create: {
-      id: USER_ID,
-      email: 'admin@example.com',
-      name: 'Kernel Admin',
-      password: passwordHash,
-      external_id: EXTERNAL_ID,
-      auth_provider: 'local',
-      org_id: ORG_KERNEL,
-    },
-  });
+  if (!existingAdmin) {
+    await prisma.user.create({
+      data: {
+        id: USER_ID,
+        email: 'admin@example.com',
+        name: 'Kernel Admin',
+        password: passwordHash,
+        external_id: EXTERNAL_ID,
+        auth_provider: 'local',
+        org_id: ORG_KERNEL,
+      },
+    });
+  }
 
   await prisma.role_user.upsert({
     where: { id: 'rous_kernel_admin' },
@@ -838,7 +843,11 @@ async function main() {
   console.log('Kernel seed ready.');
   console.log('  system org: org_system');
   console.log('  tenant org: org_kernel');
-  console.log('  login: admin@example.com / admin123');
+  if (!existingAdmin) {
+    console.log('  login: admin@example.com / admin123');
+  } else {
+    console.log('  admin user already present; password and org name were left unchanged');
+  }
 }
 
 main()

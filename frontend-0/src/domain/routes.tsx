@@ -30,6 +30,20 @@ import { SupplierForm } from '@/domain/sales/SupplierForm';
 import { TaxMasterForm } from '@/domain/sales/TaxMasterForm';
 import { TaxRegionForm } from '@/domain/sales/TaxRegionForm';
 import { TaxGroupForm } from '@/domain/sales/TaxGroupForm';
+import OnboardingPage from '@/domain/onboarding/OnboardingPage';
+import { OnboardingGate } from '@/domain/onboarding/OnboardingGate';
+
+/** Wraps the authenticated layout; may redirect to a route in `DomainStandaloneRoutes`. */
+export const DomainShellGate = OnboardingGate;
+
+/** Authenticated routes rendered outside `AppLayout` (no sidebar or top bar). */
+export function DomainStandaloneRoutes() {
+  return (
+    <>
+      <Route path="/onboarding" element={<OnboardingPage />} />
+    </>
+  );
+}
 
 export function DomainRoutes() {
   return (

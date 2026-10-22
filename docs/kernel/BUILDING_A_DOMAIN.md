@@ -1,6 +1,6 @@
 # Building a domain on the kernel
 
-This file says where a domain's files go. Behavior of the engine is in [../README.md](../README.md). This branch has no product models. Copy `seedKernel.ts` for the view seed.
+This file says where a product's files go. Behavior of the engine is in [README.md](./README.md). Product models live under `backend/prisma/schema/` (start with `domain.prisma`). A checkout with no product has no product models there. Copy `seedKernel.ts` when you write a view seed.
 
 | Path | What goes here |
 |---|---|
@@ -57,7 +57,7 @@ A seed command may import the product library. `backend/src/utils/setup/seed<Dom
 
 View graphs for the shell are written by `seedKernel.ts`. A domain adds its own graphs in a `seed<Domain>.ts` script. There is no JSON view catalog to sync.
 
-`domain.prisma` and `domainNavigation` are empty on this branch. A domain seed is a second command after `setup:kernel`. The kernel seed does not insert those rows.
+On a checkout with no product, `domain.prisma` and `domainNavigation` are empty. A domain seed is a second command after `setup:kernel`. The kernel seed does not insert product rows.
 
 ## Platform models
 

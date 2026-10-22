@@ -10,7 +10,7 @@ Definitions live in `workflow_flow`, `workflow_state`, and `workflow_action`. A 
 
 `workflow_state`: `flow_id`, `name`, `sequence`, `is_initial`, `is_final`, `is_active`, `skip`, `skip_target_state_id`, `entry_conditions`, `exit_conditions`. Assignment is required: `assigned_for` is `USER`, `ROLE`, or `EXPRESSION`. `ROLE` uses `assigned_role_id`. `USER` uses `assigned_user_id`. `EXPRESSION` uses `assigned_expression`. `assigned_for` is a required `String` in Prisma.
 
-`workflow_action`: `name`, `source_state_id`, `target_state_id`, `conditions`, `side_effects`, `org_id`. `side_effects` is JSON. A database effect names a function in `workflowActionMap` in `backend/src/domain/actions.ts`. That map is empty on this branch. Registering a handler is a domain extension; the kernel only calls the name.
+`workflow_action`: `name`, `source_state_id`, `target_state_id`, `conditions`, `side_effects`, `org_id`. `side_effects` is JSON. A database effect names a function in `workflowActionMap` in `backend/lib/domain.ts` (reached from `backend/src/domain/actions.ts`). The map stays empty until a product registers a handler. The kernel only calls the name.
 
 `GET /api/workflow/flows` returns flows whose `org_id` is the caller org or `org_system`. It does not hide the system row when a tenant row exists, and it does not prefer the tenant row.
 
