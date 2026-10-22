@@ -191,14 +191,34 @@ Per line (money `Decimal(19,4)`; rates as stored):
 4. Tax (next section) → `line_tax_amount`; write `invoice_line_tax` rows when using a group.
 5. Persist line `amount = taxable` (**exclusive of tax**, matching typical `net` semantics) **or** `amount = taxable + tax` — **lock: `amount` = taxable (net of discount, before tax)**; tax lives in `invoice_line_tax` / header `tax_amount`. Align with QBO sync conventions on this branch when they conflict — prefer exclusive net on `amount`.
 
-Header on every recalculate/save:
+Header formula:
 
 1. `net_amount` = Σ line taxable  
 2. `tax_amount` = Σ line tax  
 3. `total_amount` = `net_amount` + `tax_amount` + (`shipping_amount` \|\| 0) + (`adjustment_amount` \|\| 0)  
 4. If no applications: `balance_amount = total_amount` when status is `posted`; draft may show projected balance = total  
 
-Recalculate on line blur/change and on Save/Post (server must recompute; do not trust client-only totals).
+**Server recomputation = prod action / `functionMap` pattern (required), not an ad-hoc “save then fix” call.**
+
+Prod wires totals through the DAL post-write hook:
+
+- Handlers: `calculate_invoice_total`, `calculate_payment_total`, `calculate_credit_note_total` in `backend/src/lib/actions/zeiv.ts` / `actions/sales.ts`.
+- Registry: `functionMap` in `backend/src/lib/actions.ts` — keys like `"invoice"`, `"invoice.invoice_line_item"`, `"invoice.payment_receipt"`, `"credit_note.credit_note_item"` with a `fields[]` watch list; on ADD/UPDATE/DELETE of those fields, `execute_Action` runs the method **inside the same transaction**.
+- Also registered on `workflowActionMap` so Submit side effects can re-run the same method; **totals must not depend on workflow Submit alone** (prod comment).
+
+Books already has the kernel seam empty and ready:
+
+- `backend/lib/domain.ts` → `functionMap` / `workflowActionMap`
+- `backend/src/domain/actions.ts` → `execute_Action` (same ADD/UPDATE/DELETE contract)
+
+**Module 3B must:**
+
+1. Implement `calculate_invoice_total` / `calculate_payment_total` / `calculate_credit_note_total` under `backend/lib/sales/` (Books field names: `quantity`, `unit_price`, `discount_rate`, `tax_group_id`, `net_amount`, `tax_amount`, `total_amount`, `balance_amount`, `invoice_line_tax`, applications).
+2. Register them on `functionMap` for parent + child keys, e.g. `"invoice"`, `"invoice.line_items"` / `"invoice.invoice_line_item"` (match whatever relation name the DAL emits), `"payment_receipt"`, `"payment_receipt.applications"` (or equivalent), `"credit_note"`, `"credit_note.items"`.
+3. Watch fields that affect money (qty, price, discount, tax, adjustment/shipping, application amounts).
+4. Keep UI optimistic display optional; **persisted truth is the action result**. Do not invent a parallel `/api/sales/recalculate` unless the view API cannot surface the updated header.
+
+Client may preview totals; every line/header money write goes through the normal view/child APIs so `execute_Action` fires.
 
 #### 5. Tax behavior — **must**
 
@@ -274,7 +294,7 @@ Shared `resolveDocumentActions(mode)`; route/view sets capability; if `source_sy
 
 **Seeds** — six views + permissions; Create only on edit views.
 
-**Backend** — `backend/lib/sales/`: `saveInvoice` (header+lines+line taxes+totals), `saveReceipt` + applications, `saveCreditNote` + applications, `applySettlement` helpers. **No** `ledgerPosting.ts`.
+**Backend** — `backend/lib/sales/`: `calculateInvoiceTotal` / `calculatePaymentTotal` / `calculateCreditNoteTotal` registered on `functionMap` (prod action pattern); thin save/apply helpers only where view API is insufficient. **No** `ledgerPosting.ts`.
 
 **Frontend** — create/edit forms with line table; shared footer; `isEditableSource`; nav Create on edit lists only.
 
@@ -300,9 +320,9 @@ Shared `resolveDocumentActions(mode)`; route/view sets capability; if `source_sy
 |---|---|---|---|
 | **3B.0** | Dual views + nav + **Create buttons** | Seed edit/readonly views; routes incl. `/imported`; **Create** on each edit list only; Eye vs Edit row actions; retire old single views from nav | Create visible on Invoices/Payments/Credit notes edit lists; absent on imported lists |
 | **3B.1** | Document mode + footer | `isEditableSource`; `resolveDocumentActions`; shared footer; readonly banner | Imported open → Close only |
-| **3B.2** | Invoice create (**complete** line editor) | Header + line add/remove; item lookup + copy matrix; free-text lines; discount %; tax group/rate editable; `invoice_line_tax`; server totals; draft/post/void | Acceptance 1–5 for invoice |
-| **3B.3** | Payment create + apply | Create button + from-invoice; applications; T1/T2 | Acceptance 6, 8 |
-| **3B.4** | Credit note create + apply | Lines (same line rules); `credit_note_application` | Acceptance 7 |
+| **3B.2** | Invoice create (**complete** line editor) | Header + line add/remove; item lookup + copy matrix; free-text lines; discount %; tax group/rate editable; `invoice_line_tax`; **`calculate_invoice_total` on `functionMap`**; draft/post/void | Acceptance 1–5 for invoice; editing a line qty updates header totals via action hook |
+| **3B.3** | Payment create + apply | Create button + from-invoice; applications; **`calculate_payment_total` on `functionMap`**; T1/T2 | Acceptance 6, 8 |
+| **3B.4** | Credit note create + apply | Lines (same line rules); `credit_note_application`; **`calculate_credit_note_total` on `functionMap`** | Acceptance 7 |
 
 Do **not** fold poster, reverse sync, or purchases into any 3B.* package.
 
