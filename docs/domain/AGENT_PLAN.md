@@ -119,15 +119,15 @@ No new header models. Application-level rules only:
 
 | Rule | Detail |
 |---|---|
-| Direction | Native invoice create always `direction = sales`. |
+| Direction | Editable invoice create always `direction = sales`. |
 | Customer | Required on sales invoice / receipt / credit note. |
-| Lineage | Native writes must leave lineage null. Reject create/update that sets lineage from the form. |
-| Synced immutability | API/UI: if `source_system_id` is set, reject update/delete from native forms. |
-| Status | Native invoice: `draft` → `posted` → `void`. Synced rows stay as sync mapped them (`posted` / `void`). |
+| Lineage | Writes via `_edit_view` leave lineage null. Reject create/update that sets lineage from the form. |
+| Readonly immutability | API/UI: if `source_system_id` is set (Module 3B readonly population), reject update/delete. |
+| Status | Editable invoice: `draft` → `posted` → `void`. Readonly (imported) rows stay as sync mapped them. |
 | Money | Header totals and line amounts `Decimal(19, 4)`. On save, recompute `net_amount` / `tax_amount` / `total_amount` from lines (or require explicit tax fields — pick one approach and document in the form). |
 | Balance | On create of a posted invoice with no apps: `balance_amount = total_amount`. Receipt/credit apply updates balances per design T1/T2 **in application code** (do not wait for poster). |
 | Payment apply | Prefer `payment_receipt_application` rows (signed amounts). Convenience `payment_receipt.invoice_id` only when exactly one invoice target. |
-| Credit apply (native) | Prefer `credit_note_application` (example 6.8). Do **not** invent a $0 payment unless matching QBO shape for tests. |
+| Credit apply (editable) | Prefer `credit_note_application` (example 6.8). Do **not** invent a $0 payment unless matching QBO shape for tests. |
 
 Optional thin fields if missing for UX: keep using existing columns (`number`, dates, `entity_id`, `currency_id`, `account_id` on receipt, line `item_master_id` / `account_id`).
 
