@@ -57,6 +57,291 @@ const taxGroupSelect = {
   instanceLabel: 'name',
 };
 
+const paymentTermsSelect = {
+  type: 'payment_terms',
+  limit: '10',
+  instanceKey: 'id',
+  instanceType: 'payment_terms',
+  searchParams: 'name',
+  instanceLabel: 'name',
+};
+
+const taxRegionSelect = {
+  type: 'tax_region',
+  limit: '10',
+  instanceKey: 'id',
+  instanceType: 'tax_region',
+  searchParams: 'name',
+  instanceLabel: 'name',
+};
+
+function buildInvoiceDataGraph(opts: {
+  showSource: boolean;
+  directionInList?: boolean;
+}): Prisma.InputJsonValue {
+  const directionInList = opts.directionInList ?? true;
+  return {
+    id: { dataType: 'string', permission: 'read' },
+    number: {
+      dataType: 'string',
+      permission: 'update',
+      displayName: 'Number',
+      isColumnShow: true,
+      searchProps: { isSearch: true, operation: 'contains' },
+      tableProps: { width: '140', columnType: 'text' },
+    },
+    invoice_date: {
+      dataType: 'date',
+      permission: 'update',
+      displayName: 'Date',
+      isColumnShow: true,
+      tableProps: { width: '130', columnType: 'date' },
+    },
+    due_date: {
+      dataType: 'date',
+      permission: 'update',
+      displayName: 'Due',
+      isColumnShow: true,
+      tableProps: { width: '130', columnType: 'date' },
+    },
+    status: {
+      dataType: 'string',
+      permission: 'update',
+      displayName: 'Status',
+      isColumnShow: true,
+      tableProps: { width: '100', columnType: 'text' },
+    },
+    direction: {
+      dataType: 'string',
+      permission: 'update',
+      displayName: 'Direction',
+      isColumnShow: directionInList,
+      tableProps: { width: '100', columnType: 'text' },
+    },
+    customer: {
+      type: 'table',
+      datatype: 'table',
+      displayName: 'Customer',
+      isColumnShow: true,
+      select: { id: 'read', name: 'read', email: 'read' },
+    },
+    customer_id: {
+      dataType: 'string',
+      permission: 'update',
+      displayName: 'Customer',
+      isColumnShow: false,
+      tableProps: {
+        columnType: 'select',
+        selectProps: { ...customerSelect, instanceSourceKey: 'customer_id' },
+      },
+    },
+    net_amount: {
+      dataType: 'decimal',
+      permission: 'update',
+      displayName: 'Net',
+      isColumnShow: true,
+      tableProps: { width: '120', columnType: 'decimal' },
+    },
+    tax_amount: {
+      dataType: 'decimal',
+      permission: 'update',
+      displayName: 'Tax',
+      isColumnShow: true,
+      tableProps: { width: '100', columnType: 'decimal' },
+    },
+    total_amount: {
+      dataType: 'decimal',
+      permission: 'update',
+      displayName: 'Total',
+      isColumnShow: true,
+      tableProps: { width: '120', columnType: 'decimal' },
+    },
+    balance_amount: {
+      dataType: 'decimal',
+      permission: 'update',
+      displayName: 'Balance',
+      isColumnShow: true,
+      tableProps: { width: '120', columnType: 'decimal' },
+    },
+    exchange_rate: {
+      dataType: 'decimal',
+      permission: 'update',
+      displayName: 'Exchange rate',
+      isColumnShow: false,
+    },
+    shipping_amount: {
+      dataType: 'decimal',
+      permission: 'update',
+      displayName: 'Shipping',
+      isColumnShow: false,
+    },
+    adjustment_amount: {
+      dataType: 'decimal',
+      permission: 'update',
+      displayName: 'Adjustment',
+      isColumnShow: false,
+    },
+    currency: {
+      type: 'table',
+      datatype: 'table',
+      displayName: 'Currency',
+      isColumnShow: true,
+      select: { id: 'read', code: 'read', name: 'read' },
+    },
+    currency_id: {
+      dataType: 'string',
+      permission: 'update',
+      displayName: 'Currency',
+      isColumnShow: false,
+      tableProps: {
+        columnType: 'select',
+        selectProps: { ...currencySelect, instanceSourceKey: 'currency_id' },
+      },
+    },
+    payment_terms: {
+      type: 'table',
+      datatype: 'table',
+      displayName: 'Payment terms',
+      isColumnShow: false,
+      select: { id: 'read', name: 'read', days: 'read' },
+    },
+    payment_terms_id: {
+      dataType: 'string',
+      permission: 'update',
+      displayName: 'Payment terms',
+      isColumnShow: false,
+      tableProps: {
+        columnType: 'select',
+        selectProps: { ...paymentTermsSelect, instanceSourceKey: 'payment_terms_id' },
+      },
+    },
+    tax_region: {
+      type: 'table',
+      datatype: 'table',
+      displayName: 'Tax region',
+      isColumnShow: false,
+      select: { id: 'read', name: 'read', code: 'read', country_code: 'read' },
+    },
+    tax_region_id: {
+      dataType: 'string',
+      permission: 'update',
+      displayName: 'Tax region',
+      isColumnShow: false,
+      tableProps: {
+        columnType: 'select',
+        selectProps: { ...taxRegionSelect, instanceSourceKey: 'tax_region_id' },
+      },
+    },
+    entity: {
+      type: 'table',
+      datatype: 'table',
+      displayName: 'Entity',
+      isColumnShow: false,
+      select: { id: 'read', name: 'read' },
+    },
+    entity_id: {
+      dataType: 'string',
+      permission: 'update',
+      displayName: 'Entity',
+      isColumnShow: false,
+      tableProps: {
+        columnType: 'select',
+        selectProps: { ...entitySelect, instanceSourceKey: 'entity_id' },
+      },
+    },
+    bill_to: { dataType: 'string', permission: 'update', displayName: 'Bill to', isColumnShow: false },
+    ship_to: { dataType: 'string', permission: 'update', displayName: 'Ship to', isColumnShow: false },
+    notes: { dataType: 'string', permission: 'update', displayName: 'Notes', isColumnShow: false },
+    reference: { dataType: 'string', permission: 'update', displayName: 'Reference', isColumnShow: false },
+    source_system_id: {
+      dataType: 'string',
+      permission: 'read',
+      displayName: 'Source',
+      isColumnShow: opts.showSource,
+      tableProps: { width: '100', columnType: 'text' },
+    },
+    source_record_id: {
+      dataType: 'string',
+      permission: 'read',
+      displayName: 'Source id',
+      isColumnShow: opts.showSource,
+    },
+    line_items: {
+      type: 'table',
+      datatype: 'table',
+      displayName: 'Line items',
+      isColumnShow: false,
+      select: {
+        id: 'read',
+        line_number: 'read',
+        description: 'read',
+        quantity: 'read',
+        unit_price: 'read',
+        amount: 'read',
+        item_master_id: 'read',
+        discount_rate: 'read',
+        discount_amount: 'read',
+        tax_group_id: 'read',
+        account_id: 'read',
+        classification_code: 'read',
+        classification_scheme: 'read',
+        item_master: {
+          type: 'table',
+          select: { id: 'read', name: 'read', code: 'read' },
+        },
+        tax_group: {
+          type: 'table',
+          select: { id: 'read', name: 'read' },
+        },
+        account: {
+          type: 'table',
+          select: { id: 'read', name: 'read', code: 'read' },
+        },
+        line_taxes: {
+          type: 'table',
+          select: {
+            id: 'read',
+            tax_master_id: 'read',
+            rate: 'read',
+            amount: 'read',
+            tax_group_id: 'read',
+          },
+        },
+      },
+    },
+    payment_receipt_applications: {
+      type: 'table',
+      datatype: 'table',
+      displayName: 'Applied receipts',
+      isColumnShow: false,
+      select: {
+        id: 'read',
+        amount_applied: 'read',
+        applied_date: 'read',
+        payment_receipt: {
+          type: 'table',
+          select: { id: 'read', number: 'read', receipt_date: 'read' },
+        },
+      },
+    },
+    credit_note_applications: {
+      type: 'table',
+      datatype: 'table',
+      displayName: 'Applied credits',
+      isColumnShow: false,
+      select: {
+        id: 'read',
+        amount_applied: 'read',
+        applied_date: 'read',
+        credit_note: {
+          type: 'table',
+          select: { id: 'read', number: 'read' },
+        },
+      },
+    },
+  };
+}
+
 const VIEWS: Array<{
   id: string;
   name: string;
@@ -169,169 +454,21 @@ const VIEWS: Array<{
     name: 'invoice_view',
     model: 'invoice',
     description: 'Invoices',
-    data_graph: {
-      id: { dataType: 'string', permission: 'read' },
-      number: {
-        dataType: 'string',
-        permission: 'update',
-        displayName: 'Number',
-        isColumnShow: true,
-        searchProps: { isSearch: true, operation: 'contains' },
-        tableProps: { width: '140', columnType: 'text' },
-      },
-      invoice_date: {
-        dataType: 'date',
-        permission: 'update',
-        displayName: 'Date',
-        isColumnShow: true,
-        tableProps: { width: '130', columnType: 'date' },
-      },
-      due_date: {
-        dataType: 'date',
-        permission: 'update',
-        displayName: 'Due',
-        isColumnShow: true,
-        tableProps: { width: '130', columnType: 'date' },
-      },
-      status: {
-        dataType: 'string',
-        permission: 'update',
-        displayName: 'Status',
-        isColumnShow: true,
-        tableProps: { width: '100', columnType: 'text' },
-      },
-      direction: {
-        dataType: 'string',
-        permission: 'update',
-        displayName: 'Direction',
-        isColumnShow: true,
-        tableProps: { width: '100', columnType: 'text' },
-      },
-      customer: {
-        type: 'table',
-        datatype: 'table',
-        displayName: 'Customer',
-        isColumnShow: true,
-        select: { id: 'read', name: 'read', email: 'read' },
-      },
-      customer_id: {
-        dataType: 'string',
-        permission: 'update',
-        displayName: 'Customer',
-        isColumnShow: false,
-        tableProps: {
-          columnType: 'select',
-          selectProps: { ...customerSelect, instanceSourceKey: 'customer_id' },
-        },
-      },
-      net_amount: {
-        dataType: 'decimal',
-        permission: 'update',
-        displayName: 'Net',
-        isColumnShow: true,
-        tableProps: { width: '120', columnType: 'decimal' },
-      },
-      tax_amount: {
-        dataType: 'decimal',
-        permission: 'update',
-        displayName: 'Tax',
-        isColumnShow: true,
-        tableProps: { width: '100', columnType: 'decimal' },
-      },
-      total_amount: {
-        dataType: 'decimal',
-        permission: 'update',
-        displayName: 'Total',
-        isColumnShow: true,
-        tableProps: { width: '120', columnType: 'decimal' },
-      },
-      balance_amount: {
-        dataType: 'decimal',
-        permission: 'update',
-        displayName: 'Balance',
-        isColumnShow: true,
-        tableProps: { width: '120', columnType: 'decimal' },
-      },
-      currency: {
-        type: 'table',
-        datatype: 'table',
-        displayName: 'Currency',
-        isColumnShow: true,
-        select: { id: 'read', code: 'read', name: 'read' },
-      },
-      currency_id: {
-        dataType: 'string',
-        permission: 'update',
-        displayName: 'Currency',
-        isColumnShow: false,
-        tableProps: {
-          columnType: 'select',
-          selectProps: { ...currencySelect, instanceSourceKey: 'currency_id' },
-        },
-      },
-      entity: {
-        type: 'table',
-        datatype: 'table',
-        displayName: 'Entity',
-        isColumnShow: false,
-        select: { id: 'read', name: 'read' },
-      },
-      entity_id: {
-        dataType: 'string',
-        permission: 'update',
-        displayName: 'Entity',
-        isColumnShow: false,
-        tableProps: {
-          columnType: 'select',
-          selectProps: { ...entitySelect, instanceSourceKey: 'entity_id' },
-        },
-      },
-      bill_to: { dataType: 'string', permission: 'update', displayName: 'Bill to', isColumnShow: false },
-      ship_to: { dataType: 'string', permission: 'update', displayName: 'Ship to', isColumnShow: false },
-      notes: { dataType: 'string', permission: 'update', displayName: 'Notes', isColumnShow: false },
-      reference: { dataType: 'string', permission: 'update', displayName: 'Reference', isColumnShow: false },
-      source_system_id: {
-        dataType: 'string',
-        permission: 'read',
-        displayName: 'Source',
-        isColumnShow: true,
-        tableProps: { width: '100', columnType: 'text' },
-      },
-      source_record_id: { dataType: 'string', permission: 'read', displayName: 'Source id', isColumnShow: false },
-      line_items: {
-        type: 'table',
-        datatype: 'table',
-        displayName: 'Line items',
-        isColumnShow: false,
-        select: {
-          id: 'read',
-          line_number: 'read',
-          description: 'read',
-          quantity: 'read',
-          unit_price: 'read',
-          amount: 'read',
-          item_master: {
-            type: 'table',
-            select: { id: 'read', name: 'read', code: 'read' },
-          },
-        },
-      },
-      payment_receipt_applications: {
-        type: 'table',
-        datatype: 'table',
-        displayName: 'Applied receipts',
-        isColumnShow: false,
-        select: {
-          id: 'read',
-          amount_applied: 'read',
-          applied_date: 'read',
-          payment_receipt: {
-            type: 'table',
-            select: { id: 'read', number: 'read', receipt_date: 'read' },
-          },
-        },
-      },
-    },
+    data_graph: buildInvoiceDataGraph({ showSource: true }),
+  },
+  {
+    id: 'view_sales_invoice_edit',
+    name: 'invoice_edit_view',
+    model: 'invoice',
+    description: 'Invoices (Books)',
+    data_graph: buildInvoiceDataGraph({ showSource: false, directionInList: false }),
+  },
+  {
+    id: 'view_sales_invoice_readonly',
+    name: 'invoice_readonly_view',
+    model: 'invoice',
+    description: 'Imported invoices',
+    data_graph: buildInvoiceDataGraph({ showSource: true }),
   },
   {
     id: 'view_sales_item_master',
@@ -821,7 +958,7 @@ async function main() {
   await seedDefaultTaxRegions();
   console.log('Sales + catalog views ready.');
   console.log(
-    '  customer_view, invoice_view, item_master_view, supplier_view, tax_master_view, tax_group_view, tax_region_view'
+    '  customer_view, invoice_view, invoice_edit_view, invoice_readonly_view, item_master_view, supplier_view, tax_master_view, tax_group_view, tax_region_view'
   );
 }
 

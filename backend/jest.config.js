@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src', '<rootDir>/lib'],
   testMatch: ['**/__tests__/**/*.test.ts'],
   // LLM prompt harnesses — run via npm run test:posting-prompt / test:posting-sample-questions
   testPathIgnorePatterns: [

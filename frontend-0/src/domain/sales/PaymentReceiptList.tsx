@@ -4,8 +4,14 @@ export default function PaymentReceiptList() {
   return (
     <Master
       type="payment_receipt"
-      view="payment_receipt_view"
+      view="payment_receipt_edit_view"
       displayName="Payments received"
+      defaultFilters={{
+        source_system_id: { is_null: true },
+      }}
+      createDefaults={{
+        status: 'draft',
+      }}
     />
   );
 }

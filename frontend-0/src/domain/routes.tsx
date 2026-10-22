@@ -20,10 +20,15 @@ import ConnectionsPage from '@/domain/connections/ConnectionsPage';
 import ConnectionDetailPage from '@/domain/connections/ConnectionDetailPage';
 import ConnectionFormPage from '@/domain/connections/ConnectionFormPage';
 import InvoiceList from '@/domain/sales/InvoiceList';
+import InvoiceImportedList from '@/domain/sales/InvoiceImportedList';
 import PaymentReceiptList from '@/domain/sales/PaymentReceiptList';
+import PaymentReceiptImportedList from '@/domain/sales/PaymentReceiptImportedList';
 import CreditNoteList from '@/domain/sales/CreditNoteList';
+import CreditNoteImportedList from '@/domain/sales/CreditNoteImportedList';
 import CustomerList from '@/domain/sales/CustomerList';
 import { InvoiceForm } from '@/domain/sales/InvoiceForm';
+import { PaymentReceiptForm } from '@/domain/sales/PaymentReceiptForm';
+import { CreditNoteForm } from '@/domain/sales/CreditNoteForm';
 import { CustomerForm } from '@/domain/sales/CustomerForm';
 import { ItemForm } from '@/domain/sales/ItemForm';
 import { SupplierForm } from '@/domain/sales/SupplierForm';
@@ -56,8 +61,11 @@ export function DomainRoutes() {
       <Route path="source_system/:id/view/:viewId" element={<ConnectionDetailPage />} />
       <Route path="source_system/:id/edit" element={<ConnectionFormPage />} />
       <Route path="sales/invoices" element={<InvoiceList />} />
+      <Route path="sales/invoices/imported" element={<InvoiceImportedList />} />
       <Route path="sales/payments" element={<PaymentReceiptList />} />
+      <Route path="sales/payments/imported" element={<PaymentReceiptImportedList />} />
       <Route path="sales/credit-notes" element={<CreditNoteList />} />
+      <Route path="sales/credit-notes/imported" element={<CreditNoteImportedList />} />
       <Route path="sales/customers" element={<CustomerList />} />
       <Route path="masters/items" element={<Master type="item_master" view="item_master_view" displayName="Items" />} />
       <Route path="purchases/suppliers" element={<Master type="supplier" view="supplier_view" displayName="Suppliers" />} />
@@ -66,6 +74,10 @@ export function DomainRoutes() {
       <Route path="masters/tax-regions" element={<Master type="tax_region" view="tax_region_view" displayName="Tax regions" />} />
       <Route path="invoice/:id/view/:viewId" element={<InvoiceForm />} />
       <Route path="invoice/view/:viewId" element={<InvoiceForm />} />
+      <Route path="payment_receipt/:id/view/:viewId" element={<PaymentReceiptForm />} />
+      <Route path="payment_receipt/view/:viewId" element={<PaymentReceiptForm />} />
+      <Route path="credit_note/:id/view/:viewId" element={<CreditNoteForm />} />
+      <Route path="credit_note/view/:viewId" element={<CreditNoteForm />} />
       <Route path="customer/:id/view/:viewId" element={<CustomerForm />} />
       <Route path="customer/view/:viewId" element={<CustomerForm />} />
       <Route path="item_master/:id/view/:viewId" element={<ItemForm />} />

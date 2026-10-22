@@ -539,7 +539,7 @@ export class DataAccessLayer {
       filteredOptions.data = filteredData;
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        const updated = await this.getModel(modelName).update(filteredOptions);
+        const updated = await (tx as any)[modelName.toLowerCase()].update(filteredOptions);
         const action_result = await execute_Action(context, 'UPDATE', modelName, id, Object.keys(filteredData), options.select, tx as unknown as PrismaClient);
         if (action_result) {
           return action_result[0];

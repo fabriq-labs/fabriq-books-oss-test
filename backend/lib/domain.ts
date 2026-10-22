@@ -14,6 +14,7 @@ import {
   registerGlRoutes,
 } from './gl/register';
 import { registerIntegrationsRoutes } from './integrations/register';
+import { salesDependencies, toFunctionMap } from './sales/dependencyMap';
 
 /** Host passed by the kernel extractor registry. */
 export type DomainExtractorHost = {
@@ -139,7 +140,9 @@ export function normalizeAnalyticsSql(query: string, _auth?: unknown, _toolConte
 }
 
 /** Post-write hooks keyed by model or "model.relation". */
-export const functionMap: Record<string, DomainActionBinding> = {};
+export const functionMap: Record<string, DomainActionBinding> = {
+  ...toFunctionMap(salesDependencies),
+};
 
 /** Workflow side effects keyed by handler name. */
 export const workflowActionMap: Record<string, (...args: any[]) => any> = {};

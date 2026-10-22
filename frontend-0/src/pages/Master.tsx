@@ -492,7 +492,8 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
   };
 
   const handleCreate = () => {
-    // Workflow models that need to create a draft record immediately
+    // Books sales documents use blank create forms + viewAPI (no workflow draft).
+    // Legacy prod workflow models still create a draft via workflowAPI.
     const workflowModels: Record<
       string,
       { stateId: string; routePattern: "view" | "state" }
@@ -500,13 +501,10 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
       sales_order: { stateId: "3", routePattern: "view" },
       quote: { stateId: "1", routePattern: "view" },
       delivery_challan: { stateId: "6", routePattern: "view" },
-      credit_note: { stateId: "7", routePattern: "view" },
-      invoice: { stateId: "3", routePattern: "view" },
     };
     const workflowConfig = workflowModels[type];
 
     if (workflowConfig) {
-      // Create draft record immediately using workflowAPI
       workflowAPI
         .create(type, workflowConfig.stateId, {
           status: workflowConfig.stateId,
@@ -514,9 +512,7 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
         })
         .then((res: any) => {
           if (res?.data?.id) {
-            // Navigate to view-based route for sales workflow models
             const basePath = supportPath ? `/${supportPath}` : "";
-
             navigate(`${basePath}/${type}/${res.data.id}/view/${view}`);
           } else {
             toast({
@@ -535,7 +531,6 @@ const Master = forwardRef<MasterHandle, MasterProps>(({
           });
         });
     } else {
-      // Regular master data - navigate to empty form
       navigate(`/${type}/view/${view}`);
     }
   };

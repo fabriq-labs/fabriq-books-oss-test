@@ -198,6 +198,7 @@ async function main() {
           views: [
             'customer_view',
             'invoice_view',
+            'invoice_edit_view',
             'item_master_view',
             'supplier_view',
             'tax_master_view',
@@ -205,7 +206,15 @@ async function main() {
             'tax_region_view',
           ],
         },
-        { script: 'seed:ar-settlement', views: ['payment_receipt_view', 'credit_note_view'] },
+        {
+          script: 'seed:ar-settlement',
+          views: [
+            'payment_receipt_view',
+            'payment_receipt_edit_view',
+            'credit_note_view',
+            'credit_note_edit_view',
+          ],
+        },
         { script: 'seed:connections', views: ['source_system_view'] },
       ];
 
