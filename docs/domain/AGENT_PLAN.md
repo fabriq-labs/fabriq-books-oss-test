@@ -198,27 +198,7 @@ Header formula:
 3. `total_amount` = `net_amount` + `tax_amount` + (`shipping_amount` \|\| 0) + (`adjustment_amount` \|\| 0)  
 4. If no applications: `balance_amount = total_amount` when status is `posted`; draft may show projected balance = total  
 
-**Server recomputation = prod action / `functionMap` pattern (required), not an ad-hoc “save then fix” call.**
-
-Prod wires totals through the DAL post-write hook:
-
-- Handlers: `calculate_invoice_total`, `calculate_payment_total`, `calculate_credit_note_total` in `backend/src/lib/actions/zeiv.ts` / `actions/sales.ts`.
-- Registry: `functionMap` in `backend/src/lib/actions.ts` — keys like `"invoice"`, `"invoice.invoice_line_item"`, `"invoice.payment_receipt"`, `"credit_note.credit_note_item"` with a `fields[]` watch list; on ADD/UPDATE/DELETE of those fields, `execute_Action` runs the method **inside the same transaction**.
-- Also registered on `workflowActionMap` so Submit side effects can re-run the same method; **totals must not depend on workflow Submit alone** (prod comment).
-
-Books already has the kernel seam empty and ready:
-
-- `backend/lib/domain.ts` → `functionMap` / `workflowActionMap`
-- `backend/src/domain/actions.ts` → `execute_Action` (same ADD/UPDATE/DELETE contract)
-
-**Module 3B must:**
-
-1. Implement `calculate_invoice_total` / `calculate_payment_total` / `calculate_credit_note_total` under `backend/lib/sales/` (Books field names: `quantity`, `unit_price`, `discount_rate`, `tax_group_id`, `net_amount`, `tax_amount`, `total_amount`, `balance_amount`, `invoice_line_tax`, applications).
-2. Register them on `functionMap` for parent + child keys, e.g. `"invoice"`, `"invoice.line_items"` / `"invoice.invoice_line_item"` (match whatever relation name the DAL emits), `"payment_receipt"`, `"payment_receipt.applications"` (or equivalent), `"credit_note"`, `"credit_note.items"`.
-3. Watch fields that affect money (qty, price, discount, tax, adjustment/shipping, application amounts).
-4. Keep UI optimistic display optional; **persisted truth is the action result**. Do not invent a parallel `/api/sales/recalculate` unless the view API cannot surface the updated header.
-
-Client may preview totals; every line/header money write goes through the normal view/child APIs so `execute_Action` fires.
+**Server recomputation = domain `functionMap` actions + declarative `dependencyMap` (see [Domain actions design](#domain-actions-dependencymap--dal-tx--invoice-totals) below).** No metadata calc engine. No parallel `/api/sales/recalculate`.
 
 #### 5. Tax behavior — **must**
 
@@ -294,9 +274,156 @@ Shared `resolveDocumentActions(mode)`; route/view sets capability; if `source_sy
 
 **Seeds** — six views + permissions; Create only on edit views.
 
-**Backend** — `backend/lib/sales/`: `calculateInvoiceTotal` / `calculatePaymentTotal` / `calculateCreditNoteTotal` registered on `functionMap` (prod action pattern); thin save/apply helpers only where view API is insufficient. **No** `ledgerPosting.ts`.
+**Backend** — `backend/lib/sales/` owns `calculate_invoice_total` (and later payment/credit totals), pure line math + thin tx adapter; register via `dependencyMap` → `functionMap` in `backend/lib/domain.ts`. **No** `ledgerPosting.ts`. **No** calc code under `backend/src` except the existing `execute_Action` seam.
 
 **Frontend** — create/edit forms with line table; shared footer; `isEditableSource`; nav Create on edit lists only.
+
+---
+
+## Domain actions: dependencyMap + DAL tx + invoice totals
+
+**Locks (this redesign):**
+
+- Keep the prod **`functionMap` / `execute_Action`** pattern (kernel seam already in `backend/src/domain/actions.ts` → empty `functionMap` from `backend/lib/domain.ts`).
+- Actions live in **`backend/lib/sales/`** (domain), not a kernel “metadata calc engine”.
+- Declare **when** an action runs with a **`dependencyMap`** (declarative). Expand it to `functionMap` at registration time.
+- **Rewrite** `calculate_invoice_total` using prod as a behavior reference — simpler, Decimal-safe, unit-tested. Drop workflow / PO side effects for Books 3B.
+- DAL must pass the **same Prisma `tx`** into the action that performed the triggering write (fix prod’s child paths; fix parent `update` so it also writes through `tx`).
+
+### Declarative `dependencyMap`
+
+One action, many trigger sites. Domain declares dependencies; kernel `execute_Action` still consumes the flat `functionMap` shape.
+
+```ts
+// backend/lib/sales/dependencyMap.ts  (domain-owned)
+
+export type DomainAction = (
+  context: AuthContext,
+  model: string,          // trigger key, e.g. 'invoice' | 'invoice.line_items'
+  instanceId: string,     // ALWAYS the parent document id
+  changeSet: string[],
+  selectSet: unknown,
+  tx: Prisma.TransactionClient,
+  created?: unknown
+) => Promise<unknown>;
+
+export type DependencyDecl = {
+  /** Action to run (full document recompute). */
+  run: DomainAction;
+  /** Parent model writes that should fire the action on UPDATE of these fields. */
+  parent: { model: string; fields: string[] };
+  /** Child relation writes: ADD/DELETE always fire; UPDATE fires if changeSet intersects fields. */
+  children: Array<{ relation: string; fields: string[] }>;
+};
+
+export const salesDependencies: DependencyDecl[] = [
+  {
+    run: calculate_invoice_total,
+    parent: {
+      model: 'invoice',
+      fields: ['shipping_amount', 'adjustment_amount'],
+    },
+    children: [
+      {
+        relation: 'line_items', // Prisma field on invoice → DAL key 'invoice.line_items'
+        fields: ['quantity', 'unit_price', 'discount_rate', 'discount_amount', 'tax_group_id'],
+      },
+    ],
+  },
+  // later: payment_receipt + applications; credit_note + line_items
+];
+
+/** Expand decls into the flat map execute_Action already understands. */
+export function toFunctionMap(decls: DependencyDecl[]): Record<string, DomainActionBinding> {
+  const map: Record<string, DomainActionBinding> = {};
+  for (const d of decls) {
+    map[d.parent.model] = { fields: d.parent.fields, method: d.run };
+    for (const c of d.children) {
+      map[`${d.parent.model}.${c.relation}`] = { fields: c.fields, method: d.run };
+    }
+  }
+  return map;
+}
+```
+
+`backend/lib/domain.ts`:
+
+```ts
+import { salesDependencies, toFunctionMap } from './sales/dependencyMap';
+export const functionMap = { ...toFunctionMap(salesDependencies) };
+```
+
+**Semantics (unchanged from prod `execute_Action`):**
+
+| Trigger | When `run` fires |
+|---|---|
+| `UPDATE` on parent key | `changeSet` intersects `parent.fields` |
+| `UPDATE` on child key | `changeSet` intersects that child’s `fields` |
+| `ADD` / `DELETE` on child key | Always (full recompute) |
+
+**Strategy inside the action:** always **recompute the whole invoice** from DB state via `tx` (no dependency graph / partial DAG). The map only answers *when* to fire.
+
+### DAL ↔ action transaction contract
+
+Required interface (match prod intent; tighten Books):
+
+```
+prisma.$transaction(async (tx) => {
+  // 1. Perform the user write ON tx (parent update, or nested child create/update/delete)
+  // 2. execute_Action(..., tx)  // same client
+  // 3. Action loads/writes ONLY through tx
+  // 4. Return action result[0] as the API payload (must not be undefined)
+})
+```
+
+| Path | Today (Books) | Required |
+|---|---|---|
+| `updateChild` / `addChildrenToParent` / `deleteRelation` | Write on `tx`, then `execute_Action(..., tx)` | Keep |
+| `update` (parent) | Write via **global** `getModel().update`, pass `tx` to action | **Fix:** write with `tx[model].update` so a thrown action rolls back the header write |
+| Action body | n/a | Use `tx.invoice`, `tx.invoice_line_item`, etc. — never import global `prisma` for these reads/writes |
+| Return | `action_result[0]` replaces response | Action returns reloaded invoice (with `select_set` when provided) |
+
+`instance_id` for child keys is the **parent** id (prod / current DAL). The action always loads the invoice by that id.
+
+### `calculate_invoice_total` rewrite (domain lib)
+
+**Reference:** prod `backend/src/lib/actions/zeiv.ts` `calculate_invoice_total` — copy *behavior for line/header money*, not structure.
+
+**Do not port:** workflow state branches, PO qty side effects, `Number()`/`toFixed(2)` float math, wipe-all tax rows without reason, god-function layout.
+
+**Suggested files:**
+
+```
+backend/lib/sales/
+  dependencyMap.ts          # decls + toFunctionMap
+  invoiceTotal/
+    lineMath.ts             # PURE: qty, price, discount % → taxable, discount_amount
+    taxMath.ts              # PURE: taxable + components → tax rows + tax total
+    headerMath.ts           # PURE: Σ lines + shipping/adjustment → net/tax/total
+    calculateInvoiceTotal.ts  # thin: load via tx → pure → write via tx → return row
+  __tests__/
+    lineMath.test.ts
+    taxMath.test.ts
+    headerMath.test.ts
+    calculateInvoiceTotal.adapter.test.ts  # fake tx
+```
+
+**Pure formulas (Books fields):**
+
+1. `base = quantity × unit_price`
+2. `discount_amount = base × (discount_rate / 100)` when rate set (UI percent; store consistent with schema)
+3. `taxable = max(0, base − discount_amount)` → persist on line `amount`
+4. Tax: if `tax_group_id`, expand `tax_group_component` → `tax_master.rate`; write `invoice_line_tax` rows; else clear / manual path as decided in tax requirements
+5. Header: `net_amount = Σ taxable`, `tax_amount = Σ line tax`, `total_amount = net + tax + shipping + adjustment`
+6. `balance_amount`: if no applications and status allows, set to `total_amount` (settlement apps are a later/separate action — do not mix GL poster here)
+
+**Testability:**
+
+- ≥90% coverage on pure math with table-driven Decimal cases (discount, multi-component tax, zero lines, clamp).
+- Adapter tests with an in-memory fake `tx` (no ModelService): load fixture → run action → assert writes.
+- One optional DAL integration test after the parent-`update` tx fix.
+
+**Payment / credit totals:** same pattern later (`DependencyDecl` + pure math). Out of the first invoice-total slice if needed; still listed under 3B.3 / 3B.4.
 
 ### Acceptance
 
@@ -320,9 +447,10 @@ Shared `resolveDocumentActions(mode)`; route/view sets capability; if `source_sy
 |---|---|---|---|
 | **3B.0** | Dual views + nav + **Create buttons** | Seed edit/readonly views; routes incl. `/imported`; **Create** on each edit list only; Eye vs Edit row actions; retire old single views from nav | Create visible on Invoices/Payments/Credit notes edit lists; absent on imported lists |
 | **3B.1** | Document mode + footer | `isEditableSource`; `resolveDocumentActions`; shared footer; readonly banner | Imported open → Close only |
-| **3B.2** | Invoice create (**complete** line editor) | Header + line add/remove; item lookup + copy matrix; free-text lines; discount %; tax group/rate editable; `invoice_line_tax`; **`calculate_invoice_total` on `functionMap`**; draft/post/void | Acceptance 1–5 for invoice; editing a line qty updates header totals via action hook |
-| **3B.3** | Payment create + apply | Create button + from-invoice; applications; **`calculate_payment_total` on `functionMap`**; T1/T2 | Acceptance 6, 8 |
-| **3B.4** | Credit note create + apply | Lines (same line rules); `credit_note_application`; **`calculate_credit_note_total` on `functionMap`** | Acceptance 7 |
+| **3B.2a** | Invoice totals action | Pure line/tax/header math + `calculate_invoice_total` tx adapter; `dependencyMap` → `functionMap`; fix DAL parent `update` to use same `tx`; unit tests | Editing line qty via child API updates `net_amount`/`tax_amount`/`total_amount` in one transaction |
+| **3B.2b** | Invoice create UI | Header + line editor (item copy, free-text, discount, tax); draft/post/void; uses totals action | Acceptance 1–5 for invoice |
+| **3B.3** | Payment create + apply | Create + from-invoice; applications; `calculate_payment_total` via same dependencyMap pattern; T1/T2 | Acceptance 6, 8 |
+| **3B.4** | Credit note create + apply | Lines; `credit_note_application`; `calculate_credit_note_total` via dependencyMap | Acceptance 7 |
 
 Do **not** fold poster, reverse sync, or purchases into any 3B.* package.
 

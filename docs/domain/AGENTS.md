@@ -19,7 +19,7 @@ When you change a public module name, update the module map in [OSS_TEST_PLAN.md
 
 Follow [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md) for every later migration from prod. The books lessons are [KERNEL_PORT.md](./KERNEL_PORT.md). The task-sized plan is [AGENT_PLAN.md](./AGENT_PLAN.md). Run one module from that plan, then stop.
 
-**Next:** Module 3B in [AGENT_PLAN.md](./AGENT_PLAN.md) — **complete create** (Create buttons, line editor with item copy/tax/discount, payments, credits). Work packages **3B.0→3B.4**. See Detailed requirements in that file. Purchases / quote/SO / investing / WP6–7 parked or deferred. No QBO write-back.
+**Next:** Module 3B in [AGENT_PLAN.md](./AGENT_PLAN.md) — complete create. Totals use domain `dependencyMap` → `functionMap` (prod pattern); `calculate_invoice_total` lives in `backend/lib/sales/` (no kernel calc engine). Work packages **3B.0→3B.4** (totals action is **3B.2a**). Purchases / quote/SO / investing / WP6–7 parked or deferred. No QBO write-back.
 
 AR Phase 3–4: design [AR_SETTLEMENT_AND_LEDGER.md](./AR_SETTLEMENT_AND_LEDGER.md), implementation [AR_PHASE_3_4_IMPLEMENTATION.md](./AR_PHASE_3_4_IMPLEMENTATION.md). WP0–WP5 done. **WP6 poster and WP7 sync-wire are deferred** — requirements and open decisions live in AGENT_PLAN’s Deferred section; do not start them unless a task names WP6/WP7 explicitly.
 
