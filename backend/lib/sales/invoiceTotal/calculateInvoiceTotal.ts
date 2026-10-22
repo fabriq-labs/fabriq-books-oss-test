@@ -12,8 +12,18 @@ const invoiceInclude = {
     orderBy: { line_number: 'asc' as const },
     include: { line_taxes: true },
   },
-  payment_receipt_applications: { select: { amount_applied: true } },
-  credit_note_applications: { select: { amount_applied: true } },
+  payment_receipt_applications: {
+    select: {
+      amount_applied: true,
+      payment_receipt: { select: { status: true } },
+    },
+  },
+  credit_note_applications: {
+    select: {
+      amount_applied: true,
+      credit_note: { select: { status: true } },
+    },
+  },
 };
 
 function sumApplied(
