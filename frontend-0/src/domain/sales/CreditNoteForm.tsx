@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -248,7 +248,17 @@ export const CreditNoteForm: React.FC = () => {
     status: nextStatus || status || 'draft',
   });
 
-  const applyServerRow = (row: any) => {
+  const linesRef = useRef(lines);
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
+  const recordIdRef = useRef(recordId);
+  useEffect(() => {
+    recordIdRef.current = recordId;
+  }, [recordId]);
+  const linePersistChain = useRef(Promise.resolve());
+
+  const applyServerTotals = (row: any) => {
     setStatus(row.status || 'draft');
     setSourceSystemId(row.source_system_id ?? null);
     setServerTotals({
@@ -257,25 +267,76 @@ export const CreditNoteForm: React.FC = () => {
       total: row.total_amount,
       balance: row.balance_amount,
     });
-    if (Array.isArray(row.line_items)) {
-      setLines(linesFromServer(row.line_items));
+  };
+
+  const mergeApps = (applications: any[] | undefined) => {
+    if (!Array.isArray(applications)) return;
+    setApps(
+      applications.map((a: any) => ({
+        key: a.id || newLineKey(),
+        id: a.id,
+        invoice_id: a.invoice_id || a.invoice?.id || '',
+        invoice: a.invoice ?? null,
+        amount_applied: a.amount_applied != null ? String(a.amount_applied) : '0',
+      }))
+    );
+  };
+
+  const mergeServerLines = (serverRaw: any[] | undefined, draftKey?: string) => {
+    if (!Array.isArray(serverRaw)) return;
+    const serverMapped = linesFromServer(serverRaw);
+    const prev = linesRef.current;
+    const used = new Set<string>();
+    let next = prev.map((local) => {
+      if (local.id) {
+        const match = serverMapped.find((s) => s.id === local.id);
+        if (match) {
+          used.add(match.id!);
+          return {
+            ...local,
+            amount: match.amount,
+            tax_amount: match.tax_amount,
+          };
+        }
+      }
+      return local;
+    });
+    if (draftKey) {
+      const idx = next.findIndex((l) => l.key === draftKey);
+      if (idx >= 0 && !next[idx].id) {
+        const fresh = serverMapped.find((s) => s.id && !used.has(s.id));
+        if (fresh) {
+          next = next.map((l, i) =>
+            i === idx
+              ? {
+                  ...l,
+                  id: fresh.id,
+                  amount: fresh.amount,
+                  tax_amount: fresh.tax_amount,
+                }
+              : l
+          );
+        }
+      }
     }
-    if (Array.isArray(row.applications)) {
-      setApps(
-        row.applications.map((a: any) => ({
-          key: a.id || newLineKey(),
-          id: a.id,
-          invoice_id: a.invoice_id || a.invoice?.id || '',
-          invoice: a.invoice ?? null,
-          amount_applied: a.amount_applied != null ? String(a.amount_applied) : '0',
-        }))
-      );
+    linesRef.current = next;
+    setLines(next);
+  };
+
+  const applyServerRow = (row: any, opts?: { draftKey?: string; replaceLines?: boolean }) => {
+    applyServerTotals(row);
+    if (opts?.replaceLines) {
+      if (Array.isArray(row.line_items)) setLines(linesFromServer(row.line_items));
+      mergeApps(row.applications);
+      return;
     }
+    if (Array.isArray(row.line_items)) mergeServerLines(row.line_items, opts?.draftKey);
+    if (Array.isArray(row.applications)) mergeApps(row.applications);
   };
 
   /** Create the draft header once required FKs exist (needed before line PUTs). */
   const ensureCreditNoteId = async (): Promise<string | null> => {
-    if (recordId) return recordId;
+    if (recordIdRef.current) return recordIdRef.current;
     const data = form.getValues();
     if (!data.customer_id || !data.entity_id || !data.currency_id) {
       toast({
@@ -289,48 +350,72 @@ export const CreditNoteForm: React.FC = () => {
     const cnId = created?.data?.id as string | undefined;
     if (!cnId) throw new Error('Create did not return an id');
     setRecordId(cnId);
+    recordIdRef.current = cnId;
     if (!id) navigate(`/credit_note/${cnId}/view/${formView}`, { replace: true });
-    applyServerRow(created.data);
+    applyServerTotals(created.data);
     return cnId;
   };
 
   const persistLine = async (line: SalesLineDraft) => {
     if (!draftEditable) return;
-    const empty =
-      !line.description?.trim() &&
-      !line.item_master_id &&
-      toNumber(line.unit_price) === 0 &&
-      !line.discount_rate &&
-      !line.tax_rate;
-    if (empty) return;
+    const draftKey = line.key;
+    linePersistChain.current = linePersistChain.current
+      .catch(() => undefined)
+      .then(async () => {
+        const fromRef =
+          linesRef.current.find((l) => l.key === draftKey) ||
+          (line.id ? linesRef.current.find((l) => l.id === line.id) : undefined);
+        const latest: SalesLineDraft = {
+          ...line,
+          id: fromRef?.id || line.id,
+          amount: fromRef?.amount ?? line.amount,
+          tax_amount: fromRef?.tax_amount ?? line.tax_amount,
+        };
+        const empty =
+          !latest.description?.trim() &&
+          !latest.item_master_id &&
+          toNumber(latest.unit_price) === 0 &&
+          !latest.discount_rate &&
+          !latest.tax_rate;
+        if (empty) return;
 
-    try {
-      setBusy(true);
-      const cnId = await ensureCreditNoteId();
-      if (!cnId) return;
-      const payload = linePayload(line);
-      let row: any;
-      if (line.id) {
-        row = (
-          await viewAPI.updateChild('credit_note', cnId, formView, 'line_items', line.id, payload)
-        )?.data;
-      } else {
-        row = (await viewAPI.addChild('credit_note', cnId, formView, 'line_items', payload))?.data;
-      }
-      if (row?.id || row?.line_items) {
-        applyServerRow(row);
-      } else {
-        await reload(cnId);
-      }
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'Failed to update line',
+        setBusy(true);
+        try {
+          const cnId = await ensureCreditNoteId();
+          if (!cnId) return;
+          const payload = linePayload(latest);
+          let row: any;
+          if (latest.id) {
+            row = (
+              await viewAPI.updateChild(
+                'credit_note',
+                cnId,
+                formView,
+                'line_items',
+                latest.id,
+                payload
+              )
+            )?.data;
+          } else {
+            row = (await viewAPI.addChild('credit_note', cnId, formView, 'line_items', payload))
+              ?.data;
+          }
+          if (row?.id || row?.line_items) {
+            applyServerRow(row, { draftKey });
+          } else {
+            await reload(cnId);
+          }
+        } catch (error: any) {
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: error.message || 'Failed to update line',
+          });
+        } finally {
+          setBusy(false);
+        }
       });
-    } finally {
-      setBusy(false);
-    }
+    await linePersistChain.current;
   };
 
   const removePersistedLine = async (line: SalesLineDraft) => {
@@ -340,7 +425,7 @@ export const CreditNoteForm: React.FC = () => {
       const row = (
         await viewAPI.deleteChild('credit_note', recordId, formView, 'line_items', line.id)
       )?.data;
-      if (row?.id) applyServerRow(row);
+      if (row?.id) applyServerRow(row, { replaceLines: true });
       else await reload(recordId);
     } catch (error: any) {
       toast({
@@ -434,24 +519,7 @@ export const CreditNoteForm: React.FC = () => {
   const reload = async (cnId: string) => {
     const res = await viewAPI.getById('credit_note', cnId, formView);
     const row = res.data ?? {};
-    setStatus(row.status || 'draft');
-    setServerTotals({
-      net: row.net_amount,
-      tax: row.tax_amount,
-      total: row.total_amount,
-      balance: row.balance_amount,
-    });
-    setLines(linesFromServer(row.line_items));
-    const applications = Array.isArray(row.applications) ? row.applications : [];
-    setApps(
-      applications.map((a: any) => ({
-        key: a.id || newLineKey(),
-        id: a.id,
-        invoice_id: a.invoice_id || a.invoice?.id || '',
-        invoice: a.invoice ?? null,
-        amount_applied: a.amount_applied != null ? String(a.amount_applied) : '0',
-      }))
-    );
+    applyServerRow(row, { replaceLines: true });
   };
 
   const save = async (data: FormValues, nextStatus: 'draft' | 'posted') => {

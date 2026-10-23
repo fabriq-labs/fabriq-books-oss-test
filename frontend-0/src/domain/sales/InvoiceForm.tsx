@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -214,7 +214,18 @@ export const InvoiceForm: React.FC = () => {
     status: nextStatus || status || 'draft',
   });
 
-  const applyServerRow = (row: any) => {
+  const linesRef = useRef(lines);
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
+  const recordIdRef = useRef(recordId);
+  useEffect(() => {
+    recordIdRef.current = recordId;
+  }, [recordId]);
+  /** Serialize line persists so blur-chaining does not create duplicate rows. */
+  const linePersistChain = useRef(Promise.resolve());
+
+  const applyServerTotals = (row: any) => {
     setStatus(row.status || 'draft');
     setSourceSystemId(row.source_system_id ?? null);
     setServerTotals({
@@ -223,21 +234,75 @@ export const InvoiceForm: React.FC = () => {
       total: row.total_amount,
       balance: row.balance_amount,
     });
-    if (Array.isArray(row.line_items)) {
-      setLines(linesFromServer(row.line_items));
+  };
+
+  /**
+   * After a line persist: attach server id + computed amounts only.
+   * Keep local editable fields so an in-flight blur does not clobber newer keystrokes,
+   * and update linesRef synchronously so the serialize queue sees the new id.
+   */
+  const mergeServerLines = (serverRaw: any[] | undefined, draftKey?: string) => {
+    if (!Array.isArray(serverRaw)) return;
+    const serverMapped = linesFromServer(serverRaw);
+    const prev = linesRef.current;
+    const used = new Set<string>();
+    let next = prev.map((local) => {
+      if (local.id) {
+        const match = serverMapped.find((s) => s.id === local.id);
+        if (match) {
+          used.add(match.id!);
+          return {
+            ...local,
+            amount: match.amount,
+            tax_amount: match.tax_amount,
+          };
+        }
+      }
+      return local;
+    });
+    if (draftKey) {
+      const idx = next.findIndex((l) => l.key === draftKey);
+      if (idx >= 0 && !next[idx].id) {
+        const fresh = serverMapped.find((s) => s.id && !used.has(s.id));
+        if (fresh) {
+          next = next.map((l, i) =>
+            i === idx
+              ? {
+                  ...l,
+                  id: fresh.id,
+                  amount: fresh.amount,
+                  tax_amount: fresh.tax_amount,
+                }
+              : l
+          );
+        }
+      }
     }
+    // Sync before setState so the serialized persist queue sees the new id immediately.
+    linesRef.current = next;
+    setLines(next);
+  };
+
+  const applyServerRow = (row: any, opts?: { draftKey?: string; replaceLines?: boolean }) => {
+    applyServerTotals(row);
+    if (!Array.isArray(row.line_items)) return;
+    if (opts?.replaceLines) {
+      setLines(linesFromServer(row.line_items));
+      return;
+    }
+    mergeServerLines(row.line_items, opts?.draftKey);
   };
 
   const reload = async (invoiceId: string) => {
     const res = await viewAPI.getById('invoice', invoiceId, formView);
     const row = res.data ?? {};
-    applyServerRow(row);
+    applyServerRow(row, { replaceLines: true });
     return row;
   };
 
   /** Create the draft header once required FKs exist (needed before line PUTs). */
   const ensureInvoiceId = async (): Promise<string | null> => {
-    if (recordId) return recordId;
+    if (recordIdRef.current) return recordIdRef.current;
     const data = form.getValues();
     if (!data.customer_id || !data.entity_id || !data.currency_id) {
       toast({
@@ -251,55 +316,74 @@ export const InvoiceForm: React.FC = () => {
     const invoiceId = created?.data?.id as string | undefined;
     if (!invoiceId) throw new Error('Create did not return an id');
     setRecordId(invoiceId);
+    recordIdRef.current = invoiceId;
     if (!id) navigate(`/invoice/${invoiceId}/view/${formView}`, { replace: true });
-    applyServerRow(created.data);
+    // Header-only create: refresh totals/status, do not wipe in-progress draft lines.
+    applyServerTotals(created.data);
     return invoiceId;
   };
 
   const persistLine = async (line: SalesLineDraft) => {
     if (!draftEditable) return;
-    // Skip empty placeholder lines until they have content.
-    const empty =
-      !line.description?.trim() &&
-      !line.item_master_id &&
-      toNumber(line.unit_price) === 0 &&
-      !line.discount_rate &&
-      !line.tax_rate;
-    if (empty) return;
+    const draftKey = line.key;
+    linePersistChain.current = linePersistChain.current
+      .catch(() => undefined)
+      .then(async () => {
+        // Prefer the blur snapshot for editable fields; take id from ref (may be set by a prior create).
+        const fromRef =
+          linesRef.current.find((l) => l.key === draftKey) ||
+          (line.id ? linesRef.current.find((l) => l.id === line.id) : undefined);
+        const latest: SalesLineDraft = {
+          ...line,
+          id: fromRef?.id || line.id,
+          amount: fromRef?.amount ?? line.amount,
+          tax_amount: fromRef?.tax_amount ?? line.tax_amount,
+        };
+        const empty =
+          !latest.description?.trim() &&
+          !latest.item_master_id &&
+          toNumber(latest.unit_price) === 0 &&
+          !latest.discount_rate &&
+          !latest.tax_rate;
+        if (empty) return;
 
-    try {
-      setBusy(true);
-      const invoiceId = await ensureInvoiceId();
-      if (!invoiceId) return;
-      const payload = linePayload(line);
-      let row: any;
-      if (line.id) {
-        row = (await viewAPI.updateChild(
-          'invoice',
-          invoiceId,
-          formView,
-          'line_items',
-          line.id,
-          payload
-        ))?.data;
-      } else {
-        row = (await viewAPI.addChild('invoice', invoiceId, formView, 'line_items', payload))
-          ?.data;
-      }
-      if (row?.id || row?.line_items) {
-        applyServerRow(row);
-      } else {
-        await reload(invoiceId);
-      }
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'Failed to update line',
+        setBusy(true);
+        try {
+          const invoiceId = await ensureInvoiceId();
+          if (!invoiceId) return;
+          const payload = linePayload(latest);
+          let row: any;
+          if (latest.id) {
+            row = (
+              await viewAPI.updateChild(
+                'invoice',
+                invoiceId,
+                formView,
+                'line_items',
+                latest.id,
+                payload
+              )
+            )?.data;
+          } else {
+            row = (await viewAPI.addChild('invoice', invoiceId, formView, 'line_items', payload))
+              ?.data;
+          }
+          if (row?.id || row?.line_items) {
+            applyServerRow(row, { draftKey });
+          } else {
+            await reload(invoiceId);
+          }
+        } catch (error: any) {
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: error.message || 'Failed to update line',
+          });
+        } finally {
+          setBusy(false);
+        }
       });
-    } finally {
-      setBusy(false);
-    }
+    await linePersistChain.current;
   };
 
   const removePersistedLine = async (line: SalesLineDraft) => {
@@ -309,7 +393,7 @@ export const InvoiceForm: React.FC = () => {
       const row = (
         await viewAPI.deleteChild('invoice', recordId, formView, 'line_items', line.id)
       )?.data;
-      if (row?.id) applyServerRow(row);
+      if (row?.id) applyServerRow(row, { replaceLines: true });
       else await reload(recordId);
     } catch (error: any) {
       toast({
