@@ -16,11 +16,17 @@ On this branch [docs/README.md](./docs/README.md) is the Books guide. The engine
 
 Do not run `prisma db push`, `prisma migrate`, or other DDL. New databases are created by `npm run setup:kernel`, which applies generated schema SQL and seeds `org_system`. After `organizations` exists, apply later tables with the SQL diff in `docs/kernel/adding-a-model.md`.
 
-Read [docs/domain/AGENTS.md](./docs/domain/AGENTS.md). That file is the product (including **tenant onboarding vs `seed:dev`**). Do not add product instructions to this file.
+Read [docs/domain/AGENTS.md](./docs/domain/AGENTS.md). That file is the product (including **tenant onboarding vs `seed:dev`**).
 
 When moving a prod feature onto the shell, follow [docs/kernel/PORTING_A_DOMAIN.md](./docs/kernel/PORTING_A_DOMAIN.md).
 
 Tool-specific folders (`.cursor/`, `.claude/`) stay on the machine that uses them. They are gitignored. Instructions for every coding agent live in this file.
+
+## Teammate / agent environments
+
+When a human asks you to set up this repo for **development, testing, or their agent environment**, figure it out from this file, [docs/domain/AGENTS.md](./docs/domain/AGENTS.md), and [docs/getting-started.md](./docs/getting-started.md). Prefer `setup:kernel` then **`npm run seed:dev`** for a local Books DB — not the tenant wizard. Install deps, start `npm run dev`, and smoke-check login yourself when you can.
+
+When they ask to **build or deploy**, open [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md) and the host file that matches their ask (Railway or Fly). Use secrets from their gitignored `.env` or from them in chat — never print or commit tokens. If they are new to the host (no project, no token yet), **guide them**: walk them through creating the project / app in the dashboard, minting the token, and where to paste it; then continue the documented deploy steps. Do not dump a long tutorial into the repo — teach just enough for this run.
 
 ## Kernel changes
 

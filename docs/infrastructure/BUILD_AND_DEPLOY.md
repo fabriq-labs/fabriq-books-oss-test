@@ -2,7 +2,7 @@
 
 One image serves the UI and the API. Build it in this repo, then run it anywhere Docker runs — local Compose, Railway, or Fly.io. The operator path and onboarding env contract are in [../operations/deploy.md](../operations/deploy.md).
 
-**Coding agents:** pick the host the human named. Do not invent a platform.
+**Coding agents:** pick the host the human named. Do not invent a platform. Read that host file and execute (or guide) from it. If they lack a project or token, help them create one in the host’s dashboard, then continue — do not stop at “you need a token.”
 
 | Human asks about… | Read |
 |---|---|

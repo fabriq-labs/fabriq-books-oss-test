@@ -4,9 +4,11 @@ Use this file when the human asks for **Railway** (CLI bring-up, project token, 
 
 **Do not** follow [DEPLOY_FLY.md](./DEPLOY_FLY.md) unless they asked for Fly.
 
+**If the human is new to Railway:** do not assume they already have a project or `RAILWAY_TOKEN`. Guide them briefly — create/sign in at railway.app, create a project, open **Project → Settings → Tokens**, create a **project token**, put it in gitignored `.env` as `RAILWAY_TOKEN` (never commit or echo it). Then continue Path A or Path B below. Figure out dashboard UI changes from Railway’s current docs if labels move.
+
 ## Prerequisites
 
-- A Railway **project** (dashboard or already created).
+- A Railway **project** (dashboard or already created) — or create one with the human as above.
 - A Railway **project token** for that project + environment (Project → Settings → Tokens).
 - Repo checkout at the **repository root** (must contain `Dockerfile`).
 

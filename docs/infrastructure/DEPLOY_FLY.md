@@ -4,6 +4,8 @@ Use this file when the human asks for **Fly.io** (apps, Managed Postgres, `fly.t
 
 **Do not** follow [DEPLOY_RAILWAY.md](./DEPLOY_RAILWAY.md) unless they asked for Railway.
 
+**If the human is new to Fly:** guide them to install `flyctl`, sign in (`fly auth login` or set `FLY_API_TOKEN`), then continue the steps below. Never print or commit the token.
+
 ## Prerequisites
 
 - Fly CLI (`fly` / `flyctl`) — [fly.io/docs/flyctl](https://fly.io/docs/flyctl/).

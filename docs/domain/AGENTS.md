@@ -16,7 +16,7 @@ Coding agents confuse these constantly. Pick one.
 - Tenant path details: [ONBOARDING_REQUIREMENTS.md](./ONBOARDING_REQUIREMENTS.md), [operations/deploy.md](../operations/deploy.md).
 - Human local install (same seeds as `seed:dev`, without the one-shot script): [getting-started.md](../getting-started.md).
 
-When the task is “spin up Books so I can code / test,” use **`seed:dev`**, not the wizard. When the task is “prove or change onboarding / AUTO_SETUP,” use the tenant path and do **not** pre-load chart/demo via CLI.
+When the task is “spin up Books so I can code / test,” use **`seed:dev`**, not the wizard. When the task is “prove or change onboarding / AUTO_SETUP,” use the tenant path and do **not** pre-load chart/demo via CLI. Teammate agent environments and “guide me on Railway/Fly” posture: root [AGENTS.md](../../AGENTS.md) § Teammate / agent environments.
 
 After `seed:dev`, sign-in as `admin@example.com` / `admin123` is success. A **password-only** gate (change the seed password) is expected and is not R-ONBOARD-ERR. Org name and chart steps should already be complete — if you see “Setup can't continue on this database,” flags were not marked; run `seed:mark-onboarding-complete` or re-run `seed:dev`. Prefer unsetting a shell `DATABASE_URL` before `npm run dev` so `backend/.env` wins.
 
