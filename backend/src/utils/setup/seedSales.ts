@@ -282,6 +282,7 @@ function buildInvoiceDataGraph(opts: {
         discount_rate: 'read',
         discount_amount: 'read',
         tax_group_id: 'read',
+        tax_rate: 'read',
         account_id: 'read',
         classification_code: 'read',
         classification_scheme: 'read',

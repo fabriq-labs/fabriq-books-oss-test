@@ -1,14 +1,13 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SearchDropDown } from '@/components/search_dropdown/dropdown';
+import { viewAPI } from '@/api/api';
 import { moneyLabel } from './lineMath';
 
 export type SalesLineDraft = {
-  /** Server id when persisted */
   id?: string;
-  /** Local key for React */
   key: string;
   line_number: number;
   item_master_id?: string | null;
@@ -17,13 +16,12 @@ export type SalesLineDraft = {
   quantity: string;
   unit_price: string;
   discount_rate: string;
+  /** Kept when item supplies a group; cleared if the user edits tax %. */
   tax_group_id?: string | null;
-  tax_group?: { id?: string; name?: string } | null;
+  tax_rate: string;
   account_id?: string | null;
   account?: { id?: string; name?: string; code?: string | null } | null;
-  /** Server-computed net (ex-tax). Shown after API calc — never computed in the browser. */
   amount?: string | number | null;
-  /** Server-computed line tax total when available from line_taxes. */
   tax_amount?: string | number | null;
 };
 
@@ -31,6 +29,9 @@ type Props = {
   lines: SalesLineDraft[];
   readOnly?: boolean;
   onChange: (lines: SalesLineDraft[]) => void;
+  /** Persist one line after a discrete edit (blur / select). */
+  onCommitLine?: (line: SalesLineDraft) => void | Promise<void>;
+  onRemoveLine?: (line: SalesLineDraft) => void | Promise<void>;
 };
 
 let lineKeySeq = 0;
@@ -47,10 +48,10 @@ export function emptySalesLine(lineNumber: number): SalesLineDraft {
     quantity: '1',
     unit_price: '0',
     discount_rate: '',
+    tax_rate: '',
     item_master_id: null,
     item_master: null,
     tax_group_id: null,
-    tax_group: null,
     account_id: null,
     account: null,
     amount: null,
@@ -58,17 +59,44 @@ export function emptySalesLine(lineNumber: number): SalesLineDraft {
   };
 }
 
-function applyItemDefaults(
+async function resolveTaxRatePercent(item: Record<string, any>): Promise<{
+  tax_rate: string;
+  tax_group_id: string | null;
+}> {
+  if (item.tax_group_id) {
+    try {
+      const res: any = await viewAPI.getById('tax_group', item.tax_group_id, 'tax_group_view');
+      const components = Array.isArray(res?.data?.components) ? res.data.components : [];
+      let sum = 0;
+      for (const c of components) {
+        const rate = c?.tax_master?.rate ?? c?.rate;
+        if (rate != null && rate !== '') sum += Number(rate);
+      }
+      if (sum > 0) {
+        return { tax_rate: String(sum), tax_group_id: item.tax_group_id };
+      }
+    } catch {
+      /* fall through */
+    }
+    return { tax_rate: '', tax_group_id: item.tax_group_id };
+  }
+  if (item.tax_master?.rate != null) {
+    return { tax_rate: String(item.tax_master.rate), tax_group_id: null };
+  }
+  return { tax_rate: '', tax_group_id: null };
+}
+
+export async function applyItemDefaults(
   line: SalesLineDraft,
   item: Record<string, any> | null | undefined
-): SalesLineDraft {
+): Promise<SalesLineDraft> {
   if (!item) {
     return {
       ...line,
       item_master_id: null,
       item_master: null,
       tax_group_id: null,
-      tax_group: null,
+      tax_rate: '',
       account_id: null,
       account: null,
       amount: null,
@@ -80,6 +108,7 @@ function applyItemDefaults(
     (item.name && String(item.name)) ||
     line.description ||
     '';
+  const tax = await resolveTaxRatePercent(item);
   return {
     ...line,
     item_master_id: item.id,
@@ -99,13 +128,8 @@ function applyItemDefaults(
       : item.sales_account_id
         ? { id: item.sales_account_id }
         : null,
-    tax_group_id: item.tax_group_id ?? null,
-    tax_group: item.tax_group
-      ? { id: item.tax_group.id, name: item.tax_group.name }
-      : item.tax_group_id
-        ? { id: item.tax_group_id }
-        : null,
-    // Clearing local money display — server recomputes on save/API.
+    tax_group_id: tax.tax_group_id,
+    tax_rate: tax.tax_rate,
     amount: null,
     tax_amount: null,
   };
@@ -126,6 +150,14 @@ function sumLineTaxes(lineTaxes: any[] | undefined): string | number | null {
 }
 
 export function mapServerLine(row: any, idx: number): SalesLineDraft {
+  const taxFromRow =
+    row.tax_rate != null && row.tax_rate !== ''
+      ? String(row.tax_rate)
+      : Array.isArray(row.line_taxes) && row.line_taxes.length
+        ? String(
+            row.line_taxes.reduce((s: number, t: any) => s + (Number(t.rate) || 0), 0) || ''
+          )
+        : '';
   return {
     key: row.id || newLineKey(),
     id: row.id,
@@ -137,7 +169,7 @@ export function mapServerLine(row: any, idx: number): SalesLineDraft {
     unit_price: row.unit_price != null ? String(row.unit_price) : '0',
     discount_rate: row.discount_rate != null ? String(row.discount_rate) : '',
     tax_group_id: row.tax_group_id ?? null,
-    tax_group: row.tax_group ?? null,
+    tax_rate: taxFromRow,
     account_id: row.account_id ?? null,
     account: row.account ?? null,
     amount: row.amount ?? null,
@@ -145,37 +177,52 @@ export function mapServerLine(row: any, idx: number): SalesLineDraft {
   };
 }
 
-export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
-  const updateLine = (key: string, patch: Partial<SalesLineDraft>) => {
-    const clearsServerMoney =
-      'quantity' in patch ||
-      'unit_price' in patch ||
-      'discount_rate' in patch ||
-      'tax_group_id' in patch ||
-      'item_master_id' in patch;
-    onChange(
-      lines.map((l) => {
-        if (l.key !== key) return l;
-        const next = { ...l, ...patch };
-        if (clearsServerMoney) {
-          if (patch.amount === undefined) next.amount = null;
-          if (patch.tax_amount === undefined) next.tax_amount = null;
-        }
-        return next;
-      })
-    );
+export function SalesLineEditor({
+  lines,
+  readOnly,
+  onChange,
+  onCommitLine,
+  onRemoveLine,
+}: Props) {
+  // onBlur runs after onChange; keep a ref so commit sees the latest draft row.
+  const linesRef = useRef(lines);
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
+
+  const replaceLine = (key: string, next: SalesLineDraft) => {
+    const nextLines = linesRef.current.map((l) => (l.key === key ? next : l));
+    linesRef.current = nextLines;
+    onChange(nextLines);
   };
 
-  const removeLine = (key: string) => {
-    const next = lines.filter((l) => l.key !== key).map((l, idx) => ({
+  const patchLine = (key: string, patch: Partial<SalesLineDraft>) => {
+    const nextLines = linesRef.current.map((l) => {
+      if (l.key !== key) return l;
+      const next = { ...l, ...patch };
+      const moneyFields = ['quantity', 'unit_price', 'discount_rate', 'tax_rate', 'item_master_id'];
+      if (moneyFields.some((f) => f in patch)) {
+        if (patch.amount === undefined) next.amount = null;
+        if (patch.tax_amount === undefined) next.tax_amount = null;
+      }
+      return next;
+    });
+    linesRef.current = nextLines;
+    onChange(nextLines);
+  };
+
+  const commit = (key: string) => {
+    const line = linesRef.current.find((l) => l.key === key);
+    if (line && onCommitLine) void onCommitLine(line);
+  };
+
+  const removeLine = async (line: SalesLineDraft) => {
+    const next = lines.filter((l) => l.key !== line.key).map((l, idx) => ({
       ...l,
       line_number: idx + 1,
     }));
     onChange(next);
-  };
-
-  const addLine = () => {
-    onChange([...lines, emptySalesLine(lines.length + 1)]);
+    if (onRemoveLine) await onRemoveLine(line);
   };
 
   return (
@@ -190,7 +237,7 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
               <th className="py-2 pr-2 font-medium">Qty</th>
               <th className="py-2 pr-2 font-medium">Unit price</th>
               <th className="py-2 pr-2 font-medium">Disc %</th>
-              <th className="py-2 pr-2 font-medium">Tax group</th>
+              <th className="py-2 pr-2 font-medium">Tax %</th>
               <th className="py-2 pr-2 text-right font-medium">Net</th>
               <th className="py-2 pr-2 text-right font-medium">Tax</th>
               {!readOnly ? <th className="py-2 font-medium" /> : null}
@@ -211,11 +258,17 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
                       instanceLabel="name"
                       instanceSubLabel="code"
                       instanceValue={line.item_master ?? null}
-                      onSelectItem={(_source, _key, value) => {
+                      onSelectItem={async (_source, _key, value) => {
                         const item = (value?.item ?? value) as Record<string, any>;
-                        updateLine(line.key, applyItemDefaults(line, item));
+                        const next = await applyItemDefaults(line, item);
+                        replaceLine(line.key, next);
+                        if (onCommitLine) void onCommitLine(next);
                       }}
-                      onClear={() => updateLine(line.key, applyItemDefaults(line, null))}
+                      onClear={async () => {
+                        const next = await applyItemDefaults(line, null);
+                        replaceLine(line.key, next);
+                        if (onCommitLine) void onCommitLine(next);
+                      }}
                       limit={10}
                       searchParams="name"
                       type="item_master"
@@ -230,7 +283,8 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
                   ) : (
                     <Input
                       value={line.description ?? ''}
-                      onChange={(e) => updateLine(line.key, { description: e.target.value })}
+                      onChange={(e) => patchLine(line.key, { description: e.target.value })}
+                      onBlur={() => commit(line.key)}
                     />
                   )}
                 </td>
@@ -240,7 +294,8 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
                   ) : (
                     <Input
                       value={line.quantity}
-                      onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
+                      onChange={(e) => patchLine(line.key, { quantity: e.target.value })}
+                      onBlur={() => commit(line.key)}
                     />
                   )}
                 </td>
@@ -250,7 +305,8 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
                   ) : (
                     <Input
                       value={line.unit_price}
-                      onChange={(e) => updateLine(line.key, { unit_price: e.target.value })}
+                      onChange={(e) => patchLine(line.key, { unit_price: e.target.value })}
+                      onBlur={() => commit(line.key)}
                     />
                   )}
                 </td>
@@ -260,38 +316,26 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
                   ) : (
                     <Input
                       value={line.discount_rate}
-                      onChange={(e) => updateLine(line.key, { discount_rate: e.target.value })}
+                      onChange={(e) => patchLine(line.key, { discount_rate: e.target.value })}
+                      onBlur={() => commit(line.key)}
                     />
                   )}
                 </td>
-                <td className="py-2 pr-2" style={{ minWidth: 140 }}>
+                <td className="py-2 pr-2" style={{ width: 80 }}>
                   {readOnly ? (
-                    <span>{line.tax_group?.name ?? '—'}</span>
+                    <span>{line.tax_rate || '—'}</span>
                   ) : (
-                    <SearchDropDown
-                      instanceType="tax_group"
-                      instanceKey="id"
-                      instanceSourceKey="tax_group_id"
-                      instanceLabel="name"
-                      instanceValue={line.tax_group ?? null}
-                      onSelectItem={(_source, key, value) => {
-                        updateLine(line.key, {
-                          tax_group_id: value?.[key] || null,
-                          tax_group:
-                            value?.item ?? (value?.[key] ? { id: value[key], name: value.name } : null),
-                        });
-                      }}
-                      onClear={() =>
-                        updateLine(line.key, {
+                    <Input
+                      value={line.tax_rate}
+                      onChange={(e) =>
+                        patchLine(line.key, {
+                          tax_rate: e.target.value,
+                          // Editing the rate leaves group expansion; use line.tax_rate path.
                           tax_group_id: null,
-                          tax_group: null,
                         })
                       }
-                      limit={10}
-                      searchParams="name"
-                      type="tax_group"
-                      isShowSearch={true}
-                      placeholder="Tax group"
+                      onBlur={() => commit(line.key)}
+                      placeholder="%"
                     />
                   )}
                 </td>
@@ -304,7 +348,7 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
                       variant="ghost"
                       size="sm"
                       className="text-red-500"
-                      onClick={() => removeLine(line.key)}
+                      onClick={() => void removeLine(line)}
                       title="Remove line"
                     >
                       <Trash2 size={14} />
@@ -317,10 +361,16 @@ export function SalesLineEditor({ lines, readOnly, onChange }: Props) {
         </table>
       </div>
       <p className="text-xs text-muted-foreground">
-        Net and tax update from the server when you save (totals action).
+        Totals refresh from the server when a field blurs or an item is selected (PUT).
       </p>
       {!readOnly ? (
-        <Button type="button" variant="outline" size="sm" className="gap-1" onClick={addLine}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          onClick={() => onChange([...lines, emptySalesLine(lines.length + 1)])}
+        >
           <Plus size={14} />
           Add line
         </Button>

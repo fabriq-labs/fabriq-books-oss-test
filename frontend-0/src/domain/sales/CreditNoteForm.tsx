@@ -78,7 +78,10 @@ function linePayload(line: SalesLineDraft) {
     quantity: line.quantity || '0',
     unit_price: line.unit_price || '0',
     discount_rate: decimalOrNull(line.discount_rate),
+    // When tax_group_id is set (from item), server expands group rates.
+    // When the user edits Tax %, editor clears tax_group_id and sends tax_rate only.
     tax_group_id: line.tax_group_id || null,
+    tax_rate: decimalOrNull(line.tax_rate),
     account_id: line.account_id || null,
   };
 }
@@ -244,6 +247,136 @@ export const CreditNoteForm: React.FC = () => {
     reason: blank(data.reason),
     status: nextStatus || status || 'draft',
   });
+
+  const applyServerRow = (row: any) => {
+    setStatus(row.status || 'draft');
+    setSourceSystemId(row.source_system_id ?? null);
+    setServerTotals({
+      net: row.net_amount,
+      tax: row.tax_amount,
+      total: row.total_amount,
+      balance: row.balance_amount,
+    });
+    if (Array.isArray(row.line_items)) {
+      setLines(linesFromServer(row.line_items));
+    }
+    if (Array.isArray(row.applications)) {
+      setApps(
+        row.applications.map((a: any) => ({
+          key: a.id || newLineKey(),
+          id: a.id,
+          invoice_id: a.invoice_id || a.invoice?.id || '',
+          invoice: a.invoice ?? null,
+          amount_applied: a.amount_applied != null ? String(a.amount_applied) : '0',
+        }))
+      );
+    }
+  };
+
+  /** Create the draft header once required FKs exist (needed before line PUTs). */
+  const ensureCreditNoteId = async (): Promise<string | null> => {
+    if (recordId) return recordId;
+    const data = form.getValues();
+    if (!data.customer_id || !data.entity_id || !data.currency_id) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing header',
+        description: 'Select customer, entity, and currency before editing lines.',
+      });
+      return null;
+    }
+    const created = await viewAPI.create('credit_note', formView, headerPayload(data, 'draft'));
+    const cnId = created?.data?.id as string | undefined;
+    if (!cnId) throw new Error('Create did not return an id');
+    setRecordId(cnId);
+    if (!id) navigate(`/credit_note/${cnId}/view/${formView}`, { replace: true });
+    applyServerRow(created.data);
+    return cnId;
+  };
+
+  const persistLine = async (line: SalesLineDraft) => {
+    if (!draftEditable) return;
+    const empty =
+      !line.description?.trim() &&
+      !line.item_master_id &&
+      toNumber(line.unit_price) === 0 &&
+      !line.discount_rate &&
+      !line.tax_rate;
+    if (empty) return;
+
+    try {
+      setBusy(true);
+      const cnId = await ensureCreditNoteId();
+      if (!cnId) return;
+      const payload = linePayload(line);
+      let row: any;
+      if (line.id) {
+        row = (
+          await viewAPI.updateChild('credit_note', cnId, formView, 'line_items', line.id, payload)
+        )?.data;
+      } else {
+        row = (await viewAPI.addChild('credit_note', cnId, formView, 'line_items', payload))?.data;
+      }
+      if (row?.id || row?.line_items) {
+        applyServerRow(row);
+      } else {
+        await reload(cnId);
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to update line',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removePersistedLine = async (line: SalesLineDraft) => {
+    if (!line.id || !recordId || !draftEditable) return;
+    try {
+      setBusy(true);
+      const row = (
+        await viewAPI.deleteChild('credit_note', recordId, formView, 'line_items', line.id)
+      )?.data;
+      if (row?.id) applyServerRow(row);
+      else await reload(recordId);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to remove line',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const persistHeaderField = async () => {
+    if (!draftEditable) return;
+    const data = form.getValues();
+    if (!data.customer_id || !data.entity_id || !data.currency_id) return;
+    try {
+      setBusy(true);
+      if (!recordId) {
+        await ensureCreditNoteId();
+        return;
+      }
+      const row = (
+        await viewAPI.update('credit_note', recordId, formView, headerPayload(data, 'draft'))
+      )?.data;
+      if (row) applyServerRow(row);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to update credit note',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const syncLines = async (cnId: string, currentLines: SalesLineDraft[]) => {
     const existing = await viewAPI.getById('credit_note', cnId, formView);
@@ -452,10 +585,12 @@ export const CreditNoteForm: React.FC = () => {
                           onSelectItem={(_s, key, value) => {
                             form.setValue('customer_id', value?.[key] || '');
                             setCustomer(value?.item ?? (value?.[key] ? { id: value[key], name: value.name } : null));
+                            void persistHeaderField();
                           }}
                           onClear={() => {
                             form.setValue('customer_id', '');
                             setCustomer(null);
+                            void persistHeaderField();
                           }}
                           limit={10}
                           searchParams="name"
@@ -485,10 +620,12 @@ export const CreditNoteForm: React.FC = () => {
                           onSelectItem={(_s, key, value) => {
                             form.setValue('entity_id', value?.[key] || '');
                             setEntity(value?.item ?? (value?.[key] ? { id: value[key], name: value.name } : null));
+                            void persistHeaderField();
                           }}
                           onClear={() => {
                             form.setValue('entity_id', '');
                             setEntity(null);
+                            void persistHeaderField();
                           }}
                           limit={10}
                           searchParams="name"
@@ -518,10 +655,12 @@ export const CreditNoteForm: React.FC = () => {
                           onSelectItem={(_s, key, value) => {
                             form.setValue('currency_id', value?.[key] || '');
                             setCurrency(value?.item ?? (value?.[key] ? { id: value[key], code: value.code } : null));
+                            void persistHeaderField();
                           }}
                           onClear={() => {
                             form.setValue('currency_id', '');
                             setCurrency(null);
+                            void persistHeaderField();
                           }}
                           limit={10}
                           searchParams="code"
@@ -541,7 +680,15 @@ export const CreditNoteForm: React.FC = () => {
                     <FormItem>
                       <FormLabel>Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} disabled={!draftEditable} />
+                        <Input
+                          type="date"
+                          {...field}
+                          disabled={!draftEditable}
+                          onBlur={() => {
+                            field.onBlur();
+                            void persistHeaderField();
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -563,11 +710,15 @@ export const CreditNoteForm: React.FC = () => {
                           disabled={!draftEditable}
                           onSelectItem={(_s, key, value) => {
                             form.setValue('invoice_id', value?.[key] || '');
-                            setOriginInvoice(value?.item ?? (value?.[key] ? { id: value[key], number: value.number } : null));
+                            setOriginInvoice(
+                              value?.item ?? (value?.[key] ? { id: value[key], number: value.number } : null)
+                            );
+                            void persistHeaderField();
                           }}
                           onClear={() => {
                             form.setValue('invoice_id', '');
                             setOriginInvoice(null);
+                            void persistHeaderField();
                           }}
                           limit={10}
                           searchParams="number"
@@ -587,7 +738,14 @@ export const CreditNoteForm: React.FC = () => {
                     <FormItem>
                       <FormLabel>Number</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled={!draftEditable} />
+                        <Input
+                          {...field}
+                          disabled={!draftEditable}
+                          onBlur={() => {
+                            field.onBlur();
+                            void persistHeaderField();
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -600,7 +758,14 @@ export const CreditNoteForm: React.FC = () => {
                     <FormItem>
                       <FormLabel>Reason</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled={!draftEditable} />
+                        <Input
+                          {...field}
+                          disabled={!draftEditable}
+                          onBlur={() => {
+                            field.onBlur();
+                            void persistHeaderField();
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -613,7 +778,14 @@ export const CreditNoteForm: React.FC = () => {
                     <FormItem className="col-span-2 md:col-span-3">
                       <FormLabel>Notes</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled={!draftEditable} />
+                        <Input
+                          {...field}
+                          disabled={!draftEditable}
+                          onBlur={() => {
+                            field.onBlur();
+                            void persistHeaderField();
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -627,7 +799,13 @@ export const CreditNoteForm: React.FC = () => {
                 <CardTitle className="text-lg">Line items</CardTitle>
               </CardHeader>
               <CardContent>
-                <SalesLineEditor lines={lines} readOnly={!draftEditable} onChange={setLines} />
+                <SalesLineEditor
+                  lines={lines}
+                  readOnly={!draftEditable}
+                  onChange={setLines}
+                  onCommitLine={persistLine}
+                  onRemoveLine={removePersistedLine}
+                />
               </CardContent>
             </Card>
 
@@ -773,7 +951,7 @@ export const CreditNoteForm: React.FC = () => {
                   <div className="text-sm font-medium">{moneyLabel(serverTotals.balance)}</div>
                 </div>
                 <p className="col-span-2 text-xs text-muted-foreground md:col-span-4">
-                  Totals come from the server after Save draft / Post.
+                  Totals refresh from the server on field blur / select (calculate_credit_note_total).
                 </p>
               </CardContent>
             </Card>

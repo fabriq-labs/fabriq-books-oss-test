@@ -372,6 +372,8 @@ model invoice_line_item {
   account               account?     @relation("invoice_line_account", fields: [account_id], references: [id], onDelete: SetNull)
   tax_group_id          String?
   tax_group             tax_group?   @relation(fields: [tax_group_id], references: [id], onDelete: SetNull)
+  /// Effective tax percent for the line when not expanding a tax_group (UI tax %).
+  tax_rate              Decimal?     @db.Decimal(9, 6)
   classification_code   String?
   classification_scheme String?
   created_by            String?
@@ -566,6 +568,8 @@ model credit_note_item {
   account               account?           @relation("credit_note_line_account", fields: [account_id], references: [id], onDelete: SetNull)
   tax_group_id          String?
   tax_group             tax_group?         @relation(fields: [tax_group_id], references: [id], onDelete: SetNull)
+  /// Effective tax percent for the line when not expanding a tax_group (UI tax %).
+  tax_rate              Decimal?           @db.Decimal(9, 6)
   classification_code   String?
   classification_scheme String?
   created_by            String?

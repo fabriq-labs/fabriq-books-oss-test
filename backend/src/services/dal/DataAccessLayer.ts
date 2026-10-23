@@ -585,15 +585,11 @@ export class DataAccessLayer {
         logger.error('Relation metadata not found', { model: modelName, relation });
         return { success: false, error: `Relation ${relation} not found in model ${modelName}` };
       }
-      // Validate permissions for both parent and child models
+      // Nested children are authorized via the parent view (same as addChildrenToParent).
+      // There is usually no top-level view for invoice_line_item / credit_note_item.
       const parentPermissions = this.validatePermissions(context, modelName, 'write');
-      const childPermissions = this.validatePermissions(context, relationMetadata.relatedModel, 'write');
-      logger.debug('Permissions validated for updateChild', {
-        parentPermissions,
-        childPermissions
-      });
-      // Filter input data based on child model permissions
-      const filteredData = PermissionService.filterFieldsByPermission(data, childPermissions);
+      logger.debug('Permissions validated for updateChild', { parentPermissions });
+      const filteredData: Record<string, unknown> = { ...data };
       filteredData.modified_by = context.user?.id;
       applyOrgOnWrite(relationMetadata.relatedModel, filteredData, context.user!.org_id, !!context.isPlatformAdmin, false);
       const unknownFields = rejectUnknownWriteFields(relationMetadata.relatedModel, filteredData);

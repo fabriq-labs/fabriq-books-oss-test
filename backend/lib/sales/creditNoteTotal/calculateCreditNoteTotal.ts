@@ -50,6 +50,7 @@ export async function calculate_credit_note_total(
     });
 
     let lineTaxTotal = new Decimal(0);
+    let taxRateToStore: Decimal | null = line.tax_rate != null ? new Decimal(line.tax_rate) : null;
 
     if (line.tax_group_id) {
       const components = await tx.tax_group_component.findMany({
@@ -67,6 +68,9 @@ export async function calculate_credit_note_total(
         })),
       });
       lineTaxTotal = taxTotal;
+      taxRateToStore = money(
+        components.reduce((s, c) => s.plus(c.tax_master.rate ?? 0), new Decimal(0))
+      );
 
       await tx.credit_note_line_tax.deleteMany({
         where: { credit_note_item_id: line.id },
@@ -85,10 +89,44 @@ export async function calculate_credit_note_total(
           },
         });
       }
+    } else if (line.tax_rate != null && !new Decimal(line.tax_rate).isZero()) {
+      const rate = new Decimal(line.tax_rate);
+      const amount = money(taxable.mul(rate.div(100)));
+      lineTaxTotal = amount;
+      taxRateToStore = rate;
+
+      await tx.credit_note_line_tax.deleteMany({
+        where: { credit_note_item_id: line.id },
+      });
+
+      const taxMaster =
+        (await tx.tax_master.findFirst({
+          where: { org_id: line.org_id, is_active: true },
+          orderBy: { code: 'asc' },
+        })) ??
+        (await tx.tax_master.findFirst({
+          where: { org_id: line.org_id },
+          orderBy: { code: 'asc' },
+        }));
+
+      if (taxMaster) {
+        await tx.credit_note_line_tax.create({
+          data: {
+            org_id: line.org_id,
+            credit_note_item_id: line.id,
+            tax_master_id: taxMaster.id,
+            tax_group_id: null,
+            rate,
+            amount,
+            component_type: taxMaster.component_type ?? 'manual',
+          },
+        });
+      }
     } else if (line.line_taxes.length === 1 && line.line_taxes[0].rate != null) {
       const existing = line.line_taxes[0];
       const amount = money(taxable.mul(existing.rate!.div(100)));
       lineTaxTotal = amount;
+      taxRateToStore = new Decimal(existing.rate!);
       await tx.credit_note_line_tax.update({
         where: { id: existing.id },
         data: { amount },
@@ -98,6 +136,7 @@ export async function calculate_credit_note_total(
         where: { credit_note_item_id: line.id },
       });
       lineTaxTotal = new Decimal(0);
+      taxRateToStore = null;
     }
 
     await tx.credit_note_item.update({
@@ -105,6 +144,7 @@ export async function calculate_credit_note_total(
       data: {
         discount_amount,
         amount: taxable,
+        tax_rate: taxRateToStore,
       },
     });
 

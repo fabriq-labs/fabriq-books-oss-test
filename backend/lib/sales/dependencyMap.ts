@@ -30,7 +30,14 @@ export const salesDependencies: DependencyDecl[] = [
     children: [
       {
         relation: 'line_items',
-        fields: ['quantity', 'unit_price', 'discount_rate', 'discount_amount', 'tax_group_id'],
+        fields: [
+          'quantity',
+          'unit_price',
+          'discount_rate',
+          'discount_amount',
+          'tax_group_id',
+          'tax_rate',
+        ],
       },
     ],
   },
@@ -56,7 +63,14 @@ export const salesDependencies: DependencyDecl[] = [
     children: [
       {
         relation: 'line_items',
-        fields: ['quantity', 'unit_price', 'discount_rate', 'discount_amount', 'tax_group_id'],
+        fields: [
+          'quantity',
+          'unit_price',
+          'discount_rate',
+          'discount_amount',
+          'tax_group_id',
+          'tax_rate',
+        ],
       },
       {
         relation: 'applications',
