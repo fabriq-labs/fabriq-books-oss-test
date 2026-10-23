@@ -178,6 +178,14 @@ Phase 1 uses the root `Dockerfile` and `/start.sh`. It does not invent a second 
 - DB that already has `organizations` + `AUTO_SETUP=true` → no `CREATE`/`ALTER`/`DROP` on application tables; restart does not reset password or org name after onboarding.
 - Pointing at an already-onboarded DB does not force the wizard again.
 
+#### Dev bootstrap vs tenant onboarding
+
+**Tenant / operator path:** empty DB + `AUTO_SETUP` (or `setup:kernel` alone) → sign-in → password → org name → chart geo or skip. The wizard owns `settings.onboarding`. Do not pre-run `seed:coa` / `seed:books-demo` on this path.
+
+**Dev / coding-agent path:** after `setup:kernel`, run `npm run seed:dev` (views + chart + demo + mark complete). That deliberately sets `settings.onboarding` so agents can code without the wizard. Details for agents: [AGENTS.md](./AGENTS.md) “Two setup paths”.
+
+Hand-running `seed:coa` (or other business seeds) without the wizard or `seed:mark-onboarding-complete` is what creates R-ONBOARD-ERR below.
+
 #### R-ONBOARD-ERR. Inconsistent database → error page, not a guess (P0)
 
 Treat as **inconsistent** when `org_kernel` (or the caller's org) shows signs of real use **and** `settings.onboarding` is missing or incomplete. Signs of real use include any of:

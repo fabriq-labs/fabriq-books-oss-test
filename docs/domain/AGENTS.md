@@ -2,6 +2,24 @@
 
 This is the product file for coding agents. Kernel instructions stay in the root [AGENTS.md](../../AGENTS.md). Human readers start at the [Books docs hub](../README.md), not here.
 
+## Two setup paths (do not mix)
+
+Coding agents confuse these constantly. Pick one.
+
+| Intent | Path | Chart / demo | First-run flags |
+|---|---|---|---|
+| **New tenant / operator** | Empty DB + `AUTO_SETUP=true` (or `setup:kernel` only), then the **in-app wizard** (password → org name → geo or skip) | Wizard loads `seed:coa` (or skip) | Wizard writes `org.settings.onboarding` |
+| **Dev / agent bootstrap** | `setup:kernel`, then **`npm run seed:dev`** from `backend/` | CLI chart + demo (+ sales catalog) | `seed:dev` marks onboarding complete |
+
+**Never** run `seed:coa` / `seed:books-demo` / other business-data seeds and leave the wizard unfinished. That trips **R-ONBOARD-ERR** (“Setup can't continue on this database”): accounts or parties exist but `settings.onboarding` is missing. The app will not guess. Recovery: `npm run seed:mark-onboarding-complete` (or wipe the DB and use one path cleanly).
+
+- Tenant path details: [ONBOARDING_REQUIREMENTS.md](./ONBOARDING_REQUIREMENTS.md), [operations/deploy.md](../operations/deploy.md).
+- Human local install (same seeds as `seed:dev`, without the one-shot script): [getting-started.md](../getting-started.md).
+
+When the task is “spin up Books so I can code / test,” use **`seed:dev`**, not the wizard. When the task is “prove or change onboarding / AUTO_SETUP,” use the tenant path and do **not** pre-load chart/demo via CLI.
+
+After `seed:dev`, sign-in as `admin@example.com` / `admin123` is success. A **password-only** gate (change the seed password) is expected and is not R-ONBOARD-ERR. Org name and chart steps should already be complete — if you see “Setup can't continue on this database,” flags were not marked; run `seed:mark-onboarding-complete` or re-run `seed:dev`. Prefer unsetting a shell `DATABASE_URL` before `npm run dev` so `backend/.env` wins.
+
 ## Public docs (humans)
 
 Write and read these in complete paragraphs. They describe the software that runs today. Agent-brief tone stays in this file and in the plans below.

@@ -88,6 +88,14 @@ npm run seed:books-demo
 
 `seed:books-demo` adds the US dollar and Indian rupee currencies if they are missing, two entities (Fabriq US, marked headquarters, and Fabriq India), INR-to-USD average and closing rates, a small USD chart on the US entity, and opening balances plus journals dated in 2026. Re-running it updates the same rows. With the organization base currency left at USD, the 2026 income statement shows US service revenue of 8,000.00, sales revenue of 1,428.00 (120,000 INR at 0.0119), US rent of 2,400.00, and rent of 428.40 (36,000 INR at 0.0119).
 
+If you load a chart or demo this way (outside the in-app wizard), mark first-run setup complete or the UI will stop on an error page after sign-in:
+
+```bash
+npm run seed:mark-onboarding-complete -- org_kernel us-ca
+```
+
+For a single command that runs the view seeds, chart, demo, sales catalog, and that mark step: `npm run seed:dev`. That path is for local development. A new operator tenant should use `AUTO_SETUP` and the wizard instead — see [ONBOARDING_REQUIREMENTS.md](./domain/ONBOARDING_REQUIREMENTS.md).
+
 ## Start the API and the UI
 
 From the repository root:
