@@ -21,6 +21,12 @@ When moving a prod feature onto the shell, follow [docs/kernel/PORTING_A_DOMAIN.
 
 Tool-specific folders (`.cursor/`, `.claude/`) stay on the machine that uses them. They are gitignored. Instructions for every coding agent live in this file.
 
+## Kernel changes
+
+Do not change kernel code without checking with the human first. Ask, explain why, and wait for approval before editing.
+
+Kernel here means the shared engine — not Books/domain product code. That includes (non-exhaustive): `backend/src/services/dal/`, `backend/src/services/core/`, `backend/src/services/permissions/`, `backend/src/rest/` (generic routes), `backend/src/auth/`, `backend/src/agent/` (runtime), kernel Prisma (`metadata.prisma`, `platform.prisma`), and kernel seeds/setup under `backend/src/utils/setup/` that are not Books-only. Prefer fixing or extending the domain (`backend/lib/`, domain prisma, `frontend-0/src/domain/`, `docs/domain/`) instead.
+
 ## Database
 
 Investigate with `SELECT` only. Read `DATABASE_URL` from `backend/.env` and pass it to `psql`. Do not print the URL, and do not commit `.env`.
