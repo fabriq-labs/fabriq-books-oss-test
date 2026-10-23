@@ -222,7 +222,7 @@ Record the commands and results in the PR / walkthrough for Phase 1. Screen reco
 
 ### 4.2 Railway template and README button (Phase 2)
 
-Today there is no Railway template and no deploy button. The supported Railway path is the CLI in [docs/infrastructure/BUILD_AND_DEPLOY.md](../infrastructure/BUILD_AND_DEPLOY.md) and [docs/operations/deploy.md](../operations/deploy.md). The root of the repo has a `Dockerfile` and no `railway.toml`. `backend/railway.toml` describes a backend-only Nixpacks process. It is not the full-image deploy path.
+Today there is no Railway template and no deploy button. The supported Railway path is [docs/infrastructure/DEPLOY_RAILWAY.md](../infrastructure/DEPLOY_RAILWAY.md) (CLI + GitHub Actions / fork) and [docs/operations/deploy.md](../operations/deploy.md). The root of the repo has a `Dockerfile` and no `railway.toml`. `backend/railway.toml` describes a backend-only Nixpacks process. It is not the full-image deploy path.
 
 Phase 2 starts after Phase 1 is proven and the branch is available on a **public** GitHub repo the template can reference.
 

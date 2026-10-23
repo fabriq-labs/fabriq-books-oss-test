@@ -1,6 +1,9 @@
 # Build the root Dockerfile, push it to GHCR, and redeploy the Railway service.
 # Run from the prod branch: Actions → Deploy (Railway) → Run workflow.
 #
+# Fork / first-time setup (secrets, GHCR image service, checklist):
+#   docs/infrastructure/DEPLOY_RAILWAY.md  — Path B
+#
 # Secrets:
 #   RAILWAY_TOKEN      — Railway project token
 #   RAILWAY_SERVICE_ID — service to redeploy

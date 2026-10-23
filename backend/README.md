@@ -48,4 +48,4 @@ There is no `/api/{model}` route without a view. Search is `POST /api/{model}/vi
 | Workflows | `/api/workflow/*` | [docs/kernel/workflows.md](../docs/kernel/workflows.md) |
 | Agent | `/api/agent/*` | [docs/kernel/agent/](../docs/kernel/agent/) |
 | Auth | `/api/auth/*` | [docs/kernel/auth.md](../docs/kernel/auth.md) |
-| Deploy | root `Dockerfile` | [docs/infrastructure/BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md) |
+| Deploy | root `Dockerfile` | [BUILD_AND_DEPLOY.md](../docs/infrastructure/BUILD_AND_DEPLOY.md), [DEPLOY_RAILWAY.md](../docs/infrastructure/DEPLOY_RAILWAY.md), [DEPLOY_FLY.md](../docs/infrastructure/DEPLOY_FLY.md) |

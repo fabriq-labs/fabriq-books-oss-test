@@ -49,7 +49,9 @@ Product instructions, when this checkout has a product, live in [domain/AGENTS.m
 
 | Document | What it covers |
 |---|---|
-| [infrastructure/BUILD_AND_DEPLOY.md](../infrastructure/BUILD_AND_DEPLOY.md) | The single image, and a new Railway service from `RAILWAY_TOKEN` |
+| [infrastructure/BUILD_AND_DEPLOY.md](../infrastructure/BUILD_AND_DEPLOY.md) | The single image; links to Railway / Fly host docs |
+| [infrastructure/DEPLOY_RAILWAY.md](../infrastructure/DEPLOY_RAILWAY.md) | Railway CLI + GitHub Actions / fork → GHCR → Railway |
+| [infrastructure/DEPLOY_FLY.md](../infrastructure/DEPLOY_FLY.md) | Fly.io app, Managed Postgres, `fly.toml` |
 
 ## Security
 

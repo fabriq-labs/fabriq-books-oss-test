@@ -27,6 +27,12 @@ Hand-running chart/demo seeds without the wizard or `seed:mark-onboarding-comple
 
 Details: [docs/domain/AGENTS.md](./docs/domain/AGENTS.md), [docs/domain/ONBOARDING_REQUIREMENTS.md](./docs/domain/ONBOARDING_REQUIREMENTS.md), [docs/getting-started.md](./docs/getting-started.md).
 
+## Teammate / agent environments
+
+When a human asks you to set up this repo for **development, testing, or their agent environment**, figure it out from this file, [docs/domain/AGENTS.md](./docs/domain/AGENTS.md), and [docs/getting-started.md](./docs/getting-started.md). Prefer `setup:kernel` then **`npm run seed:dev`** for a local Books DB — not the tenant wizard. Install deps, start `npm run dev`, and smoke-check login yourself when you can.
+
+When they ask to **build or deploy**, open [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md) and the host file that matches their ask (Railway or Fly). Use secrets from their gitignored `.env` or from them in chat — never print or commit tokens. If they are new to the host (no project, no token yet), **guide them**: walk them through creating the project / app in the dashboard, minting the token, and where to paste it; then continue the documented deploy steps. Do not dump a long tutorial into the repo — teach just enough for this run.
+
 ## What to build next
 
 Follow [docs/domain/AGENT_PLAN.md](./docs/domain/AGENT_PLAN.md) **one module at a time**, then stop. Porting from prod: [docs/kernel/PORTING_A_DOMAIN.md](./docs/kernel/PORTING_A_DOMAIN.md) and Books notes in [docs/domain/KERNEL_PORT.md](./docs/domain/KERNEL_PORT.md). Invoice UI notes: [docs/domain/INVOICE_DOCUMENT_UI.md](./docs/domain/INVOICE_DOCUMENT_UI.md).
@@ -59,9 +65,16 @@ Quote `"user"`. Filter private rows by `org_id`. Shareable rows (`role`, `workfl
 
 ## Deploy
 
-Operator paths (Compose / Railway / Fly + `AUTO_SETUP`): [docs/operations/deploy.md](./docs/operations/deploy.md). Railway project token details: [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md).
+Image layout: [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). **Pick the host file from the human’s ask** — do not invent a platform:
 
-`RAILWAY_TOKEN` in repo-root `.env` or `backend/.env` is a project token. Load it into the environment; never print or commit it. Do not redeploy or restart an existing production service unless the user explicitly asks. `railway variable list` prints secrets — do not write that output into logs, docs, or the repo.
+| Ask | File |
+|---|---|
+| Railway | [docs/infrastructure/DEPLOY_RAILWAY.md](./docs/infrastructure/DEPLOY_RAILWAY.md) |
+| Fly.io | [docs/infrastructure/DEPLOY_FLY.md](./docs/infrastructure/DEPLOY_FLY.md) |
+
+Operator overview (Compose + both hosts): [docs/operations/deploy.md](./docs/operations/deploy.md).
+
+`RAILWAY_TOKEN` / `FLY_API_TOKEN` in repo-root `.env` or `backend/.env` stay gitignored. Load into the environment; never print or commit. Do not redeploy or restart an existing production service unless the user explicitly asks. `railway variable list` / `fly secrets list` print secrets — do not write that output into logs, docs, or the repo.
 
 ```bash
 npx -y @railway/cli@latest service list

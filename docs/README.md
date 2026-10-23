@@ -32,7 +32,7 @@ A bookkeeper can follow the connections guide without setting up Airbyte. The ad
 | [Deploy](./operations/deploy.md) | The single Docker image, `AUTO_SETUP` onboarding, local Compose, Railway, and Fly.io. |
 | [Connections setup](./operations/connections-setup.md) | Intuit app credentials, Airbyte, extraction settings, and the stream list for the QuickBooks path. |
 
-The longer operator note that the deploy guide is written from is [infrastructure/BUILD_AND_DEPLOY.md](./infrastructure/BUILD_AND_DEPLOY.md).
+Longer operator notes: [infrastructure/BUILD_AND_DEPLOY.md](./infrastructure/BUILD_AND_DEPLOY.md) (image), [DEPLOY_RAILWAY.md](./infrastructure/DEPLOY_RAILWAY.md), [DEPLOY_FLY.md](./infrastructure/DEPLOY_FLY.md).
 
 ## Metadata engine
 

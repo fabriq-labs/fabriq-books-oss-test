@@ -16,7 +16,9 @@ Same rule as root AGENTS: **dev → `seed:dev`**; **tenant → AUTO_SETUP + wiza
 - Tenant path: [ONBOARDING_REQUIREMENTS.md](./ONBOARDING_REQUIREMENTS.md), [operations/deploy.md](../operations/deploy.md).
 - Human local install: [getting-started.md](../getting-started.md).
 
-After `seed:dev`, password-only gate is OK; “Setup can't continue…” means flags were not marked.
+When the task is “spin up Books so I can code / test,” use **`seed:dev`**, not the wizard. When the task is “prove or change onboarding / AUTO_SETUP,” use the tenant path and do **not** pre-load chart/demo via CLI. Teammate agent environments and “guide me on Railway/Fly” posture: root [AGENTS.md](../../AGENTS.md) § Teammate / agent environments.
+
+After `seed:dev`, password-only gate is OK; “Setup can't continue…” means flags were not marked. Prefer unsetting a shell `DATABASE_URL` before `npm run dev` so `backend/.env` wins.
 
 ## Public docs (humans)
 
@@ -26,7 +28,7 @@ Write and read these in complete paragraphs. They describe the software that run
 |---|---|
 | Anyone evaluating or running Books | [docs/README.md](../README.md), [getting-started.md](../getting-started.md), [concepts.md](../concepts.md) |
 | Ledger, sales, connections | [modules/ledger.md](../modules/ledger.md), [modules/sales-ar.md](../modules/sales-ar.md), [modules/connections.md](../modules/connections.md) |
-| Database, deploy, connector setup | [operations/database.md](../operations/database.md), [operations/deploy.md](../operations/deploy.md) (Compose, Railway, Fly + `AUTO_SETUP` onboarding), [operations/connections-setup.md](../operations/connections-setup.md) |
+| Database, deploy, connector setup | [operations/database.md](../operations/database.md), [operations/deploy.md](../operations/deploy.md); host detail [DEPLOY_RAILWAY.md](../infrastructure/DEPLOY_RAILWAY.md) / [DEPLOY_FLY.md](../infrastructure/DEPLOY_FLY.md); [operations/connections-setup.md](../operations/connections-setup.md) |
 | Onboarding requirements | [ONBOARDING_REQUIREMENTS.md](./ONBOARDING_REQUIREMENTS.md) |
 | How Books uses the engine | [architecture.md](../architecture.md). The engine itself is [kernel/README.md](../kernel/README.md) and stays domain-neutral. |
 | Contributors | [CONTRIBUTING.md](../../CONTRIBUTING.md), [SECURITY.md](../../SECURITY.md) |

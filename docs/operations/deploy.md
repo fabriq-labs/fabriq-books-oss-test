@@ -2,7 +2,7 @@
 
 Books ships as one container image. The image serves the web app and the API, and it can run the import service on a private port inside the same container. PostgreSQL stays outside the image. You can run that image on any host that has Docker — locally, on Railway, or on Fly.io. The host is packaging. The image and the env contract are the same.
 
-The command-level notes this page is written from are in [Build and deploy](../infrastructure/BUILD_AND_DEPLOY.md). Read that file when you want every flag. This page is the path, and the reasons for it. First-boot schema and the in-app wizard are specified in [Onboarding requirements](../domain/ONBOARDING_REQUIREMENTS.md).
+The command-level notes this page is written from are in [Build and deploy](../infrastructure/BUILD_AND_DEPLOY.md) (image layout), plus platform files agents should open by host: [Railway](../infrastructure/DEPLOY_RAILWAY.md), [Fly.io](../infrastructure/DEPLOY_FLY.md). This page is the path, and the reasons for it. First-boot schema and the in-app wizard are specified in [Onboarding requirements](../domain/ONBOARDING_REQUIREMENTS.md).
 
 ## What the image contains
 
@@ -81,6 +81,8 @@ Then apply the `datalake` schema and, if you want the rule enforced, the headqua
 
 ## Railway
 
+Full CLI and **GitHub Actions / fork** procedures: [DEPLOY_RAILWAY.md](../infrastructure/DEPLOY_RAILWAY.md). Coding agents: use that file when the human asks for Railway.
+
 Railway is one place to run the same image. The steps below create a new service in the project your token already belongs to. They do not create a new Railway project. `railway up --new` is a different command and wants an account token; do not use it for this.
 
 Put a project token in the repo-root `.env` or in `backend/.env` as `RAILWAY_TOKEN`. Both files are gitignored. Load the variable into your shell without printing it. `railway variable list` prints secret values. Do not redirect that output into a log, a doc, or the repository.
@@ -133,6 +135,8 @@ If this database is new and you skipped auto-setup, follow up with the `datalake
 Connector variables (`ERP_CONFIG_ENCRYPTION_KEY`, and the Airbyte values if you use them) are set the same way, from stdin or from a file you do not commit. They are listed in [Connections setup](./connections-setup.md).
 
 ## Fly.io
+
+Full Fly procedure: [DEPLOY_FLY.md](../infrastructure/DEPLOY_FLY.md). Coding agents: use that file when the human asks for Fly.
 
 Fly.io is another host for the same root Dockerfile and the same env contract. Use an org or personal access token as `FLY_API_TOKEN` (do not commit it). Install the CLI from [fly.io/docs/flyctl](https://fly.io/docs/flyctl/).
 
@@ -198,7 +202,7 @@ Tear down when you are done exploring: destroy the app, then the Postgres cluste
 
 ## GitHub Actions
 
-`.github/workflows/deploy-railway.yml` is a manually dispatched workflow. It builds this Dockerfile **with `SOURCE_*` build-args**, pushes `ghcr.io/<owner>/<repo>:prod-latest`, and redeploys a Railway service that is already configured as a Docker image source for that tag. That is the supported path for `/build-info.json` with real commit metadata: the builder supplies the args; Railway (or Fly / GCP / AWS) only runs the image. The workflow refuses to run unless the branch name is `prod`, and it expects repository secrets `RAILWAY_TOKEN` and `RAILWAY_SERVICE_ID`. A first bring-up can still use `railway up`, Fly `fly deploy`, or local Compose / `docker run`; use the Actions (or `./docker-build.sh` + registry) path when build metadata matters.
+`.github/workflows/deploy-railway.yml` is a manually dispatched workflow (branch **`prod`** only). Fork → secrets → GHCR → Railway image service is documented step-by-step in [DEPLOY_RAILWAY.md](../infrastructure/DEPLOY_RAILWAY.md) **Path B**. That is the supported path for `/build-info.json` with real commit metadata. A first bring-up can still use `railway up`, Fly `fly deploy`, or local Compose / `docker run`.
 
 ## After it is up
 

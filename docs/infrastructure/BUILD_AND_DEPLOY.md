@@ -1,8 +1,16 @@
 # Build and deploy
 
-One image serves the UI and the API. Build the app in this repo, then run that image anywhere Docker runs — local Compose, Railway, or Fly.io. The operator path and onboarding env contract are in [../operations/deploy.md](../operations/deploy.md). This page keeps the image layout and the Railway / Fly CLI detail.
+One image serves the UI and the API. Build it in this repo, then run it anywhere Docker runs — local Compose, Railway, or Fly.io. The operator path and onboarding env contract are in [../operations/deploy.md](../operations/deploy.md).
 
-Build the domain first. A model, its table, its view, and its form are in [../kernel/adding-a-model.md](../kernel/adding-a-model.md). Where domain files go is in [../kernel/BUILDING_A_DOMAIN.md](../kernel/BUILDING_A_DOMAIN.md).
+**Coding agents:** pick the host the human named. Do not invent a platform. Read that host file and execute (or guide) from it. If they lack a project or token, help them create one in the host’s dashboard, then continue — do not stop at “you need a token.”
+
+| Human asks about… | Read |
+|---|---|
+| Railway (CLI, new service, GitHub Actions, fork → deploy) | [DEPLOY_RAILWAY.md](./DEPLOY_RAILWAY.md) |
+| Fly.io (app, Managed Postgres, `fly.toml`, deploy) | [DEPLOY_FLY.md](./DEPLOY_FLY.md) |
+| Local Docker / Compose / image layout | This page + [../operations/deploy.md](../operations/deploy.md) |
+
+Build the domain first. A model, its table, its view, and its form: [../kernel/adding-a-model.md](../kernel/adding-a-model.md). Where domain files go: [../kernel/BUILDING_A_DOMAIN.md](../kernel/BUILDING_A_DOMAIN.md).
 
 ## The image
 
@@ -25,7 +33,7 @@ The root `Dockerfile` is the build. Context is the repo root. It copies `backend
 
 The image listens on `8080` only.
 
-This repo has no Railway config file. A new Railway service defaults to Railpack. Before the first upload, set the service build to the Dockerfile at the repo root and set the deploy health check to `GET /health`. The upload has to be the repo root. An upload rooted at `backend/` does not contain `Dockerfile`. Fly.io uses the same Dockerfile via a `fly.toml` `[build]` section (example in [../operations/deploy.md](../operations/deploy.md)).
+This repo has no Railway config file at the root. A new Railway service defaults to Railpack until you set the Dockerfile — details in [DEPLOY_RAILWAY.md](./DEPLOY_RAILWAY.md). Fly uses the same Dockerfile via `fly.toml` — see [DEPLOY_FLY.md](./DEPLOY_FLY.md).
 
 `.git` is not in the Docker build context (see `.dockerignore`). `/build-info.json` is filled only when the **builder** passes `SOURCE_*` (and related) build-args — the same contract in GitHub Actions and locally. The runtime host (Railway, Fly, GCP, AWS, Compose) just runs the image; it does not supply this metadata.
 
@@ -40,122 +48,3 @@ npm run docker:compose        # same args via compose build.args, then up --buil
 ```
 
 A plain `docker build .` or `railway up` without those args leaves branch/commit/tag as `unknown` (build time may still be set inside the Dockerfile). For a deployable image with real metadata, build in CI (or with `./docker-build.sh`), push to a registry, then point the runtime at that image.
-
-## Railway: new service
-
-The token is a Railway **project token**. Put it in the repo-root `.env` or `backend/.env` as `RAILWAY_TOKEN`. Both files are gitignored. Load it into the shell. Never print it, and never commit it.
-
-```bash
-if [ -f .env ]; then
-  RAILWAY_TOKEN="$(grep -E '^RAILWAY_TOKEN=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
-fi
-if [ -z "${RAILWAY_TOKEN:-}" ] && [ -f backend/.env ]; then
-  RAILWAY_TOKEN="$(grep -E '^RAILWAY_TOKEN=' backend/.env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
-fi
-export RAILWAY_TOKEN
-test -n "$RAILWAY_TOKEN"
-```
-
-A project token acts inside one project and one environment. `railway service list` shows that project. `railway up --new` creates a different project and needs an account token. Add a service here, then upload this repo to it.
-
-CLI is `npx -y @railway/cli@latest`. Commands below use that as `railway`.
-
-1. Pick a short service name from the spec, lowercase, no spaces. Confirm it is absent:
-
-```bash
-railway service list --json
-```
-
-2. Create the app service and a Postgres service. Read `name` from each JSON object. The database service deploys on its own.
-
-```bash
-railway add --service "$APP" --json
-railway add --database postgres --json
-```
-
-3. Point the app at that database. Set `APP` and `DB` to the `name` fields from the JSON above. The backslash leaves `${{` for Railway to resolve. `--skip-deploys` waits until the source upload.
-
-```bash
-APP=my-app
-DB=Postgres
-railway variable set \
-  "DATABASE_URL=\${{${DB}.DATABASE_URL}}" \
-  "AUTH_PROVIDER=local" \
-  "NODE_ENV=production" \
-  "AUTO_SETUP=true" \
-  "ENABLE_SYNC_SERVICE=false" \
-  --service "$APP" \
-  --skip-deploys \
-  --json
-```
-
-Set `JWT_SECRET` from stdin:
-
-```bash
-openssl rand -base64 32 | railway variable set JWT_SECRET --stdin --service "$APP" --skip-deploys --json
-```
-
-`railway variable list --json` and `--kv` print secret values. Do not write that output into logs, docs, or the repo.
-
-4. From the repo root, upload and build on Railway (quick bring-up). `railway up` does not pass `SOURCE_*` build-args, so `/build-info.json` will show `unknown` for commit fields. For real metadata, build and push with GitHub Actions (or `./docker-build.sh` + your registry), then point the service at that image instead.
-
-```bash
-railway up --service "$APP" --detach --yes
-```
-
-5. Poll until the newest deployment finishes:
-
-```bash
-railway deployment list --service "$APP" --limit 5 --json
-```
-
-While it is building or deploying, wait and list again. On failure:
-
-```bash
-railway logs --service "$APP" --build -n 200
-railway logs --service "$APP" -n 200
-```
-
-6. With `AUTO_SETUP=true`, first boot applies schema when `organizations` is missing and seeds Super Admin plus Books views. Watch logs for `AUTO_SETUP complete`, then open the public URL and finish the in-app wizard. If you left `AUTO_SETUP` off, apply the schema once after the deployment is up. `npm run setup:kernel` creates the application database when needed, applies SQL from `prisma/schema` when `organizations` is missing, and seeds `org_system`, the kernel tenant, Super Admin, USD, and the shell views. Each of those views has a `data_graph`. It does not use `prisma db push`. If `organizations` already exists, it leaves the schema alone. Later tables use the SQL diff in [../kernel/adding-a-model.md](../kernel/adding-a-model.md). A product seed is a second command from `/app/backend`, after that product's tables exist. `setup:kernel` does not run it.
-
-```bash
-railway ssh --service "$APP" -- sh -c 'cd /app/backend && npm run setup:kernel'
-```
-
-7. Give the service a public URL. `railway up` does not create one.
-
-```bash
-railway domain --service "$APP" --json
-```
-
-Open `https://<that-host>/health`, then the same host in a browser. Login is `admin@example.com` / `admin123` (change password in the onboarding wizard when `AUTO_SETUP` seeded the user).
-
-Changing a variable redeploys the service. Pass `--skip-deploys` when you are setting several, then `railway up` or `railway redeploy --service "$APP" --yes` once.
-
-To debug a service that is already deployed, read its name from `railway service list` and follow the log commands in [../../AGENTS.md](../../AGENTS.md). Leave service ids out of docs.
-
-## Fly.io: new app
-
-Use a Fly org or personal token as `FLY_API_TOKEN`. Never print it or commit it.
-
-1. `fly apps create <name> --org <org>`
-2. Create Managed Postgres (`fly mpg create`), create an application database if needed, and `fly mpg attach <cluster-id> --app <name> --database <db>` so `DATABASE_URL` is set.
-3. `fly secrets set AUTH_PROVIDER=local NODE_ENV=production AUTO_SETUP=true ENABLE_SYNC_SERVICE=false --app <name>`, and set `JWT_SECRET` from stdin (`fly secrets set JWT_SECRET=-`).
-4. Add a `fly.toml` with `dockerfile = "Dockerfile"`, `internal_port = 8080`, and `GET /health` (full example in [../operations/deploy.md](../operations/deploy.md)).
-5. From the repo root: `fly deploy --app <name> --ha=false --yes --wait-timeout 600`.
-6. Open `https://<name>.fly.dev/health`, sign in, complete onboarding.
-
-Do not write `fly secrets` or connection strings into docs or the repository.
-
-## GitHub Actions
-
-`.github/workflows/deploy-railway.yml` is the only workflow. Run it from the `prod` branch: Actions → **Deploy (Railway)**.
-
-It builds this Dockerfile, pushes `ghcr.io/<owner>/<repo>:prod-latest` (and a timestamp tag), then runs `railway redeploy --from-source`. The Railway service is already a Docker Image source pointed at that tag, with registry credentials that can read packages.
-
-Repository secrets:
-
-| Secret | Value |
-|---|---|
-| `RAILWAY_TOKEN` | Railway project token |
-| `RAILWAY_SERVICE_ID` | Service to redeploy |
