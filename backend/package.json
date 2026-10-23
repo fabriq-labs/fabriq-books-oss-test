@@ -18,6 +18,8 @@
     "seed:coa": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedChart.ts",
     "seed:books-demo": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedBooksDemo.ts",
     "seed:sales-catalog": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedSalesCatalog.ts",
+    "seed:mark-onboarding-complete": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedMarkOnboardingComplete.ts",
+    "seed:dev": "node -r dotenv/config scripts/seed-dev.js",
     "seed:sales": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedSales.ts",
     "seed:ar-settlement": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedArSettlement.ts",
     "seed:connections": "node -r dotenv/config ./node_modules/.bin/ts-node --transpile-only src/utils/setup/seedConnections.ts",

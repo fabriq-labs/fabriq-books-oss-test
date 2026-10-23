@@ -11,11 +11,12 @@ On this branch [docs/README.md](./docs/README.md) is the Books guide. The engine
 | Backend | `backend/`, port 4000 |
 | Frontend | `frontend-0/`, port 5174 |
 | Database setup | `cd backend && npm run setup:kernel` |
+| Dev Books data (agents) | After kernel setup: `cd backend && npm run seed:dev` — not the tenant wizard |
 | Login | `admin@example.com` / `admin123` |
 
 Do not run `prisma db push`, `prisma migrate`, or other DDL. New databases are created by `npm run setup:kernel`, which applies generated schema SQL and seeds `org_system`. After `organizations` exists, apply later tables with the SQL diff in `docs/kernel/adding-a-model.md`.
 
-Read [docs/domain/AGENTS.md](./docs/domain/AGENTS.md). That file is the product. Do not add product instructions to this file.
+Read [docs/domain/AGENTS.md](./docs/domain/AGENTS.md). That file is the product (including **tenant onboarding vs `seed:dev`**). Do not add product instructions to this file.
 
 When moving a prod feature onto the shell, follow [docs/kernel/PORTING_A_DOMAIN.md](./docs/kernel/PORTING_A_DOMAIN.md).
 
