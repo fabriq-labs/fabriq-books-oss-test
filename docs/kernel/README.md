@@ -31,7 +31,7 @@ To add a model, follow this order: [BUILDING_A_DOMAIN.md](./BUILDING_A_DOMAIN.md
 
 | Document | What it teaches |
 |---|---|
-| [metadata.md](./metadata.md) | How a view, a permission, and a role produce an API and a list. Request path from HTTP to the data access layer. `data_graph` properties. |
+| [metadata.md](./metadata.md) | How a view, a permission, and a role produce an API and a list. Request path from HTTP to the data access layer. `data_graph` properties. Nested `updateChild` / `addChild` auth and returned parent graph. |
 | [adding-a-model.md](./adding-a-model.md) | Add a model, apply its table without `db push`, seed its view and permission, and add the list route and form routes. |
 | [tenancy.md](./tenancy.md) | Org scope, shareable and private reads, platform-admin writes, and the row-level security sketch to review. |
 | [examples.md](./examples.md) | Worked steps on tables and routes that exist in the kernel seed: model, view, permission, role, workflow, instance. |

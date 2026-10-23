@@ -7,11 +7,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { viewAPI } from '@/api/api';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { SearchDropDown } from '@/components/search_dropdown/dropdown';
+import { Badge } from '@/components/ui/badge';
 import DocumentFooter from './DocumentFooter';
 import {
   isEditableSource,
@@ -25,7 +27,10 @@ import {
   SalesLineEditor,
   type SalesLineDraft,
 } from './SalesLineEditor';
-import { dateInput, datePayload, moneyLabel, todayIsoDate, toNumber } from './lineMath';
+import { dateInput, datePayload, todayIsoDate, toNumber } from './lineMath';
+
+const fieldLabelClass =
+  'text-[11px] font-semibold uppercase tracking-wide text-muted-foreground';
 
 const EDIT_LIST = '/sales/invoices';
 const EDIT_VIEW = 'invoice_edit_view';
@@ -608,23 +613,45 @@ export const InvoiceForm: React.FC = () => {
     void persistHeaderField();
   };
 
+  const statusLabel = sourceSystemId
+    ? 'Imported'
+    : status === 'posted'
+      ? 'Posted'
+      : status === 'void'
+        ? 'Void'
+        : recordId
+          ? 'Draft'
+          : 'New';
+
   return (
-    <div className="mx-auto w-[90%] max-w-5xl space-y-6 py-4 pb-24">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {form.watch('number') ? `Invoice ${form.watch('number')}` : recordId ? 'Invoice' : 'New invoice'}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <div className="mx-auto w-[94%] max-w-6xl space-y-5 py-4 pb-28">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              {form.watch('number')
+                ? `Invoice ${form.watch('number')}`
+                : recordId
+                  ? 'Invoice'
+                  : 'New invoice'}
+            </h1>
+            <Badge
+              variant="secondary"
+              className={
+                status === 'posted'
+                  ? 'bg-green-100 text-green-800 hover:bg-green-100'
+                  : status === 'void'
+                    ? 'bg-red-100 text-red-800 hover:bg-red-100'
+                    : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+              }
+            >
+              {statusLabel}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
             {sourceSystemId
-              ? 'Imported — view only in Books'
-              : status === 'posted'
-                ? 'Posted'
-                : status === 'void'
-                  ? 'Void'
-                  : recordId
-                    ? 'Draft'
-                    : 'Create a sales invoice'}
+              ? 'Imported from a connection — view only in Books'
+              : 'Customer, lines, and totals on one document. Blur a field to save and recalculate.'}
           </p>
         </div>
         <Button
@@ -644,372 +671,356 @@ export const InvoiceForm: React.FC = () => {
       ) : null}
 
       {isLoading ? (
-        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-64 w-full" />
       ) : (
         <Form {...form}>
-          <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Header</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="customer_id"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>Customer</FormLabel>
-                      <FormControl>
-                        <SearchDropDown
-                          instanceType="customer"
-                          instanceKey="id"
-                          instanceSourceKey="customer_id"
-                          instanceLabel="name"
-                          instanceValue={customer}
-                          disabled={!draftEditable}
-                          onSelectItem={(_s, _k, value) => applyCustomerDefaults(value)}
-                          onClear={() => {
-                            form.setValue('customer_id', '');
-                            setCustomer(null);
-                            void persistHeaderField();
-                          }}
-                          limit={10}
-                          searchParams="name"
-                          type="customer"
-                          isShowSearch={true}
-                          placeholder="Select customer"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="entity_id"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>Entity</FormLabel>
-                      <FormControl>
-                        <SearchDropDown
-                          instanceType="entity"
-                          instanceKey="id"
-                          instanceSourceKey="entity_id"
-                          instanceLabel="name"
-                          instanceValue={entity}
-                          disabled={!draftEditable}
-                          onSelectItem={(_s, key, value) => {
-                            form.setValue('entity_id', value?.[key] || '');
-                            setEntity(value?.item ?? (value?.[key] ? { id: value[key], name: value.name } : null));
-                            void persistHeaderField();
-                          }}
-                          onClear={() => {
-                            form.setValue('entity_id', '');
-                            setEntity(null);
-                            void persistHeaderField();
-                          }}
-                          limit={10}
-                          searchParams="name"
-                          type="entity"
-                          isShowSearch={true}
-                          placeholder="Select entity"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="currency_id"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>Currency</FormLabel>
-                      <FormControl>
-                        <SearchDropDown
-                          instanceType="currency"
-                          instanceKey="id"
-                          instanceSourceKey="currency_id"
-                          instanceLabel="code"
-                          instanceSubLabel="name"
-                          instanceValue={currency}
-                          disabled={!draftEditable}
-                          onSelectItem={(_s, key, value) => {
-                            form.setValue('currency_id', value?.[key] || '');
-                            setCurrency(value?.item ?? (value?.[key] ? { id: value[key], code: value.code } : null));
-                            void persistHeaderField();
-                          }}
-                          onClear={() => {
-                            form.setValue('currency_id', '');
-                            setCurrency(null);
-                            void persistHeaderField();
-                          }}
-                          limit={10}
-                          searchParams="code"
-                          type="currency"
-                          isShowSearch={true}
-                          placeholder="Currency"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="invoice_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Invoice date</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="due_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Due date</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="payment_terms_id"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>Payment terms</FormLabel>
-                      <FormControl>
-                        <SearchDropDown
-                          instanceType="payment_terms"
-                          instanceKey="id"
-                          instanceSourceKey="payment_terms_id"
-                          instanceLabel="name"
-                          instanceValue={paymentTerms}
-                          disabled={!draftEditable}
-                          onSelectItem={(_s, _k, value) => applyPaymentTerms(value)}
-                          onClear={() => {
-                            form.setValue('payment_terms_id', '');
-                            setPaymentTerms(null);
-                            void persistHeaderField();
-                          }}
-                          limit={10}
-                          searchParams="name"
-                          type="payment_terms"
-                          isShowSearch={true}
-                          placeholder="Terms"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Number</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="exchange_rate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Exchange rate</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="reference"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Reference</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="shipping_amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Shipping</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="adjustment_amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Adjustment</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="bill_to"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2 md:col-span-3">
-                      <FormLabel>Bill to</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem className="col-span-2 md:col-span-3">
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          disabled={!draftEditable}
-                          onBlur={() => {
-                            field.onBlur();
-                            void persistHeaderField();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+          <form className="space-y-0" onSubmit={(e) => e.preventDefault()}>
+            <Card className="overflow-hidden border-border/70 shadow-sm">
+              <CardContent className="space-y-8 p-6 md:p-8">
+                {/* Header — prod-style two-pane grid, uppercase micro-labels */}
+                <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="customer_id"
+                      render={() => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>
+                            Customer <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <SearchDropDown
+                              instanceType="customer"
+                              instanceKey="id"
+                              instanceSourceKey="customer_id"
+                              instanceLabel="name"
+                              instanceValue={customer}
+                              disabled={!draftEditable}
+                              onSelectItem={(_s, _k, value) => applyCustomerDefaults(value)}
+                              onClear={() => {
+                                form.setValue('customer_id', '');
+                                setCustomer(null);
+                                void persistHeaderField();
+                              }}
+                              limit={10}
+                              searchParams="name"
+                              type="customer"
+                              isShowSearch={true}
+                              placeholder="Select customer"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="entity_id"
+                      render={() => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>
+                            Entity <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <SearchDropDown
+                              instanceType="entity"
+                              instanceKey="id"
+                              instanceSourceKey="entity_id"
+                              instanceLabel="name"
+                              instanceValue={entity}
+                              disabled={!draftEditable}
+                              onSelectItem={(_s, key, value) => {
+                                form.setValue('entity_id', value?.[key] || '');
+                                setEntity(
+                                  value?.item ??
+                                    (value?.[key] ? { id: value[key], name: value.name } : null)
+                                );
+                                void persistHeaderField();
+                              }}
+                              onClear={() => {
+                                form.setValue('entity_id', '');
+                                setEntity(null);
+                                void persistHeaderField();
+                              }}
+                              limit={10}
+                              searchParams="name"
+                              type="entity"
+                              isShowSearch={true}
+                              placeholder="Select entity"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="payment_terms_id"
+                      render={() => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>Payment terms</FormLabel>
+                          <FormControl>
+                            <SearchDropDown
+                              instanceType="payment_terms"
+                              instanceKey="id"
+                              instanceSourceKey="payment_terms_id"
+                              instanceLabel="name"
+                              instanceValue={paymentTerms}
+                              disabled={!draftEditable}
+                              onSelectItem={(_s, _k, value) => applyPaymentTerms(value)}
+                              onClear={() => {
+                                form.setValue('payment_terms_id', '');
+                                setPaymentTerms(null);
+                                void persistHeaderField();
+                              }}
+                              limit={10}
+                              searchParams="name"
+                              type="payment_terms"
+                              isShowSearch={true}
+                              placeholder="Terms"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="currency_id"
+                      render={() => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>
+                            Currency <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <SearchDropDown
+                              instanceType="currency"
+                              instanceKey="id"
+                              instanceSourceKey="currency_id"
+                              instanceLabel="code"
+                              instanceSubLabel="name"
+                              instanceValue={currency}
+                              disabled={!draftEditable}
+                              onSelectItem={(_s, key, value) => {
+                                form.setValue('currency_id', value?.[key] || '');
+                                setCurrency(
+                                  value?.item ??
+                                    (value?.[key] ? { id: value[key], code: value.code } : null)
+                                );
+                                void persistHeaderField();
+                              }}
+                              onClear={() => {
+                                form.setValue('currency_id', '');
+                                setCurrency(null);
+                                void persistHeaderField();
+                              }}
+                              limit={10}
+                              searchParams="code"
+                              type="currency"
+                              isShowSearch={true}
+                              placeholder="Currency"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="exchange_rate"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>Exchange rate</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              disabled={!draftEditable}
+                              className="h-10 border-border/70"
+                              onBlur={() => {
+                                field.onBlur();
+                                void persistHeaderField();
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bill_to"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2 sm:col-span-2">
+                          <FormLabel className={fieldLabelClass}>Bill to</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              disabled={!draftEditable}
+                              rows={3}
+                              className="min-h-[72px] resize-y border-border/70 bg-muted/30"
+                              onBlur={() => {
+                                field.onBlur();
+                                void persistHeaderField();
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Line items</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SalesLineEditor
-                  lines={lines}
-                  readOnly={!draftEditable}
-                  onChange={setLines}
-                  onCommitLine={persistLine}
-                  onRemoveLine={removePersistedLine}
-                />
-              </CardContent>
-            </Card>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="number"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>Invoice #</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              disabled={!draftEditable}
+                              className="h-10 border-border/70"
+                              onBlur={() => {
+                                field.onBlur();
+                                void persistHeaderField();
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="reference"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>Reference</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              disabled={!draftEditable}
+                              className="h-10 border-border/70"
+                              onBlur={() => {
+                                field.onBlur();
+                                void persistHeaderField();
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="invoice_date"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>
+                            Invoice date <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              disabled={!draftEditable}
+                              className="h-10 border-border/70"
+                              onBlur={() => {
+                                field.onBlur();
+                                void persistHeaderField();
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="due_date"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className={fieldLabelClass}>Due date</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              disabled={!draftEditable}
+                              className="h-10 border-border/70"
+                              onBlur={() => {
+                                field.onBlur();
+                                void persistHeaderField();
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Totals</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">Net</div>
-                  <div className="text-sm font-medium">{moneyLabel(serverTotals.net)}</div>
+                {/* Lines + stacked totals (prod SalesInvoiceItemTable pattern) */}
+                <div className="border-t border-border/60 pt-6">
+                  <SalesLineEditor
+                    lines={lines}
+                    readOnly={!draftEditable}
+                    onChange={setLines}
+                    onCommitLine={persistLine}
+                    onRemoveLine={removePersistedLine}
+                    totals={serverTotals}
+                    shippingAmount={form.watch('shipping_amount')}
+                    adjustmentAmount={form.watch('adjustment_amount')}
+                    onShippingChange={
+                      draftEditable
+                        ? (value) => form.setValue('shipping_amount', value)
+                        : undefined
+                    }
+                    onShippingBlur={draftEditable ? () => void persistHeaderField() : undefined}
+                    onAdjustmentChange={
+                      draftEditable
+                        ? (value) => form.setValue('adjustment_amount', value)
+                        : undefined
+                    }
+                    onAdjustmentBlur={
+                      draftEditable ? () => void persistHeaderField() : undefined
+                    }
+                    showBalance
+                  />
                 </div>
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">Tax</div>
-                  <div className="text-sm font-medium">{moneyLabel(serverTotals.tax)}</div>
+
+                {/* Notes — prod Zoho-style lower panel */}
+                <div className="rounded-lg border border-border/70 bg-muted/10">
+                  <div className="space-y-2 p-4">
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem className="space-y-2">
+                          <FormLabel className="text-sm font-medium text-foreground">
+                            Customer notes
+                          </FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              disabled={!draftEditable}
+                              placeholder="Thanks for your business."
+                              rows={2}
+                              className="min-h-[78px] resize-y border-border/70 bg-background"
+                              onBlur={() => {
+                                field.onBlur();
+                                void persistHeaderField();
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">Total</div>
-                  <div className="text-sm font-medium">{moneyLabel(serverTotals.total)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">Balance</div>
-                  <div className="text-sm font-medium">{moneyLabel(serverTotals.balance)}</div>
-                </div>
-                <p className="col-span-2 text-xs text-muted-foreground md:col-span-4">
-                  Totals refresh from the server on field blur / select (calculate_invoice_total).
-                </p>
               </CardContent>
             </Card>
           </form>

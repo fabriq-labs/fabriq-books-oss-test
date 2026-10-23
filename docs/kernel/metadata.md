@@ -49,6 +49,22 @@ A relation the API should return:
 
 Routes are registered once, when the process starts, by parsing `backend/prisma/schema/`. After a model is added, restart the backend. Until then `GET /api/models` can list the model while `/api/{model}/view/...` returns 404.
 
+## Nested child writes (`updateChild` / `addChild`)
+
+Parent documents often expose lines as a relation on the parent view (`invoice` → `line_items`), not as a separate top-level model the role is granted.
+
+| Operation | Coarse auth | Field filter today |
+|---|---|---|
+| `addChild` | Parent model **write** only | Payload is not filtered by a child-model permission map |
+| `updateChild` | Parent model **write** only (same idea as add) | Payload is not filtered by a child-model permission map; unknown Prisma fields are still rejected |
+| Parent `update` | Parent model **write** | `filterFieldsByPermission` on the parent field map |
+
+`updateChild` does **not** require a view whose `model_name` is the child (for example `invoice_line_item`). A dedicated child view remains valid if a product wants separate ACLs; the kernel does not require it for nested routes.
+
+After the child row is written, `execute_Action` runs with key `{parent}.{relation}` (for example `invoice.line_items`) and the **parent** view’s Prisma `select` (from that view’s `data_graph`). If a `functionMap` binding matches the changed fields, the action runs in the same transaction and typically re-fetches the **whole parent graph**. Header totals and every line in the select come back updated when the action writes them — including counters or amounts the action recalculates on sibling lines.
+
+`data_graph` on the parent view still controls what is **selected and returned**. Nested select markers such as `tax_rate: "read"` include the field in the response; they are not the write ACL for `updateChild` today. A later option may field-filter child payloads from the parent relation’s `data_graph` without requiring a child-model view.
+
 ## Request path
 
 ```

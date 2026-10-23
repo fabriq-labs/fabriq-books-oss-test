@@ -17,7 +17,7 @@ Write and read these in complete paragraphs. They describe the software that run
 
 When you change a public module name, update the module map in [OSS_TEST_PLAN.md](./OSS_TEST_PLAN.md) in the same change.
 
-Follow [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md) for every later migration from prod. The books lessons are [KERNEL_PORT.md](./KERNEL_PORT.md). The task-sized plan is [AGENT_PLAN.md](./AGENT_PLAN.md). Run one module from that plan, then stop.
+Follow [../kernel/PORTING_A_DOMAIN.md](../kernel/PORTING_A_DOMAIN.md) for every later migration from prod. The books lessons are [KERNEL_PORT.md](./KERNEL_PORT.md). The task-sized plan is [AGENT_PLAN.md](./AGENT_PLAN.md). Run one module from that plan, then stop. Invoice create/edit layout notes: [INVOICE_DOCUMENT_UI.md](./INVOICE_DOCUMENT_UI.md).
 
 **Next:** After Module 3B (invoice/payment/credit create on this branch) — see [AGENT_PLAN.md](./AGENT_PLAN.md) “After Module 3B”. Purchases / quote/SO / investing / WP6–7 remain parked or deferred. No QBO write-back.
 

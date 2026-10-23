@@ -873,6 +873,8 @@ export const CreditNoteForm: React.FC = () => {
                   onChange={setLines}
                   onCommitLine={persistLine}
                   onRemoveLine={removePersistedLine}
+                  totals={serverTotals}
+                  showBalance
                 />
               </CardContent>
             </Card>
@@ -997,32 +999,6 @@ export const CreditNoteForm: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Totals</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">Net</div>
-                  <div className="text-sm font-medium">{moneyLabel(serverTotals.net)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">Tax</div>
-                  <div className="text-sm font-medium">{moneyLabel(serverTotals.tax)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">Total</div>
-                  <div className="text-sm font-medium">{moneyLabel(serverTotals.total)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">Balance</div>
-                  <div className="text-sm font-medium">{moneyLabel(serverTotals.balance)}</div>
-                </div>
-                <p className="col-span-2 text-xs text-muted-foreground md:col-span-4">
-                  Totals refresh from the server on field blur / select (calculate_credit_note_total).
-                </p>
-              </CardContent>
-            </Card>
           </form>
         </Form>
       )}

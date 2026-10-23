@@ -28,6 +28,8 @@ Sales → Invoices is the list of sales documents: number, dates, customer, stat
 
 Direction on these invoices is `sales`. Status is `draft`, `posted`, or `void`. The balance is the amount still open, stored on the invoice so the list can show it. Applications, below, are what move that balance when a receipt or a credit is applied.
 
+Draft invoices created in Books use a document layout aligned with the prod sales invoice: one card, two-pane header with compact labels, an item table, and a **stacked totals footer** (subtotal → tax → shipping → adjustment → grand total → balance). Line and header fields persist on blur; the server recalculates amounts and returns the full parent graph. Imported connection invoices stay read-only.
+
 The invoice screen reads a document that is already stored. Customers, items, and tax are the records you maintain in their own forms; the invoice is the document those records hang from, whether you loaded it through the API or a connection imported it.
 
 ## Payment receipts
