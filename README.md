@@ -1,5 +1,9 @@
 # Fabriq Books
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/fabriq-books-oss-template)
+
+One-click deploy uses the Docker image `ghcr.io/fabriq-labs/fabriq-books-oss-test:latest` plus Postgres. After deploy, open the app URL, wait for first-boot setup, then sign in as `admin@example.com` / `admin123`.
+
 Fabriq Books is a multi-entity accounting application. It keeps a chart of accounts, journal postings, and financial reports for each legal entity, and it keeps a sales subledger — customers, suppliers, items, tax, invoices, payment receipts, and credit notes — in one model that does not belong to any single outside product. When you connect an external bookkeeping system, Books imports that system's records into these same screens. QuickBooks Online is the connector that ships today.
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/QSQdeQ)
