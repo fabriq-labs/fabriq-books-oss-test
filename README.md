@@ -2,6 +2,10 @@
 
 Fabriq Books is a multi-entity accounting application. It keeps a chart of accounts, journal postings, and financial reports for each legal entity, and it keeps a sales subledger — customers, suppliers, items, tax, invoices, payment receipts, and credit notes — in one model that does not belong to any single outside product. When you connect an external bookkeeping system, Books imports that system's records into these same screens. QuickBooks Online is the connector that ships today.
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/QSQdeQ)
+
+Deploys the public image `ghcr.io/fabriq-labs/fabriq-books-oss-test:latest` with Postgres. After deploy, open the app URL, wait for first-boot setup, then sign in as `admin@example.com` / `admin123`.
+
 The application is meant for someone who already knows bookkeeping and wants the books in a database they can run themselves: one organization, several entities, one chart and one set of reports that can span those entities when exchange rates are present.
 
 ## What Books does
