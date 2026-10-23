@@ -1,24 +1,22 @@
-# Books
+# Books (plans and depth)
 
-This is the product file for coding agents. Kernel instructions stay in the root [AGENTS.md](../../AGENTS.md). Human readers start at the [Books docs hub](../README.md), not here.
+Start at the root [AGENTS.md](../../AGENTS.md) — that file is the Books agent brief (setup paths, next work, metadata-first, kernel guardrails). This file holds longer product plans, OSS engagements, and pointers humans and agents use after that. Human docs hub: [Books docs README](../README.md).
 
-## Two setup paths (do not mix)
+## Setup paths (detail)
 
-Coding agents confuse these constantly. Pick one.
+Same rule as root AGENTS: **dev → `seed:dev`**; **tenant → AUTO_SETUP + wizard**. Do not mix.
 
 | Intent | Path | Chart / demo | First-run flags |
 |---|---|---|---|
 | **New tenant / operator** | Empty DB + `AUTO_SETUP=true` (or `setup:kernel` only), then the **in-app wizard** (password → org name → geo or skip) | Wizard loads `seed:coa` (or skip) | Wizard writes `org.settings.onboarding` |
 | **Dev / agent bootstrap** | `setup:kernel`, then **`npm run seed:dev`** from `backend/` | CLI chart + demo (+ sales catalog) | `seed:dev` marks onboarding complete |
 
-**Never** run `seed:coa` / `seed:books-demo` / other business-data seeds and leave the wizard unfinished. That trips **R-ONBOARD-ERR** (“Setup can't continue on this database”): accounts or parties exist but `settings.onboarding` is missing. The app will not guess. Recovery: `npm run seed:mark-onboarding-complete` (or wipe the DB and use one path cleanly).
+**Never** run `seed:coa` / `seed:books-demo` / other business-data seeds and leave the wizard unfinished. That trips **R-ONBOARD-ERR** (“Setup can't continue on this database”). Recovery: `npm run seed:mark-onboarding-complete` (or wipe the DB and use one path cleanly).
 
-- Tenant path details: [ONBOARDING_REQUIREMENTS.md](./ONBOARDING_REQUIREMENTS.md), [operations/deploy.md](../operations/deploy.md).
-- Human local install (same seeds as `seed:dev`, without the one-shot script): [getting-started.md](../getting-started.md).
+- Tenant path: [ONBOARDING_REQUIREMENTS.md](./ONBOARDING_REQUIREMENTS.md), [operations/deploy.md](../operations/deploy.md).
+- Human local install: [getting-started.md](../getting-started.md).
 
-When the task is “spin up Books so I can code / test,” use **`seed:dev`**, not the wizard. When the task is “prove or change onboarding / AUTO_SETUP,” use the tenant path and do **not** pre-load chart/demo via CLI.
-
-After `seed:dev`, sign-in as `admin@example.com` / `admin123` is success. A **password-only** gate (change the seed password) is expected and is not R-ONBOARD-ERR. Org name and chart steps should already be complete — if you see “Setup can't continue on this database,” flags were not marked; run `seed:mark-onboarding-complete` or re-run `seed:dev`. Prefer unsetting a shell `DATABASE_URL` before `npm run dev` so `backend/.env` wins.
+After `seed:dev`, password-only gate is OK; “Setup can't continue…” means flags were not marked.
 
 ## Public docs (humans)
 
