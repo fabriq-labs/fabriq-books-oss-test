@@ -38,13 +38,20 @@ Quote `"user"`. Filter private rows by `org_id`. Shareable rows (`role`, `workfl
 
 Given a spec, add the domain with [docs/kernel/adding-a-model.md](./docs/kernel/adding-a-model.md) and [docs/kernel/BUILDING_A_DOMAIN.md](./docs/kernel/BUILDING_A_DOMAIN.md).
 
-Deploy that app as a new Railway service with [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). `RAILWAY_TOKEN` in the repo-root `.env` or `backend/.env` is a project token. Load it into the environment. Never print it or commit it. `railway add` creates the service in that token's project. `railway up` builds the root `Dockerfile` without `SOURCE_*` args (build-info stays unknown). For real `/build-info.json`, build with GitHub Actions or `./docker-build.sh` / `npm run docker:build`, push the image, and point the runtime at it.
+Image layout: [docs/infrastructure/BUILD_AND_DEPLOY.md](./docs/infrastructure/BUILD_AND_DEPLOY.md). **Pick the host file from the human’s ask** — do not invent a platform:
 
-To inspect a service that is already deployed, list services, then pass the name or id from that list:
+| Ask | File |
+|---|---|
+| Railway | [docs/infrastructure/DEPLOY_RAILWAY.md](./docs/infrastructure/DEPLOY_RAILWAY.md) |
+| Fly.io | [docs/infrastructure/DEPLOY_FLY.md](./docs/infrastructure/DEPLOY_FLY.md) |
+
+Operator overview (Compose + both hosts): [docs/operations/deploy.md](./docs/operations/deploy.md).
+
+`RAILWAY_TOKEN` / `FLY_API_TOKEN` in repo-root `.env` or `backend/.env` stay gitignored. Load into the environment; never print or commit. Do not redeploy or restart an existing production service unless the user explicitly asks. `railway variable list` / `fly secrets list` print secrets — do not write that output into logs, docs, or the repo.
 
 ```bash
 npx -y @railway/cli@latest service list
 npx -y @railway/cli@latest logs --service <service-id> -n 200
 ```
 
-Leave service ids out of this file. Do not redeploy or restart an existing production service unless the user explicitly asks. `railway variable list` prints secret values. Do not write that output into logs, docs, or the repo.
+Leave service ids out of this file.

@@ -86,4 +86,4 @@ Follow [tenancy.md](./tenancy.md) and [examples.md](./examples.md).
 - `view.data_graph` is required. It is the Prisma `select` and the column list. A relation key needs `type: "table"` and `select`.
 - Create and edit forms are routes you add. See [adding-a-model.md](./adding-a-model.md).
 
-Deploy the finished app with [../infrastructure/BUILD_AND_DEPLOY.md](../infrastructure/BUILD_AND_DEPLOY.md). That builds one image from the root `Dockerfile` and creates a new Railway service in the project that `RAILWAY_TOKEN` belongs to.
+Deploy the finished app with [../infrastructure/BUILD_AND_DEPLOY.md](../infrastructure/BUILD_AND_DEPLOY.md) (image) and the host file the human asked for: [DEPLOY_RAILWAY.md](../infrastructure/DEPLOY_RAILWAY.md) or [DEPLOY_FLY.md](../infrastructure/DEPLOY_FLY.md).
